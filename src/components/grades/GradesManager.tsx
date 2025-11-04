@@ -245,37 +245,39 @@ export const GradesManager = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="sticky left-0 bg-background z-10 min-w-[200px]">
+                    <TableHead className="sticky left-0 bg-background z-10 w-[180px]">
                       Aluno
                     </TableHead>
                     {SUBJECT_AREAS.map(area => (
                       area.subjects.map(subject => (
-                        <TableHead key={subject} className="text-center min-w-[100px]">
-                          <div className="space-y-1">
-                            <div className="text-xs font-normal text-muted-foreground">
-                              {area.name}
+                        <TableHead key={subject} className="text-center w-[80px] p-2">
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="text-[10px] font-normal text-muted-foreground uppercase">
+                              {area.name.split(' ')[0].substring(0, 4)}
                             </div>
-                            <div className="font-medium">{subject}</div>
+                            <div className="text-xs font-medium leading-tight text-center">
+                              {subject.length > 10 ? subject.substring(0, 10) + '...' : subject}
+                            </div>
                           </div>
                         </TableHead>
                       ))
                     ))}
                     {professionalSubjects.map(subject => (
-                      <TableHead key={subject} className="text-center min-w-[100px]">
-                        <div className="space-y-1">
-                          <div className="text-xs font-normal text-muted-foreground">
-                            Base Prof.
+                      <TableHead key={subject} className="text-center w-[80px] p-2">
+                        <div className="flex flex-col items-center gap-1">
+                          <div className="text-[10px] font-normal text-muted-foreground uppercase">
+                            Prof
                           </div>
-                          <div className="font-medium flex items-center justify-center gap-1">
-                            {subject}
+                          <div className="text-xs font-medium leading-tight text-center flex items-center justify-center gap-1">
+                            <span className="truncate max-w-[60px]">{subject}</span>
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-4 w-4"
+                              className="h-3 w-3 p-0"
                               onClick={() => handleRemoveProfessionalSubject(subject)}
                             >
-                              <X className="h-3 w-3" />
+                              <X className="h-2 w-2" />
                             </Button>
                           </div>
                         </div>
@@ -289,20 +291,22 @@ export const GradesManager = () => {
                     
                     return (
                       <TableRow key={student.id}>
-                        <TableCell className="sticky left-0 bg-background z-10">
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-10 w-10">
+                        <TableCell className="sticky left-0 bg-background z-10 p-2">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-8 w-8 flex-shrink-0">
                               {student.photoUrl ? (
                                 <AvatarImage src={student.photoUrl} alt={student.name} />
                               ) : (
-                                <AvatarFallback className="bg-primary/10 text-xs">
+                                <AvatarFallback className="bg-primary/10 text-[10px]">
                                   {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                                 </AvatarFallback>
                               )}
                             </Avatar>
-                            <div className="min-w-0">
-                              <p className="font-medium text-sm truncate">{student.name}</p>
-                              <p className="text-xs text-muted-foreground">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-xs truncate" title={student.name}>
+                                {student.name}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">
                                 {student.enrollment || 'S/N'}
                               </p>
                             </div>
@@ -312,27 +316,20 @@ export const GradesManager = () => {
                           const gradeValue = studentGrade?.grades[subject] || '';
                           const grade = parseFloat(gradeValue);
                           const isLowGrade = !isNaN(grade) && grade < 6;
-                          const area = getSubjectArea(subject);
 
                           return (
-                            <TableCell key={subject} className="p-2">
-                              <div className="relative">
-                                <Input
-                                  type="number"
-                                  step="0.1"
-                                  min="0"
-                                  max="10"
-                                  placeholder="0-10"
-                                  value={gradeValue}
-                                  onChange={(e) => handleGradeChange(student.id, subject, e.target.value)}
-                                  className={`text-center ${isLowGrade ? 'border-severity-critical bg-severity-critical/5' : ''}`}
-                                />
-                                {isLowGrade && (
-                                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                                    <AlertTriangle className="h-3 w-3 text-severity-critical" />
-                                  </div>
-                                )}
-                              </div>
+                            <TableCell key={subject} className="p-1">
+                              <Input
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                max="10"
+                                placeholder="-"
+                                value={gradeValue}
+                                onChange={(e) => handleGradeChange(student.id, subject, e.target.value)}
+                                className={`text-center h-9 text-sm ${isLowGrade ? 'border-severity-critical bg-severity-critical/5 font-bold' : ''}`}
+                                title={`${subject} - ${student.name}`}
+                              />
                             </TableCell>
                           );
                         })}

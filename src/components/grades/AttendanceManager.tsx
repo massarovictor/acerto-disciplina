@@ -224,12 +224,16 @@ export const AttendanceManager = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="sticky left-0 bg-background z-10 min-w-[200px]">
+                    <TableHead className="sticky left-0 bg-background z-10 w-[180px]">
                       Aluno
                     </TableHead>
                     {allSubjects.map(subject => (
-                      <TableHead key={subject} className="text-center min-w-[120px]">
-                        {subject}
+                      <TableHead key={subject} className="text-center w-[70px] p-1">
+                        <div className="flex flex-col items-center">
+                          <div className="text-[10px] font-medium leading-tight text-center max-w-[70px] break-words">
+                            {subject.length > 12 ? subject.substring(0, 12) + '...' : subject}
+                          </div>
+                        </div>
                       </TableHead>
                     ))}
                   </TableRow>
@@ -240,20 +244,22 @@ export const AttendanceManager = () => {
                     
                     return (
                       <TableRow key={student.id}>
-                        <TableCell className="sticky left-0 bg-background z-10">
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-10 w-10">
+                        <TableCell className="sticky left-0 bg-background z-10 p-2">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-8 w-8 flex-shrink-0">
                               {student.photoUrl ? (
                                 <AvatarImage src={student.photoUrl} alt={student.name} />
                               ) : (
-                                <AvatarFallback className="bg-primary/10 text-xs">
+                                <AvatarFallback className="bg-primary/10 text-[10px]">
                                   {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                                 </AvatarFallback>
                               )}
                             </Avatar>
-                            <div className="min-w-0">
-                              <p className="font-medium text-sm truncate">{student.name}</p>
-                              <p className="text-xs text-muted-foreground">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-xs truncate" title={student.name}>
+                                {student.name}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">
                                 {student.enrollment || 'S/N'}
                               </p>
                             </div>
@@ -263,12 +269,13 @@ export const AttendanceManager = () => {
                           const status = studentAtt?.attendance[subject] || 'presente';
 
                           return (
-                            <TableCell key={subject} className="p-2">
+                            <TableCell key={subject} className="p-1">
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className={`w-full h-12 ${getStatusColor(status)}`}
+                                className={`w-full h-10 p-0 ${getStatusColor(status)}`}
                                 onClick={() => toggleStatus(student.id, subject)}
+                                title={`${subject} - ${student.name}`}
                               >
                                 {getStatusIcon(status)}
                               </Button>
