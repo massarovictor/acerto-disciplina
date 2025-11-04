@@ -11,6 +11,7 @@ import NewIncident from '@/pages/NewIncident';
 import Classes from '@/pages/Classes';
 import Students from '@/pages/Students';
 import GradesAttendance from '@/pages/GradesAttendance';
+import Reports from '@/pages/Reports';
 import NotFound from "./pages/NotFound";
 import { useInitializeData } from '@/hooks/useLocalStorage';
 
@@ -65,6 +66,7 @@ const App = () => (
               <Route path="turmas" element={<Classes />} />
               <Route path="alunos" element={<Students />} />
               <Route path="notas-frequencia" element={<GradesAttendance />} />
+              <Route path="relatorios" element={<Reports />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
