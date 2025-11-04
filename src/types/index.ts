@@ -10,7 +10,7 @@ export interface User {
   assignedClasses?: string[]; // IDs of classes
 }
 
-export type IncidentStatus = 'aberta' | 'em_analise' | 'resolvida' | 'encerrada';
+export type IncidentStatus = 'aberta' | 'em-analise' | 'resolvida' | 'encerrada';
 export type IncidentSeverity = 'leve' | 'intermediaria' | 'grave' | 'gravissima';
 
 export interface IncidentEpisode {
@@ -29,14 +29,7 @@ export interface Incident {
   episodes: string[]; // Episode IDs
   calculatedSeverity: IncidentSeverity;
   finalSeverity: IncidentSeverity;
-  severityOverride?: {
-    reason: string;
-    overriddenBy: string;
-    overriddenAt: string;
-    approved: boolean;
-    approvedBy?: string;
-    approvedAt?: string;
-  };
+  severityOverrideReason?: string;
   description: string;
   actions?: string;
   status: IncidentStatus;
@@ -57,23 +50,23 @@ export interface Comment {
 export interface Class {
   id: string;
   name: string;
-  year: number; // 1, 2, or 3
-  type: 'regular' | 'tecnico';
+  series: string;
+  course: string;
   directorId?: string;
-  shift: 'morning' | 'afternoon' | 'evening';
+  active: boolean;
 }
 
 export interface Student {
   id: string;
   name: string;
-  cpf?: string;
-  birthDate: string;
   classId: string;
-  guardianName: string;
-  guardianPhone: string;
-  guardianEmail?: string;
-  enrollmentDate: string;
-  status: 'active' | 'transferred' | 'graduated';
+  birthDate: string;
+  gender: string;
+  enrollment?: string;
+  censusId?: string;
+  cpf?: string;
+  rg?: string;
+  status: 'active' | 'inactive' | 'transferred';
 }
 
 export interface Grade {
@@ -81,9 +74,9 @@ export interface Grade {
   studentId: string;
   classId: string;
   subject: string;
-  bimester: 1 | 2 | 3 | 4;
-  value: number; // 0-10
-  recordedBy: string;
+  quarter: string;
+  grade: number;
+  observation?: string;
   recordedAt: string;
 }
 

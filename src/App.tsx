@@ -8,6 +8,9 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import Login from '@/pages/Login';
 import Dashboard from '@/pages/Dashboard';
 import NewIncident from '@/pages/NewIncident';
+import Classes from '@/pages/Classes';
+import Students from '@/pages/Students';
+import GradesAttendance from '@/pages/GradesAttendance';
 import NotFound from "./pages/NotFound";
 import { useInitializeData } from '@/hooks/useLocalStorage';
 
@@ -59,6 +62,9 @@ const App = () => (
             >
               <Route index element={<Dashboard />} />
               <Route path="nova-ocorrencia" element={<NewIncident />} />
+              <Route path="turmas" element={<Classes />} />
+              <Route path="alunos" element={<Students />} />
+              <Route path="notas-frequencia" element={<GradesAttendance />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
