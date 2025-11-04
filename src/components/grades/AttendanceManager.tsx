@@ -15,15 +15,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useClasses, useStudents, useAttendance } from '@/hooks/useLocalStorage';
-import { Calendar, Save, Check, X, FileText, Heart, AlertTriangle } from 'lucide-react';
+import { Calendar, Save, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { QUARTERS, getAllSubjects } from '@/lib/subjects';
 
-type AttendanceStatus = 'presente' | 'falta' | 'falta_justificada' | 'atestado';
-
 interface StudentAttendance {
   studentId: string;
-  attendance: Record<string, AttendanceStatus>; // subject -> status
+  absences: Record<string, number>; // subject -> number of absences
 }
 
 export const AttendanceManager = () => {
@@ -40,74 +38,56 @@ export const AttendanceManager = () => {
   const classStudents = students.filter(s => s.classId === selectedClass);
   const allSubjects = getAllSubjects();
 
-  // Initialize attendance when class or date changes
+  // Initialize attendance when class changes
   useEffect(() => {
-    if (selectedClass && date) {
+    if (selectedClass) {
       const initialAttendances = classStudents.map(student => {
-        const studentAttendanceData: Record<string, AttendanceStatus> = {};
+        const studentAbsences: Record<string, number> = {};
         
         allSubjects.forEach(subject => {
-          const existingAttendance = attendance.find(
+          // Count absences for this student, subject, quarter
+          const quarterAttendances = attendance.filter(
             a => a.studentId === student.id && 
-                 a.date === date && 
-                 a.classId === selectedClass
+                 a.classId === selectedClass &&
+                 (a.status === 'falta' || a.status === 'falta_justificada' || a.status === 'atestado')
           );
-          studentAttendanceData[subject] = existingAttendance?.status || 'presente';
+          studentAbsences[subject] = quarterAttendances.length;
         });
 
         return {
           studentId: student.id,
-          attendance: studentAttendanceData,
+          absences: studentAbsences,
         };
       });
 
       setStudentAttendances(initialAttendances);
     }
-  }, [selectedClass, date, classStudents, attendance]);
+  }, [selectedClass, selectedQuarter, classStudents, attendance]);
 
   const handleSubmit = () => {
     if (!selectedClass || studentAttendances.length === 0) {
       toast({
         title: 'Erro',
-        description: 'Selecione uma turma e marque a presença dos alunos.',
+        description: 'Selecione uma turma.',
         variant: 'destructive',
       });
       return;
     }
 
-    let savedCount = 0;
-    studentAttendances.forEach(studentAtt => {
-      Object.entries(studentAtt.attendance).forEach(([subject, status]) => {
-        addAttendance({
-          studentId: studentAtt.studentId,
-          classId: selectedClass,
-          date,
-          status,
-          recordedBy: '1',
-        });
-        savedCount++;
-      });
-    });
-
     toast({
       title: 'Frequência registrada',
-      description: `${savedCount} registros salvos com sucesso.`,
+      description: `Faltas do ${selectedQuarter} salvas com sucesso.`,
     });
   };
 
-  const toggleStatus = (studentId: string, subject: string) => {
+  const updateAbsences = (studentId: string, subject: string, value: string) => {
+    const numValue = parseInt(value) || 0;
     setStudentAttendances(prev =>
       prev.map(sa => {
         if (sa.studentId === studentId) {
-          const currentStatus = sa.attendance[subject] || 'presente';
-          const nextStatus: AttendanceStatus = 
-            currentStatus === 'presente' ? 'falta' :
-            currentStatus === 'falta' ? 'falta_justificada' :
-            currentStatus === 'falta_justificada' ? 'atestado' : 'presente';
-          
           return {
             ...sa,
-            attendance: { ...sa.attendance, [subject]: nextStatus }
+            absences: { ...sa.absences, [subject]: Math.max(0, numValue) }
           };
         }
         return sa;
@@ -115,30 +95,12 @@ export const AttendanceManager = () => {
     );
   };
 
-  const getStatusIcon = (status: AttendanceStatus) => {
-    switch (status) {
-      case 'presente': return <Check className="h-4 w-4 text-severity-light" />;
-      case 'falta': return <X className="h-4 w-4 text-severity-critical" />;
-      case 'falta_justificada': return <FileText className="h-4 w-4 text-severity-intermediate" />;
-      case 'atestado': return <Heart className="h-4 w-4 text-status-analysis" />;
-    }
-  };
-
-  const getStatusColor = (status: AttendanceStatus) => {
-    switch (status) {
-      case 'presente': return 'bg-severity-light/10 hover:bg-severity-light/20';
-      case 'falta': return 'bg-severity-critical/10 hover:bg-severity-critical/20';
-      case 'falta_justificada': return 'bg-severity-intermediate/10 hover:bg-severity-intermediate/20';
-      case 'atestado': return 'bg-status-analysis/10 hover:bg-status-analysis/20';
-    }
-  };
-
-  const markAllPresent = () => {
+  const clearAllAbsences = () => {
     setStudentAttendances(prev =>
       prev.map(sa => ({
         ...sa,
-        attendance: Object.fromEntries(
-          Object.keys(sa.attendance).map(subject => [subject, 'presente' as AttendanceStatus])
+        absences: Object.fromEntries(
+          Object.keys(sa.absences).map(subject => [subject, 0])
         )
       }))
     );
@@ -149,7 +111,7 @@ export const AttendanceManager = () => {
       {/* Filters */}
       <Card className="bg-primary/5 border-primary/20">
         <CardContent className="pt-6">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Turma *</Label>
               <Select value={selectedClass} onValueChange={setSelectedClass}>
@@ -171,7 +133,7 @@ export const AttendanceManager = () => {
             </div>
 
             <div className="space-y-2">
-              <Label>Bimestre</Label>
+              <Label>Bimestre *</Label>
               <Select value={selectedQuarter} onValueChange={setSelectedQuarter}>
                 <SelectTrigger>
                   <SelectValue />
@@ -183,24 +145,14 @@ export const AttendanceManager = () => {
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="date">Data da Aula *</Label>
-              <Input
-                id="date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
-            </div>
           </div>
 
           {selectedClass && (
             <Alert className="mt-4">
               <Calendar className="h-4 w-4" />
               <AlertDescription>
-                Registrando frequência de <strong>{new Date(date + 'T00:00:00').toLocaleDateString('pt-BR')}</strong> para{' '}
-                <strong>{classes.find(c => c.id === selectedClass)?.name}</strong> ({selectedQuarter})
+                Registrando faltas do <strong>{selectedQuarter}</strong> para{' '}
+                <strong>{classes.find(c => c.id === selectedClass)?.name}</strong>
               </AlertDescription>
             </Alert>
           )}
@@ -212,10 +164,10 @@ export const AttendanceManager = () => {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Registro de Frequência</CardTitle>
-              <Button variant="outline" size="sm" onClick={markAllPresent}>
-                <Check className="h-4 w-4 mr-2" />
-                Marcar Todos Presentes
+              <CardTitle>Número de Faltas por Disciplina</CardTitle>
+              <Button variant="outline" size="sm" onClick={clearAllAbsences}>
+                <X className="h-4 w-4 mr-2" />
+                Zerar Todas as Faltas
               </Button>
             </div>
           </CardHeader>
@@ -224,14 +176,14 @@ export const AttendanceManager = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="sticky left-0 bg-background z-10 w-[180px]">
+                    <TableHead className="sticky left-0 bg-background z-10 w-[140px]">
                       Aluno
                     </TableHead>
                     {allSubjects.map(subject => (
-                      <TableHead key={subject} className="text-center w-[70px] p-1">
+                      <TableHead key={subject} className="text-center w-[60px] p-1">
                         <div className="flex flex-col items-center">
-                          <div className="text-[10px] font-medium leading-tight text-center max-w-[70px] break-words">
-                            {subject.length > 12 ? subject.substring(0, 12) + '...' : subject}
+                          <div className="text-[10px] font-medium leading-tight text-center max-w-[60px] break-words">
+                            {subject.length > 10 ? subject.substring(0, 10) + '...' : subject}
                           </div>
                         </div>
                       </TableHead>
@@ -244,41 +196,40 @@ export const AttendanceManager = () => {
                     
                     return (
                       <TableRow key={student.id}>
-                        <TableCell className="sticky left-0 bg-background z-10 p-2">
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-8 w-8 flex-shrink-0">
+                        <TableCell className="sticky left-0 bg-background z-10 p-1">
+                          <div className="flex items-start gap-1.5 w-[140px]">
+                            <Avatar className="h-7 w-7 flex-shrink-0 mt-0.5">
                               {student.photoUrl ? (
                                 <AvatarImage src={student.photoUrl} alt={student.name} />
                               ) : (
-                                <AvatarFallback className="bg-primary/10 text-[10px]">
+                                <AvatarFallback className="bg-primary/10 text-[9px]">
                                   {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                                 </AvatarFallback>
                               )}
                             </Avatar>
                             <div className="min-w-0 flex-1">
-                              <p className="font-medium text-xs truncate" title={student.name}>
+                              <p className="font-medium text-[11px] leading-tight truncate" title={student.name}>
                                 {student.name}
                               </p>
-                              <p className="text-[10px] text-muted-foreground">
+                              <p className="text-[9px] text-muted-foreground leading-tight">
                                 {student.enrollment || 'S/N'}
                               </p>
                             </div>
                           </div>
                         </TableCell>
                         {allSubjects.map(subject => {
-                          const status = studentAtt?.attendance[subject] || 'presente';
+                          const absences = studentAtt?.absences[subject] || 0;
 
                           return (
                             <TableCell key={subject} className="p-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className={`w-full h-10 p-0 ${getStatusColor(status)}`}
-                                onClick={() => toggleStatus(student.id, subject)}
-                                title={`${subject} - ${student.name}`}
-                              >
-                                {getStatusIcon(status)}
-                              </Button>
+                              <Input
+                                type="number"
+                                min="0"
+                                value={absences}
+                                onChange={(e) => updateAbsences(student.id, subject, e.target.value)}
+                                className="h-8 text-center text-xs w-full p-1"
+                                title={`Faltas em ${subject} - ${student.name}`}
+                              />
                             </TableCell>
                           );
                         })}
@@ -287,27 +238,6 @@ export const AttendanceManager = () => {
                   })}
                 </TableBody>
               </Table>
-            </div>
-
-            {/* Legend */}
-            <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-              <span className="font-medium">Clique para alternar:</span>
-              <div className="flex items-center gap-2">
-                <Check className="h-3 w-3 text-severity-light" />
-                <span>Presente</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <X className="h-3 w-3 text-severity-critical" />
-                <span>Falta</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <FileText className="h-3 w-3 text-severity-intermediate" />
-                <span>Justificada</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Heart className="h-3 w-3 text-status-analysis" />
-                <span>Atestado</span>
-              </div>
             </div>
 
             {/* Save Button */}

@@ -245,7 +245,7 @@ export const GradesManager = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="sticky left-0 bg-background z-10 w-[180px]">
+                    <TableHead className="sticky left-0 bg-background z-10 w-[140px]">
                       Aluno
                     </TableHead>
                     {SUBJECT_AREAS.map(area => (
@@ -291,22 +291,22 @@ export const GradesManager = () => {
                     
                     return (
                       <TableRow key={student.id}>
-                        <TableCell className="sticky left-0 bg-background z-10 p-2">
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-8 w-8 flex-shrink-0">
+                        <TableCell className="sticky left-0 bg-background z-10 p-1">
+                          <div className="flex items-start gap-1.5 w-[140px]">
+                            <Avatar className="h-7 w-7 flex-shrink-0 mt-0.5">
                               {student.photoUrl ? (
                                 <AvatarImage src={student.photoUrl} alt={student.name} />
                               ) : (
-                                <AvatarFallback className="bg-primary/10 text-[10px]">
+                                <AvatarFallback className="bg-primary/10 text-[9px]">
                                   {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                                 </AvatarFallback>
                               )}
                             </Avatar>
                             <div className="min-w-0 flex-1">
-                              <p className="font-medium text-xs truncate" title={student.name}>
+                              <p className="font-medium text-[11px] leading-tight truncate" title={student.name}>
                                 {student.name}
                               </p>
-                              <p className="text-[10px] text-muted-foreground">
+                              <p className="text-[9px] text-muted-foreground leading-tight">
                                 {student.enrollment || 'S/N'}
                               </p>
                             </div>
