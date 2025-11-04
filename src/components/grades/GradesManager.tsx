@@ -24,6 +24,10 @@ export const GradesManager = () => {
   const { grades, addGrade } = useGrades();
   const { toast } = useToast();
 
+  console.log('GradesManager - Total classes:', classes.length);
+  console.log('GradesManager - Active classes:', classes.filter(c => c.active).length);
+  console.log('GradesManager - Classes data:', classes);
+
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedQuarter, setSelectedQuarter] = useState('1º Bimestre');
   const [selectedStudent, setSelectedStudent] = useState('');
@@ -226,6 +230,16 @@ export const GradesManager = () => {
 
   return (
     <div className="space-y-6">
+      {/* No classes warning */}
+      {classes.filter(c => c.active).length === 0 && (
+        <Alert className="border-severity-critical">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Nenhuma turma ativa encontrada.</strong> Para lançar notas, é necessário cadastrar pelo menos uma turma ativa na seção <strong>Turmas</strong>.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Filters */}
       <Card className="bg-primary/5 border-primary/20">
         <CardContent className="pt-6">
@@ -237,11 +251,22 @@ export const GradesManager = () => {
                   <SelectValue placeholder="Selecione a turma" />
                 </SelectTrigger>
                 <SelectContent>
-                  {classes.filter(c => c.active).map(cls => (
-                    <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
-                  ))}
+                  {classes.filter(c => c.active).length === 0 ? (
+                    <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                      Nenhuma turma ativa cadastrada
+                    </div>
+                  ) : (
+                    classes.filter(c => c.active).map(cls => (
+                      <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
+              {classes.filter(c => c.active).length === 0 && (
+                <p className="text-xs text-severity-critical">
+                  Cadastre uma turma ativa primeiro
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
