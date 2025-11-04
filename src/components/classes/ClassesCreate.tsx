@@ -142,12 +142,11 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
 
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="director">Diretor</Label>
-              <Select value={formData.directorId} onValueChange={(value) => setFormData({ ...formData, directorId: value })}>
+              <Select value={formData.directorId || undefined} onValueChange={(value) => setFormData({ ...formData, directorId: value })}>
                 <SelectTrigger id="director">
                   <SelectValue placeholder="Selecione um diretor (opcional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhum</SelectItem>
                   {directors.map(director => {
                     const load = getDirectorLoad(director.id);
                     return (
