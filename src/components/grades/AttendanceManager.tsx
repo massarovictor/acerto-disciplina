@@ -18,7 +18,7 @@ export const AttendanceManager = () => {
 
   const [selectedClass, setSelectedClass] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [attendanceRecords, setAttendanceRecords] = useState<Record<string, 'present' | 'absent' | 'justified' | 'medical'>>({});
+  const [attendanceRecords, setAttendanceRecords] = useState<Record<string, 'presente' | 'falta' | 'falta_justificada' | 'atestado'>>({});
 
   const classStudents = students.filter(s => s.classId === selectedClass);
 
@@ -38,6 +38,7 @@ export const AttendanceManager = () => {
         classId: selectedClass,
         date,
         status,
+        recordedBy: '1', // Mock user ID
       });
     });
 
@@ -50,8 +51,8 @@ export const AttendanceManager = () => {
   };
 
   const toggleStatus = (studentId: string) => {
-    const currentStatus = attendanceRecords[studentId] || 'present';
-                const nextStatus = currentStatus === 'present' ? 'falta' :
+    const currentStatus = attendanceRecords[studentId] || 'presente';
+    const nextStatus = currentStatus === 'presente' ? 'falta' :
                       currentStatus === 'falta' ? 'falta_justificada' :
                       currentStatus === 'falta_justificada' ? 'atestado' : 'presente';
     
