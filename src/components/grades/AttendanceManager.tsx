@@ -5,19 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useClasses, useStudents, useAttendance } from '@/hooks/useLocalStorage';
-import { Calendar, Save, X } from 'lucide-react';
+import { Calendar, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { QUARTERS, getAllSubjects } from '@/lib/subjects';
+import { QUARTERS, SUBJECT_AREAS } from '@/lib/subjects';
 
 interface StudentAttendance {
   studentId: string;
@@ -32,11 +26,11 @@ export const AttendanceManager = () => {
 
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedQuarter, setSelectedQuarter] = useState('1º Bimestre');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [studentAttendances, setStudentAttendances] = useState<StudentAttendance[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
 
   const classStudents = students.filter(s => s.classId === selectedClass);
-  const allSubjects = getAllSubjects();
+  const allSubjects = SUBJECT_AREAS.flatMap(area => area.subjects);
 
   // Initialize attendance when class changes
   useEffect(() => {
@@ -64,20 +58,21 @@ export const AttendanceManager = () => {
     }
   }, [selectedClass, selectedQuarter, classStudents, attendance]);
 
-  const handleSubmit = () => {
-    if (!selectedClass || studentAttendances.length === 0) {
-      toast({
-        title: 'Erro',
-        description: 'Selecione uma turma.',
-        variant: 'destructive',
-      });
-      return;
-    }
+  const handleSaveStudentAttendance = () => {
+    if (!selectedStudent || !selectedClass || !selectedQuarter) return;
+
+    const studentAtt = studentAttendances.find(sa => sa.studentId === selectedStudent);
+    if (!studentAtt) return;
+
+    const totalAbsences = Object.values(studentAtt.absences).reduce((sum, val) => sum + val, 0);
+    const student = students.find(s => s.id === selectedStudent);
 
     toast({
-      title: 'Frequência registrada',
-      description: `Faltas do ${selectedQuarter} salvas com sucesso.`,
+      title: 'Frequência salva',
+      description: `${totalAbsences} falta(s) de ${student?.name} registrada(s) no ${selectedQuarter}.`,
     });
+
+    setSelectedStudent(null);
   };
 
   const updateAbsences = (studentId: string, subject: string, value: string) => {
@@ -95,16 +90,6 @@ export const AttendanceManager = () => {
     );
   };
 
-  const clearAllAbsences = () => {
-    setStudentAttendances(prev =>
-      prev.map(sa => ({
-        ...sa,
-        absences: Object.fromEntries(
-          Object.keys(sa.absences).map(subject => [subject, 0])
-        )
-      }))
-    );
-  };
 
   return (
     <div className="space-y-6">
@@ -159,97 +144,117 @@ export const AttendanceManager = () => {
         </CardContent>
       </Card>
 
-      {/* Attendance Table */}
+      {/* Students List */}
       {selectedClass && classStudents.length > 0 && (
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Número de Faltas por Disciplina</CardTitle>
-              <Button variant="outline" size="sm" onClick={clearAllAbsences}>
-                <X className="h-4 w-4 mr-2" />
-                Zerar Todas as Faltas
-              </Button>
-            </div>
+            <CardTitle>Alunos - Clique para Registrar Faltas</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="sticky left-0 bg-background z-10 w-[140px]">
-                      Aluno
-                    </TableHead>
-                    {allSubjects.map(subject => (
-                      <TableHead key={subject} className="text-center w-[60px] p-1">
-                        <div className="flex flex-col items-center">
-                          <div className="text-[10px] font-medium leading-tight text-center max-w-[60px] break-words">
-                            {subject.length > 10 ? subject.substring(0, 10) + '...' : subject}
-                          </div>
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              {classStudents.map((student) => {
+                const studentAtt = studentAttendances.find(sa => sa.studentId === student.id);
+                const totalAbsences = studentAtt 
+                  ? Object.values(studentAtt.absences).reduce((sum, val) => sum + val, 0)
+                  : 0;
+
+                return (
+                  <Card 
+                    key={student.id} 
+                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => setSelectedStudent(student.id)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-12 w-12">
+                          {student.photoUrl ? (
+                            <AvatarImage src={student.photoUrl} alt={student.name} />
+                          ) : (
+                            <AvatarFallback className="bg-primary/10">
+                              {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          )}
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{student.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {student.enrollment || 'S/N'}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {totalAbsences} falta(s) registrada(s)
+                          </p>
                         </div>
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {classStudents.map((student) => {
-                    const studentAtt = studentAttendances.find(sa => sa.studentId === student.id);
-                    
-                    return (
-                      <TableRow key={student.id}>
-                        <TableCell className="sticky left-0 bg-background z-10 p-1">
-                          <div className="flex items-start gap-1.5 w-[140px]">
-                            <Avatar className="h-7 w-7 flex-shrink-0 mt-0.5">
-                              {student.photoUrl ? (
-                                <AvatarImage src={student.photoUrl} alt={student.name} />
-                              ) : (
-                                <AvatarFallback className="bg-primary/10 text-[9px]">
-                                  {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                                </AvatarFallback>
-                              )}
-                            </Avatar>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-medium text-[11px] leading-tight truncate" title={student.name}>
-                                {student.name}
-                              </p>
-                              <p className="text-[9px] text-muted-foreground leading-tight">
-                                {student.enrollment || 'S/N'}
-                              </p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        {allSubjects.map(subject => {
-                          const absences = studentAtt?.absences[subject] || 0;
-
-                          return (
-                            <TableCell key={subject} className="p-1">
-                              <Input
-                                type="number"
-                                min="0"
-                                value={absences}
-                                onChange={(e) => updateAbsences(student.id, subject, e.target.value)}
-                                className="h-8 text-center text-xs w-full p-1"
-                                title={`Faltas em ${subject} - ${student.name}`}
-                              />
-                            </TableCell>
-                          );
-                        })}
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-
-            {/* Save Button */}
-            <div className="flex gap-4 pt-6 border-t mt-6">
-              <Button onClick={handleSubmit} size="lg">
-                <Save className="h-4 w-4 mr-2" />
-                Salvar Frequência
-              </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
       )}
+
+      {/* Student Attendance Dialog */}
+      <Dialog open={!!selectedStudent} onOpenChange={(open) => !open && setSelectedStudent(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Registrar Faltas - {students.find(s => s.id === selectedStudent)?.name}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedStudent && (
+            <div className="space-y-6">
+              {/* Subject Areas */}
+              {SUBJECT_AREAS.map(area => {
+                const studentAtt = studentAttendances.find(sa => sa.studentId === selectedStudent);
+                
+                return (
+                  <div key={area.name} className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={area.color}>
+                        {area.name}
+                      </Badge>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {area.subjects.map(subject => {
+                        const absences = studentAtt?.absences[subject] || 0;
+
+                        return (
+                          <div key={subject} className="space-y-1">
+                            <Label className="text-sm">{subject}</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              placeholder="Número de faltas"
+                              value={absences}
+                              onChange={(e) => updateAbsences(selectedStudent, subject, e.target.value)}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4 border-t">
+                <Button onClick={handleSaveStudentAttendance} className="flex-1">
+                  <Save className="h-4 w-4 mr-2" />
+                  Salvar Faltas
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setSelectedStudent(null)}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {selectedClass && classStudents.length === 0 && (
         <Alert>
