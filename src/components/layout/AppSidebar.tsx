@@ -1,4 +1,4 @@
-import { Home, FileText, School, Users, BookOpen, BarChart3, Settings, GraduationCap } from 'lucide-react';
+import { Home, FileText, School, Users, BookOpen, BarChart3, Settings, GraduationCap, AlertTriangle } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Sidebar,
@@ -15,12 +15,12 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const menuItems = [
   { icon: Home, label: 'Dashboard', path: '/', roles: ['professor', 'diretor', 'coordenador', 'secretaria'] },
+  { icon: AlertTriangle, label: 'Ocorrências', path: '/ocorrencias', roles: ['professor', 'diretor', 'coordenador', 'secretaria'] },
   { icon: FileText, label: 'Nova Ocorrência', path: '/nova-ocorrencia', roles: ['professor', 'diretor', 'coordenador'] },
   { icon: School, label: 'Turmas', path: '/turmas', roles: ['diretor', 'coordenador'] },
   { icon: Users, label: 'Alunos', path: '/alunos', roles: ['diretor', 'coordenador', 'secretaria'] },
   { icon: BookOpen, label: 'Notas & Frequência', path: '/notas-frequencia', roles: ['professor', 'diretor', 'coordenador'] },
   { icon: BarChart3, label: 'Relatórios', path: '/relatorios', roles: ['diretor', 'coordenador'] },
-  { icon: Settings, label: 'Configurações', path: '/configuracoes', roles: ['coordenador'] },
 ];
 
 export const AppSidebar = () => {
