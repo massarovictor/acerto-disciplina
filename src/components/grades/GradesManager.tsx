@@ -38,6 +38,7 @@ export const GradesManager = () => {
   const [professionalSubjects, setProfessionalSubjects] = useState<string[]>([]);
   const [newProfessionalSubject, setNewProfessionalSubject] = useState('');
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
 
   const classStudents = students.filter(s => s.classId === selectedClass);
 
@@ -97,34 +98,28 @@ export const GradesManager = () => {
     setProfessionalSubjects(prev => prev.filter(s => s !== subject));
   };
 
-  const handleSaveAll = () => {
-    if (!selectedClass || !selectedQuarter) {
-      toast({
-        title: 'Erro',
-        description: 'Selecione turma e bimestre.',
-        variant: 'destructive',
-      });
-      return;
-    }
+  const handleSaveStudentGrades = () => {
+    if (!selectedStudent || !selectedClass || !selectedQuarter) return;
+
+    const studentGrade = studentGrades.find(sg => sg.studentId === selectedStudent);
+    if (!studentGrade) return;
 
     let savedCount = 0;
     let lowGradesCount = 0;
 
-    studentGrades.forEach(studentGrade => {
-      Object.entries(studentGrade.grades).forEach(([subject, gradeValue]) => {
-        const grade = parseFloat(gradeValue);
-        if (!isNaN(grade) && grade >= 0 && grade <= 10) {
-          addGrade({
-            studentId: studentGrade.studentId,
-            classId: selectedClass,
-            subject: subject,
-            quarter: selectedQuarter,
-            grade: grade,
-          });
-          savedCount++;
-          if (grade < 6) lowGradesCount++;
-        }
-      });
+    Object.entries(studentGrade.grades).forEach(([subject, gradeValue]) => {
+      const grade = parseFloat(gradeValue);
+      if (!isNaN(grade) && grade >= 0 && grade <= 10) {
+        addGrade({
+          studentId: selectedStudent,
+          classId: selectedClass,
+          subject: subject,
+          quarter: selectedQuarter,
+          grade: grade,
+        });
+        savedCount++;
+        if (grade < 6) lowGradesCount++;
+      }
     });
 
     if (savedCount === 0) {
@@ -136,17 +131,20 @@ export const GradesManager = () => {
       return;
     }
 
+    const student = students.find(s => s.id === selectedStudent);
     if (lowGradesCount > 0) {
       toast({
         title: 'Notas Lançadas',
-        description: `✓ ${savedCount} nota(s) salva(s). ⚠️ ${lowGradesCount} nota(s) abaixo da média.`,
+        description: `✓ ${savedCount} nota(s) de ${student?.name} salva(s). ⚠️ ${lowGradesCount} nota(s) abaixo da média.`,
       });
     } else {
       toast({
         title: 'Sucesso',
-        description: `${savedCount} nota(s) lançada(s) com sucesso.`,
+        description: `${savedCount} nota(s) de ${student?.name} lançada(s) com sucesso.`,
       });
     }
+
+    setSelectedStudent(null);
   };
 
   const getSubjectArea = (subject: string) => {
@@ -205,182 +203,212 @@ export const GradesManager = () => {
         </CardContent>
       </Card>
 
-      {/* Grades Table */}
+      {/* Add Professional Subject Button */}
+      {selectedClass && classStudents.length > 0 && (
+        <div className="flex justify-end">
+          <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar Disciplina Profissional
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Adicionar Disciplina da Base Profissional</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nome da Disciplina</Label>
+                  <Input
+                    placeholder="Ex: Gestão de Processos"
+                    value={newProfessionalSubject}
+                    onChange={(e) => setNewProfessionalSubject(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddProfessionalSubject()}
+                  />
+                </div>
+                <Button onClick={handleAddProfessionalSubject} className="w-full">
+                  Adicionar
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
+
+      {/* Students List */}
       {selectedClass && classStudents.length > 0 && (
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Lançamento de Notas</CardTitle>
-              <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Adicionar Disciplina Profissional
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Adicionar Disciplina da Base Profissional</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Nome da Disciplina</Label>
-                      <Input
-                        placeholder="Ex: Gestão de Processos"
-                        value={newProfessionalSubject}
-                        onChange={(e) => setNewProfessionalSubject(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleAddProfessionalSubject()}
-                      />
-                    </div>
-                    <Button onClick={handleAddProfessionalSubject} className="w-full">
-                      Adicionar
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
+            <CardTitle>Alunos - Clique para Lançar Notas</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="sticky left-0 bg-background z-10 w-[140px]">
-                      Aluno
-                    </TableHead>
-                    {SUBJECT_AREAS.map(area => (
-                      area.subjects.map(subject => (
-                        <TableHead key={subject} className="text-center w-[80px] p-2">
-                          <div className="flex flex-col items-center gap-1">
-                            <div className="text-[10px] font-normal text-muted-foreground uppercase">
-                              {area.name.split(' ')[0].substring(0, 4)}
-                            </div>
-                            <div className="text-xs font-medium leading-tight text-center">
-                              {subject.length > 10 ? subject.substring(0, 10) + '...' : subject}
-                            </div>
-                          </div>
-                        </TableHead>
-                      ))
-                    ))}
-                    {professionalSubjects.map(subject => (
-                      <TableHead key={subject} className="text-center w-[80px] p-2">
-                        <div className="flex flex-col items-center gap-1">
-                          <div className="text-[10px] font-normal text-muted-foreground uppercase">
-                            Prof
-                          </div>
-                          <div className="text-xs font-medium leading-tight text-center flex items-center justify-center gap-1">
-                            <span className="truncate max-w-[60px]">{subject}</span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-3 w-3 p-0"
-                              onClick={() => handleRemoveProfessionalSubject(subject)}
-                            >
-                              <X className="h-2 w-2" />
-                            </Button>
-                          </div>
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              {classStudents.map((student) => {
+                const studentGrade = studentGrades.find(sg => sg.studentId === student.id);
+                const filledGrades = studentGrade 
+                  ? Object.values(studentGrade.grades).filter(g => g !== '').length 
+                  : 0;
+                const totalSubjects = allSubjects.length;
+
+                return (
+                  <Card 
+                    key={student.id} 
+                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => setSelectedStudent(student.id)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-12 w-12">
+                          {student.photoUrl ? (
+                            <AvatarImage src={student.photoUrl} alt={student.name} />
+                          ) : (
+                            <AvatarFallback className="bg-primary/10">
+                              {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          )}
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{student.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {student.enrollment || 'S/N'}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {filledGrades}/{totalSubjects} notas lançadas
+                          </p>
                         </div>
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {classStudents.map((student) => {
-                    const studentGrade = studentGrades.find(sg => sg.studentId === student.id);
-                    
-                    return (
-                      <TableRow key={student.id}>
-                        <TableCell className="sticky left-0 bg-background z-10 p-1">
-                          <div className="flex items-start gap-1.5 w-[140px]">
-                            <Avatar className="h-7 w-7 flex-shrink-0 mt-0.5">
-                              {student.photoUrl ? (
-                                <AvatarImage src={student.photoUrl} alt={student.name} />
-                              ) : (
-                                <AvatarFallback className="bg-primary/10 text-[9px]">
-                                  {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                                </AvatarFallback>
-                              )}
-                            </Avatar>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-medium text-[11px] leading-tight truncate" title={student.name}>
-                                {student.name}
-                              </p>
-                              <p className="text-[9px] text-muted-foreground leading-tight">
-                                {student.enrollment || 'S/N'}
-                              </p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        {allSubjects.map(subject => {
-                          const gradeValue = studentGrade?.grades[subject] || '';
-                          const grade = parseFloat(gradeValue);
-                          const isLowGrade = !isNaN(grade) && grade < 6;
-
-                          return (
-                            <TableCell key={subject} className="p-1">
-                              <Input
-                                type="number"
-                                step="0.1"
-                                min="0"
-                                max="10"
-                                placeholder="-"
-                                value={gradeValue}
-                                onChange={(e) => handleGradeChange(student.id, subject, e.target.value)}
-                                className={`text-center h-9 text-sm ${isLowGrade ? 'border-severity-critical bg-severity-critical/5 font-bold' : ''}`}
-                                title={`${subject} - ${student.name}`}
-                              />
-                            </TableCell>
-                          );
-                        })}
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-
-            {/* Legend */}
-            <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-3 w-3 text-severity-critical" />
-                <span>Nota abaixo da média (menor que 6.0)</span>
-              </div>
-              {SUBJECT_AREAS.map(area => (
-                <div key={area.name} className="flex items-center gap-2">
-                  <Badge variant="outline" className={`${area.color} text-xs py-0`}>
-                    {area.name}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-
-            {/* Save Button */}
-            <div className="flex gap-4 pt-6 border-t mt-6">
-              <Button onClick={handleSaveAll} size="lg">
-                <Save className="h-4 w-4 mr-2" />
-                Salvar Todas as Notas
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() => {
-                  setStudentGrades(prev =>
-                    prev.map(sg => ({
-                      ...sg,
-                      grades: Object.fromEntries(
-                        Object.keys(sg.grades).map(subject => [subject, ''])
-                      ),
-                    }))
-                  );
-                }}
-              >
-                Limpar Formulário
-              </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
       )}
+
+      {/* Student Grades Dialog */}
+      <Dialog open={!!selectedStudent} onOpenChange={(open) => !open && setSelectedStudent(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Lançar Notas - {students.find(s => s.id === selectedStudent)?.name}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedStudent && (
+            <div className="space-y-6">
+              {/* Subject Areas */}
+              {SUBJECT_AREAS.map(area => {
+                const studentGrade = studentGrades.find(sg => sg.studentId === selectedStudent);
+                
+                return (
+                  <div key={area.name} className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={area.color}>
+                        {area.name}
+                      </Badge>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {area.subjects.map(subject => {
+                        const gradeValue = studentGrade?.grades[subject] || '';
+                        const grade = parseFloat(gradeValue);
+                        const isLowGrade = !isNaN(grade) && grade < 6;
+
+                        return (
+                          <div key={subject} className="space-y-1">
+                            <Label className="text-sm">{subject}</Label>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              max="10"
+                              placeholder="0.0 a 10.0"
+                              value={gradeValue}
+                              onChange={(e) => handleGradeChange(selectedStudent, subject, e.target.value)}
+                              className={isLowGrade ? 'border-severity-critical bg-severity-critical/5 font-bold' : ''}
+                            />
+                            {isLowGrade && (
+                              <p className="text-xs text-severity-critical flex items-center gap-1">
+                                <AlertTriangle className="h-3 w-3" />
+                                Abaixo da média
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Professional Subjects */}
+              {professionalSubjects.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">Base Profissional</Badge>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {professionalSubjects.map(subject => {
+                      const studentGrade = studentGrades.find(sg => sg.studentId === selectedStudent);
+                      const gradeValue = studentGrade?.grades[subject] || '';
+                      const grade = parseFloat(gradeValue);
+                      const isLowGrade = !isNaN(grade) && grade < 6;
+
+                      return (
+                        <div key={subject} className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-sm">{subject}</Label>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-4 w-4"
+                              onClick={() => handleRemoveProfessionalSubject(subject)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="10"
+                            placeholder="0.0 a 10.0"
+                            value={gradeValue}
+                            onChange={(e) => handleGradeChange(selectedStudent, subject, e.target.value)}
+                            className={isLowGrade ? 'border-severity-critical bg-severity-critical/5 font-bold' : ''}
+                          />
+                          {isLowGrade && (
+                            <p className="text-xs text-severity-critical flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              Abaixo da média
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4 border-t">
+                <Button onClick={handleSaveStudentGrades} className="flex-1">
+                  <Save className="h-4 w-4 mr-2" />
+                  Salvar Notas
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setSelectedStudent(null)}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {selectedClass && classStudents.length === 0 && (
         <Alert>
