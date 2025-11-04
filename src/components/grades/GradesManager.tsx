@@ -7,15 +7,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useClasses, useStudents, useGrades } from '@/hooks/useLocalStorage';
-import { AlertTriangle, Save, Plus, X } from 'lucide-react';
+import { AlertTriangle, Save, Plus, X, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SUBJECT_AREAS, QUARTERS, SubjectArea } from '@/lib/subjects';
 
-interface GradeInput {
-  subject: string;
-  grade: string;
+interface StudentGrades {
+  studentId: string;
+  grades: Record<string, string>; // subject -> grade
 }
 
 export const GradesManager = () => {
@@ -26,41 +27,49 @@ export const GradesManager = () => {
 
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedQuarter, setSelectedQuarter] = useState('1º Bimestre');
-  const [selectedStudent, setSelectedStudent] = useState('');
-  const [gradeInputs, setGradeInputs] = useState<GradeInput[]>([]);
+  const [studentGrades, setStudentGrades] = useState<StudentGrades[]>([]);
   const [professionalSubjects, setProfessionalSubjects] = useState<string[]>([]);
   const [newProfessionalSubject, setNewProfessionalSubject] = useState('');
   const [showAddDialog, setShowAddDialog] = useState(false);
 
   const classStudents = students.filter(s => s.classId === selectedClass);
 
-  // Initialize grade inputs when student or quarter changes
+  // Initialize grades when class or quarter changes
   useEffect(() => {
-    if (selectedStudent && selectedQuarter) {
+    if (selectedClass && selectedQuarter) {
       const allSubjects = [
         ...SUBJECT_AREAS.flatMap(area => area.subjects),
         ...professionalSubjects,
       ];
 
-      const inputs = allSubjects.map(subject => {
-        const existingGrade = grades.find(
-          g => g.studentId === selectedStudent && 
-               g.subject === subject && 
-               g.quarter === selectedQuarter
-        );
+      const initialGrades = classStudents.map(student => {
+        const studentGradeData: Record<string, string> = {};
+        
+        allSubjects.forEach(subject => {
+          const existingGrade = grades.find(
+            g => g.studentId === student.id && 
+                 g.subject === subject && 
+                 g.quarter === selectedQuarter
+          );
+          studentGradeData[subject] = existingGrade ? String(existingGrade.grade) : '';
+        });
+
         return {
-          subject,
-          grade: existingGrade ? String(existingGrade.grade) : '',
+          studentId: student.id,
+          grades: studentGradeData,
         };
       });
-      setGradeInputs(inputs);
-    }
-  }, [selectedStudent, selectedQuarter, professionalSubjects, grades]);
 
-  const handleGradeChange = (subject: string, value: string) => {
-    setGradeInputs(prev =>
-      prev.map(input =>
-        input.subject === subject ? { ...input, grade: value } : input
+      setStudentGrades(initialGrades);
+    }
+  }, [selectedClass, selectedQuarter, professionalSubjects, classStudents, grades]);
+
+  const handleGradeChange = (studentId: string, subject: string, value: string) => {
+    setStudentGrades(prev =>
+      prev.map(sg =>
+        sg.studentId === studentId
+          ? { ...sg, grades: { ...sg.grades, [subject]: value } }
+          : sg
       )
     );
   };
@@ -82,21 +91,36 @@ export const GradesManager = () => {
   };
 
   const handleSaveAll = () => {
-    if (!selectedClass || !selectedQuarter || !selectedStudent) {
+    if (!selectedClass || !selectedQuarter) {
       toast({
         title: 'Erro',
-        description: 'Selecione turma, bimestre e aluno.',
+        description: 'Selecione turma e bimestre.',
         variant: 'destructive',
       });
       return;
     }
 
-    const validGrades = gradeInputs.filter(input => {
-      const gradeValue = parseFloat(input.grade);
-      return !isNaN(gradeValue) && gradeValue >= 0 && gradeValue <= 10;
+    let savedCount = 0;
+    let lowGradesCount = 0;
+
+    studentGrades.forEach(studentGrade => {
+      Object.entries(studentGrade.grades).forEach(([subject, gradeValue]) => {
+        const grade = parseFloat(gradeValue);
+        if (!isNaN(grade) && grade >= 0 && grade <= 10) {
+          addGrade({
+            studentId: studentGrade.studentId,
+            classId: selectedClass,
+            subject: subject,
+            quarter: selectedQuarter,
+            grade: grade,
+          });
+          savedCount++;
+          if (grade < 6) lowGradesCount++;
+        }
+      });
     });
 
-    if (validGrades.length === 0) {
+    if (savedCount === 0) {
       toast({
         title: 'Erro',
         description: 'Adicione pelo menos uma nota válida (0-10).',
@@ -105,124 +129,23 @@ export const GradesManager = () => {
       return;
     }
 
-    validGrades.forEach(input => {
-      addGrade({
-        studentId: selectedStudent,
-        classId: selectedClass,
-        subject: input.subject,
-        quarter: selectedQuarter,
-        grade: parseFloat(input.grade),
-      });
-    });
-
-    const lowGrades = validGrades.filter(input => parseFloat(input.grade) < 6);
-    
-    if (lowGrades.length > 0) {
+    if (lowGradesCount > 0) {
       toast({
         title: 'Notas Lançadas',
-        description: `⚠️ ${lowGrades.length} nota(s) abaixo da média.`,
-        variant: 'default',
+        description: `✓ ${savedCount} nota(s) salva(s). ⚠️ ${lowGradesCount} nota(s) abaixo da média.`,
       });
     } else {
       toast({
         title: 'Sucesso',
-        description: `${validGrades.length} nota(s) lançada(s) com sucesso.`,
+        description: `${savedCount} nota(s) lançada(s) com sucesso.`,
       });
     }
   };
 
-  const renderSubjectArea = (area: SubjectArea) => (
-    <div key={area.name} className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Badge variant="outline" className={area.color}>
-          {area.name}
-        </Badge>
-      </div>
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-        {area.subjects.map(subject => {
-          const input = gradeInputs.find(i => i.subject === subject);
-          const gradeValue = input ? parseFloat(input.grade) : NaN;
-          const isLowGrade = !isNaN(gradeValue) && gradeValue < 6;
-
-          return (
-            <div key={subject} className="space-y-1">
-              <Label className="text-xs">{subject}</Label>
-              <div className="relative">
-                <Input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="10"
-                  placeholder="0-10"
-                  value={input?.grade || ''}
-                  onChange={(e) => handleGradeChange(subject, e.target.value)}
-                  disabled={!selectedStudent}
-                  className={isLowGrade ? 'border-severity-critical' : ''}
-                />
-                {isLowGrade && (
-                  <AlertTriangle className="absolute right-3 top-2.5 h-4 w-4 text-severity-critical" />
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-
-  const renderProfessionalSubjects = () => {
-    if (professionalSubjects.length === 0) return null;
-
-    return (
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <Badge variant="outline" className="bg-orange-500/10 text-orange-700 border-orange-500/30">
-            Base Profissional
-          </Badge>
-        </div>
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {professionalSubjects.map(subject => {
-            const input = gradeInputs.find(i => i.subject === subject);
-            const gradeValue = input ? parseFloat(input.grade) : NaN;
-            const isLowGrade = !isNaN(gradeValue) && gradeValue < 6;
-
-            return (
-              <div key={subject} className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs">{subject}</Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5"
-                    onClick={() => handleRemoveProfessionalSubject(subject)}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-                <div className="relative">
-                  <Input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="10"
-                    placeholder="0-10"
-                    value={input?.grade || ''}
-                    onChange={(e) => handleGradeChange(subject, e.target.value)}
-                    disabled={!selectedStudent}
-                    className={isLowGrade ? 'border-severity-critical' : ''}
-                  />
-                  {isLowGrade && (
-                    <AlertTriangle className="absolute right-3 top-2.5 h-4 w-4 text-severity-critical" />
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
+  const allSubjects = [
+    ...SUBJECT_AREAS.flatMap(area => area.subjects),
+    ...professionalSubjects,
+  ];
 
   return (
     <div className="space-y-6">
@@ -239,7 +162,7 @@ export const GradesManager = () => {
       {/* Filters */}
       <Card className="bg-primary/5 border-primary/20">
         <CardContent className="pt-6">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Turma *</Label>
               <Select value={selectedClass} onValueChange={setSelectedClass}>
@@ -278,46 +201,25 @@ export const GradesManager = () => {
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="space-y-2">
-              <Label>Aluno *</Label>
-              <Select 
-                value={selectedStudent} 
-                onValueChange={setSelectedStudent}
-                disabled={!selectedClass}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={selectedClass ? "Selecione o aluno" : "Selecione uma turma primeiro"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {classStudents.map(student => (
-                    <SelectItem key={student.id} value={student.id}>
-                      {student.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
-          {selectedClass && selectedQuarter && selectedStudent && (
+          {selectedClass && selectedQuarter && (
             <Alert className="mt-4">
               <AlertDescription>
-                Lançando notas do <strong>{selectedQuarter}</strong> para{' '}
-                <strong>{students.find(s => s.id === selectedStudent)?.name}</strong> da turma{' '}
-                <strong>{classes.find(c => c.id === selectedClass)?.name}</strong>
+                Lançando notas do <strong>{selectedQuarter}</strong> para a turma{' '}
+                <strong>{classes.find(c => c.id === selectedClass)?.name}</strong> ({classStudents.length} alunos)
               </AlertDescription>
             </Alert>
           )}
         </CardContent>
       </Card>
 
-      {/* Grades Grid */}
-      {selectedStudent && (
+      {/* Grades Table */}
+      {selectedClass && classStudents.length > 0 && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Lançamento de Notas por Disciplina</CardTitle>
+              <CardTitle>Lançamento de Notas - Todos os Alunos</CardTitle>
               <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm">
@@ -348,29 +250,193 @@ export const GradesManager = () => {
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            {SUBJECT_AREAS.map(area => (
+            {/* Subject Areas */}
+            {SUBJECT_AREAS.map((area, areaIndex) => (
               <div key={area.name}>
-                {renderSubjectArea(area)}
-                <Separator className="mt-6" />
+                <div className="mb-4">
+                  <Badge variant="outline" className={area.color}>
+                    {area.name}
+                  </Badge>
+                </div>
+
+                <div className="space-y-4">
+                  {classStudents.map((student) => {
+                    const studentGrade = studentGrades.find(sg => sg.studentId === student.id);
+                    
+                    return (
+                      <div key={`${student.id}-${area.name}`} className="border rounded-lg p-4">
+                        <div className="flex items-center gap-3 mb-4">
+                          <Avatar className="h-10 w-10">
+                            {student.photoUrl ? (
+                              <AvatarImage src={student.photoUrl} alt={student.name} />
+                            ) : (
+                              <AvatarFallback className="bg-primary/10">
+                                {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            )}
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{student.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Mat: {student.enrollment || 'S/N'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4">
+                          {area.subjects.map(subject => {
+                            const gradeValue = studentGrade?.grades[subject] || '';
+                            const grade = parseFloat(gradeValue);
+                            const isLowGrade = !isNaN(grade) && grade < 6;
+
+                            return (
+                              <div key={subject} className="space-y-1">
+                                <Label className="text-xs">{subject}</Label>
+                                <div className="relative">
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    min="0"
+                                    max="10"
+                                    placeholder="0-10"
+                                    value={gradeValue}
+                                    onChange={(e) => handleGradeChange(student.id, subject, e.target.value)}
+                                    className={isLowGrade ? 'border-severity-critical' : ''}
+                                  />
+                                  {isLowGrade && (
+                                    <AlertTriangle className="absolute right-3 top-2.5 h-4 w-4 text-severity-critical" />
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {areaIndex < SUBJECT_AREAS.length - 1 && <Separator className="my-6" />}
               </div>
             ))}
-            
-            {renderProfessionalSubjects()}
 
-            <div className="flex gap-4 pt-4">
-              <Button onClick={handleSaveAll}>
+            {/* Professional Subjects */}
+            {professionalSubjects.length > 0 && (
+              <>
+                <Separator className="my-6" />
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <Badge variant="outline" className="bg-orange-500/10 text-orange-700 border-orange-500/30">
+                      Base Profissional
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-4">
+                    {classStudents.map((student) => {
+                      const studentGrade = studentGrades.find(sg => sg.studentId === student.id);
+                      
+                      return (
+                        <div key={`${student.id}-professional`} className="border rounded-lg p-4">
+                          <div className="flex items-center gap-3 mb-4">
+                            <Avatar className="h-10 w-10">
+                              {student.photoUrl ? (
+                                <AvatarImage src={student.photoUrl} alt={student.name} />
+                              ) : (
+                                <AvatarFallback className="bg-primary/10">
+                                  {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                              )}
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">{student.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Mat: {student.enrollment || 'S/N'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4">
+                            {professionalSubjects.map(subject => {
+                              const gradeValue = studentGrade?.grades[subject] || '';
+                              const grade = parseFloat(gradeValue);
+                              const isLowGrade = !isNaN(grade) && grade < 6;
+
+                              return (
+                                <div key={subject} className="space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <Label className="text-xs">{subject}</Label>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-5 w-5"
+                                      onClick={() => handleRemoveProfessionalSubject(subject)}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                  <div className="relative">
+                                    <Input
+                                      type="number"
+                                      step="0.1"
+                                      min="0"
+                                      max="10"
+                                      placeholder="0-10"
+                                      value={gradeValue}
+                                      onChange={(e) => handleGradeChange(student.id, subject, e.target.value)}
+                                      className={isLowGrade ? 'border-severity-critical' : ''}
+                                    />
+                                    {isLowGrade && (
+                                      <AlertTriangle className="absolute right-3 top-2.5 h-4 w-4 text-severity-critical" />
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Save Button */}
+            <div className="flex gap-4 pt-4 border-t">
+              <Button onClick={handleSaveAll} size="lg">
                 <Save className="h-4 w-4 mr-2" />
                 Salvar Todas as Notas
               </Button>
               <Button
                 variant="outline"
+                size="lg"
                 onClick={() => {
-                  setGradeInputs(prev => prev.map(input => ({ ...input, grade: '' })));
+                  setStudentGrades(prev =>
+                    prev.map(sg => ({
+                      ...sg,
+                      grades: Object.fromEntries(
+                        Object.keys(sg.grades).map(subject => [subject, ''])
+                      ),
+                    }))
+                  );
                 }}
               >
                 Limpar Formulário
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {selectedClass && classStudents.length === 0 && (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">Nenhum aluno encontrado</h3>
+            <p className="text-muted-foreground">
+              Cadastre alunos nesta turma para lançar notas.
+            </p>
           </CardContent>
         </Card>
       )}
