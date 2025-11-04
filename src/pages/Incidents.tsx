@@ -18,6 +18,8 @@ import { useNavigate } from 'react-router-dom';
 import { useIncidents, useClasses, useStudents } from '@/hooks/useLocalStorage';
 import { IncidentDetailsDialog } from '@/components/incidents/IncidentDetailsDialog';
 import { IncidentManagementDialog } from '@/components/incidents/IncidentManagementDialog';
+import { IncidentWizard } from '@/components/incidents/IncidentWizard';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Incident } from '@/types';
 
 const Incidents = () => {
@@ -30,6 +32,7 @@ const Incidents = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [managingIncident, setManagingIncident] = useState<Incident | null>(null);
+  const [showNewIncidentDialog, setShowNewIncidentDialog] = useState(false);
 
   // Filter incidents by status
   const openIncidents = incidents.filter(i => i.status === 'aberta');
@@ -167,7 +170,7 @@ const Incidents = () => {
           </p>
         </div>
         {(user?.role === 'professor' || user?.role === 'diretor' || user?.role === 'coordenador') && (
-          <Button size="lg" onClick={() => navigate('/nova-ocorrencia')}>
+          <Button size="lg" onClick={() => setShowNewIncidentDialog(true)}>
             <Plus className="h-5 w-5 mr-2" />
             Registrar Ocorrência
           </Button>
@@ -303,6 +306,16 @@ const Incidents = () => {
           onOpenChange={(open) => !open && setManagingIncident(null)}
         />
       )}
+
+      {/* New Incident Dialog */}
+      <Dialog open={showNewIncidentDialog} onOpenChange={setShowNewIncidentDialog}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Registrar Nova Ocorrência</DialogTitle>
+          </DialogHeader>
+          <IncidentWizard onComplete={() => setShowNewIncidentDialog(false)} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

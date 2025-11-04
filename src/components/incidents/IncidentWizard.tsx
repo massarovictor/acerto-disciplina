@@ -33,7 +33,11 @@ const steps = [
   { id: 5, name: 'Revisão', component: ReviewStep },
 ];
 
-export const IncidentWizard = () => {
+interface IncidentWizardProps {
+  onComplete?: () => void;
+}
+
+export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<Partial<IncidentFormData>>({
     date: new Date().toISOString().split('T')[0],
@@ -87,7 +91,11 @@ export const IncidentWizard = () => {
       description: 'A ocorrência foi registrada com sucesso.',
     });
 
-    navigate('/');
+    if (onComplete) {
+      onComplete();
+    } else {
+      navigate('/');
+    }
   };
 
   const CurrentStepComponent = steps[currentStep - 1].component;

@@ -133,7 +133,7 @@ const Dashboard = () => {
           </p>
         </div>
         {(user?.role === 'professor' || user?.role === 'diretor' || user?.role === 'coordenador') && (
-          <Button size="lg" onClick={() => navigate('/nova-ocorrencia')}>
+          <Button size="lg" onClick={() => navigate('/ocorrencias')}>
             <Plus className="h-5 w-5 mr-2" />
             Registrar Ocorrência
           </Button>
@@ -258,7 +258,7 @@ const Dashboard = () => {
                   : 'Tente ajustar os filtros de busca.'}
               </p>
               {incidents.length === 0 && (user?.role === 'professor' || user?.role === 'diretor' || user?.role === 'coordenador') && (
-                <Button onClick={() => navigate('/nova-ocorrencia')}>
+                <Button onClick={() => navigate('/ocorrencias')}>
                   <Plus className="h-4 w-4 mr-2" />
                   Registrar Ocorrência
                 </Button>
