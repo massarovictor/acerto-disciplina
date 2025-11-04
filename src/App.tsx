@@ -7,7 +7,9 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Login from '@/pages/Login';
 import Dashboard from '@/pages/Dashboard';
+import NewIncident from '@/pages/NewIncident';
 import NotFound from "./pages/NotFound";
+import { useInitializeData } from '@/hooks/useLocalStorage';
 
 const queryClient = new QueryClient();
 
@@ -32,10 +34,16 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const AppContent = () => {
+  useInitializeData();
+  return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
+        <AppContent />
         <Toaster />
         <Sonner />
         <BrowserRouter>
@@ -50,6 +58,7 @@ const App = () => (
               }
             >
               <Route index element={<Dashboard />} />
+              <Route path="nova-ocorrencia" element={<NewIncident />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
