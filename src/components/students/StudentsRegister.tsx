@@ -5,9 +5,10 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useStudents, useClasses } from '@/hooks/useLocalStorage';
 import { useToast } from '@/hooks/use-toast';
-import { ChevronDown, Upload, Download, UserPlus } from 'lucide-react';
+import { ChevronDown, Upload, Download, UserPlus, Camera, X } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
 export const StudentsRegister = () => {
@@ -24,8 +25,10 @@ export const StudentsRegister = () => {
     censusId: '',
     cpf: '',
     rg: '',
+    photoUrl: '',
   });
 
+  const [photoPreview, setPhotoPreview] = useState<string>('');
   const [isOfficialDataOpen, setIsOfficialDataOpen] = useState(false);
 
   const todayRegistered = students.filter(s => {
@@ -87,6 +90,7 @@ export const StudentsRegister = () => {
       censusId: formData.censusId,
       cpf: formData.cpf,
       rg: formData.rg,
+      photoUrl: formData.photoUrl,
       status: 'active',
     });
 
@@ -105,7 +109,47 @@ export const StudentsRegister = () => {
       censusId: '',
       cpf: '',
       rg: '',
+      photoUrl: '',
     });
+    setPhotoPreview('');
+  };
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        toast({
+          title: 'Erro',
+          description: 'A imagem deve ter no máximo 2MB.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: 'Erro',
+          description: 'Por favor, selecione uma imagem válida.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setFormData({ ...formData, photoUrl: base64String });
+        setPhotoPreview(base64String);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removePhoto = () => {
+    setFormData({ ...formData, photoUrl: '' });
+    setPhotoPreview('');
   };
 
   return (
@@ -122,6 +166,47 @@ export const StudentsRegister = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Photo Upload Section */}
+            <div className="flex justify-center">
+              <div className="relative">
+                <Avatar className="h-32 w-32">
+                  {photoPreview ? (
+                    <AvatarImage src={photoPreview} alt="Preview" />
+                  ) : (
+                    <AvatarFallback className="bg-muted">
+                      <Camera className="h-12 w-12 text-muted-foreground" />
+                    </AvatarFallback>
+                  )}
+                </Avatar>
+                {photoPreview && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute -top-2 -right-2 h-8 w-8 rounded-full"
+                    onClick={removePhoto}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+                <Label
+                  htmlFor="photo"
+                  className="absolute bottom-0 right-0 cursor-pointer"
+                >
+                  <div className="bg-primary text-primary-foreground rounded-full p-2 shadow-lg hover:bg-primary/90 transition-colors">
+                    <Camera className="h-4 w-4" />
+                  </div>
+                  <Input
+                    id="photo"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handlePhotoChange}
+                  />
+                </Label>
+              </div>
+            </div>
+
             <div className="grid gap-6 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="name">Nome Completo *</Label>
@@ -230,16 +315,20 @@ export const StudentsRegister = () => {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setFormData({
-                  name: '',
-                  classId: '',
-                  birthDate: '',
-                  gender: '',
-                  enrollment: '',
-                  censusId: '',
-                  cpf: '',
-                  rg: '',
-                })}
+                onClick={() => {
+                  setFormData({
+                    name: '',
+                    classId: '',
+                    birthDate: '',
+                    gender: '',
+                    enrollment: '',
+                    censusId: '',
+                    cpf: '',
+                    rg: '',
+                    photoUrl: '',
+                  });
+                  setPhotoPreview('');
+                }}
               >
                 Limpar Formulário
               </Button>

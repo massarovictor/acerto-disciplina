@@ -66,6 +66,7 @@ export interface Student {
   censusId?: string;
   cpf?: string;
   rg?: string;
+  photoUrl?: string;
   status: 'active' | 'inactive' | 'transferred';
 }
 

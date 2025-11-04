@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table,
@@ -13,7 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useStudents, useClasses } from '@/hooks/useLocalStorage';
-import { Search, Edit, User, Download } from 'lucide-react';
+import { Search, Edit, Download } from 'lucide-react';
 
 export const StudentsManage = () => {
   const { students } = useStudents();
@@ -92,7 +93,7 @@ export const StudentsManage = () => {
         <CardContent>
           {filteredStudents.length === 0 ? (
             <div className="text-center py-12">
-              <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium mb-2">Nenhum aluno encontrado</h3>
               <p className="text-muted-foreground">
                 {students.length === 0 
@@ -105,6 +106,7 @@ export const StudentsManage = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Foto</TableHead>
                     <TableHead>Nome</TableHead>
                     <TableHead>Matrícula</TableHead>
                     <TableHead>ID Censo</TableHead>
@@ -119,12 +121,18 @@ export const StudentsManage = () => {
                   {filteredStudents.map((student) => (
                     <TableRow key={student.id}>
                       <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <User className="h-4 w-4 text-primary" />
-                          </div>
-                          <span className="font-medium">{student.name}</span>
-                        </div>
+                        <Avatar className="h-10 w-10">
+                          {student.photoUrl ? (
+                            <AvatarImage src={student.photoUrl} alt={student.name} />
+                          ) : (
+                            <AvatarFallback className="bg-primary/10 text-primary">
+                              {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          )}
+                        </Avatar>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-medium">{student.name}</span>
                       </TableCell>
                       <TableCell>{student.enrollment || '-'}</TableCell>
                       <TableCell>{student.censusId || '-'}</TableCell>
