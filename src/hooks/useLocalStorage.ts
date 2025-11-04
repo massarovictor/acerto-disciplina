@@ -8,7 +8,6 @@ type StorageKey = 'INCIDENTS' | 'CLASSES' | 'STUDENTS' | 'GRADES' | 'ATTENDANCE'
 export function useLocalStorage<T>(key: StorageKey, initialValue: T) {
   const [storedValue, setStoredValue] = useState<T>(() => {
     const item = storage.get<T>(key);
-    console.log(`useLocalStorage - Reading ${key}:`, item, 'initialValue:', initialValue);
     return item !== null ? item : initialValue;
   });
 
@@ -76,9 +75,6 @@ export function useIncidents() {
 // Hook for classes
 export function useClasses() {
   const [classes, setClasses] = useLocalStorage<Class[]>('CLASSES', MOCK_CLASSES);
-
-  console.log('useClasses - classes from hook:', classes);
-  console.log('useClasses - MOCK_CLASSES:', MOCK_CLASSES);
 
   const addClass = (classData: Omit<Class, 'id'>) => {
     const newClass: Class = {
