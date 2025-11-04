@@ -6,13 +6,20 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { useClasses, useStudents, useGrades } from '@/hooks/useLocalStorage';
-import { AlertTriangle, Save, Plus, X, User } from 'lucide-react';
+import { AlertTriangle, Save, Plus, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { SUBJECT_AREAS, QUARTERS, SubjectArea } from '@/lib/subjects';
+import { SUBJECT_AREAS, QUARTERS } from '@/lib/subjects';
 
 interface StudentGrades {
   studentId: string;
@@ -34,14 +41,14 @@ export const GradesManager = () => {
 
   const classStudents = students.filter(s => s.classId === selectedClass);
 
+  const allSubjects = [
+    ...SUBJECT_AREAS.flatMap(area => area.subjects),
+    ...professionalSubjects,
+  ];
+
   // Initialize grades when class or quarter changes
   useEffect(() => {
     if (selectedClass && selectedQuarter) {
-      const allSubjects = [
-        ...SUBJECT_AREAS.flatMap(area => area.subjects),
-        ...professionalSubjects,
-      ];
-
       const initialGrades = classStudents.map(student => {
         const studentGradeData: Record<string, string> = {};
         
@@ -142,23 +149,12 @@ export const GradesManager = () => {
     }
   };
 
-  const allSubjects = [
-    ...SUBJECT_AREAS.flatMap(area => area.subjects),
-    ...professionalSubjects,
-  ];
+  const getSubjectArea = (subject: string) => {
+    return SUBJECT_AREAS.find(area => area.subjects.includes(subject));
+  };
 
   return (
     <div className="space-y-6">
-      {/* No classes warning */}
-      {classes.length === 0 && (
-        <Alert className="border-severity-critical">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            <strong>Nenhuma turma encontrada.</strong> Para lançar notas, é necessário cadastrar pelo menos uma turma na seção <strong>Turmas</strong>.
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* Filters */}
       <Card className="bg-primary/5 border-primary/20">
         <CardContent className="pt-6">
@@ -181,11 +177,6 @@ export const GradesManager = () => {
                   )}
                 </SelectContent>
               </Select>
-              {classes.length === 0 && (
-                <p className="text-xs text-severity-critical">
-                  Cadastre uma turma primeiro
-                </p>
-              )}
             </div>
 
             <div className="space-y-2">
@@ -219,7 +210,7 @@ export const GradesManager = () => {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Lançamento de Notas - Todos os Alunos</CardTitle>
+              <CardTitle>Lançamento de Notas</CardTitle>
               <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm">
@@ -249,161 +240,126 @@ export const GradesManager = () => {
               </Dialog>
             </div>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Subject Areas */}
-            {SUBJECT_AREAS.map((area, areaIndex) => (
-              <div key={area.name}>
-                <div className="mb-4">
-                  <Badge variant="outline" className={area.color}>
-                    {area.name}
-                  </Badge>
-                </div>
-
-                <div className="space-y-4">
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="sticky left-0 bg-background z-10 min-w-[200px]">
+                      Aluno
+                    </TableHead>
+                    {SUBJECT_AREAS.map(area => (
+                      area.subjects.map(subject => (
+                        <TableHead key={subject} className="text-center min-w-[100px]">
+                          <div className="space-y-1">
+                            <div className="text-xs font-normal text-muted-foreground">
+                              {area.name}
+                            </div>
+                            <div className="font-medium">{subject}</div>
+                          </div>
+                        </TableHead>
+                      ))
+                    ))}
+                    {professionalSubjects.map(subject => (
+                      <TableHead key={subject} className="text-center min-w-[100px]">
+                        <div className="space-y-1">
+                          <div className="text-xs font-normal text-muted-foreground">
+                            Base Prof.
+                          </div>
+                          <div className="font-medium flex items-center justify-center gap-1">
+                            {subject}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-4 w-4"
+                              onClick={() => handleRemoveProfessionalSubject(subject)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {classStudents.map((student) => {
                     const studentGrade = studentGrades.find(sg => sg.studentId === student.id);
                     
                     return (
-                      <div key={`${student.id}-${area.name}`} className="border rounded-lg p-4">
-                        <div className="flex items-center gap-3 mb-4">
-                          <Avatar className="h-10 w-10">
-                            {student.photoUrl ? (
-                              <AvatarImage src={student.photoUrl} alt={student.name} />
-                            ) : (
-                              <AvatarFallback className="bg-primary/10">
-                                {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                              </AvatarFallback>
-                            )}
-                          </Avatar>
-                          <div>
-                            <p className="font-medium">{student.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Mat: {student.enrollment || 'S/N'}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4">
-                          {area.subjects.map(subject => {
-                            const gradeValue = studentGrade?.grades[subject] || '';
-                            const grade = parseFloat(gradeValue);
-                            const isLowGrade = !isNaN(grade) && grade < 6;
-
-                            return (
-                              <div key={subject} className="space-y-1">
-                                <Label className="text-xs">{subject}</Label>
-                                <div className="relative">
-                                  <Input
-                                    type="number"
-                                    step="0.1"
-                                    min="0"
-                                    max="10"
-                                    placeholder="0-10"
-                                    value={gradeValue}
-                                    onChange={(e) => handleGradeChange(student.id, subject, e.target.value)}
-                                    className={isLowGrade ? 'border-severity-critical' : ''}
-                                  />
-                                  {isLowGrade && (
-                                    <AlertTriangle className="absolute right-3 top-2.5 h-4 w-4 text-severity-critical" />
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {areaIndex < SUBJECT_AREAS.length - 1 && <Separator className="my-6" />}
-              </div>
-            ))}
-
-            {/* Professional Subjects */}
-            {professionalSubjects.length > 0 && (
-              <>
-                <Separator className="my-6" />
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <Badge variant="outline" className="bg-orange-500/10 text-orange-700 border-orange-500/30">
-                      Base Profissional
-                    </Badge>
-                  </div>
-
-                  <div className="space-y-4">
-                    {classStudents.map((student) => {
-                      const studentGrade = studentGrades.find(sg => sg.studentId === student.id);
-                      
-                      return (
-                        <div key={`${student.id}-professional`} className="border rounded-lg p-4">
-                          <div className="flex items-center gap-3 mb-4">
+                      <TableRow key={student.id}>
+                        <TableCell className="sticky left-0 bg-background z-10">
+                          <div className="flex items-center gap-3">
                             <Avatar className="h-10 w-10">
                               {student.photoUrl ? (
                                 <AvatarImage src={student.photoUrl} alt={student.name} />
                               ) : (
-                                <AvatarFallback className="bg-primary/10">
+                                <AvatarFallback className="bg-primary/10 text-xs">
                                   {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                                 </AvatarFallback>
                               )}
                             </Avatar>
-                            <div>
-                              <p className="font-medium">{student.name}</p>
+                            <div className="min-w-0">
+                              <p className="font-medium text-sm truncate">{student.name}</p>
                               <p className="text-xs text-muted-foreground">
-                                Mat: {student.enrollment || 'S/N'}
+                                {student.enrollment || 'S/N'}
                               </p>
                             </div>
                           </div>
+                        </TableCell>
+                        {allSubjects.map(subject => {
+                          const gradeValue = studentGrade?.grades[subject] || '';
+                          const grade = parseFloat(gradeValue);
+                          const isLowGrade = !isNaN(grade) && grade < 6;
+                          const area = getSubjectArea(subject);
 
-                          <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4">
-                            {professionalSubjects.map(subject => {
-                              const gradeValue = studentGrade?.grades[subject] || '';
-                              const grade = parseFloat(gradeValue);
-                              const isLowGrade = !isNaN(grade) && grade < 6;
+                          return (
+                            <TableCell key={subject} className="p-2">
+                              <div className="relative">
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  max="10"
+                                  placeholder="0-10"
+                                  value={gradeValue}
+                                  onChange={(e) => handleGradeChange(student.id, subject, e.target.value)}
+                                  className={`text-center ${isLowGrade ? 'border-severity-critical bg-severity-critical/5' : ''}`}
+                                />
+                                {isLowGrade && (
+                                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                                    <AlertTriangle className="h-3 w-3 text-severity-critical" />
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
 
-                              return (
-                                <div key={subject} className="space-y-1">
-                                  <div className="flex items-center justify-between">
-                                    <Label className="text-xs">{subject}</Label>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-5 w-5"
-                                      onClick={() => handleRemoveProfessionalSubject(subject)}
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                  <div className="relative">
-                                    <Input
-                                      type="number"
-                                      step="0.1"
-                                      min="0"
-                                      max="10"
-                                      placeholder="0-10"
-                                      value={gradeValue}
-                                      onChange={(e) => handleGradeChange(student.id, subject, e.target.value)}
-                                      className={isLowGrade ? 'border-severity-critical' : ''}
-                                    />
-                                    {isLowGrade && (
-                                      <AlertTriangle className="absolute right-3 top-2.5 h-4 w-4 text-severity-critical" />
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+            {/* Legend */}
+            <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-3 w-3 text-severity-critical" />
+                <span>Nota abaixo da média (menor que 6.0)</span>
+              </div>
+              {SUBJECT_AREAS.map(area => (
+                <div key={area.name} className="flex items-center gap-2">
+                  <Badge variant="outline" className={`${area.color} text-xs py-0`}>
+                    {area.name}
+                  </Badge>
                 </div>
-              </>
-            )}
+              ))}
+            </div>
 
             {/* Save Button */}
-            <div className="flex gap-4 pt-4 border-t">
+            <div className="flex gap-4 pt-6 border-t mt-6">
               <Button onClick={handleSaveAll} size="lg">
                 <Save className="h-4 w-4 mr-2" />
                 Salvar Todas as Notas
@@ -430,15 +386,11 @@ export const GradesManager = () => {
       )}
 
       {selectedClass && classStudents.length === 0 && (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">Nenhum aluno encontrado</h3>
-            <p className="text-muted-foreground">
-              Cadastre alunos nesta turma para lançar notas.
-            </p>
-          </CardContent>
-        </Card>
+        <Alert>
+          <AlertDescription>
+            Nenhum aluno cadastrado nesta turma. Cadastre alunos para lançar notas.
+          </AlertDescription>
+        </Alert>
       )}
     </div>
   );
