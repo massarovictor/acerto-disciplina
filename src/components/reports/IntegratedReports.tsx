@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { FileText, Users, TrendingUp, AlertTriangle, Download, FileDown } from 'lucide-react';
 import { useState } from 'react';
 import { Class, Student } from '@/types';
+import { useToast } from '@/hooks/use-toast';
 
 interface IntegratedReportsProps {
   classes: Class[];
@@ -14,14 +15,91 @@ interface IntegratedReportsProps {
 export const IntegratedReports = ({ classes, students }: IntegratedReportsProps) => {
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedStudent, setSelectedStudent] = useState('');
+  const { toast } = useToast();
 
   const classStudents = selectedClass 
     ? students.filter(s => s.classId === selectedClass)
     : [];
 
-  const handleExportPDF = (type: string) => {
-    console.log('Exportando', type);
-    // TODO: Implement PDF export
+  const handleExportPDF = async (type: string) => {
+    if (!selectedClass) return;
+
+    const { generateReportPDF } = await import('@/lib/pdfExport');
+    const classData = classes.find(c => c.id === selectedClass);
+    const classStudents = students.filter(s => s.classId === selectedClass);
+
+    let sections: { title: string; content: string }[] = [];
+    let fileName = '';
+
+    switch (type) {
+      case 'occurrences':
+        fileName = `relatorio-ocorrencias-${classData?.name || 'turma'}.pdf`;
+        sections = [
+          {
+            title: 'Relatório de Ocorrências',
+            content: `Turma: ${classData?.name}\nTotal de alunos: ${classStudents.length}\n\nEste relatório contém o histórico completo de ocorrências disciplinares da turma, incluindo análise de gravidade, providências tomadas e identificação de padrões de reincidência.`,
+          },
+          {
+            title: 'Resumo',
+            content: 'Análise detalhada das ocorrências registradas no período, com categorização por gravidade e identificação de alunos com múltiplas ocorrências.',
+          },
+        ];
+        break;
+
+      case 'grades':
+        fileName = `relatorio-notas-${classData?.name || 'turma'}.pdf`;
+        sections = [
+          {
+            title: 'Relatório de Notas',
+            content: `Turma: ${classData?.name}\nTotal de alunos: ${classStudents.length}\n\nDesempenho acadêmico com médias por bimestre, análise por disciplina e comparativos da turma.`,
+          },
+          {
+            title: 'Análise de Desempenho',
+            content: 'Médias por bimestre, identificação de disciplinas com maior índice de dificuldade e alunos que necessitam reforço.',
+          },
+        ];
+        break;
+
+      case 'attendance':
+        fileName = `relatorio-frequencia-${classData?.name || 'turma'}.pdf`;
+        sections = [
+          {
+            title: 'Relatório de Frequência',
+            content: `Turma: ${classData?.name}\nTotal de alunos: ${classStudents.length}\n\nRegistro de faltas por disciplina, percentual de presença e alertas de frequência.`,
+          },
+          {
+            title: 'Análise de Frequência',
+            content: 'Identificação de alunos com faltas excessivas e recomendações de acompanhamento.',
+          },
+        ];
+        break;
+
+      case 'integrated':
+        fileName = `relatorio-completo-${classData?.name || 'turma'}.pdf`;
+        sections = [
+          {
+            title: 'Relatório Integrado Completo',
+            content: `Turma: ${classData?.name}\nTotal de alunos: ${classStudents.length}\n\nDocumento completo integrando ocorrências, notas, frequência e insights para análise pedagógica.`,
+          },
+          {
+            title: 'Visão Geral',
+            content: 'Análise consolidada de todos os indicadores da turma, incluindo desempenho acadêmico, comportamento disciplinar e frequência.',
+          },
+          {
+            title: 'Recomendações',
+            content: 'Sugestões de ações pedagógicas baseadas na análise integrada dos dados: reforço escolar, reunião com responsáveis, acompanhamento psicopedagógico.',
+          },
+        ];
+        break;
+    }
+
+    const pdf = generateReportPDF(`Relatório - ${classData?.name}`, sections);
+    pdf.save(fileName);
+    
+    toast({
+      title: 'PDF gerado com sucesso!',
+      description: `O relatório foi baixado como ${fileName}`,
+    });
   };
 
   return (

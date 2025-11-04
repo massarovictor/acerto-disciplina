@@ -13,6 +13,7 @@ import { ClassSlide4 } from './slides/ClassSlide4';
 import { ClassSlide5 } from './slides/ClassSlide5';
 import { StudentSlide1 } from './slides/StudentSlide1';
 import { StudentSlide2 } from './slides/StudentSlide2';
+import { useToast } from '@/hooks/use-toast';
 
 interface ClassSlidesProps {
   classes: Class[];
@@ -27,6 +28,7 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
   const [selectedStudent, setSelectedStudent] = useState('');
   const [currentSlide, setCurrentSlide] = useState(1);
   const [viewMode, setViewMode] = useState<'class' | 'individual'>('class');
+  const { toast } = useToast();
 
   const classData = classes.find(c => c.id === selectedClass);
   const classStudents = selectedClass ? students.filter(s => s.classId === selectedClass) : [];
@@ -35,9 +37,29 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
 
   const maxSlides = viewMode === 'class' ? 5 : 2;
 
-  const handleExportPDF = () => {
-    console.log('Exportando slides para PDF');
-    // TODO: Implement PDF export
+  const handleExportPDF = async () => {
+    const slideElement = document.getElementById('slide-container');
+    if (!slideElement) return;
+
+    try {
+      const { exportSlideAsPDF } = await import('@/lib/pdfExport');
+      const fileName = viewMode === 'class'
+        ? `relatorio-turma-${classData?.name || 'turma'}-slide-${currentSlide}.pdf`
+        : `relatorio-aluno-${studentData?.name || 'aluno'}-slide-${currentSlide}.pdf`;
+
+      await exportSlideAsPDF('slide-container', fileName);
+      
+      toast({
+        title: 'Slide exportado com sucesso!',
+        description: `O slide foi baixado como ${fileName}`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro ao exportar',
+        description: 'Ocorreu um erro ao gerar o PDF. Tente novamente.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const renderSlide = () => {
@@ -171,7 +193,7 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
 
       {selectedClass && (viewMode === 'class' || selectedStudent) ? (
         <div className="relative">
-          <div className="aspect-[16/9] bg-background border-2 rounded-lg overflow-hidden shadow-lg">
+          <div id="slide-container" className="aspect-[16/9] bg-background border-2 rounded-lg overflow-hidden shadow-lg">
             {renderSlide()}
           </div>
         </div>

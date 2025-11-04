@@ -129,13 +129,31 @@ export function useGrades() {
   const [grades, setGrades] = useLocalStorage<Grade[]>('GRADES', []);
 
   const addGrade = (grade: Omit<Grade, 'id' | 'recordedAt'>) => {
-    const newGrade: Grade = {
-      ...grade,
-      id: Date.now().toString(),
-      recordedAt: new Date().toISOString(),
-    };
-    setGrades((prev) => [...prev, newGrade]);
-    return newGrade;
+    setGrades((prev) => {
+      // Check if grade already exists for this student, class, subject, and quarter
+      const existingIndex = prev.findIndex(
+        g => g.studentId === grade.studentId && 
+             g.classId === grade.classId && 
+             g.subject === grade.subject && 
+             g.quarter === grade.quarter
+      );
+
+      const newGrade: Grade = {
+        ...grade,
+        id: existingIndex >= 0 ? prev[existingIndex].id : Date.now().toString(),
+        recordedAt: new Date().toISOString(),
+      };
+
+      if (existingIndex >= 0) {
+        // Update existing grade
+        const updated = [...prev];
+        updated[existingIndex] = newGrade;
+        return updated;
+      } else {
+        // Add new grade
+        return [...prev, newGrade];
+      }
+    });
   };
 
   const updateGrade = (id: string, updates: Partial<Grade>) => {
