@@ -6,14 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChevronLeft, ChevronRight, Download, Presentation } from 'lucide-react';
 import { Class, Student, Incident, Grade, AttendanceRecord } from '@/types';
-import { ClassSlide1 } from './slides/ClassSlide1';
-import { ClassSlide2 } from './slides/ClassSlide2';
-import { ClassSlide3 } from './slides/ClassSlide3';
-import { ClassSlide4 } from './slides/ClassSlide4';
-import { ClassSlide5 } from './slides/ClassSlide5';
-import { StudentSlide1 } from './slides/StudentSlide1';
-import { StudentSlide2 } from './slides/StudentSlide2';
+import { CoverSlide } from './slides/CoverSlide';
+import { ClassOverviewSlide } from './slides/ClassOverviewSlide';
+import { AreaPerformanceSlide } from './slides/AreaPerformanceSlide';
+import { StudentMetricsSlide } from './slides/StudentMetricsSlide';
+import { StudentGradesTableSlide } from './slides/StudentGradesTableSlide';
 import { useToast } from '@/hooks/use-toast';
+import { QUARTERS } from '@/lib/subjects';
 
 interface ClassSlidesProps {
   classes: Class[];
@@ -26,16 +25,35 @@ interface ClassSlidesProps {
 export const ClassSlides = ({ classes, students, incidents, grades, attendance }: ClassSlidesProps) => {
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedStudent, setSelectedStudent] = useState('');
+  const [selectedPeriod, setSelectedPeriod] = useState('all');
   const [currentSlide, setCurrentSlide] = useState(1);
   const [viewMode, setViewMode] = useState<'class' | 'individual'>('class');
+  const [professionalSubjects] = useState<string[]>([]); // TODO: Get from storage
   const { toast } = useToast();
 
   const classData = classes.find(c => c.id === selectedClass);
   const classStudents = selectedClass ? students.filter(s => s.classId === selectedClass) : [];
   const classIncidents = selectedClass ? incidents.filter(i => i.classId === selectedClass) : [];
+  const classGrades = selectedClass ? grades.filter(g => g.classId === selectedClass) : [];
   const studentData = students.find(s => s.id === selectedStudent);
 
-  const maxSlides = viewMode === 'class' ? 5 : 2;
+  // Calculate student rankings (lowest to highest)
+  const studentRankings = classStudents.map(student => {
+    const filteredGrades = selectedPeriod === 'all'
+      ? classGrades.filter(g => g.studentId === student.id)
+      : classGrades.filter(g => g.studentId === student.id && g.quarter === selectedPeriod);
+    
+    const average = filteredGrades.length > 0
+      ? filteredGrades.reduce((sum, g) => sum + g.grade, 0) / filteredGrades.length
+      : 0;
+
+    return { student, average };
+  }).sort((a, b) => a.average - b.average); // Lowest first
+
+  // Calculate max slides for class view
+  const maxSlides = viewMode === 'class' 
+    ? 3 + (studentRankings.length * 2) // Cover + Overview + Areas + (2 slides per student)
+    : 2; // Individual view: 2 slides
 
   const handleExportPDF = async () => {
     const slideElement = document.getElementById('slide-container');
@@ -66,32 +84,66 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
     if (!selectedClass) return null;
 
     if (viewMode === 'class') {
-      switch (currentSlide) {
-        case 1:
-          return <ClassSlide1 classData={classData!} students={classStudents} grades={grades} />;
-        case 2:
-          return <ClassSlide2 classData={classData!} students={classStudents} incidents={classIncidents} grades={grades} />;
-        case 3:
-          return <ClassSlide3 classData={classData!} students={classStudents} grades={grades} />;
-        case 4:
-          return <ClassSlide4 classData={classData!} students={classStudents} incidents={classIncidents} grades={grades} />;
-        case 5:
-          return <ClassSlide5 classData={classData!} students={classStudents} incidents={classIncidents} />;
-        default:
-          return null;
+      if (currentSlide === 1) {
+        return <CoverSlide classData={classData!} period={selectedPeriod} />;
+      } else if (currentSlide === 2) {
+        return <ClassOverviewSlide classData={classData!} students={classStudents} grades={classGrades} incidents={classIncidents} period={selectedPeriod} />;
+      } else if (currentSlide === 3) {
+        return <AreaPerformanceSlide classData={classData!} grades={classGrades} period={selectedPeriod} professionalSubjects={professionalSubjects} />;
+      } else {
+        // Student slides (2 per student)
+        const studentIndex = Math.floor((currentSlide - 4) / 2);
+        const isMetricsSlide = (currentSlide - 4) % 2 === 0;
+        
+        if (studentIndex < studentRankings.length) {
+          const { student } = studentRankings[studentIndex];
+          const position = studentRankings.length - studentIndex; // Reverse position for display
+          
+          if (isMetricsSlide) {
+            return <StudentMetricsSlide 
+              student={student} 
+              grades={classGrades} 
+              incidents={classIncidents} 
+              period={selectedPeriod}
+              position={position}
+              totalStudents={studentRankings.length}
+            />;
+          } else {
+            return <StudentGradesTableSlide 
+              student={student} 
+              grades={classGrades} 
+              period={selectedPeriod}
+            />;
+          }
+        }
       }
     } else {
+      // Individual view
       if (!selectedStudent || !studentData) return null;
       
-      switch (currentSlide) {
-        case 1:
-          return <StudentSlide1 student={studentData} grades={grades} incidents={incidents} />;
-        case 2:
-          return <StudentSlide2 student={studentData} grades={grades} incidents={incidents} attendance={attendance} />;
-        default:
-          return null;
+      const studentGrades = classGrades.filter(g => g.studentId === selectedStudent);
+      const position = studentRankings.findIndex(r => r.student.id === selectedStudent);
+      const displayPosition = position >= 0 ? studentRankings.length - position : 0;
+
+      if (currentSlide === 1) {
+        return <StudentMetricsSlide 
+          student={studentData} 
+          grades={studentGrades} 
+          incidents={classIncidents} 
+          period={selectedPeriod}
+          position={displayPosition}
+          totalStudents={studentRankings.length}
+        />;
+      } else {
+        return <StudentGradesTableSlide 
+          student={studentData} 
+          grades={studentGrades} 
+          period={selectedPeriod}
+        />;
       }
     }
+
+    return null;
   };
 
   return (
@@ -108,23 +160,40 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
             </TabsList>
 
             <TabsContent value="class" className="space-y-4">
-              <div className="space-y-2">
-                <Label>Selecione a Turma</Label>
-                <Select value={selectedClass} onValueChange={(v) => { setSelectedClass(v); setCurrentSlide(1); }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a turma" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {classes.map(cls => (
-                      <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Selecione a Turma</Label>
+                  <Select value={selectedClass} onValueChange={(v) => { setSelectedClass(v); setCurrentSlide(1); }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a turma" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {classes.map(cls => (
+                        <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Período</Label>
+                  <Select value={selectedPeriod} onValueChange={(v) => { setSelectedPeriod(v); setCurrentSlide(1); }}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Ano Letivo Completo</SelectItem>
+                      {QUARTERS.map(quarter => (
+                        <SelectItem key={quarter} value={quarter}>{quarter}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </TabsContent>
 
             <TabsContent value="individual" className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
                   <Label>Turma</Label>
                   <Select value={selectedClass} onValueChange={(v) => { setSelectedClass(v); setSelectedStudent(''); setCurrentSlide(1); }}>
@@ -148,6 +217,21 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
                     <SelectContent>
                       {classStudents.map(student => (
                         <SelectItem key={student.id} value={student.id}>{student.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Período</Label>
+                  <Select value={selectedPeriod} onValueChange={(v) => { setSelectedPeriod(v); setCurrentSlide(1); }}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Ano Letivo Completo</SelectItem>
+                      {QUARTERS.map(quarter => (
+                        <SelectItem key={quarter} value={quarter}>{quarter}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
