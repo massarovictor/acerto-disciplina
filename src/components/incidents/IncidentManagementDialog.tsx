@@ -109,17 +109,21 @@ export const IncidentManagementDialog = ({
   };
 
   const handleStartFollowUp = () => {
-    // Muda status para acompanhamento e abre o dialog
+    if (!user) return;
+
+    // Muda status para acompanhamento ANTES de abrir o dialog
     updateIncident(incident.id, {
       status: 'acompanhamento',
     });
     
-    toast({
-      title: 'Acompanhamento iniciado',
-      description: 'Registre agora as ações de acompanhamento',
-    });
-    
-    setShowFollowUpDialog(true);
+    // Pequeno delay para garantir que o estado foi atualizado
+    setTimeout(() => {
+      setShowFollowUpDialog(true);
+      toast({
+        title: 'Acompanhamento iniciado',
+        description: 'Preencha os detalhes da ação realizada. As providências já foram sugeridas automaticamente.',
+      });
+    }, 100);
   };
 
   return (

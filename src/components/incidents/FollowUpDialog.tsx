@@ -38,28 +38,32 @@ export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: 
   const [tipoSituacao, setTipoSituacao] = useState('');
   const [descricaoSituacao, setDescricaoSituacao] = useState('');
 
-  // Auto-preencher tipo e providências ao abrir
+  // Auto-preencher tipo e providências ao abrir (SEMPRE recalcula)
   useEffect(() => {
     if (open) {
-      // Calcular automaticamente com base na gravidade e histórico
-      try {
-        const suggested = calculateSuggestedAction(
-          incident.studentIds,
-          incident.finalSeverity,
-          incidents,
-          students
-        );
-        const autoType = suggestFollowUpType(suggested, incident.finalSeverity);
-        setType(autoType);
-        setProvidencias(suggested);
-      } catch (_e) {
-        // fallback silencioso
+      // Calcular automaticamente com base na gravidade e histórico REAL
+      const suggested = calculateSuggestedAction(
+        incident.studentIds,
+        incident.finalSeverity,
+        incidents,
+        students
+      );
+      const autoType = suggestFollowUpType(suggested, incident.finalSeverity);
+      
+      // Preenche automaticamente
+      setType(autoType);
+      setProvidencias(suggested);
+      
+      // Define motivo padrão baseado na gravidade
+      if (incident.finalSeverity === 'grave' || incident.finalSeverity === 'gravissima') {
+        setMotivo('1 - Comportamento inadequado');
+      } else if (incident.finalSeverity === 'intermediaria') {
+        setMotivo('2 - Conflitos/Relação interpessoal');
       }
 
-      // Reset dos outros campos
+      // Reset dos outros campos (mantém os auto-preenchidos)
       setDate(new Date().toISOString().split('T')[0]);
       setResponsavel('');
-      setMotivo('');
       setAssuntosTratados('');
       setEncaminhamentos('');
       setDisciplina('');
@@ -200,13 +204,16 @@ export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: 
               <div className="space-y-2">
                 <Label>Providências Tomadas / Sugeridas</Label>
                 <div className="mb-2 p-3 bg-primary/5 border border-primary/20 rounded-md">
-                  <p className="text-xs font-medium text-primary mb-1">✓ Sugestão Automática (baseada na gravidade):</p>
-                  <p className="text-sm">{providencias}</p>
+                  <p className="text-xs font-medium text-primary mb-1">✓ Sugestão Automática (baseada na gravidade e histórico):</p>
+                  <p className="text-sm font-medium">{providencias}</p>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  A providência acima foi calculada automaticamente. Você pode editá-la se necessário.
+                </p>
                 <Textarea
                   value={providencias}
                   onChange={(e) => setProvidencias(e.target.value)}
-                  placeholder="Providências tomadas ou sugeridas..."
+                  placeholder="Edite as providências se necessário..."
                   rows={3}
                 />
               </div>
