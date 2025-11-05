@@ -118,16 +118,6 @@ const Incidents = () => {
                     {getSeverityLabel(incident.finalSeverity)}
                   </Badge>
                   <span className="text-sm font-medium">{incidentClass?.name || 'Turma não encontrada'}</span>
-                  {incident.status === 'aberta' && !incident.validatedBy && (
-                    <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
-                      Aguardando Validação
-                    </Badge>
-                  )}
-                  {incident.validatedBy && (
-                    <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
-                      Validada
-                    </Badge>
-                  )}
                 </div>
                 <p className="text-sm text-muted-foreground">
                   {incidentStudents.map(s => s.name).join(', ')} • {incident.episodes.length} episódio(s)

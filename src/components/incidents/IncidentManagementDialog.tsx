@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { FollowUpList } from './FollowUpList';
 import { FollowUpDialog } from './FollowUpDialog';
-import { ValidationDialog } from './ValidationDialog';
 import {
   Dialog,
   DialogContent,
@@ -26,7 +25,7 @@ import { Incident, IncidentStatus } from '@/types';
 import { useIncidents, useClasses, useStudents } from '@/hooks/useLocalStorage';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Clock, CheckCircle, Plus, FileCheck } from 'lucide-react';
+import { Clock, CheckCircle, Plus } from 'lucide-react';
 
 interface IncidentManagementDialogProps {
   incident: Incident;
@@ -48,13 +47,13 @@ export const IncidentManagementDialog = ({
   const [newStatus, setNewStatus] = useState<IncidentStatus>(incident.status);
   const [commentText, setCommentText] = useState('');
   const [showFollowUpDialog, setShowFollowUpDialog] = useState(false);
-  const [showValidationDialog, setShowValidationDialog] = useState(false);
 
   const incidentClass = classes.find(c => c.id === incident.classId);
   const incidentStudents = students.filter(s => incident.studentIds.includes(s.id));
 
-  const canValidate = user?.role === 'diretor' || user?.role === 'coordenador';
-  const needsValidation = incident.status === 'aberta' && !incident.validatedBy;
+  const canManage = user?.role === 'diretor' || user?.role === 'coordenador';
+  const canStartFollowUp = incident.status === 'aberta' && canManage;
+  const canAddFollowUp = incident.status === 'acompanhamento';
 
   const statusOptions = [
     { value: 'aberta', label: 'Aberta' },
@@ -109,6 +108,20 @@ export const IncidentManagementDialog = ({
     setCommentText('');
   };
 
+  const handleStartFollowUp = () => {
+    // Muda status para acompanhamento e abre o dialog
+    updateIncident(incident.id, {
+      status: 'acompanhamento',
+    });
+    
+    toast({
+      title: 'Acompanhamento iniciado',
+      description: 'Registre agora as ações de acompanhamento',
+    });
+    
+    setShowFollowUpDialog(true);
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -121,14 +134,13 @@ export const IncidentManagementDialog = ({
                   Altere o status, adicione comentários e registre acompanhamentos
                 </DialogDescription>
               </div>
-              {needsValidation && canValidate && (
+              {canStartFollowUp && (
                 <Button 
-                  size="sm" 
-                  onClick={() => setShowValidationDialog(true)}
+                  onClick={handleStartFollowUp}
                   className="gap-2"
                 >
-                  <FileCheck className="h-4 w-4" />
-                  Validar Ocorrência
+                  <Plus className="h-4 w-4" />
+                  Iniciar Acompanhamento
                 </Button>
               )}
             </div>
@@ -145,12 +157,6 @@ export const IncidentManagementDialog = ({
                  incident.finalSeverity === 'intermediaria' ? 'Intermediária' :
                  incident.finalSeverity === 'grave' ? 'Grave' : 'Gravíssima'}
               </Badge>
-              {incident.validatedBy && (
-                <Badge variant="outline" className="gap-1">
-                  <CheckCircle className="h-3 w-3" />
-                  Validada
-                </Badge>
-              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-sm">
@@ -164,7 +170,7 @@ export const IncidentManagementDialog = ({
               <div className="col-span-2">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">Alunos:</span>
-                  {incident.status === 'acompanhamento' && (
+                  {canAddFollowUp && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -192,7 +198,30 @@ export const IncidentManagementDialog = ({
 
             <Separator />
 
-            {incident.status === 'acompanhamento' && (
+            {canStartFollowUp && (
+              <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4 flex items-start gap-3">
+                <div className="flex-shrink-0">
+                  <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+                    <Plus className="h-5 w-5 text-blue-600" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-medium mb-1">Pronto para iniciar o acompanhamento?</h4>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Clique no botão para mudar o status e registrar as ações de acompanhamento desta ocorrência.
+                  </p>
+                  <Button 
+                    onClick={handleStartFollowUp}
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Iniciar Acompanhamento
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {canAddFollowUp && (
               <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex items-start gap-3">
                 <div className="flex-shrink-0">
                   <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -202,7 +231,7 @@ export const IncidentManagementDialog = ({
                 <div className="flex-1">
                   <h4 className="font-medium mb-1">Ocorrência em Acompanhamento</h4>
                   <p className="text-sm text-muted-foreground mb-3">
-                    Registre as conversas individuais, reuniões com pais ou outras situações relacionadas aos alunos desta ocorrência.
+                    Registre conversas individuais, reuniões com pais ou outras ações relacionadas a esta ocorrência.
                   </p>
                   <Button 
                     size="sm" 
@@ -278,15 +307,16 @@ export const IncidentManagementDialog = ({
                   <p className="text-sm text-muted-foreground">
                     Registros de acompanhamento da ocorrência
                   </p>
-                  <Button 
-                    size="sm" 
-                    onClick={() => setShowFollowUpDialog(true)}
-                    className="gap-2"
-                    disabled={incident.status !== 'acompanhamento'}
-                  >
-                    <Plus className="h-4 w-4" />
-                    Novo Acompanhamento
-                  </Button>
+                  {canAddFollowUp && (
+                    <Button 
+                      size="sm" 
+                      onClick={() => setShowFollowUpDialog(true)}
+                      className="gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Novo Acompanhamento
+                    </Button>
+                  )}
                 </div>
                 <FollowUpList followUps={incident.followUps || []} />
               </TabsContent>
@@ -345,13 +375,6 @@ export const IncidentManagementDialog = ({
         open={showFollowUpDialog}
         onOpenChange={setShowFollowUpDialog}
         onAddFollowUp={addFollowUp}
-      />
-
-      <ValidationDialog
-        incident={incident}
-        open={showValidationDialog}
-        onOpenChange={setShowValidationDialog}
-        onValidate={updateIncident}
       />
     </>
   );
