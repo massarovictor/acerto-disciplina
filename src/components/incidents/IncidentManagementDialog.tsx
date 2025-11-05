@@ -33,6 +33,7 @@ interface IncidentManagementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onStatusChange?: (newStatus: IncidentStatus) => void;
+  initialTab?: 'info' | 'followup' | 'comments';
 }
 
 export const IncidentManagementDialog = ({
@@ -40,6 +41,7 @@ export const IncidentManagementDialog = ({
   open,
   onOpenChange,
   onStatusChange,
+  initialTab = 'info',
 }: IncidentManagementDialogProps) => {
   const { user } = useAuth();
   const { incidents, updateIncident, addFollowUp } = useIncidents();
@@ -49,7 +51,12 @@ export const IncidentManagementDialog = ({
 
   const [newStatus, setNewStatus] = useState<IncidentStatus>(incident.status);
   const [commentText, setCommentText] = useState('');
-  const [tab, setTab] = useState<'info' | 'followup' | 'comments'>('info');
+  const [tab, setTab] = useState<'info' | 'followup' | 'comments'>(initialTab);
+  
+  // Sincroniza a aba quando initialTab mudar
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab]);
   
   // Campos do acompanhamento
   const [followUpType, setFollowUpType] = useState<FollowUpType>('conversa_individual');

@@ -11,7 +11,8 @@ import {
   AlertTriangle,
   Clock,
   CheckCircle2,
-  XCircle
+  Trash2,
+  Edit
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -20,20 +21,25 @@ import { IncidentDetailsDialog } from '@/components/incidents/IncidentDetailsDia
 import { IncidentManagementDialog } from '@/components/incidents/IncidentManagementDialog';
 import { IncidentWizard } from '@/components/incidents/IncidentWizard';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Incident } from '@/types';
+import { useToast } from '@/hooks/use-toast';
 
 const Incidents = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { incidents } = useIncidents();
+  const { incidents, deleteIncident } = useIncidents();
   const { classes } = useClasses();
   const { students } = useStudents();
+  const { toast } = useToast();
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
+  const [viewingIncident, setViewingIncident] = useState<Incident | null>(null);
   const [managingIncident, setManagingIncident] = useState<Incident | null>(null);
+  const [deletingIncident, setDeletingIncident] = useState<Incident | null>(null);
   const [showNewIncidentDialog, setShowNewIncidentDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<'aberta' | 'acompanhamento' | 'resolvida'>('aberta');
+  const [initialTab, setInitialTab] = useState<'info' | 'followup' | 'comments'>('info');
 
   // Filter incidents by status
   const openIncidents = incidents.filter(i => i.status === 'aberta');
@@ -134,21 +140,55 @@ const Incidents = () => {
               </div>
 
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSelectedIncident(incident)}
-                >
-                  <Eye className="h-4 w-4 mr-1" />
-                  Ver
-                </Button>
-                {(user?.role === 'diretor' || user?.role === 'coordenador') && (
+                {(user?.role === 'diretor' || user?.role === 'coordenador') ? (
+                  <>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => {
+                        if (incident.status === 'acompanhamento') {
+                          setInitialTab('followup');
+                        } else {
+                          setInitialTab('info');
+                        }
+                        setManagingIncident(incident);
+                      }}
+                    >
+                      {incident.status === 'aberta' ? (
+                        <>
+                          <Edit className="h-4 w-4 mr-1" />
+                          Gerenciar
+                        </>
+                      ) : incident.status === 'acompanhamento' ? (
+                        <>
+                          <Edit className="h-4 w-4 mr-1" />
+                          Editar
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="h-4 w-4 mr-1" />
+                          Visualizar
+                        </>
+                      )}
+                    </Button>
+                    {incident.status === 'aberta' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDeletingIncident(incident)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </>
+                ) : (
                   <Button
-                    variant="default"
+                    variant="outline"
                     size="sm"
-                    onClick={() => setManagingIncident(incident)}
+                    onClick={() => setViewingIncident(incident)}
                   >
-                    Gerenciar
+                    <Eye className="h-4 w-4 mr-1" />
+                    Visualizar
                   </Button>
                 )}
               </div>
@@ -268,11 +308,11 @@ const Incidents = () => {
       </Tabs>
 
       {/* Dialogs */}
-      {selectedIncident && (
+      {viewingIncident && (
         <IncidentDetailsDialog
-          incident={selectedIncident}
-          open={!!selectedIncident}
-          onOpenChange={(open) => !open && setSelectedIncident(null)}
+          incident={viewingIncident}
+          open={!!viewingIncident}
+          onOpenChange={(open) => !open && setViewingIncident(null)}
         />
       )}
 
@@ -280,9 +320,14 @@ const Incidents = () => {
         <IncidentManagementDialog
           incident={managingIncident}
           open={!!managingIncident}
-          onOpenChange={(open) => !open && setManagingIncident(null)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setManagingIncident(null);
+              setInitialTab('info');
+            }
+          }}
+          initialTab={initialTab}
           onStatusChange={(newStatus) => {
-            // Quando o status mudar, trocar a aba
             if (newStatus === 'acompanhamento') {
               setActiveTab('acompanhamento');
             } else if (newStatus === 'resolvida') {
@@ -291,6 +336,35 @@ const Incidents = () => {
           }}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingIncident} onOpenChange={(open) => !open && setDeletingIncident(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta ocorrência? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deletingIncident) {
+                  deleteIncident(deletingIncident.id);
+                  toast({
+                    title: 'Ocorrência excluída',
+                    description: 'A ocorrência foi removida com sucesso.',
+                  });
+                  setDeletingIncident(null);
+                }
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* New Incident Dialog */}
       <Dialog open={showNewIncidentDialog} onOpenChange={setShowNewIncidentDialog}>
