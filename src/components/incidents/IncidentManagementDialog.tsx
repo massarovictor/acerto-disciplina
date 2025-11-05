@@ -31,12 +31,14 @@ interface IncidentManagementDialogProps {
   incident: Incident;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onStatusChange?: (newStatus: IncidentStatus) => void;
 }
 
 export const IncidentManagementDialog = ({
   incident,
   open,
   onOpenChange,
+  onStatusChange,
 }: IncidentManagementDialogProps) => {
   const { user } = useAuth();
   const { incidents, updateIncident, addFollowUp } = useIncidents();
@@ -56,6 +58,9 @@ export const IncidentManagementDialog = ({
   const canManage = user?.role === 'diretor' || user?.role === 'coordenador';
   const canStartFollowUp = currentIncident.status === 'aberta' && canManage;
   const canAddFollowUp = currentIncident.status === 'acompanhamento';
+  const canResolve = currentIncident.status === 'acompanhamento' && 
+                     (currentIncident.followUps?.length || 0) > 0 && 
+                     canManage;
 
   const statusOptions = [
     { value: 'aberta', label: 'Aberta' },
@@ -113,10 +118,13 @@ export const IncidentManagementDialog = ({
   const handleStartFollowUp = () => {
     if (!user) return;
 
-    // Muda status para acompanhamento ANTES de abrir o dialog
+    // Muda status para acompanhamento
     updateIncident(incident.id, {
       status: 'acompanhamento',
     });
+
+    // Notifica mudança de status
+    onStatusChange?.('acompanhamento');
 
     // Já muda para a aba de acompanhamentos
     setTab('followups');
@@ -129,6 +137,26 @@ export const IncidentManagementDialog = ({
         description: 'Preencha os detalhes da ação realizada. As providências já foram sugeridas automaticamente.',
       });
     }, 100);
+  };
+
+  const handleResolve = () => {
+    if (!user) return;
+
+    updateIncident(incident.id, {
+      status: 'resolvida',
+    });
+
+    onStatusChange?.('resolvida');
+
+    toast({
+      title: 'Ocorrência resolvida',
+      description: 'A ocorrência foi marcada como resolvida com sucesso.',
+    });
+
+    // Fecha o dialog após resolver
+    setTimeout(() => {
+      onOpenChange(false);
+    }, 500);
   };
 
   return (
@@ -216,14 +244,27 @@ export const IncidentManagementDialog = ({
                   <p className="text-sm text-muted-foreground mb-3">
                     Registre conversas individuais, reuniões com pais ou outras ações relacionadas a esta ocorrência.
                   </p>
-                  <Button 
-                    size="sm" 
-                    onClick={() => setShowFollowUpDialog(true)}
-                    className="gap-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Registrar Acompanhamento
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      onClick={() => setShowFollowUpDialog(true)}
+                      className="gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Registrar Acompanhamento
+                    </Button>
+                    {canResolve && (
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={handleResolve}
+                        className="gap-2"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                        Resolver Ocorrência
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

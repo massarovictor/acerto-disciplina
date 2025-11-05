@@ -33,6 +33,7 @@ const Incidents = () => {
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [managingIncident, setManagingIncident] = useState<Incident | null>(null);
   const [showNewIncidentDialog, setShowNewIncidentDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState<'aberta' | 'acompanhamento' | 'resolvida'>('aberta');
 
   // Filter incidents by status
   const openIncidents = incidents.filter(i => i.status === 'aberta');
@@ -219,7 +220,7 @@ const Incidents = () => {
       </div>
 
       {/* Tabs by Status */}
-      <Tabs defaultValue="aberta" className="w-full">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'aberta' | 'acompanhamento' | 'resolvida')} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="aberta">
             Abertas ({openIncidents.length})
@@ -280,6 +281,27 @@ const Incidents = () => {
           incident={managingIncident}
           open={!!managingIncident}
           onOpenChange={(open) => !open && setManagingIncident(null)}
+          onStatusChange={(newStatus) => {
+            // Quando o status mudar, trocar a aba e reabrir o dialog
+            if (newStatus === 'acompanhamento') {
+              setActiveTab('acompanhamento');
+              // Pequeno delay para garantir que a ocorrência foi atualizada
+              setTimeout(() => {
+                const updatedIncident = incidents.find(i => i.id === managingIncident.id);
+                if (updatedIncident) {
+                  setManagingIncident(updatedIncident);
+                }
+              }, 200);
+            } else if (newStatus === 'resolvida') {
+              setActiveTab('resolvida');
+              setTimeout(() => {
+                const updatedIncident = incidents.find(i => i.id === managingIncident.id);
+                if (updatedIncident) {
+                  setManagingIncident(updatedIncident);
+                }
+              }, 200);
+            }
+          }}
         />
       )}
 
