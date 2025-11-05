@@ -39,7 +39,7 @@ export const IncidentManagementDialog = ({
   onOpenChange,
 }: IncidentManagementDialogProps) => {
   const { user } = useAuth();
-  const { updateIncident, addFollowUp } = useIncidents();
+  const { incidents, updateIncident, addFollowUp } = useIncidents();
   const { classes } = useClasses();
   const { students } = useStudents();
   const { toast } = useToast();
@@ -47,13 +47,15 @@ export const IncidentManagementDialog = ({
   const [newStatus, setNewStatus] = useState<IncidentStatus>(incident.status);
   const [commentText, setCommentText] = useState('');
   const [showFollowUpDialog, setShowFollowUpDialog] = useState(false);
+  const [tab, setTab] = useState<'info' | 'followups' | 'comments'>('info');
+  const currentIncident = incidents.find(i => i.id === incident.id) || incident;
 
-  const incidentClass = classes.find(c => c.id === incident.classId);
-  const incidentStudents = students.filter(s => incident.studentIds.includes(s.id));
+  const incidentClass = classes.find(c => c.id === currentIncident.classId);
+  const incidentStudents = students.filter(s => currentIncident.studentIds.includes(s.id));
 
   const canManage = user?.role === 'diretor' || user?.role === 'coordenador';
-  const canStartFollowUp = incident.status === 'aberta' && canManage;
-  const canAddFollowUp = incident.status === 'acompanhamento';
+  const canStartFollowUp = currentIncident.status === 'aberta' && canManage;
+  const canAddFollowUp = currentIncident.status === 'acompanhamento';
 
   const statusOptions = [
     { value: 'aberta', label: 'Aberta' },
@@ -115,6 +117,9 @@ export const IncidentManagementDialog = ({
     updateIncident(incident.id, {
       status: 'acompanhamento',
     });
+
+    // Já muda para a aba de acompanhamentos
+    setTab('followups');
     
     // Pequeno delay para garantir que o estado foi atualizado
     setTimeout(() => {
@@ -140,13 +145,13 @@ export const IncidentManagementDialog = ({
           <div className="space-y-4">
             {/* Header Info */}
             <div className="flex gap-2 flex-wrap">
-              <Badge variant="outline" className={getStatusColor(incident.status)}>
-                {statusOptions.find(s => s.value === incident.status)?.label}
+              <Badge variant="outline" className={getStatusColor(currentIncident.status)}>
+                {statusOptions.find(s => s.value === currentIncident.status)?.label}
               </Badge>
-              <Badge variant="outline" className={getSeverityColor(incident.finalSeverity)}>
-                {incident.finalSeverity === 'leve' ? 'Leve' :
-                 incident.finalSeverity === 'intermediaria' ? 'Intermediária' :
-                 incident.finalSeverity === 'grave' ? 'Grave' : 'Gravíssima'}
+              <Badge variant="outline" className={getSeverityColor(currentIncident.finalSeverity)}>
+                {currentIncident.finalSeverity === 'leve' ? 'Leve' :
+                 currentIncident.finalSeverity === 'intermediaria' ? 'Intermediária' :
+                 currentIncident.finalSeverity === 'grave' ? 'Grave' : 'Gravíssima'}
               </Badge>
             </div>
 
@@ -156,7 +161,7 @@ export const IncidentManagementDialog = ({
               </div>
               <div>
                 <span className="font-medium">Data:</span>{' '}
-                {new Date(incident.createdAt).toLocaleDateString('pt-BR')}
+                {new Date(currentIncident.createdAt).toLocaleDateString('pt-BR')}
               </div>
               <div className="col-span-2">
                 <span className="font-medium">Alunos:</span>
@@ -224,14 +229,14 @@ export const IncidentManagementDialog = ({
             )}
 
             {/* Tabs */}
-            <Tabs defaultValue="info" className="w-full">
+            <Tabs value={tab} onValueChange={(v) => setTab(v as 'info' | 'followups' | 'comments')} className="w-full">
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="info">Informações</TabsTrigger>
                 <TabsTrigger value="followups">
-                  Acompanhamentos ({incident.followUps?.length || 0})
+                  Acompanhamentos ({currentIncident.followUps?.length || 0})
                 </TabsTrigger>
                 <TabsTrigger value="comments">
-                  Comentários ({incident.comments?.length || 0})
+                  Comentários ({currentIncident.comments?.length || 0})
                 </TabsTrigger>
               </TabsList>
 
@@ -239,24 +244,24 @@ export const IncidentManagementDialog = ({
                 <div className="space-y-2">
                   <Label>Descrição</Label>
                   <p className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
-                    {incident.description}
+                    {currentIncident.description}
                   </p>
                 </div>
 
-                {incident.suggestedAction && (
+                {currentIncident.suggestedAction && (
                   <div className="space-y-2">
                     <Label>Providência Sugerida (Automática)</Label>
                     <p className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
-                      {incident.suggestedAction}
+                      {currentIncident.suggestedAction}
                     </p>
                   </div>
                 )}
 
-                {incident.actions && (
+                {currentIncident.actions && (
                   <div className="space-y-2">
                     <Label>Providências Tomadas</Label>
                     <p className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
-                      {incident.actions}
+                      {currentIncident.actions}
                     </p>
                   </div>
                 )}
@@ -296,7 +301,7 @@ export const IncidentManagementDialog = ({
                     </Button>
                   )}
                 </div>
-                <FollowUpList followUps={incident.followUps || []} />
+                <FollowUpList followUps={currentIncident.followUps || []} />
               </TabsContent>
 
               <TabsContent value="comments" className="space-y-4 mt-4">
@@ -311,12 +316,12 @@ export const IncidentManagementDialog = ({
                   />
                 </div>
 
-                {incident.comments && incident.comments.length > 0 && (
+                {currentIncident.comments && currentIncident.comments.length > 0 && (
                   <>
                     <Separator />
                     <div className="space-y-3">
                       <Label>Histórico de Comentários</Label>
-                      {incident.comments.map((comment) => (
+                      {currentIncident.comments.map((comment) => (
                         <div key={comment.id} className="border rounded-lg p-3 space-y-1">
                           <div className="flex items-center gap-2 text-sm">
                             <span className="font-medium">{comment.userName}</span>
