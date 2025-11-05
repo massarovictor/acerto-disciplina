@@ -442,10 +442,16 @@ export const IncidentManagementDialog = ({
                     </div>
                   </>
                 ) : (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">
-                      Inicie o acompanhamento na aba "Informações" para preencher este formulário.
-                    </p>
+                  <div className="space-y-4 mt-2">
+                    {currentIncident.followUps && currentIncident.followUps.length > 0 ? (
+                      <FollowUpList followUps={currentIncident.followUps} />
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-muted-foreground">
+                          Nenhum acompanhamento registrado para esta ocorrência.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </TabsContent>

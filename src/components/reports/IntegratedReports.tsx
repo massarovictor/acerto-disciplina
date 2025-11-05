@@ -4,15 +4,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { FileText, Users, TrendingUp, AlertTriangle, Download, FileDown } from 'lucide-react';
 import { useState } from 'react';
-import { Class, Student } from '@/types';
+import { Class, Student, Incident } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 
 interface IntegratedReportsProps {
   classes: Class[];
   students: Student[];
+  incidents: Incident[];
 }
 
-export const IntegratedReports = ({ classes, students }: IntegratedReportsProps) => {
+export const IntegratedReports = ({ classes, students, incidents }: IntegratedReportsProps) => {
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedStudent, setSelectedStudent] = useState('');
   const { toast } = useToast();
@@ -34,14 +35,27 @@ export const IntegratedReports = ({ classes, students }: IntegratedReportsProps)
     switch (type) {
       case 'occurrences':
         fileName = `relatorio-ocorrencias-${classData?.name || 'turma'}.pdf`;
+        const classIncidents = incidents.filter(i => i.classId === selectedClass);
+        const resolved = classIncidents.filter(i => i.status === 'resolvida');
+        const followUpCount = classIncidents.filter(i => i.followUps && i.followUps.length > 0).length;
+        const resolvedDetails = resolved.map(i => {
+          const date = new Date(i.date).toLocaleDateString('pt-BR');
+          const sev = i.finalSeverity;
+          const prov = (i.followUps || [])
+            .map(f => f.providencias)
+            .filter(Boolean)
+            .join('; ');
+          return `- ${date} | Gravidade: ${sev} | Alunos: ${i.studentIds.length} | Providências: ${prov || '—'}`;
+        }).join('\n');
+
         sections = [
           {
             title: 'Relatório de Ocorrências',
-            content: `Turma: ${classData?.name}\nTotal de alunos: ${classStudents.length}\n\nEste relatório contém o histórico completo de ocorrências disciplinares da turma, incluindo análise de gravidade, providências tomadas e identificação de padrões de reincidência.`,
+            content: `Turma: ${classData?.name}\nTotal de alunos: ${classStudents.length}\nOcorrências: ${classIncidents.length}\nCom acompanhamento: ${followUpCount}\nResolvidas: ${resolved.length}`,
           },
           {
-            title: 'Resumo',
-            content: 'Análise detalhada das ocorrências registradas no período, com categorização por gravidade e identificação de alunos com múltiplas ocorrências.',
+            title: 'Ocorrências Resolvidas (Resumo Completo)',
+            content: resolved.length ? resolvedDetails : 'Nenhuma ocorrência resolvida registrada para esta turma.',
           },
         ];
         break;

@@ -72,6 +72,23 @@ export const FollowUpList = ({ followUps }: FollowUpListProps) => {
                 <span>Responsável: {followUp.responsavel}</span>
               </div>
 
+              {followUp.type === 'conversa_pais' && (followUp.nomeResponsavelPai || followUp.grauParentesco) && (
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  {followUp.nomeResponsavelPai && (
+                    <div>
+                      <p className="text-sm font-medium mb-1">Nome do Responsável</p>
+                      <p className="text-sm text-muted-foreground">{followUp.nomeResponsavelPai}</p>
+                    </div>
+                  )}
+                  {followUp.grauParentesco && (
+                    <div>
+                      <p className="text-sm font-medium mb-1">Grau de Parentesco</p>
+                      <p className="text-sm text-muted-foreground">{followUp.grauParentesco}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {followUp.motivo && (
                 <div>
                   <p className="text-sm font-medium mb-1">Motivo:</p>
@@ -79,17 +96,24 @@ export const FollowUpList = ({ followUps }: FollowUpListProps) => {
                 </div>
               )}
 
+              {followUp.providencias && (
+                <div>
+                  <p className="text-sm font-medium mb-1">Providências Tomadas/Sugeridas:</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{followUp.providencias}</p>
+                </div>
+              )}
+
               {followUp.assuntosTratados && (
                 <div>
                   <p className="text-sm font-medium mb-1">Assuntos Tratados:</p>
-                  <p className="text-sm text-muted-foreground">{followUp.assuntosTratados}</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{followUp.assuntosTratados}</p>
                 </div>
               )}
 
               {followUp.encaminhamentos && (
                 <div>
                   <p className="text-sm font-medium mb-1">Encaminhamentos/Combinados:</p>
-                  <p className="text-sm text-muted-foreground">{followUp.encaminhamentos}</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{followUp.encaminhamentos}</p>
                 </div>
               )}
 
@@ -110,7 +134,7 @@ export const FollowUpList = ({ followUps }: FollowUpListProps) => {
               {followUp.descricaoSituacao && (
                 <div>
                   <p className="text-sm font-medium mb-1">Descrição da Situação:</p>
-                  <p className="text-sm text-muted-foreground">{followUp.descricaoSituacao}</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{followUp.descricaoSituacao}</p>
                 </div>
               )}
 

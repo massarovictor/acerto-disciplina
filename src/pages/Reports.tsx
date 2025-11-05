@@ -43,6 +43,7 @@ const Reports = () => {
           <IntegratedReports 
             classes={classes} 
             students={students} 
+            incidents={incidents}
           />
         </TabsContent>
 

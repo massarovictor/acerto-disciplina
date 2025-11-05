@@ -146,6 +146,10 @@ const Incidents = () => {
                       variant="default"
                       size="sm"
                       onClick={() => {
+                        if (incident.status === 'resolvida') {
+                          setViewingIncident(incident);
+                          return;
+                        }
                         if (incident.status === 'acompanhamento') {
                           setInitialTab('followup');
                         } else {
