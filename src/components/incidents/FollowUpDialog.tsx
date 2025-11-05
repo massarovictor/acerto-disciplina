@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Incident, FollowUpType } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { suggestFollowUpType } from '@/lib/incidentActions';
+import { useIncidents, useStudents } from '@/hooks/useLocalStorage';
+import { calculateSuggestedAction, suggestFollowUpType } from '@/lib/incidentActions';
 
 interface FollowUpDialogProps {
   incident: Incident;
@@ -20,6 +21,8 @@ interface FollowUpDialogProps {
 export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: FollowUpDialogProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { incidents } = useIncidents();
+  const { students } = useStudents();
   const [type, setType] = useState<FollowUpType>('conversa_individual');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [responsavel, setResponsavel] = useState('');
@@ -38,11 +41,21 @@ export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: 
   // Auto-preencher tipo e providências ao abrir
   useEffect(() => {
     if (open) {
-      if (incident.suggestedAction) {
-        const suggestedType = suggestFollowUpType(incident.suggestedAction);
-        setType(suggestedType);
-        setProvidencias(incident.suggestedAction);
+      // Calcular automaticamente com base na gravidade e histórico
+      try {
+        const suggested = calculateSuggestedAction(
+          incident.studentIds,
+          incident.finalSeverity,
+          incidents,
+          students
+        );
+        const autoType = suggestFollowUpType(suggested, incident.finalSeverity);
+        setType(autoType);
+        setProvidencias(suggested);
+      } catch (_e) {
+        // fallback silencioso
       }
+
       // Reset dos outros campos
       setDate(new Date().toISOString().split('T')[0]);
       setResponsavel('');
@@ -53,7 +66,7 @@ export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: 
       setTipoSituacao('');
       setDescricaoSituacao('');
     }
-  }, [open]);
+  }, [open, incidents, students, incident.studentIds, incident.finalSeverity]);
 
   const motivoOptions = [
     '1 - Comportamento inadequado',

@@ -45,16 +45,32 @@ export function calculateSuggestedAction(
 }
 
 // Get follow-up type suggestion based on action taken
-export function suggestFollowUpType(action: string): 'conversa_individual' | 'conversa_pais' | 'situacoes_diversas' {
+export function suggestFollowUpType(
+  action: string,
+  severity?: IncidentSeverity
+): 'conversa_individual' | 'conversa_pais' | 'situacoes_diversas' {
+  // Se a gravidade já indica necessidade de contato com responsáveis
+  if (severity === 'intermediaria' || severity === 'grave' || severity === 'gravissima') {
+    return 'conversa_pais';
+  }
+
   const actionLower = action.toLowerCase();
-  
-  if (actionLower.includes('suspensão') || actionLower.includes('suspenso')) {
+
+  if (
+    actionLower.includes('suspensão') ||
+    actionLower.includes('suspensao') ||
+    actionLower.includes('suspenso')
+  ) {
     return 'conversa_pais';
   }
-  
-  if (actionLower.includes('comunicado aos pais') || actionLower.includes('responsáveis')) {
+
+  if (
+    actionLower.includes('comunicado aos pais') ||
+    actionLower.includes('responsáveis') ||
+    actionLower.includes('responsaveis')
+  ) {
     return 'conversa_pais';
   }
-  
+
   return 'conversa_individual';
 }
