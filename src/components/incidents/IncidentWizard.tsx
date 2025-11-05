@@ -23,6 +23,7 @@ export interface IncidentFormData {
   severityOverrideReason?: string;
   description: string;
   actions?: string;
+  suggestedAction?: string;
 }
 
 const steps = [
@@ -82,13 +83,14 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
       finalSeverity: formData.finalSeverity || formData.calculatedSeverity || 'leve',
       description: formData.description || '',
       actions: formData.actions,
+      suggestedAction: formData.suggestedAction,
       status: 'aberta',
       createdBy: user.id,
     });
 
     toast({
       title: 'Ocorrência registrada',
-      description: 'A ocorrência foi registrada com sucesso.',
+      description: 'A ocorrência foi registrada com sucesso e aguarda validação.',
     });
 
     if (onComplete) {

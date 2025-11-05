@@ -104,9 +104,8 @@ const Dashboard = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'aberta': return 'bg-status-open/10 text-status-open border-status-open';
-      case 'em-analise': return 'bg-status-analysis/10 text-status-analysis border-status-analysis';
+      case 'acompanhamento': return 'bg-status-analysis/10 text-status-analysis border-status-analysis';
       case 'resolvida': return 'bg-status-resolved/10 text-status-resolved border-status-resolved';
-      case 'encerrada': return 'bg-status-closed/10 text-status-closed border-status-closed';
       default: return '';
     }
   };
@@ -206,11 +205,11 @@ const Dashboard = () => {
             Abertas
           </Button>
           <Button
-            variant={statusFilter === 'em-analise' ? 'default' : 'outline'}
+            variant={statusFilter === 'acompanhamento' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setStatusFilter('em-analise')}
+            onClick={() => setStatusFilter('acompanhamento')}
           >
-            Em Análise
+            Em Acompanhamento
           </Button>
           <Button
             variant={statusFilter === 'resolvida' ? 'default' : 'outline'}
@@ -218,13 +217,6 @@ const Dashboard = () => {
             onClick={() => setStatusFilter('resolvida')}
           >
             Resolvidas
-          </Button>
-          <Button
-            variant={statusFilter === 'encerrada' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setStatusFilter('encerrada')}
-          >
-            Encerradas
           </Button>
         </div>
         <Button
