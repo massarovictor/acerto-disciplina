@@ -5,6 +5,7 @@ import { ValidationDialog } from './ValidationDialog';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -114,7 +115,12 @@ export const IncidentManagementDialog = ({
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-start justify-between">
-              <DialogTitle>Gerenciar Ocorrência</DialogTitle>
+              <div>
+                <DialogTitle>Gerenciar Ocorrência</DialogTitle>
+                <DialogDescription>
+                  Altere o status, adicione comentários e registre acompanhamentos
+                </DialogDescription>
+              </div>
               {needsValidation && canValidate && (
                 <Button 
                   size="sm" 
@@ -156,11 +162,59 @@ export const IncidentManagementDialog = ({
                 {new Date(incident.createdAt).toLocaleDateString('pt-BR')}
               </div>
               <div className="col-span-2">
-                <span className="font-medium">Alunos:</span> {incidentStudents.map(s => s.name).join(', ')}
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Alunos:</span>
+                  {incident.status === 'acompanhamento' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowFollowUpDialog(true)}
+                      className="gap-1 h-7 text-xs"
+                    >
+                      <Plus className="h-3 w-3" />
+                      Registrar acompanhamento
+                    </Button>
+                  )}
+                </div>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {incidentStudents.map(student => (
+                    <Badge 
+                      key={student.id} 
+                      variant="secondary"
+                      className="cursor-default"
+                    >
+                      {student.name}
+                    </Badge>
+                  ))}
+                </div>
               </div>
             </div>
 
             <Separator />
+
+            {incident.status === 'acompanhamento' && (
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex items-start gap-3">
+                <div className="flex-shrink-0">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Plus className="h-5 w-5 text-primary" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-medium mb-1">Ocorrência em Acompanhamento</h4>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Registre as conversas individuais, reuniões com pais ou outras situações relacionadas aos alunos desta ocorrência.
+                  </p>
+                  <Button 
+                    size="sm" 
+                    onClick={() => setShowFollowUpDialog(true)}
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Registrar Acompanhamento
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Tabs */}
             <Tabs defaultValue="info" className="w-full">
@@ -220,20 +274,19 @@ export const IncidentManagementDialog = ({
               </TabsContent>
 
               <TabsContent value="followups" className="space-y-4 mt-4">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center mb-4">
                   <p className="text-sm text-muted-foreground">
                     Registros de acompanhamento da ocorrência
                   </p>
-                  {incident.status === 'acompanhamento' && (
-                    <Button 
-                      size="sm" 
-                      onClick={() => setShowFollowUpDialog(true)}
-                      className="gap-2"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Adicionar
-                    </Button>
-                  )}
+                  <Button 
+                    size="sm" 
+                    onClick={() => setShowFollowUpDialog(true)}
+                    className="gap-2"
+                    disabled={incident.status !== 'acompanhamento'}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Novo Acompanhamento
+                  </Button>
                 </div>
                 <FollowUpList followUps={incident.followUps || []} />
               </TabsContent>

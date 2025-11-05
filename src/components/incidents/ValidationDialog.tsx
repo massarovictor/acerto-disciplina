@@ -29,26 +29,23 @@ export const ValidationDialog = ({ incident, open, onOpenChange, onValidate }: V
       status: approved ? 'acompanhamento' : 'aberta',
       validatedBy: user.id,
       validatedAt: new Date().toISOString(),
-    };
-
-    if (notes) {
-      updates.comments = [
+      comments: [
         ...(incident.comments || []),
         {
           id: Date.now().toString(),
           userId: user.id,
           userName: user.name,
-          text: `Validação: ${approved ? 'Aprovada' : 'Rejeitada'}. ${notes}`,
+          text: `${approved ? '✓ Validação aprovada' : '✗ Validação rejeitada'}${notes ? ': ' + notes : ''}`,
           createdAt: new Date().toISOString(),
         },
-      ];
-    }
+      ],
+    };
 
     onValidate(incident.id, updates);
     
     toast({
-      title: approved ? 'Ocorrência validada' : 'Ocorrência retornada',
-      description: approved ? 'Acompanhamento iniciado com sucesso' : 'Solicitado mais informações',
+      title: approved ? 'Ocorrência validada!' : 'Ocorrência retornada',
+      description: approved ? 'Status alterado para "Em Acompanhamento"' : 'Solicitadas mais informações',
     });
 
     onOpenChange(false);
