@@ -127,23 +127,10 @@ export const IncidentManagementDialog = ({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <div className="flex items-start justify-between">
-              <div>
-                <DialogTitle>Gerenciar Ocorrência</DialogTitle>
-                <DialogDescription>
-                  Altere o status, adicione comentários e registre acompanhamentos
-                </DialogDescription>
-              </div>
-              {canStartFollowUp && (
-                <Button 
-                  onClick={handleStartFollowUp}
-                  className="gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Iniciar Acompanhamento
-                </Button>
-              )}
-            </div>
+            <DialogTitle>Gerenciar Ocorrência</DialogTitle>
+            <DialogDescription>
+              Altere o status, adicione comentários e registre acompanhamentos
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -168,20 +155,7 @@ export const IncidentManagementDialog = ({
                 {new Date(incident.createdAt).toLocaleDateString('pt-BR')}
               </div>
               <div className="col-span-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">Alunos:</span>
-                  {canAddFollowUp && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setShowFollowUpDialog(true)}
-                      className="gap-1 h-7 text-xs"
-                    >
-                      <Plus className="h-3 w-3" />
-                      Registrar acompanhamento
-                    </Button>
-                  )}
-                </div>
+                <span className="font-medium">Alunos:</span>
                 <div className="mt-1 flex flex-wrap gap-2">
                   {incidentStudents.map(student => (
                     <Badge 

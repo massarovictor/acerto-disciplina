@@ -28,6 +28,7 @@ export interface FollowUpRecord {
   date: string;
   responsavel: string;
   motivo?: string;
+  providencias?: string;
   assuntosTratados?: string;
   encaminhamentos?: string;
   disciplina?: string;

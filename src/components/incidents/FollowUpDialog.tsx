@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Incident, FollowUpType } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { suggestFollowUpType } from '@/lib/incidentActions';
 
 interface FollowUpDialogProps {
   incident: Incident;
@@ -23,15 +24,25 @@ export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: 
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [responsavel, setResponsavel] = useState('');
   
-  // Conversa Individual fields
+  // Conversa Individual/Pais fields
   const [motivo, setMotivo] = useState('');
   const [assuntosTratados, setAssuntosTratados] = useState('');
   const [encaminhamentos, setEncaminhamentos] = useState('');
+  const [providencias, setProvidencias] = useState('');
   
   // Situações Diversas fields
   const [disciplina, setDisciplina] = useState('');
   const [tipoSituacao, setTipoSituacao] = useState('');
   const [descricaoSituacao, setDescricaoSituacao] = useState('');
+
+  // Auto-preencher tipo e providências ao abrir
+  useEffect(() => {
+    if (open && incident.suggestedAction) {
+      const suggestedType = suggestFollowUpType(incident.suggestedAction);
+      setType(suggestedType);
+      setProvidencias(incident.suggestedAction);
+    }
+  }, [open, incident.suggestedAction]);
 
   const motivoOptions = [
     '1 - Comportamento inadequado',
@@ -70,6 +81,7 @@ export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: 
 
     if (type === 'conversa_individual' || type === 'conversa_pais') {
       followUp.motivo = motivo;
+      followUp.providencias = providencias;
       followUp.assuntosTratados = assuntosTratados;
       followUp.encaminhamentos = encaminhamentos;
     }
@@ -92,9 +104,11 @@ export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: 
   };
 
   const resetForm = () => {
+    setType('conversa_individual');
     setDate(new Date().toISOString().split('T')[0]);
     setResponsavel('');
     setMotivo('');
+    setProvidencias('');
     setAssuntosTratados('');
     setEncaminhamentos('');
     setDisciplina('');
@@ -157,6 +171,20 @@ export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: 
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Providências Tomadas / Sugeridas</Label>
+                <div className="mb-2 p-3 bg-primary/5 border border-primary/20 rounded-md">
+                  <p className="text-xs font-medium text-primary mb-1">✓ Sugestão Automática (baseada na gravidade):</p>
+                  <p className="text-sm">{providencias}</p>
+                </div>
+                <Textarea
+                  value={providencias}
+                  onChange={(e) => setProvidencias(e.target.value)}
+                  placeholder="Providências tomadas ou sugeridas..."
+                  rows={3}
+                />
               </div>
 
               <div className="space-y-2">

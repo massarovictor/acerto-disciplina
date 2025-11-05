@@ -23,7 +23,7 @@ export const DetailsStep = ({ formData, updateFormData }: DetailsStepProps) => {
         incidents,
         students
       );
-      updateFormData({ suggestedAction: suggested, actions: suggested });
+      updateFormData({ suggestedAction: suggested });
     }
   }, [formData.studentIds, formData.finalSeverity]);
 
@@ -32,7 +32,7 @@ export const DetailsStep = ({ formData, updateFormData }: DetailsStepProps) => {
       <div>
         <h2 className="text-2xl font-bold">Detalhes da Ocorrência</h2>
         <p className="text-muted-foreground mt-1">
-          Descreva o que aconteceu e as providências tomadas ou sugeridas
+          Descreva detalhadamente o que aconteceu
         </p>
       </div>
 
@@ -44,32 +44,11 @@ export const DetailsStep = ({ formData, updateFormData }: DetailsStepProps) => {
             placeholder="Descreva com detalhes o que aconteceu, contexto e circunstâncias..."
             value={formData.description || ''}
             onChange={(e) => updateFormData({ description: e.target.value })}
-            rows={6}
+            rows={8}
             className="resize-none"
           />
           <p className="text-xs text-muted-foreground">
             {formData.description?.length || 0} / 1000 caracteres
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="actions">Providências Tomadas / Sugeridas</Label>
-          {formData.suggestedAction && (
-            <div className="mb-2 p-3 bg-primary/5 border border-primary/20 rounded-md">
-              <p className="text-xs font-medium text-primary mb-1">✓ Sugestão Automática:</p>
-              <p className="text-sm text-muted-foreground">{formData.suggestedAction}</p>
-            </div>
-          )}
-          <Textarea
-            id="actions"
-            placeholder="Descreva as ações já tomadas ou sugestões de providências..."
-            value={formData.actions || ''}
-            onChange={(e) => updateFormData({ actions: e.target.value })}
-            rows={4}
-            className="resize-none"
-          />
-          <p className="text-xs text-muted-foreground">
-            Opcional - pode ser preenchido posteriormente pelo diretor
           </p>
         </div>
       </div>
