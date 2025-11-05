@@ -36,7 +36,7 @@ const Dashboard = () => {
 
   // Calculate metrics
   const openIncidents = incidents.filter(i => i.status === 'aberta');
-  const analysisIncidents = incidents.filter(i => i.status === 'em-analise');
+  const followUpIncidents = incidents.filter(i => i.status === 'acompanhamento');
   const thisMonthIncidents = incidents.filter(i => {
     const incidentDate = new Date(i.createdAt);
     const now = new Date();
@@ -44,7 +44,6 @@ const Dashboard = () => {
            incidentDate.getFullYear() === now.getFullYear();
   });
   const resolvedThisMonth = thisMonthIncidents.filter(i => i.status === 'resolvida');
-  const closedThisMonth = thisMonthIncidents.filter(i => i.status === 'encerrada');
   const resolutionRate = thisMonthIncidents.length > 0 
     ? Math.round((resolvedThisMonth.length / thisMonthIncidents.length) * 100) 
     : 0;
@@ -75,8 +74,8 @@ const Dashboard = () => {
       bgColor: 'bg-status-open/10',
     },
     {
-      title: 'Em Análise',
-      value: analysisIncidents.length.toString(),
+      title: 'Em Acompanhamento',
+      value: followUpIncidents.length.toString(),
       icon: Clock,
       trend: 'Aguardando resolução',
       color: 'text-status-analysis',
@@ -171,10 +170,6 @@ const Dashboard = () => {
         <div className="text-center p-4 bg-card rounded-lg border">
           <p className="text-xs text-muted-foreground">Resolvidas (mês)</p>
           <p className="text-xl font-bold mt-1">{resolvedThisMonth.length}</p>
-        </div>
-        <div className="text-center p-4 bg-card rounded-lg border">
-          <p className="text-xs text-muted-foreground">Encerradas (mês)</p>
-          <p className="text-xl font-bold mt-1">{closedThisMonth.length}</p>
         </div>
         <div className="text-center p-4 bg-card rounded-lg border">
           <p className="text-xs text-muted-foreground">Taxa de Resolução</p>
@@ -287,8 +282,8 @@ const Dashboard = () => {
                         <span className="text-sm font-medium">{incidentClass?.name || 'Turma não encontrada'}</span>
                         <Badge variant="outline" className={getStatusColor(incident.status)}>
                           {incident.status === 'aberta' ? 'Aberta' :
-                           incident.status === 'em-analise' ? 'Em Análise' :
-                           incident.status === 'resolvida' ? 'Resolvida' : 'Encerrada'}
+                           incident.status === 'acompanhamento' ? 'Em Acompanhamento' :
+                           'Resolvida'}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">

@@ -50,6 +50,7 @@ export function useIncidents() {
       id: Date.now().toString(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      followUps: [],
     };
     setIncidents((prev) => [...prev, newIncident]);
     return newIncident;
@@ -69,7 +70,28 @@ export function useIncidents() {
     setIncidents((prev) => prev.filter((incident) => incident.id !== id));
   };
 
-  return { incidents, addIncident, updateIncident, deleteIncident };
+  const addFollowUp = (incidentId: string, followUp: Omit<import('@/types').FollowUpRecord, 'id' | 'incidentId' | 'createdAt'>) => {
+    setIncidents((prev) =>
+      prev.map((incident) => {
+        if (incident.id === incidentId) {
+          const newFollowUp: import('@/types').FollowUpRecord = {
+            ...followUp,
+            id: Date.now().toString(),
+            incidentId,
+            createdAt: new Date().toISOString(),
+          };
+          return {
+            ...incident,
+            followUps: [...(incident.followUps || []), newFollowUp],
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return incident;
+      })
+    );
+  };
+
+  return { incidents, addIncident, updateIncident, deleteIncident, addFollowUp };
 }
 
 // Hook for classes

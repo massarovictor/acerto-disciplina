@@ -49,17 +49,15 @@ export const IncidentManagementDialog = ({
 
   const statusOptions = [
     { value: 'aberta', label: 'Aberta' },
-    { value: 'em-analise', label: 'Em Análise' },
+    { value: 'acompanhamento', label: 'Em Acompanhamento' },
     { value: 'resolvida', label: 'Resolvida' },
-    { value: 'encerrada', label: 'Encerrada' },
   ];
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'aberta': return 'bg-status-open/10 text-status-open border-status-open';
-      case 'em-analise': return 'bg-status-analysis/10 text-status-analysis border-status-analysis';
+      case 'acompanhamento': return 'bg-status-analysis/10 text-status-analysis border-status-analysis';
       case 'resolvida': return 'bg-status-resolved/10 text-status-resolved border-status-resolved';
-      case 'encerrada': return 'bg-status-closed/10 text-status-closed border-status-closed';
       default: return '';
     }
   };

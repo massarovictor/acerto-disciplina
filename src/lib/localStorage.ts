@@ -7,6 +7,7 @@ const STORAGE_KEYS = {
   STUDENTS: 'school_incidents_students',
   GRADES: 'school_incidents_grades',
   ATTENDANCE: 'school_incidents_attendance',
+  FOLLOWUPS: 'school_incidents_followups',
 } as const;
 
 export const storage = {

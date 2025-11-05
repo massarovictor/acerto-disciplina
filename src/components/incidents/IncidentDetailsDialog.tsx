@@ -31,9 +31,8 @@ export const IncidentDetailsDialog = ({ incident, open, onOpenChange }: Incident
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'aberta': return 'bg-status-open/10 text-status-open border-status-open';
-      case 'em-analise': return 'bg-status-analysis/10 text-status-analysis border-status-analysis';
+      case 'acompanhamento': return 'bg-status-analysis/10 text-status-analysis border-status-analysis';
       case 'resolvida': return 'bg-status-resolved/10 text-status-resolved border-status-resolved';
-      case 'encerrada': return 'bg-status-closed/10 text-status-closed border-status-closed';
       default: return '';
     }
   };
@@ -47,8 +46,8 @@ export const IncidentDetailsDialog = ({ incident, open, onOpenChange }: Incident
             <div className="flex gap-2 flex-wrap">
               <Badge variant="outline" className={getStatusColor(incident.status)}>
                 {incident.status === 'aberta' ? 'Aberta' :
-                 incident.status === 'em-analise' ? 'Em Análise' :
-                 incident.status === 'resolvida' ? 'Resolvida' : 'Encerrada'}
+                 incident.status === 'acompanhamento' ? 'Em Acompanhamento' :
+                 'Resolvida'}
               </Badge>
               <Badge variant="outline" className={getSeverityColor(incident.finalSeverity)}>
                 {incident.finalSeverity === 'leve' ? 'Leve' :

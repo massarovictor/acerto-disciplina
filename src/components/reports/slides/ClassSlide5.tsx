@@ -14,7 +14,7 @@ export const ClassSlide5 = ({ classData, students, incidents }: ClassSlide5Props
     i => i.finalSeverity === 'grave' || i.finalSeverity === 'gravissima'
   );
 
-  const openIncidents = incidents.filter(i => i.status === 'aberta' || i.status === 'em-analise');
+  const openIncidents = incidents.filter(i => i.status === 'aberta' || i.status === 'acompanhamento');
 
   return (
     <div className="h-full p-8 bg-gradient-to-br from-primary/5 to-background flex flex-col">

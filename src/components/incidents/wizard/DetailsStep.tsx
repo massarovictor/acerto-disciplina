@@ -1,6 +1,10 @@
+import { useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { IncidentFormData } from '../IncidentWizard';
+import { calculateSuggestedAction } from '@/lib/incidentActions';
+import { useIncidents } from '@/hooks/useLocalStorage';
+import { useStudents } from '@/hooks/useLocalStorage';
 
 interface DetailsStepProps {
   formData: Partial<IncidentFormData>;
@@ -8,6 +12,21 @@ interface DetailsStepProps {
 }
 
 export const DetailsStep = ({ formData, updateFormData }: DetailsStepProps) => {
+  const { incidents } = useIncidents();
+  const { students } = useStudents();
+
+  useEffect(() => {
+    if (formData.studentIds && formData.finalSeverity && !formData.suggestedAction) {
+      const suggested = calculateSuggestedAction(
+        formData.studentIds,
+        formData.finalSeverity,
+        incidents,
+        students
+      );
+      updateFormData({ suggestedAction: suggested, actions: suggested });
+    }
+  }, [formData.studentIds, formData.finalSeverity]);
+
   return (
     <div className="space-y-6">
       <div>

@@ -36,9 +36,8 @@ const Incidents = () => {
 
   // Filter incidents by status
   const openIncidents = incidents.filter(i => i.status === 'aberta');
-  const analysisIncidents = incidents.filter(i => i.status === 'em-analise');
+  const followUpIncidents = incidents.filter(i => i.status === 'acompanhamento');
   const resolvedIncidents = incidents.filter(i => i.status === 'resolvida');
-  const closedIncidents = incidents.filter(i => i.status === 'encerrada');
 
   const filterIncidents = (statusIncidents: Incident[]) => {
     if (!searchTerm) return statusIncidents;
@@ -190,11 +189,11 @@ const Incidents = () => {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Em Análise</CardTitle>
+            <CardTitle className="text-sm font-medium">Em Acompanhamento</CardTitle>
             <Clock className="h-4 w-4 text-status-analysis" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analysisIncidents.length}</div>
+            <div className="text-2xl font-bold">{followUpIncidents.length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -204,15 +203,6 @@ const Incidents = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{resolvedIncidents.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Encerradas</CardTitle>
-            <XCircle className="h-4 w-4 text-status-closed" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{closedIncidents.length}</div>
           </CardContent>
         </Card>
       </div>
@@ -230,18 +220,15 @@ const Incidents = () => {
 
       {/* Tabs by Status */}
       <Tabs defaultValue="aberta" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="aberta">
             Abertas ({openIncidents.length})
           </TabsTrigger>
-          <TabsTrigger value="em-analise">
-            Em Análise ({analysisIncidents.length})
+          <TabsTrigger value="acompanhamento">
+            Em Acompanhamento ({followUpIncidents.length})
           </TabsTrigger>
           <TabsTrigger value="resolvida">
             Resolvidas ({resolvedIncidents.length})
-          </TabsTrigger>
-          <TabsTrigger value="encerrada">
-            Encerradas ({closedIncidents.length})
           </TabsTrigger>
         </TabsList>
         
@@ -256,13 +243,13 @@ const Incidents = () => {
           </Card>
         </TabsContent>
         
-        <TabsContent value="em-analise" className="mt-6">
+        <TabsContent value="acompanhamento" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Ocorrências em Análise</CardTitle>
+              <CardTitle>Ocorrências em Acompanhamento</CardTitle>
             </CardHeader>
             <CardContent>
-              {renderIncidentsList(analysisIncidents)}
+              {renderIncidentsList(followUpIncidents)}
             </CardContent>
           </Card>
         </TabsContent>
@@ -274,17 +261,6 @@ const Incidents = () => {
             </CardHeader>
             <CardContent>
               {renderIncidentsList(resolvedIncidents)}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="encerrada" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Ocorrências Encerradas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {renderIncidentsList(closedIncidents)}
             </CardContent>
           </Card>
         </TabsContent>
