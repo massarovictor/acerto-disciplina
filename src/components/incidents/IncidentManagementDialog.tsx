@@ -49,7 +49,6 @@ export const IncidentManagementDialog = ({
   const { students } = useStudents();
   const { toast } = useToast();
 
-  const [newStatus, setNewStatus] = useState<IncidentStatus>(incident.status);
   const [commentText, setCommentText] = useState('');
   const [tab, setTab] = useState<'info' | 'followup' | 'comments'>(initialTab);
   
@@ -72,11 +71,6 @@ export const IncidentManagementDialog = ({
   
   // Sempre pega a versão mais recente dos incidents
   const currentIncident = incidents.find(i => i.id === incident.id) || incident;
-
-  // Sincroniza newStatus quando currentIncident mudar
-  useEffect(() => {
-    setNewStatus(currentIncident.status);
-  }, [currentIncident.status]);
 
   // Auto-preencher acompanhamento quando mudar para status acompanhamento
   useEffect(() => {
@@ -188,19 +182,19 @@ export const IncidentManagementDialog = ({
         text: commentText,
         createdAt: new Date().toISOString(),
       });
+      
+      updateIncident(incident.id, {
+        comments: updatedComments,
+      });
+
+      toast({
+        title: 'Comentário adicionado',
+        description: 'O comentário foi salvo com sucesso.',
+      });
     }
 
-    updateIncident(incident.id, {
-      status: newStatus,
-      comments: updatedComments,
-    });
-
-    toast({
-      title: 'Ocorrência atualizada',
-      description: 'As alterações foram salvas com sucesso.',
-    });
-
     setCommentText('');
+    onOpenChange(false);
   };
 
   const handleStartFollowUp = () => {
@@ -267,6 +261,8 @@ export const IncidentManagementDialog = ({
       title: 'Acompanhamento salvo',
       description: 'O registro foi atualizado com sucesso',
     });
+    
+    onOpenChange(false);
   };
 
   const handleResolve = () => {
@@ -337,67 +333,6 @@ export const IncidentManagementDialog = ({
               </div>
             </div>
 
-            <Separator />
-
-            {canStartFollowUp && (
-              <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4 flex items-start gap-3">
-                <div className="flex-shrink-0">
-                  <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-                    <Plus className="h-5 w-5 text-blue-600" />
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-medium mb-1">Pronto para iniciar o acompanhamento?</h4>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Clique no botão para mudar o status e registrar as ações de acompanhamento desta ocorrência.
-                  </p>
-                  <Button 
-                    onClick={handleStartFollowUp}
-                    className="gap-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Iniciar Acompanhamento
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {canEditFollowUp && (
-              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex items-start gap-3">
-                <div className="flex-shrink-0">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Plus className="h-5 w-5 text-primary" />
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-medium mb-1">Ocorrência em Acompanhamento</h4>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Preencha o acompanhamento na aba abaixo. Cada ocorrência tem apenas um registro de acompanhamento.
-                  </p>
-                  <div className="flex gap-2">
-                    <Button 
-                      size="sm" 
-                      onClick={() => setTab('followup')}
-                      className="gap-2"
-                    >
-                      <Plus className="h-4 w-4" />
-                      {currentIncident.followUps?.length > 0 ? 'Editar' : 'Registrar'} Acompanhamento
-                    </Button>
-                    {canResolve && (
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={handleResolve}
-                        className="gap-2"
-                      >
-                        <CheckCircle className="h-4 w-4" />
-                        Resolver Ocorrência
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Tabs */}
             <Tabs value={tab} onValueChange={(v) => setTab(v as 'info' | 'followup' | 'comments')} className="w-full">
@@ -414,15 +349,15 @@ export const IncidentManagementDialog = ({
               <TabsContent value="info" className="space-y-4 mt-4">
                 <div className="space-y-2">
                   <Label>Descrição</Label>
-                  <p className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+                  <p className="text-sm bg-muted p-3 rounded-md">
                     {currentIncident.description}
                   </p>
                 </div>
 
                 {currentIncident.suggestedAction && (
                   <div className="space-y-2">
-                    <Label>Providência Sugerida (Automática)</Label>
-                    <p className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+                    <Label>Providência Sugerida</Label>
+                    <p className="text-sm bg-muted p-3 rounded-md">
                       {currentIncident.suggestedAction}
                     </p>
                   </div>
@@ -431,43 +366,29 @@ export const IncidentManagementDialog = ({
                 {currentIncident.actions && (
                   <div className="space-y-2">
                     <Label>Providências Tomadas</Label>
-                    <p className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+                    <p className="text-sm bg-muted p-3 rounded-md">
                       {currentIncident.actions}
                     </p>
                   </div>
                 )}
 
-                <Separator />
-
-                <div className="space-y-2">
-                  <Label htmlFor="status">Alterar Status</Label>
-                  <Select value={newStatus} onValueChange={(value) => setNewStatus(value as IncidentStatus)}>
-                    <SelectTrigger id="status">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {statusOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {canStartFollowUp && (
+                  <>
+                    <Separator />
+                    <Button 
+                      onClick={handleStartFollowUp}
+                      className="w-full gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Iniciar Acompanhamento
+                    </Button>
+                  </>
+                )}
               </TabsContent>
 
               <TabsContent value="followup" className="space-y-4 mt-4">
                 {canEditFollowUp ? (
                   <>
-                    <div className="mb-4">
-                      <h3 className="text-lg font-medium">Registro de Acompanhamento</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {currentIncident.followUps?.length > 0 
-                          ? 'Edite os dados do acompanhamento existente.' 
-                          : 'Preencha as informações do acompanhamento. Os campos foram preenchidos automaticamente com base na gravidade.'}
-                      </p>
-                    </div>
-
                     <FollowUpForm
                       type={followUpType}
                       setType={setFollowUpType}
@@ -491,8 +412,18 @@ export const IncidentManagementDialog = ({
                       setDescricaoSituacao={setFollowUpDescricaoSituacao}
                     />
 
-                    <div className="flex justify-end pt-4">
-                      <Button onClick={handleSaveFollowUp}>
+                    <div className="flex justify-between pt-4 border-t">
+                      {canResolve && (
+                        <Button 
+                          variant="outline"
+                          onClick={handleResolve}
+                          className="gap-2"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                          Resolver Ocorrência
+                        </Button>
+                      )}
+                      <Button onClick={handleSaveFollowUp} className="ml-auto">
                         Salvar Acompanhamento
                       </Button>
                     </div>
@@ -500,7 +431,7 @@ export const IncidentManagementDialog = ({
                 ) : (
                   <div className="text-center py-8">
                     <p className="text-muted-foreground">
-                      O acompanhamento só pode ser editado quando a ocorrência está em status "Em Acompanhamento".
+                      Inicie o acompanhamento na aba "Informações" para preencher este formulário.
                     </p>
                   </div>
                 )}
@@ -543,14 +474,16 @@ export const IncidentManagementDialog = ({
             </Tabs>
 
             {/* Actions */}
-            <div className="flex justify-end gap-2 pt-4 border-t">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Fechar
-              </Button>
-              <Button onClick={handleSave}>
-                Salvar Alterações
-              </Button>
-            </div>
+            {tab === 'comments' && (
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button variant="outline" onClick={() => onOpenChange(false)}>
+                  Fechar
+                </Button>
+                <Button onClick={handleSave} disabled={!commentText.trim()}>
+                  Salvar Comentário
+                </Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
