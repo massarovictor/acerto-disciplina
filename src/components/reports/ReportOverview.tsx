@@ -13,7 +13,16 @@ interface ReportOverviewProps {
 export const ReportOverview = ({ classes, students, incidents, grades }: ReportOverviewProps) => {
   const totalIncidents = incidents.length;
   const openIncidents = incidents.filter(i => i.status === 'aberta').length;
+  const followUpIncidents = incidents.filter(i => i.status === 'acompanhamento').length;
+  const resolvedIncidents = incidents.filter(i => i.status === 'resolvida').length;
   const criticalIncidents = incidents.filter(i => i.finalSeverity === 'gravissima').length;
+  
+  const incidentsWithFollowUp = incidents.filter(i => i.followUps && i.followUps.length > 0).length;
+  const followUpByType = {
+    conversa_individual: incidents.filter(i => i.followUps?.some(f => f.type === 'conversa_individual')).length,
+    conversa_pais: incidents.filter(i => i.followUps?.some(f => f.type === 'conversa_pais')).length,
+    situacoes_diversas: incidents.filter(i => i.followUps?.some(f => f.type === 'situacoes_diversas')).length,
+  };
 
   const studentsByClass = classes.map(cls => ({
     class: cls.name,
@@ -173,6 +182,129 @@ export const ReportOverview = ({ classes, students, incidents, grades }: ReportO
           </div>
         </CardContent>
       </Card>
+
+      {/* Follow-up Statistics */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Status das Ocorrências</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-medium">Abertas</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{openIncidents} ocorrências</span>
+                    <Badge variant="outline" className="bg-status-open/10 text-status-open">
+                      {totalIncidents > 0 ? Math.round((openIncidents / totalIncidents) * 100) : 0}%
+                    </Badge>
+                  </div>
+                </div>
+                <div className="w-full bg-secondary h-3 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-status-open h-full rounded-full"
+                    style={{ width: `${totalIncidents > 0 ? (openIncidents / totalIncidents) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-medium">Em Acompanhamento</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{followUpIncidents} ocorrências</span>
+                    <Badge variant="outline" className="bg-status-analysis/10 text-status-analysis">
+                      {totalIncidents > 0 ? Math.round((followUpIncidents / totalIncidents) * 100) : 0}%
+                    </Badge>
+                  </div>
+                </div>
+                <div className="w-full bg-secondary h-3 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-status-analysis h-full rounded-full"
+                    style={{ width: `${totalIncidents > 0 ? (followUpIncidents / totalIncidents) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-medium">Resolvidas</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{resolvedIncidents} ocorrências</span>
+                    <Badge variant="outline" className="bg-status-resolved/10 text-status-resolved">
+                      {totalIncidents > 0 ? Math.round((resolvedIncidents / totalIncidents) * 100) : 0}%
+                    </Badge>
+                  </div>
+                </div>
+                <div className="w-full bg-secondary h-3 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-status-resolved h-full rounded-full"
+                    style={{ width: `${totalIncidents > 0 ? (resolvedIncidents / totalIncidents) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Tipos de Acompanhamento Realizados</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3 bg-accent/30 rounded-lg">
+                <span className="text-sm font-medium">Total de Acompanhamentos</span>
+                <Badge variant="default" className="text-base px-3 py-1">
+                  {incidentsWithFollowUp}
+                </Badge>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm">Conversa Individual</span>
+                    <span className="text-sm text-muted-foreground">{followUpByType.conversa_individual}</span>
+                  </div>
+                  <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-primary h-full rounded-full"
+                      style={{ width: `${incidentsWithFollowUp > 0 ? (followUpByType.conversa_individual / incidentsWithFollowUp) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm">Conversa com Pais</span>
+                    <span className="text-sm text-muted-foreground">{followUpByType.conversa_pais}</span>
+                  </div>
+                  <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-primary h-full rounded-full"
+                      style={{ width: `${incidentsWithFollowUp > 0 ? (followUpByType.conversa_pais / incidentsWithFollowUp) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm">Situações Diversas</span>
+                    <span className="text-sm text-muted-foreground">{followUpByType.situacoes_diversas}</span>
+                  </div>
+                  <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-primary h-full rounded-full"
+                      style={{ width: `${incidentsWithFollowUp > 0 ? (followUpByType.situacoes_diversas / incidentsWithFollowUp) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

@@ -192,6 +192,151 @@ export const IncidentDetailsDialog = ({ incident, open, onOpenChange }: Incident
               </div>
             </>
           )}
+
+          {/* Follow-up Information (for acompanhamento and resolvida) */}
+          {(incident.status === 'acompanhamento' || incident.status === 'resolvida') && incident.followUps && incident.followUps.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <h3 className="font-semibold mb-3">Registro de Acompanhamento</h3>
+                {incident.followUps.map((followUp) => (
+                  <div key={followUp.id} className="space-y-4 p-4 bg-accent/30 rounded-lg">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Tipo</p>
+                        <p className="font-medium">
+                          {followUp.type === 'conversa_individual' ? 'Conversa Individual com Estudante' :
+                           followUp.type === 'conversa_pais' ? 'Conversa com Pais/Responsáveis' :
+                           'Registro de Situações Diversas'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Data</p>
+                        <p className="font-medium">{new Date(followUp.date).toLocaleDateString('pt-BR')}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-muted-foreground">Responsável pelo Registro</p>
+                        <p className="font-medium">{followUp.responsavel || 'Não informado'}</p>
+                      </div>
+                    </div>
+
+                    {followUp.type === 'conversa_pais' && (followUp.nomeResponsavelPai || followUp.grauParentesco) && (
+                      <>
+                        <Separator className="my-3" />
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          {followUp.nomeResponsavelPai && (
+                            <div>
+                              <p className="text-muted-foreground">Nome do Responsável</p>
+                              <p className="font-medium">{followUp.nomeResponsavelPai}</p>
+                            </div>
+                          )}
+                          {followUp.grauParentesco && (
+                            <div>
+                              <p className="text-muted-foreground">Grau de Parentesco</p>
+                              <p className="font-medium">{followUp.grauParentesco}</p>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {(followUp.type === 'conversa_individual' || followUp.type === 'conversa_pais') && (
+                      <>
+                        {followUp.motivo && (
+                          <>
+                            <Separator className="my-3" />
+                            <div>
+                              <p className="text-muted-foreground text-sm mb-1">Motivo</p>
+                              <p className="text-sm">{followUp.motivo}</p>
+                            </div>
+                          </>
+                        )}
+                        
+                        {followUp.providencias && (
+                          <div>
+                            <p className="text-muted-foreground text-sm mb-1">Providências Tomadas/Sugeridas</p>
+                            <p className="text-sm whitespace-pre-wrap">{followUp.providencias}</p>
+                          </div>
+                        )}
+
+                        {followUp.assuntosTratados && (
+                          <div>
+                            <p className="text-muted-foreground text-sm mb-1">Assuntos Tratados</p>
+                            <p className="text-sm whitespace-pre-wrap">{followUp.assuntosTratados}</p>
+                          </div>
+                        )}
+
+                        {followUp.encaminhamentos && (
+                          <div>
+                            <p className="text-muted-foreground text-sm mb-1">Encaminhamentos/Combinados</p>
+                            <p className="text-sm whitespace-pre-wrap">{followUp.encaminhamentos}</p>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {followUp.type === 'situacoes_diversas' && (
+                      <>
+                        {followUp.disciplina && (
+                          <>
+                            <Separator className="my-3" />
+                            <div>
+                              <p className="text-muted-foreground text-sm mb-1">Disciplina/Professor</p>
+                              <p className="text-sm">{followUp.disciplina}</p>
+                            </div>
+                          </>
+                        )}
+
+                        {followUp.tipoSituacao && (
+                          <div>
+                            <p className="text-muted-foreground text-sm mb-1">Tipo de Situação</p>
+                            <p className="text-sm">{followUp.tipoSituacao}</p>
+                          </div>
+                        )}
+
+                        {followUp.descricaoSituacao && (
+                          <div>
+                            <p className="text-muted-foreground text-sm mb-1">Descrição da Situação</p>
+                            <p className="text-sm whitespace-pre-wrap">{followUp.descricaoSituacao}</p>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    <div className="text-xs text-muted-foreground pt-2 border-t">
+                      Registrado em {new Date(followUp.createdAt).toLocaleDateString('pt-BR')} às{' '}
+                      {new Date(followUp.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Comments */}
+          {incident.comments && incident.comments.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <h3 className="font-semibold mb-3">Comentários ({incident.comments.length})</h3>
+                <div className="space-y-3">
+                  {incident.comments.map((comment) => (
+                    <div key={comment.id} className="border rounded-lg p-3 space-y-1">
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="font-medium">{comment.userName}</span>
+                        <Clock className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-muted-foreground text-xs">
+                          {new Date(comment.createdAt).toLocaleDateString('pt-BR')} às{' '}
+                          {new Date(comment.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p className="text-sm">{comment.text}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>
