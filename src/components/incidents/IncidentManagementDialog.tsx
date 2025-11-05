@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FollowUpList } from './FollowUpList';
 import { FollowUpDialog } from './FollowUpDialog';
 import {
@@ -50,7 +50,14 @@ export const IncidentManagementDialog = ({
   const [commentText, setCommentText] = useState('');
   const [showFollowUpDialog, setShowFollowUpDialog] = useState(false);
   const [tab, setTab] = useState<'info' | 'followups' | 'comments'>('info');
+  
+  // Sempre pega a versão mais recente dos incidents
   const currentIncident = incidents.find(i => i.id === incident.id) || incident;
+
+  // Sincroniza newStatus quando currentIncident mudar
+  useEffect(() => {
+    setNewStatus(currentIncident.status);
+  }, [currentIncident.status]);
 
   const incidentClass = classes.find(c => c.id === currentIncident.classId);
   const incidentStudents = students.filter(s => currentIncident.studentIds.includes(s.id));
@@ -123,20 +130,21 @@ export const IncidentManagementDialog = ({
       status: 'acompanhamento',
     });
 
-    // Notifica mudança de status
+    toast({
+      title: 'Acompanhamento iniciado',
+      description: 'Preencha os detalhes da ação realizada.',
+    });
+
+    // Notifica mudança de status para o componente pai trocar a aba
     onStatusChange?.('acompanhamento');
 
-    // Já muda para a aba de acompanhamentos
+    // Já muda para a aba de acompanhamentos dentro do dialog
     setTab('followups');
     
-    // Pequeno delay para garantir que o estado foi atualizado
+    // Pequeno delay para garantir que o estado foi atualizado e abrir o dialog
     setTimeout(() => {
       setShowFollowUpDialog(true);
-      toast({
-        title: 'Acompanhamento iniciado',
-        description: 'Preencha os detalhes da ação realizada. As providências já foram sugeridas automaticamente.',
-      });
-    }, 100);
+    }, 150);
   };
 
   const handleResolve = () => {

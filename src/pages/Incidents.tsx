@@ -282,24 +282,11 @@ const Incidents = () => {
           open={!!managingIncident}
           onOpenChange={(open) => !open && setManagingIncident(null)}
           onStatusChange={(newStatus) => {
-            // Quando o status mudar, trocar a aba e reabrir o dialog
+            // Quando o status mudar, trocar a aba
             if (newStatus === 'acompanhamento') {
               setActiveTab('acompanhamento');
-              // Pequeno delay para garantir que a ocorrência foi atualizada
-              setTimeout(() => {
-                const updatedIncident = incidents.find(i => i.id === managingIncident.id);
-                if (updatedIncident) {
-                  setManagingIncident(updatedIncident);
-                }
-              }, 200);
             } else if (newStatus === 'resolvida') {
               setActiveTab('resolvida');
-              setTimeout(() => {
-                const updatedIncident = incidents.find(i => i.id === managingIncident.id);
-                if (updatedIncident) {
-                  setManagingIncident(updatedIncident);
-                }
-              }, 200);
             }
           }}
         />
