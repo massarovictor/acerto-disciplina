@@ -44,6 +44,31 @@ export function useInitializeData() {
 export function useIncidents() {
   const [incidents, setIncidents] = useLocalStorage<Incident[]>('INCIDENTS', []);
   
+  // Force re-render when localStorage changes (mesmo em outras abas/componentes)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const updated = storage.get<Incident[]>('INCIDENTS');
+      if (updated) {
+        setIncidents(updated);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Também escuta mudanças internas
+    const interval = setInterval(() => {
+      const current = storage.get<Incident[]>('INCIDENTS');
+      if (current && JSON.stringify(current) !== JSON.stringify(incidents)) {
+        setIncidents(current);
+      }
+    }, 500);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [incidents]);
+  
   const addIncident = (incident: Omit<Incident, 'id' | 'createdAt' | 'updatedAt'>) => {
     const newIncident: Incident = {
       ...incident,
