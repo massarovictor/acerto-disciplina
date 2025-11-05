@@ -25,6 +25,10 @@ interface FollowUpFormProps {
   setTipoSituacao: (tipo: string) => void;
   descricaoSituacao: string;
   setDescricaoSituacao: (descricao: string) => void;
+  nomeResponsavelPai: string;
+  setNomeResponsavelPai: (nome: string) => void;
+  grauParentesco: string;
+  setGrauParentesco: (grau: string) => void;
 }
 
 export const FollowUpForm = ({
@@ -48,6 +52,10 @@ export const FollowUpForm = ({
   setTipoSituacao,
   descricaoSituacao,
   setDescricaoSituacao,
+  nomeResponsavelPai,
+  setNomeResponsavelPai,
+  grauParentesco,
+  setGrauParentesco,
 }: FollowUpFormProps) => {
   const motivoOptions = [
     '1 - Comportamento inadequado',
@@ -111,6 +119,36 @@ export const FollowUpForm = ({
 
       {(type === 'conversa_individual' || type === 'conversa_pais') && (
         <>
+          {type === 'conversa_pais' && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Nome do Responsável</Label>
+                <Input
+                  value={nomeResponsavelPai}
+                  onChange={(e) => setNomeResponsavelPai(e.target.value)}
+                  placeholder="Nome completo do responsável"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Grau de Parentesco</Label>
+                <Select value={grauParentesco} onValueChange={setGrauParentesco}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Pai">Pai</SelectItem>
+                    <SelectItem value="Mãe">Mãe</SelectItem>
+                    <SelectItem value="Avô/Avó">Avô/Avó</SelectItem>
+                    <SelectItem value="Tio/Tia">Tio/Tia</SelectItem>
+                    <SelectItem value="Irmão/Irmã">Irmão/Irmã</SelectItem>
+                    <SelectItem value="Tutor Legal">Tutor Legal</SelectItem>
+                    <SelectItem value="Outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          
           <div className="space-y-2">
             <Label>Motivo</Label>
             <Select value={motivo} onValueChange={setMotivo}>

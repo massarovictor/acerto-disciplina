@@ -68,6 +68,8 @@ export const IncidentManagementDialog = ({
   const [followUpDisciplina, setFollowUpDisciplina] = useState('');
   const [followUpTipoSituacao, setFollowUpTipoSituacao] = useState('');
   const [followUpDescricaoSituacao, setFollowUpDescricaoSituacao] = useState('');
+  const [followUpNomeResponsavelPai, setFollowUpNomeResponsavelPai] = useState('');
+  const [followUpGrauParentesco, setFollowUpGrauParentesco] = useState('');
   
   // Sempre pega a versão mais recente dos incidents
   const currentIncident = incidents.find(i => i.id === incident.id) || incident;
@@ -106,6 +108,8 @@ export const IncidentManagementDialog = ({
       setFollowUpDisciplina(followUp.disciplina || '');
       setFollowUpTipoSituacao(followUp.tipoSituacao || '');
       setFollowUpDescricaoSituacao(followUp.descricaoSituacao || '');
+      setFollowUpNomeResponsavelPai(followUp.nomeResponsavelPai || '');
+      setFollowUpGrauParentesco(followUp.grauParentesco || '');
     }
   }, [currentIncident.status, currentIncident.followUps, incidents, students, currentIncident.studentIds, currentIncident.finalSeverity]);
 
@@ -232,6 +236,11 @@ export const IncidentManagementDialog = ({
       followUp.providencias = followUpProvidencias;
       followUp.assuntosTratados = followUpAssuntosTratados;
       followUp.encaminhamentos = followUpEncaminhamentos;
+    }
+
+    if (followUpType === 'conversa_pais') {
+      followUp.nomeResponsavelPai = followUpNomeResponsavelPai;
+      followUp.grauParentesco = followUpGrauParentesco;
     }
 
     if (followUpType === 'situacoes_diversas') {
@@ -410,6 +419,10 @@ export const IncidentManagementDialog = ({
                       setTipoSituacao={setFollowUpTipoSituacao}
                       descricaoSituacao={followUpDescricaoSituacao}
                       setDescricaoSituacao={setFollowUpDescricaoSituacao}
+                      nomeResponsavelPai={followUpNomeResponsavelPai}
+                      setNomeResponsavelPai={setFollowUpNomeResponsavelPai}
+                      grauParentesco={followUpGrauParentesco}
+                      setGrauParentesco={setFollowUpGrauParentesco}
                     />
 
                     <div className="flex justify-between pt-4 border-t">

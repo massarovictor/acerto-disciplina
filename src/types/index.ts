@@ -34,6 +34,8 @@ export interface FollowUpRecord {
   disciplina?: string;
   tipoSituacao?: string;
   descricaoSituacao?: string;
+  nomeResponsavelPai?: string;
+  grauParentesco?: string;
   createdBy: string;
   createdAt: string;
 }
