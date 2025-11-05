@@ -37,12 +37,23 @@ export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: 
 
   // Auto-preencher tipo e providências ao abrir
   useEffect(() => {
-    if (open && incident.suggestedAction) {
-      const suggestedType = suggestFollowUpType(incident.suggestedAction);
-      setType(suggestedType);
-      setProvidencias(incident.suggestedAction);
+    if (open) {
+      if (incident.suggestedAction) {
+        const suggestedType = suggestFollowUpType(incident.suggestedAction);
+        setType(suggestedType);
+        setProvidencias(incident.suggestedAction);
+      }
+      // Reset dos outros campos
+      setDate(new Date().toISOString().split('T')[0]);
+      setResponsavel('');
+      setMotivo('');
+      setAssuntosTratados('');
+      setEncaminhamentos('');
+      setDisciplina('');
+      setTipoSituacao('');
+      setDescricaoSituacao('');
     }
-  }, [open, incident.suggestedAction]);
+  }, [open]);
 
   const motivoOptions = [
     '1 - Comportamento inadequado',
