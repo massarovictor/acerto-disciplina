@@ -9,6 +9,7 @@ import Login from '@/pages/Login';
 import Dashboard from '@/pages/Dashboard';
 import Incidents from '@/pages/Incidents';
 import Classes from '@/pages/Classes';
+import ArchivedClasses from '@/pages/ArchivedClasses';
 import Students from '@/pages/Students';
 import GradesAttendance from '@/pages/GradesAttendance';
 import Reports from '@/pages/Reports';
@@ -64,6 +65,7 @@ const App = () => (
               <Route index element={<Dashboard />} />
               <Route path="ocorrencias" element={<Incidents />} />
               <Route path="turmas" element={<Classes />} />
+              <Route path="turmas-arquivadas" element={<ArchivedClasses />} />
               <Route path="alunos" element={<Students />} />
               <Route path="notas-frequencia" element={<GradesAttendance />} />
               <Route path="relatorios" element={<Reports />} />

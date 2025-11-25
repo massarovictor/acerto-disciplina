@@ -75,13 +75,6 @@ export const IncidentDetailsDialog = ({ incident, open, onOpenChange }: Incident
                   <p className="font-medium">{new Date(incident.date).toLocaleDateString('pt-BR')}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-muted-foreground">Período</p>
-                  <p className="font-medium capitalize">{incident.period}</p>
-                </div>
-              </div>
               <div>
                 <p className="text-muted-foreground">Turma</p>
                 <p className="font-medium">{incidentClass?.name || 'Não encontrada'}</p>

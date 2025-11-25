@@ -1,13 +1,11 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useClasses, useStudents, useIncidents, useGrades, useAttendance } from '@/hooks/useLocalStorage';
-import { ReportOverview } from '@/components/reports/ReportOverview';
 import { IntegratedReports } from '@/components/reports/IntegratedReports';
 import { ClassSlides } from '@/components/reports/ClassSlides';
 
 const Reports = () => {
-  const [activeTab, setActiveTab] = useState('overview');
-  
+  const [activeTab, setActiveTab] = useState('integrated');
   const { classes } = useClasses();
   const { students } = useStudents();
   const { incidents } = useIncidents();
@@ -24,22 +22,12 @@ const Reports = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="integrated">Relatórios Integrados</TabsTrigger>
           <TabsTrigger value="slides">Slides de Apresentação</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6 mt-6">
-          <ReportOverview 
-            classes={classes} 
-            students={students} 
-            incidents={incidents} 
-            grades={grades} 
-          />
-        </TabsContent>
-
-        <TabsContent value="integrated" className="space-y-6 mt-6">
+        <TabsContent value="integrated" className="mt-6 space-y-6">
           <IntegratedReports 
             classes={classes} 
             students={students} 
@@ -47,7 +35,7 @@ const Reports = () => {
           />
         </TabsContent>
 
-        <TabsContent value="slides" className="space-y-6 mt-6">
+        <TabsContent value="slides" className="mt-6 space-y-6">
           <ClassSlides 
             classes={classes} 
             students={students} 

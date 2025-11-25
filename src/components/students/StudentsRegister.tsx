@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -6,10 +6,30 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { useStudents, useClasses } from '@/hooks/useLocalStorage';
 import { useToast } from '@/hooks/use-toast';
-import { ChevronDown, Upload, Download, UserPlus, Camera, X } from 'lucide-react';
+import { ChevronDown, Upload, Download, UserPlus, Camera, X, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { generateStudentTemplate } from '@/lib/excelExport';
+import { readExcelFile, validateImportData, ImportRow } from '@/lib/excelImport';
 
 export const StudentsRegister = () => {
   const { students, addStudent } = useStudents();
@@ -30,6 +50,12 @@ export const StudentsRegister = () => {
 
   const [photoPreview, setPhotoPreview] = useState<string>('');
   const [isOfficialDataOpen, setIsOfficialDataOpen] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [importPreview, setImportPreview] = useState<ImportRow[]>([]);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [selectedClassForImport, setSelectedClassForImport] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const todayRegistered = students.filter(s => {
     const today = new Date().toDateString();
@@ -69,9 +95,10 @@ export const StudentsRegister = () => {
     }
 
     // Check for duplicates
-    const duplicate = students.find(s => 
-      s.cpf && formData.cpf && s.cpf === formData.cpf
-    );
+    const cleanedCPF = formData.cpf ? formData.cpf.replace(/\D/g, '') : '';
+    const duplicate = cleanedCPF ? students.find(s => 
+      s.cpf && s.cpf.replace(/\D/g, '') === cleanedCPF
+    ) : null;
     if (duplicate) {
       toast({
         title: 'Erro',
@@ -88,7 +115,7 @@ export const StudentsRegister = () => {
       gender: formData.gender,
       enrollment: formData.enrollment,
       censusId: formData.censusId,
-      cpf: formData.cpf,
+      cpf: cleanedCPF || undefined,
       rg: formData.rg,
       photoUrl: formData.photoUrl,
       status: 'active',
@@ -150,6 +177,198 @@ export const StudentsRegister = () => {
   const removePhoto = () => {
     setFormData({ ...formData, photoUrl: '' });
     setPhotoPreview('');
+  };
+
+  // Máscaras de input
+  const formatCPF = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 11) {
+      return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    }
+    return value;
+  };
+
+  const formatRG = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 9) {
+      return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{1})/, '$1.$2.$3-$4');
+    }
+    return value;
+  };
+
+  // Handlers de importação
+  const handleFileSelect = async (file: File) => {
+    if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
+      toast({
+        title: 'Erro',
+        description: 'Por favor, selecione um arquivo Excel (.xlsx, .xls) ou CSV.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validar se turma foi selecionada
+    if (!selectedClassForImport) {
+      toast({
+        title: 'Atenção',
+        description: 'Por favor, selecione uma turma antes de importar a planilha.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setIsImporting(true);
+      const data = await readExcelFile(file);
+      const result = validateImportData(data, classes, students, selectedClassForImport);
+      setImportPreview(result.rows);
+      setShowImportDialog(true);
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: error instanceof Error ? error.message : 'Erro ao processar o arquivo.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      handleFileSelect(file);
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileSelect(file);
+    }
+  };
+
+  const handleImportConfirm = async () => {
+    const validRows = importPreview.filter(r => r.isValid);
+    
+    if (validRows.length === 0) {
+      toast({
+        title: 'Erro',
+        description: 'Nenhuma linha válida para importar.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    let imported = 0;
+    let errors = 0;
+    const errorMessages: string[] = [];
+
+    // Processar alunos sequencialmente para evitar problemas de concorrência
+    console.log(`[IMPORTAÇÃO] Iniciando importação de ${validRows.length} alunos válidos`);
+    
+    for (let index = 0; index < validRows.length; index++) {
+      const row = validRows[index];
+      console.log(`[IMPORTAÇÃO] Linha ${row.rowNumber}: Processando`, row.data);
+      
+      try {
+        // Usar o classId que foi validado pela planilha (baseado no número da turma)
+        if (!row.data.classId || row.data.classId === '') {
+          const errorMsg = `Linha ${row.rowNumber}: ❌ classId VAZIO ou inválido`;
+          console.error(errorMsg, row);
+          errorMessages.push(errorMsg);
+          errors++;
+          continue;
+        }
+
+        console.log(`[IMPORTAÇÃO] Linha ${row.rowNumber}: classId = "${row.data.classId}"`);
+
+        // Verificar se a turma existe
+        const classExists = classes.find(c => c.id === row.data.classId);
+        if (!classExists) {
+          const errorMsg = `Linha ${row.rowNumber}: ❌ Turma com ID "${row.data.classId}" não encontrada no sistema`;
+          console.error(errorMsg, row);
+          console.error(`[IMPORTAÇÃO] Turmas disponíveis:`, classes.map(c => ({ id: c.id, name: c.name, classNumber: c.classNumber })));
+          errorMessages.push(errorMsg);
+          errors++;
+          continue;
+        }
+
+        console.log(`[IMPORTAÇÃO] Linha ${row.rowNumber}: ✅ Turma encontrada:`, { id: classExists.id, name: classExists.name, classNumber: classExists.classNumber });
+
+        // Verificar campos obrigatórios
+        if (!row.data.name || !row.data.birthDate || !row.data.gender) {
+          const errorMsg = `Linha ${row.rowNumber}: ❌ Campos obrigatórios faltando`;
+          console.error(errorMsg, row);
+          errorMessages.push(errorMsg);
+          errors++;
+          continue;
+        }
+
+        console.log(`[IMPORTAÇÃO] Linha ${row.rowNumber}: Adicionando aluno ${index + 1}/${validRows.length}:`, {
+          name: row.data.name,
+          classId: row.data.classId,
+          className: classExists.name,
+          classNumber: classExists.classNumber,
+        });
+
+        const newStudent = addStudent({
+          name: row.data.name || '',
+          classId: row.data.classId, // Usar classId validado da planilha
+          birthDate: row.data.birthDate || '',
+          gender: row.data.gender || 'M',
+          enrollment: row.data.enrollment,
+          censusId: row.data.censusId,
+          cpf: row.data.cpf,
+          rg: row.data.rg,
+          photoUrl: row.data.photoUrl,
+          status: 'active',
+        });
+
+        console.log(`[IMPORTAÇÃO] Linha ${row.rowNumber}: ✅ Aluno adicionado com sucesso:`, newStudent);
+        imported++;
+
+        // Pequeno delay para garantir IDs únicos e atualização do estado
+        await new Promise(resolve => setTimeout(resolve, 10));
+      } catch (error) {
+        const errorMsg = `Linha ${row.rowNumber}: ${error instanceof Error ? error.message : 'Erro desconhecido'}`;
+        console.error(`[IMPORTAÇÃO] ❌ Erro ao importar aluno:`, error, row);
+        errorMessages.push(errorMsg);
+        errors++;
+      }
+    }
+
+    const description = imported > 0 
+      ? `${imported} aluno(s) importado(s) com sucesso.${errors > 0 ? ` ${errors} erro(s): ${errorMessages.slice(0, 3).join('; ')}${errorMessages.length > 3 ? '...' : ''}` : ''}`
+      : `Nenhum aluno foi importado. Erros: ${errorMessages.slice(0, 5).join('; ')}`;
+
+    toast({
+      title: imported > 0 ? 'Importação concluída' : 'Erro na importação',
+      description,
+      variant: imported > 0 ? 'default' : 'destructive',
+    });
+
+    setShowImportDialog(false);
+    setImportPreview([]);
+    setSelectedClassForImport('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
+    // Forçar atualização da lista de alunos
+    console.log('Importação finalizada. Total de alunos no sistema:', students.length + imported);
   };
 
   return (
@@ -226,7 +445,9 @@ export const StudentsRegister = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {classes.filter(c => c.active).map(cls => (
-                      <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+                      <SelectItem key={cls.id} value={cls.id}>
+                        {cls.classNumber} - {cls.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -292,7 +513,11 @@ export const StudentsRegister = () => {
                           id="cpf"
                           placeholder="000.000.000-00"
                           value={formData.cpf}
-                          onChange={(e) => setFormData({ ...formData, cpf: e.target.value })}
+                          onChange={(e) => {
+                            const formatted = formatCPF(e.target.value);
+                            setFormData({ ...formData, cpf: formatted });
+                          }}
+                          maxLength={14}
                         />
                       </div>
 
@@ -302,7 +527,11 @@ export const StudentsRegister = () => {
                           id="rg"
                           placeholder="00.000.000-0"
                           value={formData.rg}
-                          onChange={(e) => setFormData({ ...formData, rg: e.target.value })}
+                          onChange={(e) => {
+                            const formatted = formatRG(e.target.value);
+                            setFormData({ ...formData, rg: formatted });
+                          }}
+                          maxLength={12}
                         />
                       </div>
                     </div>
@@ -347,25 +576,217 @@ export const StudentsRegister = () => {
           <CardTitle>Importação em Lote</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
+          {/* Seletor de Turma */}
+          <div className="space-y-2">
+            <Label htmlFor="import-class">Selecione a Turma *</Label>
+            <Select 
+              value={selectedClassForImport} 
+              onValueChange={setSelectedClassForImport}
+            >
+              <SelectTrigger id="import-class">
+                <SelectValue placeholder="Selecione a turma para importação" />
+              </SelectTrigger>
+              <SelectContent>
+                {classes.filter(c => c.active).map(cls => (
+                  <SelectItem key={cls.id} value={cls.id}>
+                    {cls.classNumber} - {cls.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground">
+              O número da turma selecionada será pré-preenchido no modelo de planilha e usado para todos os alunos importados.
+            </p>
+          </div>
+
+          <div
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+              isDragOver
+                ? 'border-primary bg-primary/5'
+                : 'border-border'
+            } ${!selectedClassForImport ? 'opacity-50 pointer-events-none' : ''}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
             <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="font-medium mb-2">Arraste uma planilha ou clique para selecionar</h3>
             <p className="text-sm text-muted-foreground mb-4">
               Formatos aceitos: Excel (.xlsx, .xls) ou CSV
             </p>
-            <Button variant="outline">
-              Selecionar Arquivo
+            <Button
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isImporting || !selectedClassForImport}
+            >
+              {isImporting ? 'Processando...' : 'Selecionar Arquivo'}
             </Button>
+            <Input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              onChange={handleFileInputChange}
+            />
           </div>
 
           <div className="flex items-center justify-center">
-            <Button variant="ghost" size="sm">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const selectedClass = classes.find(c => c.id === selectedClassForImport);
+                generateStudentTemplate(selectedClass);
+              }}
+              disabled={!selectedClassForImport}
+            >
               <Download className="h-4 w-4 mr-2" />
               Baixar Modelo de Planilha
             </Button>
           </div>
         </CardContent>
       </Card>
+
+      {/* Import Preview Dialog */}
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Preview da Importação</DialogTitle>
+            <DialogDescription>
+              Revise os dados antes de importar. Apenas linhas válidas serão importadas.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Estatísticas */}
+            <div className="grid grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="text-2xl font-bold">{importPreview.length}</div>
+                  <div className="text-sm text-muted-foreground">Total de Linhas</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="text-2xl font-bold text-green-600">
+                    {importPreview.filter(r => r.isValid).length}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Válidas</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="text-2xl font-bold text-red-600">
+                    {importPreview.filter(r => !r.isValid).length}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Inválidas</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="text-2xl font-bold text-yellow-600">
+                    {importPreview.filter(r => r.warnings.length > 0).length}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Com Avisos</div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Tabela de Preview */}
+            <div className="border rounded-lg overflow-hidden">
+              <div className="max-h-[400px] overflow-y-auto">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-background">
+                    <TableRow>
+                      <TableHead className="w-16">Linha</TableHead>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Número da Turma</TableHead>
+                      <TableHead>Data Nasc.</TableHead>
+                      <TableHead>Sexo</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {importPreview.map((row) => (
+                      <TableRow key={row.rowNumber}>
+                        <TableCell className="font-medium">{row.rowNumber}</TableCell>
+                        <TableCell>{row.data.name || '-'}</TableCell>
+                        <TableCell>
+                          {classes.find(c => c.id === row.data.classId)?.classNumber || '-'}
+                        </TableCell>
+                        <TableCell>
+                          {row.data.birthDate
+                            ? new Date(row.data.birthDate).toLocaleDateString('pt-BR')
+                            : '-'}
+                        </TableCell>
+                        <TableCell>{row.data.gender || '-'}</TableCell>
+                        <TableCell>
+                          {row.isValid ? (
+                            <Badge className="bg-green-100 text-green-800 border-green-300">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Válida
+                            </Badge>
+                          ) : (
+                            <Badge variant="destructive">
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              Inválida
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            {/* Erros e Avisos */}
+            {importPreview.some(r => r.errors.length > 0 || r.warnings.length > 0) && (
+              <div className="space-y-2">
+                <h4 className="font-medium">Detalhes dos Erros e Avisos:</h4>
+                <div className="max-h-[200px] overflow-y-auto space-y-2">
+                  {importPreview.map((row) => {
+                    if (row.errors.length === 0 && row.warnings.length === 0) return null;
+                    return (
+                      <Alert
+                        key={row.rowNumber}
+                        variant={row.errors.length > 0 ? 'destructive' : 'default'}
+                      >
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          <strong>Linha {row.rowNumber}:</strong>{' '}
+                          {row.errors.length > 0 && (
+                            <span className="text-red-600">
+                              {row.errors.join('; ')}
+                            </span>
+                          )}
+                          {row.warnings.length > 0 && (
+                            <span className="text-yellow-600">
+                              {row.warnings.join('; ')}
+                            </span>
+                          )}
+                        </AlertDescription>
+                      </Alert>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowImportDialog(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleImportConfirm}
+              disabled={importPreview.filter(r => r.isValid).length === 0}
+            >
+              Importar {importPreview.filter(r => r.isValid).length} Aluno(s)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

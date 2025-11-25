@@ -8,11 +8,20 @@ import { ChevronLeft, ChevronRight, Download, Presentation } from 'lucide-react'
 import { Class, Student, Incident, Grade, AttendanceRecord } from '@/types';
 import { CoverSlide } from './slides/CoverSlide';
 import { ClassOverviewSlide } from './slides/ClassOverviewSlide';
-import { AreaPerformanceSlide } from './slides/AreaPerformanceSlide';
+import { QuarterComparisonSlide } from './slides/QuarterComparisonSlide';
+import { SubjectRankingSlide } from './slides/SubjectRankingSlide';
+import { LanguagesAreaSlide } from './slides/LanguagesAreaSlide';
+import { HumanitiesAreaSlide } from './slides/HumanitiesAreaSlide';
+import { SciencesAreaSlide } from './slides/SciencesAreaSlide';
+import { MathAreaSlide } from './slides/MathAreaSlide';
+import { ProfessionalAreaSlide } from './slides/ProfessionalAreaSlide';
+import { RiskAnalysisSlide } from './slides/RiskAnalysisSlide';
+import { RecommendationsSlide } from './slides/RecommendationsSlide';
 import { StudentMetricsSlide } from './slides/StudentMetricsSlide';
 import { StudentGradesTableSlide } from './slides/StudentGradesTableSlide';
 import { useToast } from '@/hooks/use-toast';
-import { QUARTERS } from '@/lib/subjects';
+import { useProfessionalSubjects } from '@/hooks/useLocalStorage';
+import { QUARTERS, SUBJECT_AREAS } from '@/lib/subjects';
 
 interface ClassSlidesProps {
   classes: Class[];
@@ -28,8 +37,13 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
   const [selectedPeriod, setSelectedPeriod] = useState('all');
   const [currentSlide, setCurrentSlide] = useState(1);
   const [viewMode, setViewMode] = useState<'class' | 'individual'>('class');
-  const [professionalSubjects] = useState<string[]>([]); // TODO: Get from storage
+  const { getProfessionalSubjects } = useProfessionalSubjects();
   const { toast } = useToast();
+
+  // Carregar disciplinas profissionais da turma selecionada
+  const professionalSubjects = selectedClass 
+    ? getProfessionalSubjects(selectedClass) 
+    : [];
 
   const classData = classes.find(c => c.id === selectedClass);
   const classStudents = selectedClass ? students.filter(s => s.classId === selectedClass) : [];
@@ -51,8 +65,38 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
   }).sort((a, b) => a.average - b.average); // Lowest first
 
   // Calculate max slides for class view
+  // Verificar quais áreas têm dados
+  const hasLanguagesData = classGrades.some(g => 
+    SUBJECT_AREAS[0].subjects.includes(g.subject)
+  );
+  const hasHumanitiesData = classGrades.some(g => 
+    SUBJECT_AREAS[1].subjects.includes(g.subject)
+  );
+  const hasSciencesData = classGrades.some(g => 
+    SUBJECT_AREAS[2].subjects.includes(g.subject)
+  );
+  const hasMathData = classGrades.some(g => 
+    SUBJECT_AREAS[3].subjects.includes(g.subject)
+  );
+  const hasProfessionalData = professionalSubjects.length > 0 && classGrades.some(g =>
+    professionalSubjects.includes(g.subject)
+  );
+
+  // Contar slides de análise (apenas para ano completo)
+  const analysisSlides = selectedPeriod === 'all' ? [
+    true, // Comparison
+    true, // Ranking
+    hasLanguagesData,
+    hasHumanitiesData,
+    hasSciencesData,
+    hasMathData,
+    hasProfessionalData,
+    true, // Risk
+    true, // Recommendations
+  ].filter(Boolean).length : 0;
+
   const maxSlides = viewMode === 'class' 
-    ? 3 + (studentRankings.length * 2) // Cover + Overview + Areas + (2 slides per student)
+    ? 2 + analysisSlides + (studentRankings.length * 2) // Cover + Overview + Analysis + Student slides
     : 2; // Individual view: 2 slides
 
   const handleExportPDF = async () => {
@@ -84,20 +128,111 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
     if (!selectedClass) return null;
 
     if (viewMode === 'class') {
-      if (currentSlide === 1) {
+      let slideIndex = 1;
+
+      // Slide 1: Capa
+      if (currentSlide === slideIndex++) {
         return <CoverSlide classData={classData!} period={selectedPeriod} />;
-      } else if (currentSlide === 2) {
-        return <ClassOverviewSlide classData={classData!} students={classStudents} grades={classGrades} incidents={classIncidents} period={selectedPeriod} />;
-      } else if (currentSlide === 3) {
-        return <AreaPerformanceSlide classData={classData!} grades={classGrades} period={selectedPeriod} professionalSubjects={professionalSubjects} />;
-      } else {
-        // Student slides (2 per student)
-        const studentIndex = Math.floor((currentSlide - 4) / 2);
-        const isMetricsSlide = (currentSlide - 4) % 2 === 0;
+      }
+
+      // Slide 2: Visão Geral
+      if (currentSlide === slideIndex++) {
+        return <ClassOverviewSlide 
+          classData={classData!} 
+          students={classStudents} 
+          grades={classGrades} 
+          incidents={classIncidents} 
+          period={selectedPeriod} 
+        />;
+      }
+
+      // Slides de análise (apenas para ano completo)
+      if (selectedPeriod === 'all') {
+        // Slide 3: Comparação Entre Bimestres
+        if (currentSlide === slideIndex++) {
+          return <QuarterComparisonSlide 
+            grades={classGrades} 
+            classData={{ name: classData!.name }} 
+          />;
+        }
+
+        // Slide 4: Ranking de Disciplinas
+        if (currentSlide === slideIndex++) {
+          return <SubjectRankingSlide 
+            grades={classGrades} 
+            classData={{ name: classData!.name }}
+            professionalSubjects={professionalSubjects}
+          />;
+        }
+
+        // Slide 5: Linguagens (se houver dados)
+        if (hasLanguagesData && currentSlide === slideIndex++) {
+          return <LanguagesAreaSlide grades={classGrades} period={selectedPeriod} />;
+        } else if (hasLanguagesData) {
+          slideIndex++;
+        }
+
+        // Slide 6: Humanas (se houver dados)
+        if (hasHumanitiesData && currentSlide === slideIndex++) {
+          return <HumanitiesAreaSlide grades={classGrades} period={selectedPeriod} />;
+        } else if (hasHumanitiesData) {
+          slideIndex++;
+        }
+
+        // Slide 7: Natureza (se houver dados)
+        if (hasSciencesData && currentSlide === slideIndex++) {
+          return <SciencesAreaSlide grades={classGrades} period={selectedPeriod} />;
+        } else if (hasSciencesData) {
+          slideIndex++;
+        }
+
+        // Slide 8: Matemática (se houver dados)
+        if (hasMathData && currentSlide === slideIndex++) {
+          return <MathAreaSlide grades={classGrades} period={selectedPeriod} />;
+        } else if (hasMathData) {
+          slideIndex++;
+        }
+
+        // Slide 9: Profissional (se houver dados)
+        if (hasProfessionalData && currentSlide === slideIndex++) {
+          return <ProfessionalAreaSlide 
+            grades={classGrades} 
+            period={selectedPeriod}
+            professionalSubjects={professionalSubjects}
+          />;
+        } else if (hasProfessionalData) {
+          slideIndex++;
+        }
+
+        // Slide 10: Análise de Risco
+        if (currentSlide === slideIndex++) {
+          return <RiskAnalysisSlide 
+            grades={classGrades} 
+            students={classStudents}
+            classData={{ name: classData!.name }}
+          />;
+        }
+
+        // Slide 11: Recomendações
+        if (currentSlide === slideIndex++) {
+          return <RecommendationsSlide 
+            grades={classGrades} 
+            students={classStudents}
+            classData={{ name: classData!.name }}
+            professionalSubjects={professionalSubjects}
+          />;
+        }
+      }
+
+      // Slides de alunos (2 por aluno)
+      const studentSlideOffset = currentSlide - slideIndex;
+      if (studentSlideOffset >= 0) {
+        const studentIndex = Math.floor(studentSlideOffset / 2);
+        const isMetricsSlide = studentSlideOffset % 2 === 0;
         
         if (studentIndex < studentRankings.length) {
           const { student } = studentRankings[studentIndex];
-          const position = studentRankings.length - studentIndex; // Reverse position for display
+          const position = studentRankings.length - studentIndex;
           
           if (isMetricsSlide) {
             return <StudentMetricsSlide 

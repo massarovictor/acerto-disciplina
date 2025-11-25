@@ -7,15 +7,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useClasses, useStudents, useAttendance } from '@/hooks/useLocalStorage';
-import { Calendar, Save } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useClasses, useStudents, useAttendance, useProfessionalSubjects } from '@/hooks/useLocalStorage';
+import { Calendar, Save, Plus, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { QUARTERS, SUBJECT_AREAS } from '@/lib/subjects';
+import { 
+  QUARTERS 
+} from '@/lib/subjects';
 
 interface StudentAttendance {
   studentId: string;
-  absences: Record<string, number>; // subject -> number of absences
+  totalAbsences: number; // Número total de faltas do bimestre
 }
 
 export const AttendanceManager = () => {
@@ -23,40 +25,69 @@ export const AttendanceManager = () => {
   const { students } = useStudents();
   const { attendance, addAttendance } = useAttendance();
   const { toast } = useToast();
+  const { 
+    getProfessionalSubjects, 
+    addProfessionalSubject, 
+    removeProfessionalSubject 
+  } = useProfessionalSubjects();
 
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedQuarter, setSelectedQuarter] = useState('1º Bimestre');
   const [studentAttendances, setStudentAttendances] = useState<StudentAttendance[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
+  const [newProfessionalSubject, setNewProfessionalSubject] = useState('');
+  const [showAddDialog, setShowAddDialog] = useState(false);
 
   const classStudents = students.filter(s => s.classId === selectedClass);
-  const allSubjects = SUBJECT_AREAS.flatMap(area => area.subjects);
+  const selectedClassData = classes.find(c => c.id === selectedClass);
+  
+  // Verificar se a turma está arquivada
+  const isClassArchived = selectedClassData?.archived === true;
+  
+  // Obter disciplinas profissionais da turma (armazenadas no localStorage)
+  const professionalSubjects = selectedClass ? getProfessionalSubjects(selectedClass) : [];
 
   // Initialize attendance when class changes
   useEffect(() => {
-    if (selectedClass) {
+    if (selectedClass && selectedQuarter) {
       const initialAttendances = classStudents.map(student => {
-        const studentAbsences: Record<string, number> = {};
+        // Contar faltas totais do bimestre para este aluno
+        // Assumindo que cada registro de falta representa uma falta
+        const quarterAttendances = attendance.filter(
+          a => a.studentId === student.id && 
+               a.classId === selectedClass &&
+               (a.status === 'falta' || a.status === 'falta_justificada' || a.status === 'atestado')
+        );
         
-        allSubjects.forEach(subject => {
-          // Count absences for this student, subject, quarter
-          const quarterAttendances = attendance.filter(
-            a => a.studentId === student.id && 
-                 a.classId === selectedClass &&
-                 (a.status === 'falta' || a.status === 'falta_justificada' || a.status === 'atestado')
-          );
-          studentAbsences[subject] = quarterAttendances.length;
-        });
-
         return {
           studentId: student.id,
-          absences: studentAbsences,
+          totalAbsences: quarterAttendances.length,
         };
       });
 
       setStudentAttendances(initialAttendances);
+    } else {
+      setStudentAttendances([]);
     }
-  }, [selectedClass, selectedQuarter, classStudents, attendance]);
+  }, [selectedClass, selectedQuarter, classStudents.length, attendance.length]);
+
+  const handleAddProfessionalSubject = () => {
+    if (newProfessionalSubject.trim() && selectedClass) {
+      addProfessionalSubject(selectedClass, newProfessionalSubject.trim());
+      setNewProfessionalSubject('');
+      setShowAddDialog(false);
+      toast({
+        title: 'Disciplina adicionada',
+        description: 'A disciplina foi adicionada com sucesso e estará disponível em Notas e Frequência.',
+      });
+    }
+  };
+
+  const handleRemoveProfessionalSubject = (subject: string) => {
+    if (selectedClass) {
+      removeProfessionalSubject(selectedClass, subject);
+    }
+  };
 
   const handleSaveStudentAttendance = () => {
     if (!selectedStudent || !selectedClass || !selectedQuarter) return;
@@ -64,9 +95,11 @@ export const AttendanceManager = () => {
     const studentAtt = studentAttendances.find(sa => sa.studentId === selectedStudent);
     if (!studentAtt) return;
 
-    const totalAbsences = Object.values(studentAtt.absences).reduce((sum, val) => sum + val, 0);
     const student = students.find(s => s.id === selectedStudent);
+    const totalAbsences = studentAtt.totalAbsences;
 
+    // Aqui você pode salvar o número total de faltas do bimestre
+    // Por enquanto, apenas mostra uma mensagem
     toast({
       title: 'Frequência salva',
       description: `${totalAbsences} falta(s) de ${student?.name} registrada(s) no ${selectedQuarter}.`,
@@ -75,14 +108,14 @@ export const AttendanceManager = () => {
     setSelectedStudent(null);
   };
 
-  const updateAbsences = (studentId: string, subject: string, value: string) => {
+  const updateAbsences = (studentId: string, value: string) => {
     const numValue = parseInt(value) || 0;
     setStudentAttendances(prev =>
       prev.map(sa => {
         if (sa.studentId === studentId) {
           return {
             ...sa,
-            absences: { ...sa.absences, [subject]: Math.max(0, numValue) }
+            totalAbsences: Math.max(0, numValue)
           };
         }
         return sa;
@@ -109,9 +142,11 @@ export const AttendanceManager = () => {
                       Nenhuma turma cadastrada
                     </div>
                   ) : (
-                    classes.map(cls => (
-                      <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
-                    ))
+                    classes
+                      .filter(cls => !cls.archived)
+                      .map(cls => (
+                        <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+                      ))
                   )}
                 </SelectContent>
               </Select>
@@ -132,7 +167,16 @@ export const AttendanceManager = () => {
             </div>
           </div>
 
-          {selectedClass && (
+          {isClassArchived && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Esta turma está arquivada. Não é possível registrar frequência para turmas arquivadas.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {selectedClass && !isClassArchived && (
             <Alert className="mt-4">
               <Calendar className="h-4 w-4" />
               <AlertDescription>
@@ -144,8 +188,41 @@ export const AttendanceManager = () => {
         </CardContent>
       </Card>
 
+      {/* Add Professional Subject Button */}
+      {selectedClass && classStudents.length > 0 && !isClassArchived && (
+        <div className="flex justify-end">
+          <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar Disciplina Profissional
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Adicionar Disciplina da Base Profissional</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nome da Disciplina</Label>
+                  <Input
+                    placeholder="Ex: Gestão de Processos"
+                    value={newProfessionalSubject}
+                    onChange={(e) => setNewProfessionalSubject(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddProfessionalSubject()}
+                  />
+                </div>
+                <Button onClick={handleAddProfessionalSubject} className="w-full">
+                  Adicionar
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
+
       {/* Students List */}
-      {selectedClass && classStudents.length > 0 && (
+      {selectedClass && classStudents.length > 0 && !isClassArchived && (
         <Card>
           <CardHeader>
             <CardTitle>Alunos - Clique para Registrar Faltas</CardTitle>
@@ -154,9 +231,7 @@ export const AttendanceManager = () => {
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
               {classStudents.map((student) => {
                 const studentAtt = studentAttendances.find(sa => sa.studentId === student.id);
-                const totalAbsences = studentAtt 
-                  ? Object.values(studentAtt.absences).reduce((sum, val) => sum + val, 0)
-                  : 0;
+                const totalAbsences = studentAtt?.totalAbsences || 0;
 
                 return (
                   <Card 
@@ -181,7 +256,7 @@ export const AttendanceManager = () => {
                             {student.enrollment || 'S/N'}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {totalAbsences} falta(s) registrada(s)
+                            {totalAbsences} falta(s) no bimestre
                           </p>
                         </div>
                       </div>
@@ -196,7 +271,7 @@ export const AttendanceManager = () => {
 
       {/* Student Attendance Dialog */}
       <Dialog open={!!selectedStudent} onOpenChange={(open) => !open && setSelectedStudent(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               Registrar Faltas - {students.find(s => s.id === selectedStudent)?.name}
@@ -205,38 +280,46 @@ export const AttendanceManager = () => {
           
           {selectedStudent && (
             <div className="space-y-6">
-              {/* Subject Areas */}
-              {SUBJECT_AREAS.map(area => {
-                const studentAtt = studentAttendances.find(sa => sa.studentId === selectedStudent);
-                
-                return (
-                  <div key={area.name} className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={area.color}>
-                        {area.name}
-                      </Badge>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {area.subjects.map(subject => {
-                        const absences = studentAtt?.absences[subject] || 0;
+              <Alert>
+                <Calendar className="h-4 w-4" />
+                <AlertDescription>
+                  Informe o número total de faltas do aluno no <strong>{selectedQuarter}</strong>.
+                </AlertDescription>
+              </Alert>
 
-                        return (
-                          <div key={subject} className="space-y-1">
-                            <Label className="text-sm">{subject}</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              placeholder="Número de faltas"
-                              value={absences}
-                              onChange={(e) => updateAbsences(selectedStudent, subject, e.target.value)}
-                            />
-                          </div>
-                        );
-                      })}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="total-absences">Número Total de Faltas no Bimestre</Label>
+                  <Input
+                    id="total-absences"
+                    type="number"
+                    min="0"
+                    placeholder="Digite o número total de faltas"
+                    value={studentAttendances.find(sa => sa.studentId === selectedStudent)?.totalAbsences || 0}
+                    onChange={(e) => updateAbsences(selectedStudent, e.target.value)}
+                    className="text-2xl font-bold text-center"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Este número representa todas as faltas do aluno no {selectedQuarter}, independente da disciplina.
+                  </p>
+                </div>
+
+                {/* Mostrar disciplinas profissionais apenas para referência */}
+                {professionalSubjects.length > 0 && (
+                  <div className="space-y-2 pt-4 border-t">
+                    <Label className="text-sm text-muted-foreground">
+                      Disciplinas Profissionais da Turma (apenas referência)
+                    </Label>
+                    <div className="flex flex-wrap gap-2">
+                      {professionalSubjects.map(subject => (
+                        <Badge key={subject} variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/30">
+                          {subject}
+                        </Badge>
+                      ))}
                     </div>
                   </div>
-                );
-              })}
+                )}
+              </div>
 
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4 border-t">
@@ -266,3 +349,4 @@ export const AttendanceManager = () => {
     </div>
   );
 };
+

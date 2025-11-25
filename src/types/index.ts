@@ -43,7 +43,6 @@ export interface FollowUpRecord {
 export interface Incident {
   id: string;
   date: string;
-  period: 'morning' | 'afternoon' | 'evening';
   classId: string;
   studentIds: string[];
   episodes: string[]; // Episode IDs
@@ -75,10 +74,20 @@ export interface Class {
   id: string;
   name: string;
   series: string;
-  course: string;
+  course?: string; // Opcional - pode ser digitado livremente
+  classNumber: string; // Número único da turma (ex: "TURMA-001")
   directorId?: string;
   active: boolean;
+  startYear?: 1 | 2 | 3; // Ano de início da turma
+  currentYear?: 1 | 2 | 3; // Ano atual da turma (calculado automaticamente)
+  startYearDate?: string; // Data de início do primeiro ano (para calcular anos seguintes)
+  archived?: boolean; // Se a turma foi arquivada
+  archivedAt?: string; // Data de arquivamento
+  archivedReason?: string; // Motivo do arquivamento
+  templateId?: string; // ID do template usado para criar a turma
 }
+
+export type StudentStatus = 'active' | 'inactive' | 'transferred' | 'approved' | 'recovery' | 'failed';
 
 export interface Student {
   id: string;
@@ -91,7 +100,7 @@ export interface Student {
   cpf?: string;
   rg?: string;
   photoUrl?: string;
-  status: 'active' | 'inactive' | 'transferred';
+  status: StudentStatus;
 }
 
 export interface Grade {
@@ -113,4 +122,26 @@ export interface AttendanceRecord {
   status: 'presente' | 'falta' | 'falta_justificada' | 'atestado';
   recordedBy: string;
   recordedAt: string;
+}
+
+export interface StudentAcademicStatus {
+  studentId: string;
+  classId: string;
+  year: string; // Ano letivo (ex: "2024")
+  status: 'approved' | 'recovery' | 'failed';
+  finalGrades: Record<string, number>; // subject -> média final
+  subjectsBelowAverage: string[]; // Disciplinas com média < 6
+  calculatedAt: string;
+}
+
+export interface ProfessionalSubjectTemplate {
+  id: string;
+  name: string;
+  course: string;
+  subjectsByYear: {
+    year: 1 | 2 | 3;
+    subjects: string[];
+  }[];
+  createdAt: string;
+  updatedAt: string;
 }

@@ -16,7 +16,7 @@ export const DetailsStep = ({ formData, updateFormData }: DetailsStepProps) => {
   const { students } = useStudents();
 
   useEffect(() => {
-    if (formData.studentIds && formData.finalSeverity && !formData.suggestedAction) {
+    if (formData.studentIds && formData.finalSeverity && formData.studentIds.length > 0 && !formData.suggestedAction) {
       const suggested = calculateSuggestedAction(
         formData.studentIds,
         formData.finalSeverity,
@@ -25,7 +25,8 @@ export const DetailsStep = ({ formData, updateFormData }: DetailsStepProps) => {
       );
       updateFormData({ suggestedAction: suggested });
     }
-  }, [formData.studentIds, formData.finalSeverity]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.studentIds, formData.finalSeverity, formData.suggestedAction]);
 
   return (
     <div className="space-y-6">

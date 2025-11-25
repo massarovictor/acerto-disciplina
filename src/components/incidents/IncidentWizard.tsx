@@ -15,7 +15,6 @@ import { useToast } from '@/hooks/use-toast';
 export interface IncidentFormData {
   classId: string;
   date: string;
-  period: 'morning' | 'afternoon' | 'evening';
   studentIds: string[];
   episodes: string[];
   calculatedSeverity: IncidentSeverity;
@@ -42,7 +41,6 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<Partial<IncidentFormData>>({
     date: new Date().toISOString().split('T')[0],
-    period: 'morning',
     studentIds: [],
     episodes: [],
   });
@@ -76,7 +74,6 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
     addIncident({
       classId: formData.classId,
       date: formData.date || new Date().toISOString(),
-      period: formData.period || 'morning',
       studentIds: formData.studentIds,
       episodes: formData.episodes,
       calculatedSeverity: formData.calculatedSeverity || 'leve',

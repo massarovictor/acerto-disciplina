@@ -19,12 +19,6 @@ const severityConfig = {
   gravissima: { label: 'Gravíssima', color: 'bg-severity-critical-bg text-severity-critical border-severity-critical' },
 };
 
-const periodLabels = {
-  morning: 'Manhã',
-  afternoon: 'Tarde',
-  evening: 'Noite',
-};
-
 export const ReviewStep = ({ formData }: ReviewStepProps) => {
   const { classes } = useClasses();
   const { students } = useStudents();
@@ -58,10 +52,6 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
               <span className="font-medium">
                 {formData.date && format(new Date(formData.date), 'PPP', { locale: ptBR })}
               </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Período:</span>
-              <span className="font-medium">{formData.period && periodLabels[formData.period]}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Registrado por:</span>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StudentsRegister } from '@/components/students/StudentsRegister';
 import { StudentsManage } from '@/components/students/StudentsManage';
+import { StudentApprovalManager } from '@/components/students/StudentApprovalManager';
 
 const Students = () => {
   const [activeTab, setActiveTab] = useState('register');
@@ -16,9 +17,10 @@ const Students = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="register">Cadastrar</TabsTrigger>
           <TabsTrigger value="manage">Gerenciar Alunos</TabsTrigger>
+          <TabsTrigger value="approval">Aprovações</TabsTrigger>
         </TabsList>
 
         <TabsContent value="register" className="space-y-6 mt-6">
@@ -27,6 +29,10 @@ const Students = () => {
 
         <TabsContent value="manage" className="space-y-6 mt-6">
           <StudentsManage />
+        </TabsContent>
+
+        <TabsContent value="approval" className="space-y-6 mt-6">
+          <StudentApprovalManager />
         </TabsContent>
       </Tabs>
     </div>

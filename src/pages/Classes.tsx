@@ -1,26 +1,38 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Archive } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { ClassesOverview } from '@/components/classes/ClassesOverview';
 import { ClassesManage } from '@/components/classes/ClassesManage';
 import { ClassesCreate } from '@/components/classes/ClassesCreate';
+import { SubjectTemplatesManager } from '@/components/classes/SubjectTemplatesManager';
 
 const Classes = () => {
   const [activeTab, setActiveTab] = useState('overview');
+  const navigate = useNavigate();
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Configurar Turmas</h1>
-        <p className="text-muted-foreground mt-1">
-          Gerencie turmas, atribua diretores e acompanhe a estrutura escolar
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Configurar Turmas</h1>
+          <p className="text-muted-foreground mt-1">
+            Gerencie turmas, atribua diretores e acompanhe a estrutura escolar
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => navigate('/turmas-arquivadas')}>
+          <Archive className="h-4 w-4 mr-2" />
+          Turmas Arquivadas
+        </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="manage">Gerenciar Turmas</TabsTrigger>
           <TabsTrigger value="create">Criar Nova Turma</TabsTrigger>
+          <TabsTrigger value="templates">Templates</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6 mt-6">
@@ -33,6 +45,10 @@ const Classes = () => {
 
         <TabsContent value="create" className="space-y-6 mt-6">
           <ClassesCreate onSuccess={() => setActiveTab('manage')} />
+        </TabsContent>
+
+        <TabsContent value="templates" className="space-y-6 mt-6">
+          <SubjectTemplatesManager />
         </TabsContent>
       </Tabs>
     </div>

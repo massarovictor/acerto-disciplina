@@ -24,7 +24,7 @@ export const ContextStep = ({ formData, updateFormData }: ContextStepProps) => {
       <div>
         <h2 className="text-2xl font-bold">Contexto da Ocorrência</h2>
         <p className="text-muted-foreground mt-1">
-          Informe a turma, data e período em que ocorreu o incidente
+          Informe a turma e data em que ocorreu o incidente
         </p>
       </div>
 
@@ -73,25 +73,6 @@ export const ContextStep = ({ formData, updateFormData }: ContextStepProps) => {
               />
             </PopoverContent>
           </Popover>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="period">Período *</Label>
-          <Select
-            value={formData.period}
-            onValueChange={(value: 'morning' | 'afternoon' | 'evening') =>
-              updateFormData({ period: value })
-            }
-          >
-            <SelectTrigger id="period">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="morning">Manhã</SelectItem>
-              <SelectItem value="afternoon">Tarde</SelectItem>
-              <SelectItem value="evening">Noite</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
       </div>
     </div>

@@ -160,22 +160,6 @@ const Dashboard = () => {
         ))}
       </div>
 
-      {/* Secondary Metrics */}
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-        <div className="text-center p-4 bg-card rounded-lg border">
-          <p className="text-xs text-muted-foreground">Total Geral</p>
-          <p className="text-xl font-bold mt-1">{incidents.length}</p>
-        </div>
-        <div className="text-center p-4 bg-card rounded-lg border">
-          <p className="text-xs text-muted-foreground">Resolvidas (mês)</p>
-          <p className="text-xl font-bold mt-1">{resolvedThisMonth.length}</p>
-        </div>
-        <div className="text-center p-4 bg-card rounded-lg border">
-          <p className="text-xs text-muted-foreground">Taxa de Resolução</p>
-          <p className="text-xl font-bold mt-1">{resolutionRate}%</p>
-        </div>
-      </div>
-
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="flex-1">

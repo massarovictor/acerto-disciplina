@@ -2,28 +2,43 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useClasses, useStudents } from '@/hooks/useLocalStorage';
-import { School, Users, AlertCircle, CheckCircle } from 'lucide-react';
+import { School, Users, AlertCircle, CheckCircle, Calendar, Archive } from 'lucide-react';
 import { MOCK_USERS } from '@/data/mockData';
 
 export const ClassesOverview = () => {
   const { classes } = useClasses();
   const { students } = useStudents();
 
-  const classesWithDirector = classes.filter(c => c.directorId);
-  const classesWithoutDirector = classes.filter(c => !c.directorId);
+  // Filtrar apenas turmas ativas (não arquivadas)
+  const activeClasses = classes.filter(c => !c.archived);
+
+  const classesWithDirector = activeClasses.filter(c => c.directorId);
+  const classesWithoutDirector = activeClasses.filter(c => !c.directorId);
+  
+  // Distribuição por ano atual
+  const yearDistribution = activeClasses.reduce((acc, cls) => {
+    if (cls.currentYear) {
+      const yearLabel = `${cls.currentYear}º ano`;
+      acc[yearLabel] = (acc[yearLabel] || 0) + 1;
+    } else {
+      acc['Sem ano definido'] = (acc['Sem ano definido'] || 0) + 1;
+    }
+    return acc;
+  }, {} as Record<string, number>);
   
   const directors = MOCK_USERS.filter(u => u.role === 'diretor');
   const directorLoad = directors.map(director => ({
     name: director.name,
-    classes: classes.filter(c => c.directorId === director.id).length
+    classes: activeClasses.filter(c => c.directorId === director.id).length
   }));
 
-  const courseDistribution = classes.reduce((acc, cls) => {
-    acc[cls.course] = (acc[cls.course] || 0) + 1;
+  const courseDistribution = activeClasses.reduce((acc, cls) => {
+    const course = cls.course || 'Sem curso';
+    acc[course] = (acc[course] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
-  const seriesDistribution = classes.reduce((acc, cls) => {
+  const seriesDistribution = activeClasses.reduce((acc, cls) => {
     const series = cls.name.split(' ')[0];
     acc[series] = (acc[series] || 0) + 1;
     return acc;
@@ -32,14 +47,14 @@ export const ClassesOverview = () => {
   return (
     <div className="space-y-6">
       {/* Metrics */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Turmas</CardTitle>
             <School className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{classes.length}</div>
+            <div className="text-2xl font-bold">{activeClasses.length}</div>
             <p className="text-xs text-muted-foreground">
               {students.length} alunos matriculados
             </p>
@@ -54,7 +69,7 @@ export const ClassesOverview = () => {
           <CardContent>
             <div className="text-2xl font-bold">{classesWithDirector.length}</div>
             <Badge variant="outline" className="bg-severity-light-bg text-severity-light border-severity-light mt-1">
-              {classes.length > 0 ? Math.round((classesWithDirector.length / classes.length) * 100) : 0}% do total
+              {activeClasses.length > 0 ? Math.round((classesWithDirector.length / activeClasses.length) * 100) : 0}% do total
             </Badge>
           </CardContent>
         </Card>
@@ -73,7 +88,52 @@ export const ClassesOverview = () => {
             )}
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Arquivadas</CardTitle>
+            <Archive className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{classes.filter(c => c.archived).length}</div>
+            <p className="text-xs text-muted-foreground">
+              Turmas concluídas
+            </p>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Year Distribution */}
+      {Object.keys(yearDistribution).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Distribuição por Ano Atual
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {Object.entries(yearDistribution)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([year, count]) => (
+                  <div key={year}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium">{year}</span>
+                      <span className="text-sm text-muted-foreground">{count} turma(s)</span>
+                    </div>
+                    <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-primary h-full rounded-full"
+                        style={{ width: `${(count / Math.max(...Object.values(yearDistribution), 1)) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Alerts */}
       {classesWithoutDirector.length > 0 && (

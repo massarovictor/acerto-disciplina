@@ -9,17 +9,18 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { useClasses, useStudents, useGrades } from '@/hooks/useLocalStorage';
-import { AlertTriangle, Save, Plus, X } from 'lucide-react';
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import { useClasses, useStudents, useGrades, useProfessionalSubjects } from '@/hooks/useLocalStorage';
+import { AlertTriangle, Save, Plus, X, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { SUBJECT_AREAS, QUARTERS } from '@/lib/subjects';
+import { 
+  SUBJECT_AREAS, 
+  QUARTERS 
+} from '@/lib/subjects';
 
 interface StudentGrades {
   studentId: string;
@@ -31,17 +32,34 @@ export const GradesManager = () => {
   const { students } = useStudents();
   const { grades, addGrade } = useGrades();
   const { toast } = useToast();
+  const { 
+    getProfessionalSubjects, 
+    addProfessionalSubject, 
+    removeProfessionalSubject,
+    setProfessionalSubjectsForClass 
+  } = useProfessionalSubjects();
 
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedQuarter, setSelectedQuarter] = useState('1º Bimestre');
   const [studentGrades, setStudentGrades] = useState<StudentGrades[]>([]);
-  const [professionalSubjects, setProfessionalSubjects] = useState<string[]>([]);
   const [newProfessionalSubject, setNewProfessionalSubject] = useState('');
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
+  const [lastInitialized, setLastInitialized] = useState<{ class: string; quarter: string } | null>(null);
 
   const classStudents = students.filter(s => s.classId === selectedClass);
+  const selectedClassData = classes.find(c => c.id === selectedClass);
+  
+  // Verificar se a turma está arquivada
+  const isClassArchived = selectedClassData?.archived === true;
+  
+  // Obter disciplinas profissionais da turma (armazenadas no localStorage)
+  const professionalSubjects = selectedClass ? getProfessionalSubjects(selectedClass) : [];
+  
+  // Usar uma string para rastrear mudanças nas disciplinas profissionais
+  const professionalSubjectsStr = professionalSubjects.join(',');
 
+  // Calcular allSubjects dentro do useEffect para evitar problemas de dependência
   const allSubjects = [
     ...SUBJECT_AREAS.flatMap(area => area.subjects),
     ...professionalSubjects,
@@ -49,11 +67,27 @@ export const GradesManager = () => {
 
   // Initialize grades when class or quarter changes
   useEffect(() => {
-    if (selectedClass && selectedQuarter) {
+    if (!selectedClass || !selectedQuarter) {
+      setStudentGrades([]);
+      setLastInitialized(null);
+      return;
+    }
+
+    // Só reinicializar se mudou a turma ou bimestre
+    const needsReinit = !lastInitialized || 
+                       lastInitialized.class !== selectedClass || 
+                       lastInitialized.quarter !== selectedQuarter;
+
+    if (needsReinit) {
+      const currentAllSubjects = [
+        ...SUBJECT_AREAS.flatMap(area => area.subjects),
+        ...professionalSubjects,
+      ];
+      
       const initialGrades = classStudents.map(student => {
         const studentGradeData: Record<string, string> = {};
         
-        allSubjects.forEach(subject => {
+        currentAllSubjects.forEach(subject => {
           const existingGrade = grades.find(
             g => g.studentId === student.id && 
                  g.subject === subject && 
@@ -69,8 +103,32 @@ export const GradesManager = () => {
       });
 
       setStudentGrades(initialGrades);
+      setLastInitialized({ class: selectedClass, quarter: selectedQuarter });
+    } else {
+      // Se apenas adicionou novas disciplinas profissionais, adicionar campos vazios sem resetar
+      const currentAllSubjects = [
+        ...SUBJECT_AREAS.flatMap(area => area.subjects),
+        ...professionalSubjects,
+      ];
+      
+      setStudentGrades(prev => {
+        return prev.map(sg => {
+          const updatedGrades = { ...sg.grades };
+          currentAllSubjects.forEach(subject => {
+            if (!(subject in updatedGrades)) {
+              const existingGrade = grades.find(
+                g => g.studentId === sg.studentId && 
+                     g.subject === subject && 
+                     g.quarter === selectedQuarter
+              );
+              updatedGrades[subject] = existingGrade ? String(existingGrade.grade) : '';
+            }
+          });
+          return { ...sg, grades: updatedGrades };
+        });
+      });
     }
-  }, [selectedClass, selectedQuarter, professionalSubjects, classStudents, grades]);
+  }, [selectedClass, selectedQuarter, professionalSubjectsStr, classStudents.length]);
 
   const handleGradeChange = (studentId: string, subject: string, value: string) => {
     setStudentGrades(prev =>
@@ -83,19 +141,21 @@ export const GradesManager = () => {
   };
 
   const handleAddProfessionalSubject = () => {
-    if (newProfessionalSubject.trim()) {
-      setProfessionalSubjects(prev => [...prev, newProfessionalSubject.trim()]);
+    if (newProfessionalSubject.trim() && selectedClass) {
+      addProfessionalSubject(selectedClass, newProfessionalSubject.trim());
       setNewProfessionalSubject('');
       setShowAddDialog(false);
       toast({
         title: 'Disciplina adicionada',
-        description: 'A disciplina foi adicionada com sucesso.',
+        description: 'A disciplina foi adicionada com sucesso e estará disponível em Notas e Frequência.',
       });
     }
   };
 
   const handleRemoveProfessionalSubject = (subject: string) => {
-    setProfessionalSubjects(prev => prev.filter(s => s !== subject));
+    if (selectedClass) {
+      removeProfessionalSubject(selectedClass, subject);
+    }
   };
 
   const handleSaveStudentGrades = () => {
@@ -106,6 +166,7 @@ export const GradesManager = () => {
 
     let savedCount = 0;
     let lowGradesCount = 0;
+    const savedByArea: Record<string, number> = {};
 
     Object.entries(studentGrade.grades).forEach(([subject, gradeValue]) => {
       const grade = parseFloat(gradeValue);
@@ -119,6 +180,11 @@ export const GradesManager = () => {
         });
         savedCount++;
         if (grade < 6) lowGradesCount++;
+        
+        // Contar por área
+        const area = SUBJECT_AREAS.find(a => a.subjects.includes(subject));
+        const areaName = area ? area.name : 'Base Profissional';
+        savedByArea[areaName] = (savedByArea[areaName] || 0) + 1;
       }
     });
 
@@ -132,19 +198,49 @@ export const GradesManager = () => {
     }
 
     const student = students.find(s => s.id === selectedStudent);
+    const areasSummary = Object.entries(savedByArea)
+      .map(([area, count]) => `${area}: ${count}`)
+      .join(', ');
+    
     if (lowGradesCount > 0) {
       toast({
         title: 'Notas Lançadas',
-        description: `✓ ${savedCount} nota(s) de ${student?.name} salva(s). ⚠️ ${lowGradesCount} nota(s) abaixo da média.`,
+        description: `✓ ${savedCount} nota(s) de ${student?.name} salva(s) (${areasSummary}). ⚠️ ${lowGradesCount} nota(s) abaixo da média.`,
       });
     } else {
       toast({
         title: 'Sucesso',
-        description: `${savedCount} nota(s) de ${student?.name} lançada(s) com sucesso.`,
+        description: `${savedCount} nota(s) de ${student?.name} lançada(s) com sucesso (${areasSummary}).`,
       });
     }
 
     setSelectedStudent(null);
+  };
+
+  // Calcular progresso por área para um aluno
+  const getAreaProgress = (studentId: string, area: typeof SUBJECT_AREAS[0]) => {
+    const studentGrade = studentGrades.find(sg => sg.studentId === studentId);
+    if (!studentGrade) return { filled: 0, total: area.subjects.length };
+    
+    const filled = area.subjects.filter(subject => {
+      const gradeValue = studentGrade.grades[subject];
+      return gradeValue && gradeValue !== '';
+    }).length;
+    
+    return { filled, total: area.subjects.length };
+  };
+
+  // Calcular progresso da base profissional
+  const getProfessionalProgress = (studentId: string) => {
+    const studentGrade = studentGrades.find(sg => sg.studentId === studentId);
+    if (!studentGrade || professionalSubjects.length === 0) return { filled: 0, total: 0 };
+    
+    const filled = professionalSubjects.filter(subject => {
+      const gradeValue = studentGrade.grades[subject];
+      return gradeValue && gradeValue !== '';
+    }).length;
+    
+    return { filled, total: professionalSubjects.length };
   };
 
   const getSubjectArea = (subject: string) => {
@@ -169,9 +265,11 @@ export const GradesManager = () => {
                       Nenhuma turma cadastrada
                     </div>
                   ) : (
-                    classes.map(cls => (
-                      <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
-                    ))
+                    classes
+                      .filter(cls => !cls.archived)
+                      .map(cls => (
+                        <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+                      ))
                   )}
                 </SelectContent>
               </Select>
@@ -192,7 +290,16 @@ export const GradesManager = () => {
             </div>
           </div>
 
-          {selectedClass && selectedQuarter && (
+          {isClassArchived && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Esta turma está arquivada. Não é possível lançar notas para turmas arquivadas.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {selectedClass && selectedQuarter && !isClassArchived && (
             <Alert className="mt-4">
               <AlertDescription>
                 Lançando notas do <strong>{selectedQuarter}</strong> para a turma{' '}
@@ -237,7 +344,7 @@ export const GradesManager = () => {
       )}
 
       {/* Students List */}
-      {selectedClass && classStudents.length > 0 && (
+      {selectedClass && classStudents.length > 0 && !isClassArchived && (
         <Card>
           <CardHeader>
             <CardTitle>Alunos - Clique para Lançar Notas</CardTitle>
@@ -250,6 +357,13 @@ export const GradesManager = () => {
                   ? Object.values(studentGrade.grades).filter(g => g !== '').length 
                   : 0;
                 const totalSubjects = allSubjects.length;
+                
+                // Calcular progresso por área
+                const areaProgresses = SUBJECT_AREAS.map(area => ({
+                  area: area.name,
+                  ...getAreaProgress(student.id, area),
+                }));
+                const professionalProgress = getProfessionalProgress(student.id);
 
                 return (
                   <Card 
@@ -273,6 +387,22 @@ export const GradesManager = () => {
                           <p className="text-sm text-muted-foreground">
                             {student.enrollment || 'S/N'}
                           </p>
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {areaProgresses.map(({ area, filled, total }) => (
+                              <Badge 
+                                key={area} 
+                                variant="outline" 
+                                className="text-xs"
+                              >
+                                {filled}/{total}
+                              </Badge>
+                            ))}
+                            {professionalProgress.total > 0 && (
+                              <Badge variant="outline" className="text-xs">
+                                Prof: {professionalProgress.filled}/{professionalProgress.total}
+                              </Badge>
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground mt-1">
                             {filledGrades}/{totalSubjects} notas lançadas
                           </p>
@@ -289,7 +419,7 @@ export const GradesManager = () => {
 
       {/* Student Grades Dialog */}
       <Dialog open={!!selectedStudent} onOpenChange={(open) => !open && setSelectedStudent(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               Lançar Notas - {students.find(s => s.id === selectedStudent)?.name}
@@ -297,106 +427,152 @@ export const GradesManager = () => {
           </DialogHeader>
           
           {selectedStudent && (
-            <div className="space-y-6">
-              {/* Subject Areas */}
-              {SUBJECT_AREAS.map(area => {
-                const studentGrade = studentGrades.find(sg => sg.studentId === selectedStudent);
-                
-                return (
-                  <div key={area.name} className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={area.color}>
-                        {area.name}
-                      </Badge>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {area.subjects.map(subject => {
-                        const gradeValue = studentGrade?.grades[subject] || '';
-                        const grade = parseFloat(gradeValue);
-                        const isLowGrade = !isNaN(grade) && grade < 6;
-
-                        return (
-                          <div key={subject} className="space-y-1">
-                            <Label className="text-sm">{subject}</Label>
-                            <Input
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              max="10"
-                              placeholder="0.0 a 10.0"
-                              value={gradeValue}
-                              onChange={(e) => handleGradeChange(selectedStudent, subject, e.target.value)}
-                              className={isLowGrade ? 'border-severity-critical bg-severity-critical/5 font-bold' : ''}
-                            />
-                            {isLowGrade && (
-                              <p className="text-xs text-severity-critical flex items-center gap-1">
-                                <AlertTriangle className="h-3 w-3" />
-                                Abaixo da média
-                              </p>
+            <div className="space-y-4">
+              <Accordion type="multiple" defaultValue={SUBJECT_AREAS.map((_, i) => `area-${i}`)} className="w-full">
+                {/* Subject Areas */}
+                {SUBJECT_AREAS.map((area, index) => {
+                  const studentGrade = studentGrades.find(sg => sg.studentId === selectedStudent);
+                  const progress = getAreaProgress(selectedStudent, area);
+                  const isComplete = progress.filled === progress.total && progress.total > 0;
+                  
+                  return (
+                    <AccordionItem key={area.name} value={`area-${index}`} className="border rounded-lg px-4 mb-2">
+                      <AccordionTrigger className="hover:no-underline">
+                        <div className="flex items-center justify-between w-full pr-4">
+                          <div className="flex items-center gap-3">
+                            <Badge variant="outline" className={area.color}>
+                              {area.name}
+                            </Badge>
+                            {isComplete && (
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
                             )}
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Professional Subjects */}
-              {professionalSubjects.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">Base Profissional</Badge>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {professionalSubjects.map(subject => {
-                      const studentGrade = studentGrades.find(sg => sg.studentId === selectedStudent);
-                      const gradeValue = studentGrade?.grades[subject] || '';
-                      const grade = parseFloat(gradeValue);
-                      const isLowGrade = !isNaN(grade) && grade < 6;
-
-                      return (
-                        <div key={subject} className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-sm">{subject}</Label>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-4 w-4"
-                              onClick={() => handleRemoveProfessionalSubject(subject)}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                          <Input
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            max="10"
-                            placeholder="0.0 a 10.0"
-                            value={gradeValue}
-                            onChange={(e) => handleGradeChange(selectedStudent, subject, e.target.value)}
-                            className={isLowGrade ? 'border-severity-critical bg-severity-critical/5 font-bold' : ''}
-                          />
-                          {isLowGrade && (
-                            <p className="text-xs text-severity-critical flex items-center gap-1">
-                              <AlertTriangle className="h-3 w-3" />
-                              Abaixo da média
-                            </p>
-                          )}
+                          <span className="text-sm text-muted-foreground">
+                            {progress.filled}/{progress.total} lançadas
+                          </span>
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 pt-2">
+                          {area.subjects.map(subject => {
+                            const gradeValue = studentGrade?.grades[subject] || '';
+                            const grade = parseFloat(gradeValue);
+                            const isLowGrade = !isNaN(grade) && grade < 6;
+                            const hasGrade = gradeValue !== '';
+
+                            return (
+                              <div key={subject} className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <Label className="text-sm">{subject}</Label>
+                                  {hasGrade && (
+                                    <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                  )}
+                                </div>
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  max="10"
+                                  placeholder="0.0 a 10.0"
+                                  value={gradeValue}
+                                  onChange={(e) => handleGradeChange(selectedStudent, subject, e.target.value)}
+                                  className={isLowGrade ? 'border-severity-critical bg-severity-critical/5 font-bold' : ''}
+                                />
+                                {isLowGrade && (
+                                  <p className="text-xs text-severity-critical flex items-center gap-1">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    Abaixo da média
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+
+                {/* Professional Subjects */}
+                {professionalSubjects.length > 0 && (() => {
+                  const professionalProgress = getProfessionalProgress(selectedStudent);
+                  return (
+                    <AccordionItem value="professional" className="border rounded-lg px-4 mb-2">
+                      <AccordionTrigger className="hover:no-underline">
+                        <div className="flex items-center justify-between w-full pr-4">
+                          <div className="flex items-center gap-3">
+                            <Badge variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/30">
+                              Base Profissional
+                              {selectedClassData?.course && ` - ${selectedClassData.course}`}
+                            </Badge>
+                            {professionalProgress.filled === professionalProgress.total && professionalProgress.total > 0 && (
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            )}
+                          </div>
+                          <span className="text-sm text-muted-foreground">
+                            {professionalProgress.filled}/{professionalProgress.total} lançadas
+                          </span>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 pt-2">
+                          {professionalSubjects.map(subject => {
+                            const studentGrade = studentGrades.find(sg => sg.studentId === selectedStudent);
+                            const gradeValue = studentGrade?.grades[subject] || '';
+                            const grade = parseFloat(gradeValue);
+                            const isLowGrade = !isNaN(grade) && grade < 6;
+                            const hasGrade = gradeValue !== '';
+
+                            return (
+                              <div key={subject} className="space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <Label className="text-sm">{subject}</Label>
+                                    {hasGrade && (
+                                      <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                    )}
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => handleRemoveProfessionalSubject(subject)}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  max="10"
+                                  placeholder="0.0 a 10.0"
+                                  value={gradeValue}
+                                  onChange={(e) => handleGradeChange(selectedStudent, subject, e.target.value)}
+                                  className={isLowGrade ? 'border-severity-critical bg-severity-critical/5 font-bold' : ''}
+                                />
+                                {isLowGrade && (
+                                  <p className="text-xs text-severity-critical flex items-center gap-1">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    Abaixo da média
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })()}
+              </Accordion>
 
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4 border-t">
                 <Button onClick={handleSaveStudentGrades} className="flex-1">
                   <Save className="h-4 w-4 mr-2" />
-                  Salvar Notas
+                  Salvar Todas as Notas
                 </Button>
                 <Button
                   variant="outline"
@@ -410,7 +586,7 @@ export const GradesManager = () => {
         </DialogContent>
       </Dialog>
 
-      {selectedClass && classStudents.length === 0 && (
+      {selectedClass && classStudents.length === 0 && !isClassArchived && (
         <Alert>
           <AlertDescription>
             Nenhum aluno cadastrado nesta turma. Cadastre alunos para lançar notas.

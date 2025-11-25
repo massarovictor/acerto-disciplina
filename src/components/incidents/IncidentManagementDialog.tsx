@@ -176,7 +176,7 @@ export const IncidentManagementDialog = ({
   const handleSave = () => {
     if (!user) return;
 
-    const updatedComments = [...(incident.comments || [])];
+    const updatedComments = [...(currentIncident.comments || [])];
     
     if (commentText.trim()) {
       updatedComments.push({
@@ -187,7 +187,7 @@ export const IncidentManagementDialog = ({
         createdAt: new Date().toISOString(),
       });
       
-      updateIncident(incident.id, {
+      updateIncident(currentIncident.id, {
         comments: updatedComments,
       });
 

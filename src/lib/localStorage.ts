@@ -8,6 +8,8 @@ const STORAGE_KEYS = {
   GRADES: 'school_incidents_grades',
   ATTENDANCE: 'school_incidents_attendance',
   FOLLOWUPS: 'school_incidents_followups',
+  PROFESSIONAL_SUBJECTS: 'school_incidents_professional_subjects', // Disciplinas profissionais por turma
+  PROFESSIONAL_SUBJECT_TEMPLATES: 'school_incidents_professional_subject_templates', // Templates de disciplinas profissionais
 } as const;
 
 export const storage = {
