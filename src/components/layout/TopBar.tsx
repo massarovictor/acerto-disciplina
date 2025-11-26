@@ -1,8 +1,9 @@
-import { Bell, LogOut } from 'lucide-react';
+import { Bell, LogOut, Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from 'next-themes';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +17,9 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 export const TopBar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { resolvedTheme, setTheme } = useTheme();
+
+  const isDark = resolvedTheme === 'dark';
 
   const handleLogout = () => {
     logout();
@@ -25,7 +29,7 @@ export const TopBar = () => {
   const getInitials = (name: string) => {
     return name
       .split(' ')
-      .map(n => n[0])
+      .map((n) => n[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
@@ -49,6 +53,14 @@ export const TopBar = () => {
         <Bell className="h-5 w-5" />
         <span className="absolute top-1 right-1 h-2 w-2 bg-destructive rounded-full" />
       </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => setTheme(isDark ? 'light' : 'dark')}
+        aria-label="Alternar tema"
+      >
+        {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+      </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="gap-2">
@@ -59,7 +71,9 @@ export const TopBar = () => {
             </Avatar>
             <div className="flex flex-col items-start text-sm">
               <span className="font-medium">{user?.name}</span>
-              <span className="text-xs text-muted-foreground">{user && getRoleLabel(user.role)}</span>
+              <span className="text-xs text-muted-foreground">
+                {user && getRoleLabel(user.role)}
+              </span>
             </div>
           </Button>
         </DropdownMenuTrigger>
