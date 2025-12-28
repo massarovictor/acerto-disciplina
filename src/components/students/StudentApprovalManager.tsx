@@ -3,16 +3,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useClasses, useStudents, useGrades } from '@/hooks/useLocalStorage';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle2, XCircle, AlertTriangle, RefreshCw } from 'lucide-react';
-import { calculateClassAcademicStatus } from '@/lib/approvalCalculator';
+import { CheckCircle2, XCircle, AlertTriangle, RefreshCw, Clock, Users, BookOpen } from 'lucide-react';
+import { calculateClassAcademicStatus, checkClassQuarterGrades, QuarterCheckResult } from '@/lib/approvalCalculator';
 import { getAcademicYear } from '@/lib/classYearCalculator';
-import { checkAndGenerateIncidents } from '@/lib/autoIncidentGenerator';
+import { generateQuarterIncidents, checkLowPerformanceStudents } from '@/lib/autoIncidentGenerator';
 import { useIncidents } from '@/hooks/useLocalStorage';
 import { useAuth } from '@/contexts/AuthContext';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { QUARTERS } from '@/lib/subjects';
 
 export const StudentApprovalManager = () => {
   const { classes } = useClasses();
@@ -22,12 +24,95 @@ export const StudentApprovalManager = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
+  const [activeTab, setActiveTab] = useState('quarter');
   const [selectedClass, setSelectedClass] = useState('');
+  const [selectedQuarter, setSelectedQuarter] = useState('1º Bimestre');
   const [academicStatuses, setAcademicStatuses] = useState<Record<string, any>>({});
+  const [quarterResults, setQuarterResults] = useState<(QuarterCheckResult & { studentName: string })[]>([]);
 
   const classStudents = students.filter((s) => s.classId === selectedClass);
   const selectedClassData = classes.find((c) => c.id === selectedClass);
 
+  // === HANDLERS POR BIMESTRE ===
+  const handleCheckQuarter = () => {
+    if (!selectedClass || !selectedClassData) {
+      toast({
+        title: 'Erro',
+        description: 'Selecione uma turma primeiro.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const results = checkLowPerformanceStudents(
+      grades,
+      classStudents,
+      selectedClass,
+      selectedQuarter
+    );
+
+    setQuarterResults(results);
+
+    if (results.length === 0) {
+      toast({
+        title: 'Nenhum aluno com baixo rendimento',
+        description: `Nenhum aluno da turma tem 3+ disciplinas abaixo de 6 no ${selectedQuarter}.`,
+      });
+    } else {
+      toast({
+        title: 'Verificação concluída',
+        description: `${results.length} aluno(s) com baixo rendimento no ${selectedQuarter}.`,
+      });
+    }
+  };
+
+  const handleGenerateQuarterIncidents = () => {
+    if (!user) {
+      toast({
+        title: 'Erro',
+        description: 'Usuário não autenticado.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!selectedClassData) {
+      toast({
+        title: 'Erro',
+        description: 'Selecione uma turma primeiro.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const newIncidents = generateQuarterIncidents(
+      grades,
+      classStudents,
+      selectedClassData,
+      selectedQuarter,
+      incidents,
+      user.id
+    );
+
+    if (newIncidents.length === 0) {
+      toast({
+        title: 'Nenhuma ocorrência gerada',
+        description: 'Todos os alunos já possuem convocação gerada para este bimestre.',
+      });
+      return;
+    }
+
+    newIncidents.forEach((incident) => {
+      addIncident(incident);
+    });
+
+    toast({
+      title: 'Convocações geradas',
+      description: `${newIncidents.length} convocação(ões) de pais gerada(s) para o ${selectedQuarter}.`,
+    });
+  };
+
+  // === HANDLERS FINAL DO ANO ===
   const handleCalculateStatuses = () => {
     if (!selectedClass || !selectedClassData) {
       toast({
@@ -73,44 +158,16 @@ export const StudentApprovalManager = () => {
     });
   };
 
-  const handleGenerateIncidents = () => {
-    if (!user) {
-      toast({
-        title: 'Erro',
-        description: 'Usuário não autenticado.',
-        variant: 'destructive',
-      });
-      return;
+  const getStatusBadge = (status: 'approved' | 'recovery' | 'failed', isPending?: boolean) => {
+    if (isPending) {
+      return (
+        <Badge className="bg-gray-500/10 text-gray-700 border-gray-500/30">
+          <Clock className="h-3 w-3 mr-1" />
+          Pendente
+        </Badge>
+      );
     }
 
-    const newIncidents = checkAndGenerateIncidents(
-      grades,
-      students,
-      classes,
-      incidents,
-      user.id
-    );
-
-    if (newIncidents.length === 0) {
-      toast({
-        title: 'Nenhuma ocorrência gerada',
-        description: 'Não há alunos que atendam aos critérios para geração automática de ocorrências.',
-      });
-      return;
-    }
-
-    // Adicionar ocorrências
-    newIncidents.forEach((incident) => {
-      addIncident(incident);
-    });
-
-    toast({
-      title: 'Ocorrências geradas',
-      description: `${newIncidents.length} ocorrência(s) gerada(s) automaticamente.`,
-    });
-  };
-
-  const getStatusBadge = (status: 'approved' | 'recovery' | 'failed') => {
     switch (status) {
       case 'approved':
         return (
@@ -140,9 +197,10 @@ export const StudentApprovalManager = () => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Aprovação/Reprovação de Alunos</CardTitle>
+          <CardTitle>Acompanhamento Acadêmico</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Seletor de Turma */}
           <div className="flex gap-4">
             <Select value={selectedClass} onValueChange={setSelectedClass}>
               <SelectTrigger className="w-[300px]">
@@ -158,18 +216,6 @@ export const StudentApprovalManager = () => {
                   ))}
               </SelectContent>
             </Select>
-
-            {selectedClass && (
-              <>
-                <Button onClick={handleCalculateStatuses}>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Calcular Status
-                </Button>
-                <Button variant="outline" onClick={handleGenerateIncidents}>
-                  Verificar e Gerar Ocorrências
-                </Button>
-              </>
-            )}
           </div>
 
           {selectedClassData && (
@@ -182,63 +228,185 @@ export const StudentApprovalManager = () => {
             </Alert>
           )}
 
-          {Object.keys(academicStatuses).length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Resultados do Cálculo</h3>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Aluno</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Disciplinas Abaixo da Média</TableHead>
-                    <TableHead>Média Geral</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {classStudents.map((student) => {
-                    const status = academicStatuses[student.id];
-                    if (!status) return null;
+          {/* Abas */}
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="quarter">
+                <BookOpen className="h-4 w-4 mr-2" />
+                Por Bimestre
+              </TabsTrigger>
+              <TabsTrigger value="final">
+                <Users className="h-4 w-4 mr-2" />
+                Final do Ano
+              </TabsTrigger>
+            </TabsList>
 
-                    const averageGrades = Object.values(status.finalGrades) as number[];
-                    const overallAverage =
-                      averageGrades.length > 0
-                        ? averageGrades.reduce((a, b) => a + b, 0) / averageGrades.length
-                        : 0;
+            {/* === ABA: POR BIMESTRE === */}
+            <TabsContent value="quarter" className="space-y-4 mt-4">
+              <div className="flex gap-4 items-center">
+                <Select value={selectedQuarter} onValueChange={setSelectedQuarter}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Selecione o bimestre" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {QUARTERS.map((q) => (
+                      <SelectItem key={q} value={q}>
+                        {q}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-                    return (
-                      <TableRow key={student.id}>
-                        <TableCell className="font-medium">{student.name}</TableCell>
-                        <TableCell>{getStatusBadge(status.status)}</TableCell>
-                        <TableCell>
-                          {status.subjectsBelowAverage.length > 0 ? (
+                {selectedClass && (
+                  <>
+                    <Button onClick={handleCheckQuarter}>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Verificar Bimestre
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleGenerateQuarterIncidents}
+                      disabled={quarterResults.length === 0}
+                    >
+                      Gerar Convocações
+                    </Button>
+                  </>
+                )}
+              </div>
+
+              {quarterResults.length > 0 && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-amber-600" />
+                    <h3 className="text-lg font-semibold">
+                      Alunos com Baixo Rendimento no {selectedQuarter}
+                    </h3>
+                    <Badge variant="destructive">{quarterResults.length}</Badge>
+                  </div>
+
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Aluno</TableHead>
+                        <TableHead>Disciplinas Abaixo de 6</TableHead>
+                        <TableHead>Notas</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {quarterResults.map((result) => (
+                        <TableRow key={result.studentId}>
+                          <TableCell className="font-medium">{result.studentName}</TableCell>
+                          <TableCell>
+                            <Badge variant="destructive">
+                              {result.subjectsBelowAverage.length} disciplina(s)
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
                             <div className="flex flex-wrap gap-1">
-                              {status.subjectsBelowAverage.map((subject: string) => (
+                              {result.subjectsBelowAverage.map((subject) => (
                                 <Badge
                                   key={subject}
                                   variant="outline"
-                                  className="bg-red-500/10 text-red-700 border-red-500/30"
+                                  className="bg-red-500/10 text-red-700 border-red-500/30 text-xs"
                                 >
-                                  {subject}
+                                  {subject}: {result.subjectGrades[subject]?.toFixed(1)}
                                 </Badge>
                               ))}
                             </div>
-                          ) : (
-                            <span className="text-muted-foreground">Nenhuma</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <strong>{overallAverage.toFixed(1)}</strong>
-                        </TableCell>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* === ABA: FINAL DO ANO === */}
+            <TabsContent value="final" className="space-y-4 mt-4">
+              {selectedClass && (
+                <Button onClick={handleCalculateStatuses}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Calcular Status Final
+                </Button>
+              )}
+
+              {Object.keys(academicStatuses).length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Status Final dos Alunos</h3>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Aluno</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Disciplinas Abaixo da Média</TableHead>
+                        <TableHead>Notas Pendentes</TableHead>
+                        <TableHead>Média Geral</TableHead>
                       </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                    </TableHeader>
+                    <TableBody>
+                      {classStudents.map((student) => {
+                        const status = academicStatuses[student.id];
+                        if (!status) return null;
+
+                        const averageGrades = Object.values(status.finalGrades) as number[];
+                        const overallAverage =
+                          averageGrades.length > 0
+                            ? averageGrades.reduce((a, b) => a + b, 0) / averageGrades.length
+                            : 0;
+
+                        return (
+                          <TableRow key={student.id}>
+                            <TableCell className="font-medium">{student.name}</TableCell>
+                            <TableCell>{getStatusBadge(status.status, status.isPending)}</TableCell>
+                            <TableCell>
+                              {status.subjectsBelowAverage.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {status.subjectsBelowAverage.map((subject: string) => (
+                                    <Badge
+                                      key={subject}
+                                      variant="outline"
+                                      className="bg-red-500/10 text-red-700 border-red-500/30"
+                                    >
+                                      {subject}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">Nenhuma</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {status.pendingSubjects ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {Object.entries(status.pendingSubjects).map(([subject, quarters]) => (
+                                    <Badge
+                                      key={subject}
+                                      variant="outline"
+                                      className="bg-gray-500/10 text-gray-700 border-gray-500/30 text-xs"
+                                    >
+                                      {subject}: {(quarters as string[]).join(', ')}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">Completo</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <strong>{overallAverage.toFixed(1)}</strong>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>
   );
 };
-

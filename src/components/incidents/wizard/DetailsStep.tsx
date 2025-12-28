@@ -16,15 +16,18 @@ export const DetailsStep = ({ formData, updateFormData }: DetailsStepProps) => {
   const { students } = useStudents();
 
   useEffect(() => {
-    if (formData.studentIds && formData.finalSeverity && formData.studentIds.length > 0 && !formData.suggestedAction) {
-      const suggested = calculateSuggestedAction(
-        formData.studentIds,
-        formData.finalSeverity,
-        incidents,
-        students
-      );
-      updateFormData({ suggestedAction: suggested });
-    }
+    const suggested = calculateSuggestedAction(
+      formData.studentIds,
+      formData.finalSeverity,
+      incidents,
+      students
+    );
+
+    // Atualiza a sugestão e pré-preenche as providências se estiver vazio
+    updateFormData({
+      suggestedAction: suggested,
+      actions: formData.actions || suggested
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.studentIds, formData.finalSeverity, formData.suggestedAction]);
 
@@ -45,11 +48,35 @@ export const DetailsStep = ({ formData, updateFormData }: DetailsStepProps) => {
             placeholder="Descreva com detalhes o que aconteceu, contexto e circunstâncias..."
             value={formData.description || ''}
             onChange={(e) => updateFormData({ description: e.target.value })}
-            rows={8}
+            rows={6}
+            className="resize-none"
+          />
+          <p className="text-xs text-muted-foreground text-right">
+            {formData.description?.length || 0} / 1000 caracteres
+          </p>
+        </div>
+
+        {formData.suggestedAction && (
+          <div className="bg-muted/50 p-4 rounded-lg space-y-2 border">
+            <h4 className="font-semibold text-sm flex items-center gap-2">
+              💡 Sugestão do Sistema
+            </h4>
+            <p className="text-sm text-muted-foreground">{formData.suggestedAction}</p>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <Label htmlFor="actions">Providências Tomadas</Label>
+          <Textarea
+            id="actions"
+            placeholder="Descreva as providências iniciais (ex: conversa, advertência)..."
+            value={formData.actions || ''}
+            onChange={(e) => updateFormData({ actions: e.target.value })}
+            rows={4}
             className="resize-none"
           />
           <p className="text-xs text-muted-foreground">
-            {formData.description?.length || 0} / 1000 caracteres
+            Este texto aparecerá no campo "Providências Tomadas" do PDF.
           </p>
         </div>
       </div>

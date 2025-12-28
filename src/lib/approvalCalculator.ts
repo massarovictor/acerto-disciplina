@@ -46,8 +46,34 @@ export function calculateFinalGrade(
 }
 
 /**
+ * Verifica se uma disciplina tem todas as 4 notas
+ * @param grades Todas as notas
+ * @param studentId ID do aluno
+ * @param subject Disciplina
+ * @returns Objeto com boolean completo e array de bimestres faltantes
+ */
+export function checkQuartersComplete(
+  grades: Grade[],
+  studentId: string,
+  subject: string
+): { complete: boolean; missingQuarters: string[] } {
+  const studentGrades = grades.filter(
+    (g) => g.studentId === studentId && g.subject === subject
+  );
+
+  const presentQuarters = studentGrades.map((g) => g.quarter);
+  const missingQuarters = QUARTERS.filter((q) => !presentQuarters.includes(q));
+
+  return {
+    complete: missingQuarters.length === 0,
+    missingQuarters,
+  };
+}
+
+/**
  * Calcula o status acadêmico de um aluno ao final dos 4 bimestres
  * Regras:
+ * - Se faltam notas em qualquer disciplina: Pendente (pending)
  * - Média >= 6,0 em todas as disciplinas: Aprovado
  * - Média < 6,0 em até 2 disciplinas: Recuperação
  * - Média < 6,0 em 3+ disciplinas: Recuperação (conforme especificado pelo usuário)
@@ -62,7 +88,7 @@ export function calculateStudentStatus(
   studentId: string,
   classId: string,
   academicYear: string
-): StudentAcademicStatus {
+): StudentAcademicStatus & { isPending?: boolean; pendingSubjects?: Record<string, string[]> } {
   // Filtrar apenas notas deste aluno e desta turma
   const studentGrades = grades.filter(
     (g) => g.studentId === studentId && g.classId === classId
@@ -73,9 +99,19 @@ export function calculateStudentStatus(
 
   const finalGrades: Record<string, number> = {};
   const subjectsBelowAverage: string[] = [];
+  const pendingSubjects: Record<string, string[]> = {}; // disciplina -> bimestres faltantes
+  let hasIncompleteSubject = false;
 
   // Calcular média final de cada disciplina
   subjects.forEach((subject) => {
+    // Verificar se tem todas as 4 notas
+    const quarterCheck = checkQuartersComplete(grades, studentId, subject);
+
+    if (!quarterCheck.complete) {
+      hasIncompleteSubject = true;
+      pendingSubjects[subject] = quarterCheck.missingQuarters;
+    }
+
     const finalGrade = calculateFinalGrade(grades, studentId, subject);
     if (finalGrade !== null) {
       finalGrades[subject] = finalGrade;
@@ -85,25 +121,36 @@ export function calculateStudentStatus(
     }
   });
 
+  // Se não tem nenhuma disciplina, também é pendente
+  if (subjects.length === 0) {
+    hasIncompleteSubject = true;
+  }
+
   // Determinar status
   let status: 'approved' | 'recovery' | 'failed' = 'approved';
 
-  if (subjectsBelowAverage.length === 0) {
+  // Se tem disciplina incompleta, consideramos pending (retornamos approved mas com flag)
+  if (hasIncompleteSubject) {
+    // Ainda calculamos o status parcial, mas indicamos que está pendente
+    status = 'approved'; // Será sobrescrito pelo isPending na UI
+  } else if (subjectsBelowAverage.length === 0) {
     status = 'approved';
   } else if (subjectsBelowAverage.length <= 2) {
-    status = 'recovery'; // Até 2 disciplinas: recuperação
+    status = 'recovery';
   } else {
-    status = 'recovery'; // 3+ disciplinas: também recuperação (conforme especificado)
+    status = 'recovery';
   }
 
   return {
     studentId,
     classId,
     year: academicYear,
-    status,
+    status: hasIncompleteSubject ? 'approved' : status, // Se pendente, não é definitivo
     finalGrades,
     subjectsBelowAverage,
     calculatedAt: new Date().toISOString(),
+    isPending: hasIncompleteSubject,
+    pendingSubjects: Object.keys(pendingSubjects).length > 0 ? pendingSubjects : undefined,
   };
 }
 
@@ -126,3 +173,72 @@ export function calculateClassAcademicStatus(
   );
 }
 
+/**
+ * Interface para resultado da verificação de bimestre
+ */
+export interface QuarterCheckResult {
+  studentId: string;
+  quarter: string;
+  subjectGrades: Record<string, number>; // disciplina -> nota
+  subjectsBelowAverage: string[]; // disciplinas com nota < 6
+  hasLowPerformance: boolean; // true se 3+ disciplinas abaixo
+  totalSubjects: number;
+}
+
+/**
+ * Verifica as notas de um aluno em um bimestre específico
+ * @param grades Todas as notas
+ * @param studentId ID do aluno
+ * @param classId ID da turma
+ * @param quarter Bimestre (B1, B2, B3, B4)
+ * @returns Resultado da verificação com notas e disciplinas abaixo da média
+ */
+export function checkQuarterGrades(
+  grades: Grade[],
+  studentId: string,
+  classId: string,
+  quarter: string
+): QuarterCheckResult {
+  // Filtrar notas do aluno para o bimestre específico
+  const quarterGrades = grades.filter(
+    (g) => g.studentId === studentId && g.classId === classId && g.quarter === quarter
+  );
+
+  const subjectGrades: Record<string, number> = {};
+  const subjectsBelowAverage: string[] = [];
+
+  quarterGrades.forEach((grade) => {
+    subjectGrades[grade.subject] = grade.grade;
+    if (grade.grade < 6) {
+      subjectsBelowAverage.push(grade.subject);
+    }
+  });
+
+  return {
+    studentId,
+    quarter,
+    subjectGrades,
+    subjectsBelowAverage,
+    hasLowPerformance: subjectsBelowAverage.length >= 3,
+    totalSubjects: Object.keys(subjectGrades).length,
+  };
+}
+
+/**
+ * Verifica as notas de todos os alunos de uma turma em um bimestre específico
+ * @param grades Todas as notas
+ * @param studentIds IDs dos alunos
+ * @param classId ID da turma
+ * @param quarter Bimestre
+ * @returns Array com resultados de verificação por aluno
+ */
+export function checkClassQuarterGrades(
+  grades: Grade[],
+  studentIds: string[],
+  classId: string,
+  quarter: string
+): QuarterCheckResult[] {
+  return studentIds.map((studentId) =>
+    checkQuarterGrades(grades, studentId, classId, quarter)
+  );
+}

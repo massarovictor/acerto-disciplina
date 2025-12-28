@@ -42,6 +42,7 @@ import {
   useGrades,
   useAttendance,
   useProfessionalSubjects,
+  useIncidents,
 } from "@/hooks/useLocalStorage";
 import { MOCK_USERS, MOCK_COURSES } from "@/data/mockData";
 import { useToast } from "@/hooks/use-toast";
@@ -53,17 +54,19 @@ import {
   School,
   Calendar,
   AlertTriangle,
+  Archive,
 } from "lucide-react";
 import { Class } from "@/types";
 import { getAcademicYear } from "@/lib/classYearCalculator";
 
 export const ClassesManage = () => {
-  const { classes, updateClass, deleteClass } = useClasses();
+  const { classes, updateClass, deleteClass, archiveClass } = useClasses();
   const { students, updateStudent } = useStudents();
   const { grades, deleteGrade } = useGrades();
   const { attendance, deleteAttendance } = useAttendance();
   const { getProfessionalSubjects, setProfessionalSubjectsForClass } =
     useProfessionalSubjects();
+  const { incidents } = useIncidents();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<
@@ -77,6 +80,7 @@ export const ClassesManage = () => {
     studentCount: number;
     gradeCount: number;
     attendanceCount: number;
+    incidentCount: number;
   } | null>(null);
   const [editFormData, setEditFormData] = useState({
     series: "",
@@ -85,6 +89,7 @@ export const ClassesManage = () => {
     directorId: "",
     active: true,
   });
+  const [archivingClass, setArchivingClass] = useState<Class | null>(null);
 
   const filteredClasses = classes.filter((cls) => {
     // Filtrar apenas turmas não arquivadas
@@ -178,12 +183,24 @@ export const ClassesManage = () => {
     const attendanceCount = attendance.filter(
       (a) => a.classId === cls.id,
     ).length;
+    const incidentCount = incidents.filter((i) => i.classId === cls.id).length;
+
+    // BLOQUEIO: Se houver ocorrências, não permitir exclusão
+    if (incidentCount > 0) {
+      toast({
+        title: "Exclusão bloqueada",
+        description: `Esta turma possui ${incidentCount} ocorrência(s) vinculada(s). Arquive a turma em vez de excluí-la para manter o histórico.`,
+        variant: "destructive",
+      });
+      return;
+    }
 
     setDeleteConfirmData({
       classData: cls,
       studentCount,
       gradeCount,
       attendanceCount,
+      incidentCount,
     });
   };
 
@@ -225,6 +242,25 @@ export const ClassesManage = () => {
   };
 
   const directors = MOCK_USERS.filter((u) => u.role === "diretor");
+
+  const handleArchive = () => {
+    if (!archivingClass) return;
+
+    // 1. Arquivar a turma
+    archiveClass(archivingClass.id, "Arquivamento manual");
+
+    // 2. Marcar alunos como inativos
+    students
+      .filter((s) => s.classId === archivingClass.id)
+      .forEach((student) => updateStudent(student.id, { status: "inactive" }));
+
+    toast({
+      title: "Turma arquivada",
+      description: `A turma ${archivingClass.name} foi arquivada com sucesso.`,
+    });
+
+    setArchivingClass(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -379,6 +415,14 @@ export const ClassesManage = () => {
                               onClick={() => handleEditClick(cls)}
                             >
                               <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setArchivingClass(cls)}
+                              title="Arquivar turma"
+                            >
+                              <Archive className="h-4 w-4 text-amber-600" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -683,6 +727,42 @@ export const ClassesManage = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Archive Confirmation Dialog */}
+      <AlertDialog
+        open={!!archivingClass}
+        onOpenChange={(open) => !open && setArchivingClass(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Archive className="h-5 w-5 text-amber-600" />
+              Confirmar Arquivamento
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4">
+              <p>
+                Você está prestes a arquivar a turma{" "}
+                <strong>{archivingClass?.name}</strong>.
+              </p>
+              <p className="text-muted-foreground">
+                A turma será movida para a lista de turmas arquivadas e seus alunos
+                serão marcados como inativos. Você pode desarquivar a turma a qualquer
+                momento.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleArchive}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              Arquivar Turma
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
+

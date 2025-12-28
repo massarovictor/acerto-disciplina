@@ -271,7 +271,7 @@ export function useClasses() {
             cls.startYear,
           );
           if (cls.currentYear !== calculatedYear) {
-            updated.currentYear = calculatedYear;
+            updated.currentYear = calculatedYear as 1 | 2 | 3;
             needsUpdate = true;
           }
 
@@ -394,12 +394,12 @@ export function useClasses() {
       prev.map((cls) =>
         cls.id === id
           ? {
-              ...cls,
-              archived: true,
-              archivedAt: new Date().toISOString(),
-              archivedReason: reason || "Arquivamento manual",
-              active: false,
-            }
+            ...cls,
+            archived: true,
+            archivedAt: new Date().toISOString(),
+            archivedReason: reason || "Arquivamento manual",
+            active: false,
+          }
           : cls,
       ),
     );
@@ -410,12 +410,12 @@ export function useClasses() {
       prev.map((cls) =>
         cls.id === id
           ? {
-              ...cls,
-              archived: false,
-              archivedAt: undefined,
-              archivedReason: undefined,
-              active: true,
-            }
+            ...cls,
+            archived: false,
+            archivedAt: undefined,
+            archivedReason: undefined,
+            active: true,
+          }
           : cls,
       ),
     );
@@ -517,7 +517,11 @@ export function useGrades() {
     );
   };
 
-  return { grades, addGrade, updateGrade };
+  const deleteGrade = (id: string) => {
+    setGrades((prev) => prev.filter((grade) => grade.id !== id));
+  };
+
+  return { grades, addGrade, updateGrade, deleteGrade };
 }
 
 // Hook for attendance
@@ -539,7 +543,11 @@ export function useAttendance() {
     return newRecord;
   };
 
-  return { attendance, addAttendance };
+  const deleteAttendance = (id: string) => {
+    setAttendance((prev) => prev.filter((record) => record.id !== id));
+  };
+
+  return { attendance, addAttendance, deleteAttendance };
 }
 
 // Hook for professional subjects by class

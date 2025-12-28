@@ -15,7 +15,7 @@ import { useClasses } from '@/hooks/useLocalStorage';
 const ArchivedClasses = () => {
   const { archivedClasses } = useArchivedClasses();
   const { unarchiveClass } = useClasses();
-  const { students } = useStudents();
+  const { students, updateStudent } = useStudents();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -37,10 +37,18 @@ const ArchivedClasses = () => {
   const handleUnarchive = () => {
     if (!unarchivingClass) return;
 
+    // 1. Desarquivar a turma
     unarchiveClass(unarchivingClass);
+
+    // 2. Restaurar status dos alunos da turma para 'active'
+    const classStudents = students.filter((s) => s.classId === unarchivingClass);
+    classStudents.forEach((student) => {
+      updateStudent(student.id, { status: 'active' });
+    });
+
     toast({
       title: 'Turma desarquivada',
-      description: 'A turma foi desarquivada com sucesso.',
+      description: `Turma desarquivada com sucesso. ${classStudents.length} aluno(s) reativado(s).`,
     });
     setUnarchivingClass(null);
   };
@@ -190,12 +198,12 @@ const ArchivedClasses = () => {
                       <p className="text-lg">
                         {cls.archivedAt
                           ? new Date(cls.archivedAt).toLocaleDateString('pt-BR', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
                           : '-'}
                       </p>
                     </div>

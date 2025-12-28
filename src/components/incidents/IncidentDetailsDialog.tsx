@@ -1,9 +1,11 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Incident } from '@/types';
 import { useClasses, useStudents } from '@/hooks/useLocalStorage';
-import { Clock, User, Calendar } from 'lucide-react';
+import { Clock, User, Calendar, FileText } from 'lucide-react';
+import { generateIncidentPDF } from '@/lib/incidentPdfExport';
 
 interface IncidentDetailsDialogProps {
   incident: Incident;
@@ -14,7 +16,7 @@ interface IncidentDetailsDialogProps {
 export const IncidentDetailsDialog = ({ incident, open, onOpenChange }: IncidentDetailsDialogProps) => {
   const { classes } = useClasses();
   const { students } = useStudents();
-  
+
   const incidentClass = classes.find(c => c.id === incident.classId);
   const incidentStudents = students.filter(s => incident.studentIds.includes(s.id));
 
@@ -42,17 +44,30 @@ export const IncidentDetailsDialog = ({ incident, open, onOpenChange }: Incident
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="space-y-3">
-            <DialogTitle className="text-2xl">Detalhes da Ocorrência</DialogTitle>
+            <div className="flex items-center justify-between pr-8">
+              <DialogTitle className="text-2xl">Detalhes da Ocorrência</DialogTitle>
+              {incident.status === 'resolvida' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => generateIncidentPDF(incident, incidentClass, incidentStudents)}
+                  className="gap-2"
+                >
+                  <FileText className="h-4 w-4" />
+                  Exportar PDF
+                </Button>
+              )}
+            </div>
             <div className="flex gap-2 flex-wrap">
               <Badge variant="outline" className={getStatusColor(incident.status)}>
                 {incident.status === 'aberta' ? 'Aberta' :
-                 incident.status === 'acompanhamento' ? 'Em Acompanhamento' :
-                 'Resolvida'}
+                  incident.status === 'acompanhamento' ? 'Em Acompanhamento' :
+                    'Resolvida'}
               </Badge>
               <Badge variant="outline" className={getSeverityColor(incident.finalSeverity)}>
                 {incident.finalSeverity === 'leve' ? 'Leve' :
-                 incident.finalSeverity === 'intermediaria' ? 'Intermediária' :
-                 incident.finalSeverity === 'grave' ? 'Grave' : 'Gravíssima'}
+                  incident.finalSeverity === 'intermediaria' ? 'Intermediária' :
+                    incident.finalSeverity === 'grave' ? 'Grave' : 'Gravíssima'}
               </Badge>
               {incident.calculatedSeverity !== incident.finalSeverity && (
                 <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
@@ -136,16 +151,16 @@ export const IncidentDetailsDialog = ({ incident, open, onOpenChange }: Incident
                       <p className="text-sm text-muted-foreground mb-1">Grau Calculado</p>
                       <Badge variant="outline" className={getSeverityColor(incident.calculatedSeverity)}>
                         {incident.calculatedSeverity === 'leve' ? 'Leve' :
-                         incident.calculatedSeverity === 'intermediaria' ? 'Intermediária' :
-                         incident.calculatedSeverity === 'grave' ? 'Grave' : 'Gravíssima'}
+                          incident.calculatedSeverity === 'intermediaria' ? 'Intermediária' :
+                            incident.calculatedSeverity === 'grave' ? 'Grave' : 'Gravíssima'}
                       </Badge>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Grau Final</p>
                       <Badge variant="outline" className={getSeverityColor(incident.finalSeverity)}>
                         {incident.finalSeverity === 'leve' ? 'Leve' :
-                         incident.finalSeverity === 'intermediaria' ? 'Intermediária' :
-                         incident.finalSeverity === 'grave' ? 'Grave' : 'Gravíssima'}
+                          incident.finalSeverity === 'intermediaria' ? 'Intermediária' :
+                            incident.finalSeverity === 'grave' ? 'Grave' : 'Gravíssima'}
                       </Badge>
                     </div>
                   </div>
@@ -199,8 +214,8 @@ export const IncidentDetailsDialog = ({ incident, open, onOpenChange }: Incident
                         <p className="text-muted-foreground">Tipo</p>
                         <p className="font-medium">
                           {followUp.type === 'conversa_individual' ? 'Conversa Individual com Estudante' :
-                           followUp.type === 'conversa_pais' ? 'Conversa com Pais/Responsáveis' :
-                           'Registro de Situações Diversas'}
+                            followUp.type === 'conversa_pais' ? 'Conversa com Pais/Responsáveis' :
+                              'Registro de Situações Diversas'}
                         </p>
                       </div>
                       <div>
@@ -244,7 +259,7 @@ export const IncidentDetailsDialog = ({ incident, open, onOpenChange }: Incident
                             </div>
                           </>
                         )}
-                        
+
                         {followUp.providencias && (
                           <div>
                             <p className="text-muted-foreground text-sm mb-1">Providências Tomadas/Sugeridas</p>

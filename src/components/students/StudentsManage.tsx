@@ -36,8 +36,8 @@ import {
 import { useStudents, useClasses, useIncidents, useGrades, useAttendance } from '@/hooks/useLocalStorage';
 import { useToast } from '@/hooks/use-toast';
 import { exportStudentsList } from '@/lib/excelExport';
-import { Search, Edit, Download, Eye, Trash2, Camera, X, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
-import { Student } from '@/types';
+import { Search, Edit, Download, Eye, Trash2, Camera, X, CheckCircle2, XCircle, AlertTriangle, ArrowRightLeft } from 'lucide-react';
+import { Student, StudentStatus } from '@/types';
 import { calculateStudentStatus } from '@/lib/approvalCalculator';
 import { getAcademicYear } from '@/lib/classYearCalculator';
 
@@ -75,27 +75,30 @@ export const StudentsManage = () => {
     cpf: '',
     rg: '',
     photoUrl: '',
-    status: 'active' as 'active' | 'inactive' | 'transferred',
+    status: 'active' as StudentStatus,
   });
   const [photoPreview, setPhotoPreview] = useState<string>('');
+  const [transferringStudent, setTransferringStudent] = useState<Student | null>(null);
+  const [transferTargetClassId, setTransferTargetClassId] = useState<string>('');
 
   const getClassName = (classId: string) => {
     const classData = classes.find(c => c.id === classId);
-    if (!classData) return 'N/A';
-    return `${classData.classNumber} - ${classData.name}`;
+    if (!classData) return 'Turma não encontrada';
+    const archived = classData.archived ? ' (Arquivada)' : '';
+    return `${classData.classNumber} - ${classData.name}${archived}`;
   };
 
   const filteredStudents = students.filter(student => {
     // Se não há termo de busca (ou apenas espaços), mostrar todos (respeitando apenas filtro de turma)
     const trimmedSearch = searchTerm.trim();
-    const matchesSearch = !trimmedSearch || 
-                         student.name.toLowerCase().includes(trimmedSearch.toLowerCase()) ||
-                         student.enrollment?.toLowerCase().includes(trimmedSearch.toLowerCase()) ||
-                         student.cpf?.includes(trimmedSearch) ||
-                         getClassName(student.classId).toLowerCase().includes(trimmedSearch.toLowerCase());
-    
+    const matchesSearch = !trimmedSearch ||
+      student.name.toLowerCase().includes(trimmedSearch.toLowerCase()) ||
+      student.enrollment?.toLowerCase().includes(trimmedSearch.toLowerCase()) ||
+      student.cpf?.includes(trimmedSearch) ||
+      getClassName(student.classId).toLowerCase().includes(trimmedSearch.toLowerCase());
+
     const matchesClass = classFilter === 'all' || student.classId === classFilter;
-    
+
     return matchesSearch && matchesClass;
   });
 
@@ -190,7 +193,7 @@ export const StudentsManage = () => {
     // Validar CPF duplicado (exceto o próprio aluno)
     if (editFormData.cpf) {
       const cleanedCPF = editFormData.cpf.replace(/\D/g, '');
-      const duplicate = students.find(s => 
+      const duplicate = students.find(s =>
         s.id !== editingStudent.id && s.cpf && s.cpf.replace(/\D/g, '') === cleanedCPF
       );
       if (duplicate) {
@@ -275,7 +278,7 @@ export const StudentsManage = () => {
     if (!deletingStudent) return;
 
     const links = checkStudentLinks(deletingStudent.id);
-    
+
     if (links.hasIncidents || links.hasGrades || links.hasAttendance) {
       const messages = [];
       if (links.hasIncidents) messages.push(`${links.incidentsCount} ocorrência(s)`);
@@ -308,6 +311,36 @@ export const StudentsManage = () => {
     });
   };
 
+  // Handler de transferência
+  const handleTransfer = () => {
+    if (!transferringStudent || !transferTargetClassId) return;
+
+    const targetClass = classes.find(c => c.id === transferTargetClassId);
+    if (!targetClass) {
+      toast({
+        title: 'Erro',
+        description: 'Turma de destino não encontrada.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const originClass = classes.find(c => c.id === transferringStudent.classId);
+
+    updateStudent(transferringStudent.id, {
+      classId: transferTargetClassId,
+      status: 'active',
+    });
+
+    toast({
+      title: 'Transferência concluída',
+      description: `${transferringStudent.name} foi transferido de "${originClass?.name || 'N/A'}" para "${targetClass.name}".`,
+    });
+
+    setTransferringStudent(null);
+    setTransferTargetClassId('');
+  };
+
   return (
     <div className="space-y-6">
       {/* Filters */}
@@ -332,7 +365,7 @@ export const StudentsManage = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas as turmas</SelectItem>
-                  {classes.map(cls => (
+                  {classes.filter(c => !c.archived).map(cls => (
                     <SelectItem key={cls.id} value={cls.id}>
                       {cls.classNumber} - {cls.name}
                     </SelectItem>
@@ -359,7 +392,7 @@ export const StudentsManage = () => {
               <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium mb-2">Nenhum aluno encontrado</h3>
               <p className="text-muted-foreground">
-                {students.length === 0 
+                {students.length === 0
                   ? 'Cadastre o primeiro aluno para começar.'
                   : 'Tente ajustar os filtros de busca.'}
               </p>
@@ -403,15 +436,15 @@ export const StudentsManage = () => {
                       <TableCell>{getClassName(student.classId)}</TableCell>
                       <TableCell>
                         {student.gender === 'M' ? 'M' :
-                         student.gender === 'F' ? 'F' :
-                         student.gender === 'O' ? 'Outro' : 'N/I'}
+                          student.gender === 'F' ? 'F' :
+                            student.gender === 'O' ? 'Outro' : 'N/I'}
                       </TableCell>
                       <TableCell>
                         {calculateAge(student.birthDate)} anos
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={
-                          student.status === 'active' 
+                          student.status === 'active'
                             ? 'bg-severity-light-bg text-severity-light border-severity-light'
                             : 'bg-muted text-muted-foreground border-muted'
                         }>
@@ -438,6 +471,17 @@ export const StudentsManage = () => {
                             onClick={() => handleEditClick(student)}
                           >
                             <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setTransferringStudent(student);
+                              setTransferTargetClassId('');
+                            }}
+                            title="Transferir aluno"
+                          >
+                            <ArrowRightLeft className="h-4 w-4 text-blue-600" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -502,8 +546,8 @@ export const StudentsManage = () => {
                   <Label className="text-muted-foreground">Sexo</Label>
                   <p className="font-medium">
                     {viewingStudent.gender === 'M' ? 'Masculino' :
-                     viewingStudent.gender === 'F' ? 'Feminino' :
-                     viewingStudent.gender === 'O' ? 'Outro' : 'Prefiro não informar'}
+                      viewingStudent.gender === 'F' ? 'Feminino' :
+                        viewingStudent.gender === 'O' ? 'Outro' : 'Prefiro não informar'}
                   </p>
                 </div>
                 <div>
@@ -514,7 +558,7 @@ export const StudentsManage = () => {
                       : 'bg-muted text-muted-foreground border-muted'
                   }>
                     {viewingStudent.status === 'active' ? 'Ativo' :
-                     viewingStudent.status === 'inactive' ? 'Inativo' : 'Transferido'}
+                      viewingStudent.status === 'inactive' ? 'Inativo' : 'Transferido'}
                   </Badge>
                 </div>
                 {viewingStudent.enrollment && (
@@ -763,7 +807,7 @@ export const StudentsManage = () => {
                   if (links.hasIncidents) messages.push(`${links.incidentsCount} ocorrência(s)`);
                   if (links.hasGrades) messages.push(`${links.gradesCount} nota(s)`);
                   if (links.hasAttendance) messages.push(`${links.attendanceCount} registro(s) de frequência`);
-                  
+
                   return (
                     <>
                       Não é possível excluir o aluno <strong>{deletingStudent.name}</strong> pois ele possui vínculos: {messages.join(', ')}.
@@ -783,15 +827,75 @@ export const StudentsManage = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             {deletingStudent && !checkStudentLinks(deletingStudent.id).hasIncidents &&
-             !checkStudentLinks(deletingStudent.id).hasGrades &&
-             !checkStudentLinks(deletingStudent.id).hasAttendance && (
-              <AlertDialogAction onClick={handleDelete} className="bg-severity-critical hover:bg-severity-critical/90">
-                Excluir
-              </AlertDialogAction>
-            )}
+              !checkStudentLinks(deletingStudent.id).hasGrades &&
+              !checkStudentLinks(deletingStudent.id).hasAttendance && (
+                <AlertDialogAction onClick={handleDelete} className="bg-severity-critical hover:bg-severity-critical/90">
+                  Excluir
+                </AlertDialogAction>
+              )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Transfer Dialog */}
+      <Dialog
+        open={!!transferringStudent}
+        onOpenChange={(open) => !open && setTransferringStudent(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="h-5 w-5 text-blue-600" />
+              Transferir Aluno
+            </DialogTitle>
+            <DialogDescription>
+              Selecione a turma de destino para {transferringStudent?.name}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Turma atual</Label>
+              <p className="text-sm text-muted-foreground">
+                {transferringStudent && getClassName(transferringStudent.classId)}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="transfer-class">Turma destino *</Label>
+              <Select
+                value={transferTargetClassId}
+                onValueChange={setTransferTargetClassId}
+              >
+                <SelectTrigger id="transfer-class">
+                  <SelectValue placeholder="Selecione a turma de destino" />
+                </SelectTrigger>
+                <SelectContent>
+                  {classes
+                    .filter(c => c.active && !c.archived && c.id !== transferringStudent?.classId)
+                    .map(cls => (
+                      <SelectItem key={cls.id} value={cls.id}>
+                        {cls.classNumber} - {cls.name}
+                      </SelectItem>
+                    ))
+                  }
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTransferringStudent(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleTransfer}
+              disabled={!transferTargetClassId}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Confirmar Transferência
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
+

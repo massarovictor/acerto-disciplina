@@ -5,7 +5,7 @@ import { StudentsManage } from '@/components/students/StudentsManage';
 import { StudentApprovalManager } from '@/components/students/StudentApprovalManager';
 
 const Students = () => {
-  const [activeTab, setActiveTab] = useState('register');
+  const [activeTab, setActiveTab] = useState('manage');
 
   return (
     <div className="p-6 space-y-6">
@@ -18,17 +18,17 @@ const Students = () => {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="register">Cadastrar</TabsTrigger>
           <TabsTrigger value="manage">Gerenciar Alunos</TabsTrigger>
+          <TabsTrigger value="register">Cadastrar</TabsTrigger>
           <TabsTrigger value="approval">Aprovações</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="register" className="space-y-6 mt-6">
-          <StudentsRegister />
-        </TabsContent>
-
         <TabsContent value="manage" className="space-y-6 mt-6">
           <StudentsManage />
+        </TabsContent>
+
+        <TabsContent value="register" className="space-y-6 mt-6">
+          <StudentsRegister />
         </TabsContent>
 
         <TabsContent value="approval" className="space-y-6 mt-6">
@@ -40,3 +40,4 @@ const Students = () => {
 };
 
 export default Students;
+

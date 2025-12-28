@@ -3,13 +3,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Archive } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { ClassesOverview } from '@/components/classes/ClassesOverview';
 import { ClassesManage } from '@/components/classes/ClassesManage';
 import { ClassesCreate } from '@/components/classes/ClassesCreate';
 import { SubjectTemplatesManager } from '@/components/classes/SubjectTemplatesManager';
 
 const Classes = () => {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('manage');
   const navigate = useNavigate();
 
   return (
@@ -28,16 +27,11 @@ const Classes = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="manage">Gerenciar Turmas</TabsTrigger>
           <TabsTrigger value="create">Criar Nova Turma</TabsTrigger>
           <TabsTrigger value="templates">Templates</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="overview" className="space-y-6 mt-6">
-          <ClassesOverview />
-        </TabsContent>
 
         <TabsContent value="manage" className="space-y-6 mt-6">
           <ClassesManage />
@@ -56,3 +50,4 @@ const Classes = () => {
 };
 
 export default Classes;
+

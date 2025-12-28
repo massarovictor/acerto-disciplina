@@ -25,8 +25,9 @@ import { Incident, IncidentStatus, FollowUpType } from '@/types';
 import { useIncidents, useClasses, useStudents } from '@/hooks/useLocalStorage';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Clock, CheckCircle, Plus } from 'lucide-react';
+import { Clock, CheckCircle, Plus, FileText } from 'lucide-react';
 import { calculateSuggestedAction, suggestFollowUpType } from '@/lib/incidentActions';
+import { generateIncidentPDF } from '@/lib/incidentPdfExport';
 
 interface IncidentManagementDialogProps {
   incident: Incident;
@@ -51,12 +52,12 @@ export const IncidentManagementDialog = ({
 
   const [commentText, setCommentText] = useState('');
   const [tab, setTab] = useState<'info' | 'followup' | 'comments'>(initialTab);
-  
+
   // Sincroniza a aba quando initialTab mudar
   useEffect(() => {
     setTab(initialTab);
   }, [initialTab]);
-  
+
   // Campos do acompanhamento
   const [followUpType, setFollowUpType] = useState<FollowUpType>('conversa_individual');
   const [followUpDate, setFollowUpDate] = useState(new Date().toISOString().split('T')[0]);
@@ -70,7 +71,7 @@ export const IncidentManagementDialog = ({
   const [followUpDescricaoSituacao, setFollowUpDescricaoSituacao] = useState('');
   const [followUpNomeResponsavelPai, setFollowUpNomeResponsavelPai] = useState('');
   const [followUpGrauParentesco, setFollowUpGrauParentesco] = useState('');
-  
+
   // Sempre pega a versão mais recente dos incidents
   const currentIncident = incidents.find(i => i.id === incident.id) || incident;
 
@@ -84,17 +85,17 @@ export const IncidentManagementDialog = ({
         students
       );
       const autoType = suggestFollowUpType(suggested, currentIncident.finalSeverity);
-      
+
       setFollowUpType(autoType);
       setFollowUpProvidencias(suggested);
-      
+
       if (currentIncident.finalSeverity === 'grave' || currentIncident.finalSeverity === 'gravissima') {
         setFollowUpMotivo('1 - Comportamento inadequado');
       } else if (currentIncident.finalSeverity === 'intermediaria') {
         setFollowUpMotivo('2 - Conflitos/Relação interpessoal');
       }
     }
-    
+
     // Se já tem acompanhamento, carregar os dados
     if (currentIncident.followUps?.length > 0) {
       const followUp = currentIncident.followUps[0];
@@ -119,9 +120,9 @@ export const IncidentManagementDialog = ({
   const canManage = user?.role === 'diretor' || user?.role === 'coordenador';
   const canStartFollowUp = currentIncident.status === 'aberta' && canManage;
   const canEditFollowUp = currentIncident.status === 'acompanhamento';
-  const canResolve = currentIncident.status === 'acompanhamento' && 
-                     (currentIncident.followUps?.length || 0) > 0 && 
-                     canManage;
+  const canResolve = currentIncident.status === 'acompanhamento' &&
+    (currentIncident.followUps?.length || 0) > 0 &&
+    canManage;
 
   const motivoOptions = [
     '1 - Comportamento inadequado',
@@ -177,7 +178,7 @@ export const IncidentManagementDialog = ({
     if (!user) return;
 
     const updatedComments = [...(currentIncident.comments || [])];
-    
+
     if (commentText.trim()) {
       updatedComments.push({
         id: Date.now().toString(),
@@ -186,7 +187,7 @@ export const IncidentManagementDialog = ({
         text: commentText,
         createdAt: new Date().toISOString(),
       });
-      
+
       updateIncident(currentIncident.id, {
         comments: updatedComments,
       });
@@ -270,7 +271,7 @@ export const IncidentManagementDialog = ({
       title: 'Acompanhamento salvo',
       description: 'O registro foi atualizado com sucesso',
     });
-    
+
     onOpenChange(false);
   };
 
@@ -307,15 +308,28 @@ export const IncidentManagementDialog = ({
 
           <div className="space-y-4">
             {/* Header Info */}
-            <div className="flex gap-2 flex-wrap">
-              <Badge variant="outline" className={getStatusColor(currentIncident.status)}>
-                {statusOptions.find(s => s.value === currentIncident.status)?.label}
-              </Badge>
-              <Badge variant="outline" className={getSeverityColor(currentIncident.finalSeverity)}>
-                {currentIncident.finalSeverity === 'leve' ? 'Leve' :
-                 currentIncident.finalSeverity === 'intermediaria' ? 'Intermediária' :
-                 currentIncident.finalSeverity === 'grave' ? 'Grave' : 'Gravíssima'}
-              </Badge>
+            <div className="flex gap-2 flex-wrap items-center justify-between pr-6">
+              <div className="flex gap-2 flex-wrap">
+                <Badge variant="outline" className={getStatusColor(currentIncident.status)}>
+                  {statusOptions.find(s => s.value === currentIncident.status)?.label}
+                </Badge>
+                <Badge variant="outline" className={getSeverityColor(currentIncident.finalSeverity)}>
+                  {currentIncident.finalSeverity === 'leve' ? 'Leve' :
+                    currentIncident.finalSeverity === 'intermediaria' ? 'Intermediária' :
+                      currentIncident.finalSeverity === 'grave' ? 'Grave' : 'Gravíssima'}
+                </Badge>
+              </div>
+              {currentIncident.status === 'resolvida' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => generateIncidentPDF(currentIncident, incidentClass, incidentStudents)}
+                  className="gap-2"
+                >
+                  <FileText className="h-4 w-4" />
+                  Exportar PDF
+                </Button>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-sm">
@@ -330,8 +344,8 @@ export const IncidentManagementDialog = ({
                 <span className="font-medium">Alunos:</span>
                 <div className="mt-1 flex flex-wrap gap-2">
                   {incidentStudents.map(student => (
-                    <Badge 
-                      key={student.id} 
+                    <Badge
+                      key={student.id}
                       variant="secondary"
                       className="cursor-default"
                     >
@@ -384,7 +398,7 @@ export const IncidentManagementDialog = ({
                 {canStartFollowUp && (
                   <>
                     <Separator />
-                    <Button 
+                    <Button
                       onClick={handleStartFollowUp}
                       className="w-full gap-2"
                     >
@@ -427,7 +441,7 @@ export const IncidentManagementDialog = ({
 
                     <div className="flex justify-between pt-4 border-t">
                       {canResolve && (
-                        <Button 
+                        <Button
                           variant="outline"
                           onClick={handleResolve}
                           className="gap-2"

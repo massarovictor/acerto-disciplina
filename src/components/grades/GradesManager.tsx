@@ -15,12 +15,13 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { useClasses, useStudents, useGrades, useProfessionalSubjects } from '@/hooks/useLocalStorage';
-import { AlertTriangle, Save, Plus, X, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, Save, Plus, X, CheckCircle2, FileUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  SUBJECT_AREAS, 
-  QUARTERS 
+import {
+  SUBJECT_AREAS,
+  QUARTERS
 } from '@/lib/subjects';
+import { SigeImportDialog } from './SigeImportDialog';
 
 interface StudentGrades {
   studentId: string;
@@ -32,11 +33,11 @@ export const GradesManager = () => {
   const { students } = useStudents();
   const { grades, addGrade } = useGrades();
   const { toast } = useToast();
-  const { 
-    getProfessionalSubjects, 
-    addProfessionalSubject, 
+  const {
+    getProfessionalSubjects,
+    addProfessionalSubject,
     removeProfessionalSubject,
-    setProfessionalSubjectsForClass 
+    setProfessionalSubjectsForClass
   } = useProfessionalSubjects();
 
   const [selectedClass, setSelectedClass] = useState('');
@@ -44,18 +45,19 @@ export const GradesManager = () => {
   const [studentGrades, setStudentGrades] = useState<StudentGrades[]>([]);
   const [newProfessionalSubject, setNewProfessionalSubject] = useState('');
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showSigeImport, setShowSigeImport] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [lastInitialized, setLastInitialized] = useState<{ class: string; quarter: string } | null>(null);
 
   const classStudents = students.filter(s => s.classId === selectedClass);
   const selectedClassData = classes.find(c => c.id === selectedClass);
-  
+
   // Verificar se a turma está arquivada
   const isClassArchived = selectedClassData?.archived === true;
-  
+
   // Obter disciplinas profissionais da turma (armazenadas no localStorage)
   const professionalSubjects = selectedClass ? getProfessionalSubjects(selectedClass) : [];
-  
+
   // Usar uma string para rastrear mudanças nas disciplinas profissionais
   const professionalSubjectsStr = professionalSubjects.join(',');
 
@@ -74,24 +76,24 @@ export const GradesManager = () => {
     }
 
     // Só reinicializar se mudou a turma ou bimestre
-    const needsReinit = !lastInitialized || 
-                       lastInitialized.class !== selectedClass || 
-                       lastInitialized.quarter !== selectedQuarter;
+    const needsReinit = !lastInitialized ||
+      lastInitialized.class !== selectedClass ||
+      lastInitialized.quarter !== selectedQuarter;
 
     if (needsReinit) {
       const currentAllSubjects = [
         ...SUBJECT_AREAS.flatMap(area => area.subjects),
         ...professionalSubjects,
       ];
-      
+
       const initialGrades = classStudents.map(student => {
         const studentGradeData: Record<string, string> = {};
-        
+
         currentAllSubjects.forEach(subject => {
           const existingGrade = grades.find(
-            g => g.studentId === student.id && 
-                 g.subject === subject && 
-                 g.quarter === selectedQuarter
+            g => g.studentId === student.id &&
+              g.subject === subject &&
+              g.quarter === selectedQuarter
           );
           studentGradeData[subject] = existingGrade ? String(existingGrade.grade) : '';
         });
@@ -110,16 +112,16 @@ export const GradesManager = () => {
         ...SUBJECT_AREAS.flatMap(area => area.subjects),
         ...professionalSubjects,
       ];
-      
+
       setStudentGrades(prev => {
         return prev.map(sg => {
           const updatedGrades = { ...sg.grades };
           currentAllSubjects.forEach(subject => {
             if (!(subject in updatedGrades)) {
               const existingGrade = grades.find(
-                g => g.studentId === sg.studentId && 
-                     g.subject === subject && 
-                     g.quarter === selectedQuarter
+                g => g.studentId === sg.studentId &&
+                  g.subject === subject &&
+                  g.quarter === selectedQuarter
               );
               updatedGrades[subject] = existingGrade ? String(existingGrade.grade) : '';
             }
@@ -180,7 +182,7 @@ export const GradesManager = () => {
         });
         savedCount++;
         if (grade < 6) lowGradesCount++;
-        
+
         // Contar por área
         const area = SUBJECT_AREAS.find(a => a.subjects.includes(subject));
         const areaName = area ? area.name : 'Base Profissional';
@@ -201,7 +203,7 @@ export const GradesManager = () => {
     const areasSummary = Object.entries(savedByArea)
       .map(([area, count]) => `${area}: ${count}`)
       .join(', ');
-    
+
     if (lowGradesCount > 0) {
       toast({
         title: 'Notas Lançadas',
@@ -221,12 +223,12 @@ export const GradesManager = () => {
   const getAreaProgress = (studentId: string, area: typeof SUBJECT_AREAS[0]) => {
     const studentGrade = studentGrades.find(sg => sg.studentId === studentId);
     if (!studentGrade) return { filled: 0, total: area.subjects.length };
-    
+
     const filled = area.subjects.filter(subject => {
       const gradeValue = studentGrade.grades[subject];
       return gradeValue && gradeValue !== '';
     }).length;
-    
+
     return { filled, total: area.subjects.length };
   };
 
@@ -234,12 +236,12 @@ export const GradesManager = () => {
   const getProfessionalProgress = (studentId: string) => {
     const studentGrade = studentGrades.find(sg => sg.studentId === studentId);
     if (!studentGrade || professionalSubjects.length === 0) return { filled: 0, total: 0 };
-    
+
     const filled = professionalSubjects.filter(subject => {
       const gradeValue = studentGrade.grades[subject];
       return gradeValue && gradeValue !== '';
     }).length;
-    
+
     return { filled, total: professionalSubjects.length };
   };
 
@@ -310,9 +312,13 @@ export const GradesManager = () => {
         </CardContent>
       </Card>
 
-      {/* Add Professional Subject Button */}
+      {/* Add Professional Subject Button and SIGE Import */}
       {selectedClass && classStudents.length > 0 && (
-        <div className="flex justify-end">
+        <div className="flex justify-between">
+          <Button variant="outline" onClick={() => setShowSigeImport(true)}>
+            <FileUp className="h-4 w-4 mr-2" />
+            Importar Notas do SIGE
+          </Button>
           <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm">
@@ -353,11 +359,11 @@ export const GradesManager = () => {
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
               {classStudents.map((student) => {
                 const studentGrade = studentGrades.find(sg => sg.studentId === student.id);
-                const filledGrades = studentGrade 
-                  ? Object.values(studentGrade.grades).filter(g => g !== '').length 
+                const filledGrades = studentGrade
+                  ? Object.values(studentGrade.grades).filter(g => g !== '').length
                   : 0;
                 const totalSubjects = allSubjects.length;
-                
+
                 // Calcular progresso por área
                 const areaProgresses = SUBJECT_AREAS.map(area => ({
                   area: area.name,
@@ -366,8 +372,8 @@ export const GradesManager = () => {
                 const professionalProgress = getProfessionalProgress(student.id);
 
                 return (
-                  <Card 
-                    key={student.id} 
+                  <Card
+                    key={student.id}
                     className="cursor-pointer hover:bg-accent/50 transition-colors"
                     onClick={() => setSelectedStudent(student.id)}
                   >
@@ -389,9 +395,9 @@ export const GradesManager = () => {
                           </p>
                           <div className="flex flex-wrap gap-1 mt-2">
                             {areaProgresses.map(({ area, filled, total }) => (
-                              <Badge 
-                                key={area} 
-                                variant="outline" 
+                              <Badge
+                                key={area}
+                                variant="outline"
                                 className="text-xs"
                               >
                                 {filled}/{total}
@@ -425,7 +431,7 @@ export const GradesManager = () => {
               Lançar Notas - {students.find(s => s.id === selectedStudent)?.name}
             </DialogTitle>
           </DialogHeader>
-          
+
           {selectedStudent && (
             <div className="space-y-4">
               <Accordion type="multiple" defaultValue={SUBJECT_AREAS.map((_, i) => `area-${i}`)} className="w-full">
@@ -434,7 +440,7 @@ export const GradesManager = () => {
                   const studentGrade = studentGrades.find(sg => sg.studentId === selectedStudent);
                   const progress = getAreaProgress(selectedStudent, area);
                   const isComplete = progress.filled === progress.total && progress.total > 0;
-                  
+
                   return (
                     <AccordionItem key={area.name} value={`area-${index}`} className="border rounded-lg px-4 mb-2">
                       <AccordionTrigger className="hover:no-underline">
@@ -593,6 +599,12 @@ export const GradesManager = () => {
           </AlertDescription>
         </Alert>
       )}
+
+      {/* SIGE Import Dialog */}
+      <SigeImportDialog
+        open={showSigeImport}
+        onOpenChange={setShowSigeImport}
+      />
     </div>
   );
 };
