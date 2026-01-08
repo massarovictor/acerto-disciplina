@@ -24,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useStudents, useClasses } from '@/hooks/useLocalStorage';
+import { useStudents, useClasses } from '@/hooks/useData';
 import { useToast } from '@/hooks/use-toast';
 import { ChevronDown, Upload, Download, UserPlus, Camera, X, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
@@ -57,13 +57,14 @@ export const StudentsRegister = () => {
   const [selectedClassForImport, setSelectedClassForImport] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const todayRegistered = students.filter(s => {
+  const todayRegistered = students.filter((s) => {
+    if (!s.createdAt) return false;
     const today = new Date().toDateString();
-    const studentDate = new Date(s.id).toDateString();
+    const studentDate = new Date(s.createdAt).toDateString();
     return today === studentDate;
   }).length;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.name || !formData.classId || !formData.birthDate || !formData.gender) {
@@ -77,6 +78,15 @@ export const StudentsRegister = () => {
 
     // Validate age by series
     const selectedClass = classes.find(c => c.id === formData.classId);
+    if (!selectedClass || !selectedClass.active || selectedClass.archived) {
+      toast({
+        title: 'Turma bloqueada',
+        description: 'A turma selecionada está inativa ou arquivada.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (selectedClass) {
       const birthDate = new Date(formData.birthDate);
       const age = new Date().getFullYear() - birthDate.getFullYear();
@@ -108,37 +118,44 @@ export const StudentsRegister = () => {
       return;
     }
 
-    addStudent({
-      name: formData.name,
-      classId: formData.classId,
-      birthDate: formData.birthDate,
-      gender: formData.gender,
-      enrollment: formData.enrollment,
-      censusId: formData.censusId,
-      cpf: cleanedCPF || undefined,
-      rg: formData.rg,
-      photoUrl: formData.photoUrl,
-      status: 'active',
-    });
+    try {
+      await addStudent({
+        name: formData.name,
+        classId: formData.classId,
+        birthDate: formData.birthDate,
+        gender: formData.gender,
+        enrollment: formData.enrollment,
+        censusId: formData.censusId,
+        cpf: cleanedCPF || undefined,
+        rg: formData.rg,
+        photoUrl: formData.photoUrl,
+        status: 'active',
+      });
 
-    toast({
-      title: 'Sucesso',
-      description: 'Aluno cadastrado com sucesso.',
-    });
+      toast({
+        title: 'Sucesso',
+        description: 'Aluno cadastrado com sucesso.',
+      });
 
-    // Reset form
-    setFormData({
-      name: '',
-      classId: '',
-      birthDate: '',
-      gender: '',
-      enrollment: '',
-      censusId: '',
-      cpf: '',
-      rg: '',
-      photoUrl: '',
-    });
-    setPhotoPreview('');
+      setFormData({
+        name: '',
+        classId: '',
+        birthDate: '',
+        gender: '',
+        enrollment: '',
+        censusId: '',
+        cpf: '',
+        rg: '',
+        photoUrl: '',
+      });
+      setPhotoPreview('');
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível cadastrar o aluno.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -305,6 +322,13 @@ export const StudentsRegister = () => {
           errors++;
           continue;
         }
+        if (!classExists.active || classExists.archived) {
+          const errorMsg = `Linha ${row.rowNumber}: ❌ Turma "${classExists.name}" está inativa ou arquivada`;
+          console.error(errorMsg, row);
+          errorMessages.push(errorMsg);
+          errors++;
+          continue;
+        }
 
         console.log(`[IMPORTAÇÃO] Linha ${row.rowNumber}: ✅ Turma encontrada:`, { id: classExists.id, name: classExists.name, classNumber: classExists.classNumber });
 
@@ -324,7 +348,7 @@ export const StudentsRegister = () => {
           classNumber: classExists.classNumber,
         });
 
-        const newStudent = addStudent({
+        await addStudent({
           name: row.data.name || '',
           classId: row.data.classId, // Usar classId validado da planilha
           birthDate: row.data.birthDate || '',
@@ -336,8 +360,7 @@ export const StudentsRegister = () => {
           photoUrl: row.data.photoUrl,
           status: 'active',
         });
-
-        console.log(`[IMPORTAÇÃO] Linha ${row.rowNumber}: ✅ Aluno adicionado com sucesso:`, newStudent);
+        console.log(`[IMPORTAÇÃO] Linha ${row.rowNumber}: ✅ Aluno adicionado com sucesso`);
         imported++;
 
         // Pequeno delay para garantir IDs únicos e atualização do estado
@@ -444,7 +467,7 @@ export const StudentsRegister = () => {
                     <SelectValue placeholder="Selecione a turma" />
                   </SelectTrigger>
                   <SelectContent>
-                    {classes.filter(c => c.active).map(cls => (
+                    {classes.filter(c => c.active && !c.archived).map(cls => (
                       <SelectItem key={cls.id} value={cls.id}>
                         {cls.classNumber} - {cls.name}
                       </SelectItem>
@@ -587,7 +610,7 @@ export const StudentsRegister = () => {
                 <SelectValue placeholder="Selecione a turma para importação" />
               </SelectTrigger>
               <SelectContent>
-                {classes.filter(c => c.active).map(cls => (
+                {classes.filter(c => c.active && !c.archived).map(cls => (
                   <SelectItem key={cls.id} value={cls.id}>
                     {cls.classNumber} - {cls.name}
                   </SelectItem>

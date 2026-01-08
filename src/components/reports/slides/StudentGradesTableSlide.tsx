@@ -26,19 +26,22 @@ export const StudentGradesTableSlide = ({ student, grades, period }: StudentGrad
     return acc;
   }, {} as Record<string, Grade[]>);
 
-  // Sort subjects by average (highest to lowest)
+  // Sort subjects by average (lowest to highest)
   const sortedSubjects = Object.entries(gradesBySubject)
     .map(([subject, subjectGrades]) => ({
       subject,
       grades: subjectGrades,
       average: subjectGrades.reduce((sum, g) => sum + g.grade, 0) / subjectGrades.length
     }))
-    .sort((a, b) => b.average - a.average);
+    .sort((a, b) => a.average - b.average);
+  const overallAverage = sortedSubjects.length > 0
+    ? sortedSubjects.reduce((sum, s) => sum + s.average, 0) / sortedSubjects.length
+    : 0;
 
   return (
-    <div className="h-full p-8 bg-gradient-to-br from-primary/5 to-background flex flex-col">
+    <div className="h-full p-10 bg-gradient-to-br from-primary/5 to-background flex flex-col">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex items-center gap-6 mb-6">
         <Avatar className="h-16 w-16 border-2 border-primary/20">
           {student.photoUrl ? (
             <AvatarImage src={student.photoUrl} alt={student.name} />
@@ -50,38 +53,38 @@ export const StudentGradesTableSlide = ({ student, grades, period }: StudentGrad
         </Avatar>
         <div className="flex-1">
           <h1 className="text-3xl font-bold">{student.name} - Notas por Disciplina</h1>
-          <p className="text-md text-muted-foreground">
-            {period === 'all' ? 'Todas as Notas' : period} • Ordenado por Desempenho
+          <p className="text-base text-muted-foreground">
+            {period === 'all' ? 'Todas as Notas' : period} • Ordenado do pior para o melhor
           </p>
         </div>
       </div>
 
       {/* Grades Table */}
       <Card className="flex-1 bg-card/50 backdrop-blur overflow-hidden">
-        <CardContent className="pt-6 h-full flex flex-col">
-          <div className="flex-1 overflow-auto">
+        <CardContent className="pt-6 h-full min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[50px]">#</TableHead>
-                  <TableHead>Disciplina</TableHead>
+                  <TableHead className="w-[60px] text-base">#</TableHead>
+                  <TableHead className="text-base">Disciplina</TableHead>
                   {period === 'all' && (
                     <>
-                      <TableHead className="text-center w-[100px]">1º Bim</TableHead>
-                      <TableHead className="text-center w-[100px]">2º Bim</TableHead>
-                      <TableHead className="text-center w-[100px]">3º Bim</TableHead>
-                      <TableHead className="text-center w-[100px]">4º Bim</TableHead>
+                      <TableHead className="text-center w-[110px] text-base">1º Bim</TableHead>
+                      <TableHead className="text-center w-[110px] text-base">2º Bim</TableHead>
+                      <TableHead className="text-center w-[110px] text-base">3º Bim</TableHead>
+                      <TableHead className="text-center w-[110px] text-base">4º Bim</TableHead>
                     </>
                   )}
-                  <TableHead className="text-center w-[100px]">Média</TableHead>
-                  <TableHead className="text-center w-[120px]">Status</TableHead>
+                  <TableHead className="text-center w-[110px] text-base">Média</TableHead>
+                  <TableHead className="text-center w-[140px] text-base">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sortedSubjects.map((item, index) => (
                   <TableRow key={index}>
-                    <TableCell className="font-medium">{index + 1}</TableCell>
-                    <TableCell className="font-medium">{item.subject}</TableCell>
+                    <TableCell className="font-medium text-base">{index + 1}</TableCell>
+                    <TableCell className="font-medium text-base">{item.subject}</TableCell>
                     {period === 'all' && (
                       <>
                         {['1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre'].map(quarter => {
@@ -95,6 +98,7 @@ export const StudentGradesTableSlide = ({ student, grades, period }: StudentGrad
                                     quarterGrade.grade >= 6 ? 'secondary' : 
                                     'destructive'
                                   }
+                                  className="text-sm"
                                 >
                                   {quarterGrade.grade.toFixed(1)}
                                 </Badge>
@@ -113,16 +117,16 @@ export const StudentGradesTableSlide = ({ student, grades, period }: StudentGrad
                           item.average >= 6 ? 'secondary' : 
                           'destructive'
                         }
-                        className="text-base px-3 py-1"
+                        className="text-base px-4 py-1"
                       >
                         {item.average.toFixed(1)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
                       {item.average >= 6 ? (
-                        <Badge variant="default" className="bg-green-500">Aprovado</Badge>
+                        <Badge variant="default" className="bg-green-500 text-sm px-3 py-1">Aprovado</Badge>
                       ) : (
-                        <Badge variant="destructive">Recuperação</Badge>
+                        <Badge variant="destructive" className="text-sm px-3 py-1">Recuperação</Badge>
                       )}
                     </TableCell>
                   </TableRow>
@@ -132,7 +136,7 @@ export const StudentGradesTableSlide = ({ student, grades, period }: StudentGrad
           </div>
 
           {/* Summary */}
-          <div className="mt-4 pt-4 border-t grid grid-cols-4 gap-4">
+          <div className="mt-6 pt-6 border-t grid grid-cols-4 gap-4">
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Total Disciplinas</p>
               <p className="text-2xl font-bold">{sortedSubjects.length}</p>
@@ -152,7 +156,7 @@ export const StudentGradesTableSlide = ({ student, grades, period }: StudentGrad
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Média Geral</p>
               <p className="text-2xl font-bold">
-                {(sortedSubjects.reduce((sum, s) => sum + s.average, 0) / sortedSubjects.length).toFixed(1)}
+                {overallAverage.toFixed(1)}
               </p>
             </div>
           </div>

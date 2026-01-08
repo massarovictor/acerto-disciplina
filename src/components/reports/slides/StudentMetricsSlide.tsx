@@ -29,10 +29,10 @@ export const StudentMetricsSlide = ({ student, grades, incidents, period, positi
   ).length;
 
   return (
-    <div className="h-full p-8 bg-gradient-to-br from-primary/5 to-background flex flex-col">
+    <div className="h-full p-10 bg-gradient-to-br from-primary/5 to-background flex flex-col">
       {/* Header */}
-      <div className="flex items-center gap-6 mb-8">
-        <Avatar className="h-24 w-24 border-4 border-primary/20">
+      <div className="flex items-center gap-8 mb-8">
+        <Avatar className="h-24 w-24 border-2 border-primary/20">
           {student.photoUrl ? (
             <AvatarImage src={student.photoUrl} alt={student.name} />
           ) : (
@@ -46,7 +46,7 @@ export const StudentMetricsSlide = ({ student, grades, incidents, period, positi
           <p className="text-lg text-muted-foreground">
             Matrícula: {student.enrollment || 'Não informada'}
           </p>
-          <p className="text-md text-muted-foreground">
+          <p className="text-base text-muted-foreground">
             {period === 'all' ? 'Ano Letivo Completo' : period}
           </p>
         </div>
@@ -67,8 +67,8 @@ export const StudentMetricsSlide = ({ student, grades, incidents, period, positi
             averageGrade >= 6 ? 'bg-yellow-500/10 border-yellow-500/20' :
             'bg-red-500/10 border-red-500/20'
           } backdrop-blur`}>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4 mb-4">
+            <CardContent className="pt-7">
+              <div className="flex items-center gap-5 mb-5">
                 <TrendingUp className={`h-12 w-12 ${
                   averageGrade >= 7 ? 'text-green-500' :
                   averageGrade >= 6 ? 'text-yellow-500' :
@@ -89,8 +89,8 @@ export const StudentMetricsSlide = ({ student, grades, incidents, period, positi
           </Card>
 
           <Card className="bg-card/50 backdrop-blur">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4 mb-4">
+            <CardContent className="pt-7">
+              <div className="flex items-center gap-5 mb-5">
                 <Trophy className="h-10 w-10 text-primary" />
                 <div>
                   <p className="text-sm text-muted-foreground">Posição na Turma</p>
@@ -119,8 +119,8 @@ export const StudentMetricsSlide = ({ student, grades, incidents, period, positi
             criticalIncidents > 0 ? 'bg-red-500/10 border-red-500/20' :
             'bg-yellow-500/10 border-yellow-500/20'
           } backdrop-blur`}>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4 mb-4">
+            <CardContent className="pt-7">
+              <div className="flex items-center gap-5 mb-5">
                 <AlertTriangle className={`h-10 w-10 ${
                   studentIncidents.length === 0 ? 'text-green-500' :
                   criticalIncidents > 0 ? 'text-red-500' :
@@ -147,8 +147,8 @@ export const StudentMetricsSlide = ({ student, grades, incidents, period, positi
           </Card>
 
           <Card className="bg-card/50 backdrop-blur">
-            <CardContent className="pt-6">
-              <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <CardContent className="pt-7">
+              <h3 className="font-semibold mb-5 flex items-center gap-2 text-base">
                 <Users className="h-5 w-5 text-primary" />
                 Estatísticas
               </h3>
@@ -175,7 +175,7 @@ export const StudentMetricsSlide = ({ student, grades, incidents, period, positi
 
           <Card className="bg-primary/5 backdrop-blur">
             <CardContent className="pt-4">
-              <p className="text-xs text-muted-foreground text-center">
+              <p className="text-sm text-muted-foreground text-center">
                 {averageGrade < 6 ? 'Recomendação: Reforço escolar e reunião com responsáveis' :
                  averageGrade < 7 ? 'Recomendação: Acompanhamento pedagógico regular' :
                  'Recomendação: Atividades de enriquecimento e desafios'}

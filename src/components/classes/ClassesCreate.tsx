@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { useClasses, useProfessionalSubjects, useProfessionalSubjectTemplates } from '@/hooks/useLocalStorage';
-import { MOCK_USERS } from '@/data/mockData';
+import { useClasses, useProfessionalSubjects, useProfessionalSubjectTemplates } from '@/hooks/useData';
 import { useToast } from '@/hooks/use-toast';
 import { AlertCircle, Info } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useAuth } from '@/contexts/AuthContext';
+import { getCourseCode } from '@/lib/classNumber';
 
 interface ClassesCreateProps {
   onSuccess?: () => void;
@@ -21,6 +22,7 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
   const { setProfessionalSubjectsForClass } = useProfessionalSubjects();
   const { templates, getTemplate } = useProfessionalSubjectTemplates();
   const { toast } = useToast();
+  const { profile } = useAuth();
   
   const [formData, setFormData] = useState({
     templateId: '',
@@ -35,9 +37,11 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
 
   const [templateSubjects, setTemplateSubjects] = useState<string[]>([]);
 
-  const directors = MOCK_USERS.filter(u => u.role === 'diretor');
+  const directors = profile ? [profile] : [];
   
   // Carregar disciplinas do template selecionado
+  // NOTA: Em criação de turma, usar startYear está CORRETO
+  // pois a turma está começando agora (currentYear = startYear)
   useEffect(() => {
     if (formData.templateId && formData.templateId !== 'none') {
       const template = getTemplate(formData.templateId);
@@ -110,7 +114,7 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
   const hasCourse = !!formData.course.trim();
   const hasTemplate = !!formData.templateId && formData.templateId !== 'none';
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validações
@@ -133,8 +137,25 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
       return;
     }
 
-    // Se tem template/curso, ano de início é obrigatório
-    if (hasTemplate && !formData.startYear) {
+    if (!formData.course.trim()) {
+      toast({
+        title: 'Erro',
+        description: 'Informe o curso tecnico da turma.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!getCourseCode(formData.course)) {
+      toast({
+        title: 'Erro',
+        description: 'Curso tecnico nao reconhecido. Use um dos cursos cadastrados.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!formData.startYear) {
       toast({
         title: 'Erro',
         description: 'Selecione o ano de início da turma.',
@@ -160,10 +181,10 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
     }
 
     // Se tem ano de início, data de início é obrigatória
-    if (formData.startYear && !formData.startYearDate) {
+    if (!formData.startYearDate) {
       toast({
         title: 'Erro',
-        description: 'Informe a data de início do 1º ano letivo.',
+        description: 'Informe a data de início do ano letivo.',
         variant: 'destructive',
       });
       return;
@@ -194,42 +215,49 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
     }
 
     // Criar turma
-    const newClass = addClass({
-      name,
-      series: formData.series,
-      course: formData.course.trim() || undefined,
-      directorId: formData.directorId || undefined,
-      active: formData.active,
-      startYear: formData.startYear,
-      startYearDate: formData.startYearDate || undefined,
-      archived: false,
-      templateId: formData.templateId || undefined,
-    });
+    try {
+      const newClass = await addClass({
+        name,
+        series: formData.series,
+        letter: formData.letter,
+        course: formData.course.trim() || undefined,
+        directorId: formData.directorId || undefined,
+        active: formData.active,
+        startYear: formData.startYear,
+        startYearDate: formData.startYearDate || undefined,
+        archived: false,
+        templateId: formData.templateId || undefined,
+      });
 
-    // Cadastrar disciplinas profissionais do template
-    if (newClass.id && templateSubjects.length > 0) {
-      setProfessionalSubjectsForClass(newClass.id, templateSubjects);
+      if (newClass?.id && templateSubjects.length > 0) {
+        await setProfessionalSubjectsForClass(newClass.id, templateSubjects);
+      }
+
+      toast({
+        title: 'Sucesso',
+        description: `Turma criada com sucesso${templateSubjects.length > 0 ? ` com ${templateSubjects.length} disciplina(s) profissional(is)` : ''}.`,
+      });
+
+      setFormData({
+        templateId: '',
+        series: '',
+        letter: '',
+        course: '',
+        startYear: undefined,
+        startYearDate: '',
+        directorId: '',
+        active: true,
+      });
+      setTemplateSubjects([]);
+
+      onSuccess?.();
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível criar a turma.',
+        variant: 'destructive',
+      });
     }
-
-    toast({
-      title: 'Sucesso',
-      description: `Turma criada com sucesso${templateSubjects.length > 0 ? ` com ${templateSubjects.length} disciplina(s) profissional(is)` : ''}.`,
-    });
-
-    // Reset form
-    setFormData({
-      templateId: '',
-      series: '',
-      letter: '',
-      course: '',
-      startYear: undefined,
-      startYearDate: '',
-      directorId: '',
-      active: true,
-    });
-    setTemplateSubjects([]);
-
-    onSuccess?.();
   };
 
   return (
@@ -321,73 +349,67 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
               )}
             </div>
 
-                {hasTemplate && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="startYear">Ano de Início *</Label>
-                  <Select 
-                    value={formData.startYear?.toString() || ''} 
-                    onValueChange={(value) => setFormData({ ...formData, startYear: parseInt(value) as 1 | 2 | 3 })}
-                  >
-                    <SelectTrigger id="startYear">
-                      <SelectValue placeholder="Selecione o ano de início" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getTemplate(formData.templateId)?.subjectsByYear
-                        .sort((a, b) => a.year - b.year)
-                        .map(yearData => (
-                          <SelectItem key={yearData.year} value={yearData.year.toString()}>
-                            {yearData.year}º ano ({yearData.subjects.length} disciplina{yearData.subjects.length !== 1 ? 's' : ''})
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                  {formData.startYear && templateSubjects.length === 0 && (
-                    <p className="text-sm text-destructive">
-                      O template selecionado não possui disciplinas para este ano.
-                    </p>
-                  )}
-                </div>
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="startYear">Ano de Início *</Label>
+                <Select 
+                  value={formData.startYear?.toString() || ''} 
+                  onValueChange={(value) => setFormData({ ...formData, startYear: parseInt(value) as 1 | 2 | 3 })}
+                >
+                  <SelectTrigger id="startYear">
+                    <SelectValue placeholder="Selecione o ano de início" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1º ano</SelectItem>
+                    <SelectItem value="2">2º ano</SelectItem>
+                    <SelectItem value="3">3º ano</SelectItem>
+                  </SelectContent>
+                </Select>
+                {hasTemplate && formData.startYear && templateSubjects.length === 0 && (
+                  <p className="text-sm text-destructive">
+                    O template selecionado não possui disciplinas para este ano.
+                  </p>
+                )}
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="startYearDate">
-                    Data de Início do {formData.startYear}º Ano * 
-                    {formData.startYear && formData.startYear > 1 && (
-                      <span className="text-muted-foreground text-xs font-normal ml-2">
-                        (pode ser uma data futura)
-                      </span>
-                    )}
-                  </Label>
-                  <Input
-                    id="startYearDate"
-                    type="date"
-                    value={formData.startYearDate}
-                    onChange={(e) => setFormData({ ...formData, startYearDate: e.target.value })}
-                  />
+              <div className="space-y-2">
+                <Label htmlFor="startYearDate">
+                  Data de Início do {formData.startYear || '1'}º Ano * 
+                  {formData.startYear && formData.startYear > 1 && (
+                    <span className="text-muted-foreground text-xs font-normal ml-2">
+                      (pode ser uma data futura)
+                    </span>
+                  )}
+                </Label>
+                <Input
+                  id="startYearDate"
+                  type="date"
+                  value={formData.startYearDate}
+                  onChange={(e) => setFormData({ ...formData, startYearDate: e.target.value })}
+                />
+                <p className="text-sm text-muted-foreground">
+                  {formData.startYear === 1 
+                    ? 'Data de início do primeiro ano letivo (geralmente fevereiro).'
+                    : `Data de início do ${formData.startYear}º ano letivo. Pode ser uma data futura se a turma ainda não começou.`}
+                </p>
+              </div>
+
+              {hasTemplate && templateSubjects.length > 0 && (
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Disciplinas Profissionais do {formData.startYear}º Ano</Label>
+                  <div className="flex flex-wrap gap-2 p-3 border rounded-md bg-muted/50">
+                    {templateSubjects.map((subject, index) => (
+                      <Badge key={`${subject}-${index}`} variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/30">
+                        {subject}
+                      </Badge>
+                    ))}
+                  </div>
                   <p className="text-sm text-muted-foreground">
-                    {formData.startYear === 1 
-                      ? 'Data de início do primeiro ano letivo (geralmente fevereiro).'
-                      : `Data de início do ${formData.startYear}º ano letivo. Pode ser uma data futura se a turma ainda não começou.`}
+                    Estas disciplinas serão cadastradas automaticamente ao criar a turma.
                   </p>
                 </div>
-
-                {templateSubjects.length > 0 && (
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>Disciplinas Profissionais do {formData.startYear}º Ano</Label>
-                    <div className="flex flex-wrap gap-2 p-3 border rounded-md bg-muted/50">
-                      {templateSubjects.map((subject, index) => (
-                        <Badge key={`${subject}-${index}`} variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/30">
-                          {subject}
-                        </Badge>
-                      ))}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Estas disciplinas serão cadastradas automaticamente ao criar a turma.
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
+              )}
+            </>
 
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="director">Diretor</Label>

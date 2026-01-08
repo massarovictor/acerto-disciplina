@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Incident, FollowUpType } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { useIncidents, useStudents } from '@/hooks/useLocalStorage';
+import { useIncidents, useStudents } from '@/hooks/useData';
 import { calculateSuggestedAction, suggestFollowUpType } from '@/lib/incidentActions';
 
 interface FollowUpDialogProps {

@@ -1,11 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useSearchParams } from 'react-router-dom';
 import { StudentsRegister } from '@/components/students/StudentsRegister';
 import { StudentsManage } from '@/components/students/StudentsManage';
 import { StudentApprovalManager } from '@/components/students/StudentApprovalManager';
 
 const Students = () => {
   const [activeTab, setActiveTab] = useState('manage');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const highlightId = searchParams.get('highlight');
+
+  // Limpar highlight após 3 segundos
+  useEffect(() => {
+    if (highlightId) {
+      const timer = setTimeout(() => {
+        setSearchParams({});
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightId, setSearchParams]);
 
   return (
     <div className="p-6 space-y-6">
@@ -24,7 +37,7 @@ const Students = () => {
         </TabsList>
 
         <TabsContent value="manage" className="space-y-6 mt-6">
-          <StudentsManage />
+          <StudentsManage highlightId={highlightId} />
         </TabsContent>
 
         <TabsContent value="register" className="space-y-6 mt-6">

@@ -1,10 +1,16 @@
-import { Checkbox } from '@/components/ui/checkbox';
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { INCIDENT_EPISODES } from '@/data/mockData';
 import { IncidentFormData } from '../IncidentWizard';
 import { IncidentSeverity } from '@/types';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Plus, X } from 'lucide-react';
 
 interface EpisodesStepProps {
   formData: Partial<IncidentFormData>;
@@ -20,21 +26,70 @@ const severityConfig = {
 
 export const EpisodesStep = ({ formData, updateFormData }: EpisodesStepProps) => {
   const selectedEpisodes = formData.episodes || [];
+  const [customEpisode, setCustomEpisode] = useState('');
+
+  // Separar episódios da lista e customizados
+  const listedEpisodes = selectedEpisodes.filter(ep => 
+    INCIDENT_EPISODES.some(e => e.id === ep)
+  );
+  const customEpisodes = selectedEpisodes.filter(ep => 
+    !INCIDENT_EPISODES.some(e => e.id === ep)
+  );
 
   const toggleEpisode = (episodeId: string) => {
     const newEpisodes = selectedEpisodes.includes(episodeId)
       ? selectedEpisodes.filter((id) => id !== episodeId)
       : [...selectedEpisodes, episodeId];
     
-    updateFormData({ 
+    const nextCalculated = calculateSeverity(newEpisodes);
+    const shouldSyncFinal =
+      !formData.finalSeverity || formData.finalSeverity === formData.calculatedSeverity;
+
+    updateFormData({
       episodes: newEpisodes,
-      calculatedSeverity: calculateSeverity(newEpisodes),
+      calculatedSeverity: nextCalculated,
+      finalSeverity: shouldSyncFinal ? nextCalculated : formData.finalSeverity,
+      severityOverrideReason: shouldSyncFinal ? undefined : formData.severityOverrideReason,
+    });
+  };
+
+  const addCustomEpisode = () => {
+    if (!customEpisode.trim()) return;
+    
+    const newEpisodes = [...selectedEpisodes, customEpisode.trim()];
+    const nextCalculated = calculateSeverity(newEpisodes);
+    const shouldSyncFinal =
+      !formData.finalSeverity || formData.finalSeverity === formData.calculatedSeverity;
+
+    updateFormData({
+      episodes: newEpisodes,
+      calculatedSeverity: nextCalculated,
+      finalSeverity: shouldSyncFinal ? nextCalculated : formData.finalSeverity,
+      severityOverrideReason: shouldSyncFinal ? undefined : formData.severityOverrideReason,
+    });
+    
+    setCustomEpisode('');
+  };
+
+  const removeCustomEpisode = (episodeText: string) => {
+    const newEpisodes = selectedEpisodes.filter(ep => ep !== episodeText);
+    const nextCalculated = calculateSeverity(newEpisodes);
+    const shouldSyncFinal =
+      !formData.finalSeverity || formData.finalSeverity === formData.calculatedSeverity;
+
+    updateFormData({
+      episodes: newEpisodes,
+      calculatedSeverity: nextCalculated,
+      finalSeverity: shouldSyncFinal ? nextCalculated : formData.finalSeverity,
+      severityOverrideReason: shouldSyncFinal ? undefined : formData.severityOverrideReason,
     });
   };
 
   const calculateSeverity = (episodeIds: string[]): IncidentSeverity => {
     const episodes = INCIDENT_EPISODES.filter((e) => episodeIds.includes(e.id));
     
+    // Episódios customizados não afetam o cálculo automático de gravidade
+    // O usuário deve ajustar manualmente se necessário
     if (episodes.some((e) => e.severity === 'gravissima')) return 'gravissima';
     if (episodes.some((e) => e.severity === 'grave')) return 'grave';
     if (episodes.some((e) => e.severity === 'intermediaria')) return 'intermediaria';
@@ -48,6 +103,10 @@ export const EpisodesStep = ({ formData, updateFormData }: EpisodesStepProps) =>
     acc[episode.severity].push(episode);
     return acc;
   }, {} as Record<string, typeof INCIDENT_EPISODES>);
+
+  const calculatedSeverity = formData.calculatedSeverity || 'leve';
+  const finalSeverity = formData.finalSeverity || calculatedSeverity;
+  const hasOverride = finalSeverity !== calculatedSeverity;
 
   return (
     <div className="space-y-6">
@@ -79,6 +138,65 @@ export const EpisodesStep = ({ formData, updateFormData }: EpisodesStepProps) =>
           </CardContent>
         </Card>
       )}
+
+      {/* Episódios Customizados */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Episódio Não Listado</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Se o episódio não estiver na lista acima, você pode adicionar um episódio customizado.
+          </p>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Descreva o episódio..."
+              value={customEpisode}
+              onChange={(e) => setCustomEpisode(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  addCustomEpisode();
+                }
+              }}
+            />
+            <Button
+              type="button"
+              onClick={addCustomEpisode}
+              disabled={!customEpisode.trim()}
+              size="default"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Adicionar
+            </Button>
+          </div>
+          
+          {customEpisodes.length > 0 && (
+            <div className="space-y-2 mt-4">
+              <Label className="text-sm">Episódios Customizados Adicionados:</Label>
+              <div className="space-y-2">
+                {customEpisodes.map((episode, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-2 border rounded-lg bg-accent/30"
+                  >
+                    <span className="text-sm">{episode}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeCustomEpisode(episode)}
+                      className="h-7 w-7 p-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="space-y-4">
         {(Object.keys(groupedEpisodes) as IncidentSeverity[]).map((severity) => (
@@ -117,6 +235,57 @@ export const EpisodesStep = ({ formData, updateFormData }: EpisodesStepProps) =>
           </Card>
         ))}
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Grau Final</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="finalSeverity">Grau final da ocorrência</Label>
+            <Select
+              value={finalSeverity}
+              onValueChange={(value) => {
+                const selected = value as IncidentSeverity;
+                updateFormData({
+                  finalSeverity: selected,
+                  severityOverrideReason:
+                    selected === calculatedSeverity ? undefined : formData.severityOverrideReason,
+                });
+              }}
+            >
+              <SelectTrigger id="finalSeverity">
+                <SelectValue placeholder="Selecione o grau final" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="leve">Leve</SelectItem>
+                <SelectItem value="intermediaria">Intermediária</SelectItem>
+                <SelectItem value="grave">Grave</SelectItem>
+                <SelectItem value="gravissima">Gravíssima</SelectItem>
+              </SelectContent>
+            </Select>
+            {hasOverride && (
+              <p className="text-xs text-muted-foreground">
+                O grau final esta diferente do calculado automaticamente.
+              </p>
+            )}
+          </div>
+
+          {hasOverride && (
+            <div className="space-y-2">
+              <Label htmlFor="severityOverrideReason">Motivo da alteracao *</Label>
+              <Textarea
+                id="severityOverrideReason"
+                placeholder="Explique por que o grau final foi alterado..."
+                value={formData.severityOverrideReason || ''}
+                onChange={(e) => updateFormData({ severityOverrideReason: e.target.value })}
+                rows={3}
+                className="resize-none"
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

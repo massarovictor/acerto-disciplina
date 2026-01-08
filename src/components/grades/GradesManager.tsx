@@ -7,15 +7,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { useClasses, useStudents, useGrades, useProfessionalSubjects } from '@/hooks/useLocalStorage';
-import { AlertTriangle, Save, Plus, X, CheckCircle2, FileUp } from 'lucide-react';
+import { useClasses, useStudents, useGrades, useProfessionalSubjects } from '@/hooks/useData';
+import { AlertTriangle, Save, CheckCircle2, FileUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   SUBJECT_AREAS,
@@ -34,17 +34,12 @@ export const GradesManager = () => {
   const { grades, addGrade } = useGrades();
   const { toast } = useToast();
   const {
-    getProfessionalSubjects,
-    addProfessionalSubject,
-    removeProfessionalSubject,
-    setProfessionalSubjectsForClass
+    getProfessionalSubjects
   } = useProfessionalSubjects();
 
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedQuarter, setSelectedQuarter] = useState('1º Bimestre');
   const [studentGrades, setStudentGrades] = useState<StudentGrades[]>([]);
-  const [newProfessionalSubject, setNewProfessionalSubject] = useState('');
-  const [showAddDialog, setShowAddDialog] = useState(false);
   const [showSigeImport, setShowSigeImport] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [lastInitialized, setLastInitialized] = useState<{ class: string; quarter: string } | null>(null);
@@ -54,8 +49,10 @@ export const GradesManager = () => {
 
   // Verificar se a turma está arquivada
   const isClassArchived = selectedClassData?.archived === true;
+  const isClassInactive = selectedClassData?.active === false;
+  const isClassLocked = isClassArchived || isClassInactive;
 
-  // Obter disciplinas profissionais da turma (armazenadas no localStorage)
+  // Obter disciplinas profissionais da turma
   const professionalSubjects = selectedClass ? getProfessionalSubjects(selectedClass) : [];
 
   // Usar uma string para rastrear mudanças nas disciplinas profissionais
@@ -142,26 +139,18 @@ export const GradesManager = () => {
     );
   };
 
-  const handleAddProfessionalSubject = () => {
-    if (newProfessionalSubject.trim() && selectedClass) {
-      addProfessionalSubject(selectedClass, newProfessionalSubject.trim());
-      setNewProfessionalSubject('');
-      setShowAddDialog(false);
-      toast({
-        title: 'Disciplina adicionada',
-        description: 'A disciplina foi adicionada com sucesso e estará disponível em Notas e Frequência.',
-      });
-    }
-  };
-
-  const handleRemoveProfessionalSubject = (subject: string) => {
-    if (selectedClass) {
-      removeProfessionalSubject(selectedClass, subject);
-    }
-  };
-
-  const handleSaveStudentGrades = () => {
+  const handleSaveStudentGrades = async () => {
     if (!selectedStudent || !selectedClass || !selectedQuarter) return;
+    if (isClassLocked) {
+      toast({
+        title: 'Turma bloqueada',
+        description: isClassArchived
+          ? 'Esta turma está arquivada e não aceita lançamento de notas.'
+          : 'Esta turma está inativa e não aceita lançamento de notas.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     const studentGrade = studentGrades.find(sg => sg.studentId === selectedStudent);
     if (!studentGrade) return;
@@ -170,16 +159,19 @@ export const GradesManager = () => {
     let lowGradesCount = 0;
     const savedByArea: Record<string, number> = {};
 
+    const gradePromises: Promise<void>[] = [];
     Object.entries(studentGrade.grades).forEach(([subject, gradeValue]) => {
       const grade = parseFloat(gradeValue);
       if (!isNaN(grade) && grade >= 0 && grade <= 10) {
-        addGrade({
-          studentId: selectedStudent,
-          classId: selectedClass,
-          subject: subject,
-          quarter: selectedQuarter,
-          grade: grade,
-        });
+        gradePromises.push(
+          addGrade({
+            studentId: selectedStudent,
+            classId: selectedClass,
+            subject: subject,
+            quarter: selectedQuarter,
+            grade: grade,
+          }),
+        );
         savedCount++;
         if (grade < 6) lowGradesCount++;
 
@@ -194,6 +186,17 @@ export const GradesManager = () => {
       toast({
         title: 'Erro',
         description: 'Adicione pelo menos uma nota válida (0-10).',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      await Promise.all(gradePromises);
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível salvar as notas.',
         variant: 'destructive',
       });
       return;
@@ -268,7 +271,7 @@ export const GradesManager = () => {
                     </div>
                   ) : (
                     classes
-                      .filter(cls => !cls.archived)
+                      .filter(cls => cls.active && !cls.archived)
                       .map(cls => (
                         <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
                       ))
@@ -292,16 +295,18 @@ export const GradesManager = () => {
             </div>
           </div>
 
-          {isClassArchived && (
+          {isClassLocked && (
             <Alert variant="destructive" className="mt-4">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Esta turma está arquivada. Não é possível lançar notas para turmas arquivadas.
+                {isClassArchived
+                  ? 'Esta turma está arquivada. Não é possível lançar notas para turmas arquivadas.'
+                  : 'Esta turma está inativa. Não é possível lançar notas para turmas inativas.'}
               </AlertDescription>
             </Alert>
           )}
 
-          {selectedClass && selectedQuarter && !isClassArchived && (
+          {selectedClass && selectedQuarter && !isClassLocked && (
             <Alert className="mt-4">
               <AlertDescription>
                 Lançando notas do <strong>{selectedQuarter}</strong> para a turma{' '}
@@ -319,38 +324,11 @@ export const GradesManager = () => {
             <FileUp className="h-4 w-4 mr-2" />
             Importar Notas do SIGE
           </Button>
-          <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Disciplina Profissional
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Adicionar Disciplina da Base Profissional</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Nome da Disciplina</Label>
-                  <Input
-                    placeholder="Ex: Gestão de Processos"
-                    value={newProfessionalSubject}
-                    onChange={(e) => setNewProfessionalSubject(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddProfessionalSubject()}
-                  />
-                </div>
-                <Button onClick={handleAddProfessionalSubject} className="w-full">
-                  Adicionar
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
         </div>
       )}
 
       {/* Students List */}
-      {selectedClass && classStudents.length > 0 && !isClassArchived && (
+      {selectedClass && classStudents.length > 0 && !isClassLocked && (
         <Card>
           <CardHeader>
             <CardTitle>Alunos - Clique para Lançar Notas</CardTitle>
@@ -531,22 +509,13 @@ export const GradesManager = () => {
 
                             return (
                               <div key={subject} className="space-y-1">
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
                                   <div className="flex items-center gap-2">
                                     <Label className="text-sm">{subject}</Label>
                                     {hasGrade && (
                                       <CheckCircle2 className="h-3 w-3 text-green-600" />
                                     )}
                                   </div>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6"
-                                    onClick={() => handleRemoveProfessionalSubject(subject)}
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
                                 </div>
                                 <Input
                                   type="number"
@@ -592,7 +561,7 @@ export const GradesManager = () => {
         </DialogContent>
       </Dialog>
 
-      {selectedClass && classStudents.length === 0 && !isClassArchived && (
+      {selectedClass && classStudents.length === 0 && !isClassLocked && (
         <Alert>
           <AlertDescription>
             Nenhum aluno cadastrado nesta turma. Cadastre alunos para lançar notas.

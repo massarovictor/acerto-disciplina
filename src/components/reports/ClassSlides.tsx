@@ -1,26 +1,18 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ChevronLeft, ChevronRight, Download, Presentation } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Maximize2, Minimize2, Presentation, ZoomIn, ZoomOut } from 'lucide-react';
 import { Class, Student, Incident, Grade, AttendanceRecord } from '@/types';
 import { CoverSlide } from './slides/CoverSlide';
 import { ClassOverviewSlide } from './slides/ClassOverviewSlide';
-import { QuarterComparisonSlide } from './slides/QuarterComparisonSlide';
-import { SubjectRankingSlide } from './slides/SubjectRankingSlide';
-import { LanguagesAreaSlide } from './slides/LanguagesAreaSlide';
-import { HumanitiesAreaSlide } from './slides/HumanitiesAreaSlide';
-import { SciencesAreaSlide } from './slides/SciencesAreaSlide';
-import { MathAreaSlide } from './slides/MathAreaSlide';
-import { ProfessionalAreaSlide } from './slides/ProfessionalAreaSlide';
-import { RiskAnalysisSlide } from './slides/RiskAnalysisSlide';
-import { RecommendationsSlide } from './slides/RecommendationsSlide';
+import { AreaAnalysisSlide } from './slides/AreaAnalysisSlide';
 import { StudentMetricsSlide } from './slides/StudentMetricsSlide';
 import { StudentGradesTableSlide } from './slides/StudentGradesTableSlide';
 import { useToast } from '@/hooks/use-toast';
-import { useProfessionalSubjects } from '@/hooks/useLocalStorage';
+import { useProfessionalSubjects } from '@/hooks/useData';
 import { QUARTERS, SUBJECT_AREAS } from '@/lib/subjects';
 
 interface ClassSlidesProps {
@@ -39,10 +31,15 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
   const [viewMode, setViewMode] = useState<'class' | 'individual'>('class');
   const { getProfessionalSubjects } = useProfessionalSubjects();
   const { toast } = useToast();
+  const slideContainerRef = useRef<HTMLDivElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [slideScale, setSlideScale] = useState(1);
+  const [previewZoom, setPreviewZoom] = useState(1);
+  const SLIDE_WIDTH = 1920;
+  const SLIDE_HEIGHT = 1080;
 
-  // Carregar disciplinas profissionais da turma selecionada
-  const professionalSubjects = selectedClass 
-    ? getProfessionalSubjects(selectedClass) 
+  const professionalSubjects = selectedClass
+    ? getProfessionalSubjects(selectedClass)
     : [];
 
   const classData = classes.find(c => c.id === selectedClass);
@@ -51,54 +48,217 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
   const classGrades = selectedClass ? grades.filter(g => g.classId === selectedClass) : [];
   const studentData = students.find(s => s.id === selectedStudent);
 
-  // Calculate student rankings (lowest to highest)
-  const studentRankings = classStudents.map(student => {
-    const filteredGrades = selectedPeriod === 'all'
-      ? classGrades.filter(g => g.studentId === student.id)
-      : classGrades.filter(g => g.studentId === student.id && g.quarter === selectedPeriod);
-    
-    const average = filteredGrades.length > 0
-      ? filteredGrades.reduce((sum, g) => sum + g.grade, 0) / filteredGrades.length
-      : 0;
+  const periodGrades = useMemo(() => {
+    return selectedPeriod === 'all'
+      ? classGrades
+      : classGrades.filter(g => g.quarter === selectedPeriod);
+  }, [classGrades, selectedPeriod]);
 
-    return { student, average };
-  }).sort((a, b) => a.average - b.average); // Lowest first
+  const studentRankings = useMemo(() => {
+    return classStudents
+      .map(student => {
+        const filteredGrades = periodGrades.filter(g => g.studentId === student.id);
 
-  // Calculate max slides for class view
-  // Verificar quais áreas têm dados
-  const hasLanguagesData = classGrades.some(g => 
-    SUBJECT_AREAS[0].subjects.includes(g.subject)
-  );
-  const hasHumanitiesData = classGrades.some(g => 
-    SUBJECT_AREAS[1].subjects.includes(g.subject)
-  );
-  const hasSciencesData = classGrades.some(g => 
-    SUBJECT_AREAS[2].subjects.includes(g.subject)
-  );
-  const hasMathData = classGrades.some(g => 
-    SUBJECT_AREAS[3].subjects.includes(g.subject)
-  );
-  const hasProfessionalData = professionalSubjects.length > 0 && classGrades.some(g =>
-    professionalSubjects.includes(g.subject)
-  );
+        const average = filteredGrades.length > 0
+          ? filteredGrades.reduce((sum, g) => sum + g.grade, 0) / filteredGrades.length
+          : 0;
 
-  // Contar slides de análise (apenas para ano completo)
-  const analysisSlides = selectedPeriod === 'all' ? [
-    true, // Comparison
-    true, // Ranking
-    hasLanguagesData,
-    hasHumanitiesData,
-    hasSciencesData,
-    hasMathData,
-    hasProfessionalData,
-    true, // Risk
-    true, // Recommendations
-  ].filter(Boolean).length : 0;
+        return { student, average };
+      })
+      .sort((a, b) => {
+        const diff = a.average - b.average;
+        if (diff !== 0) return diff;
+        return a.student.name.localeCompare(b.student.name);
+      });
+  }, [classStudents, periodGrades]);
 
-  const maxSlides = viewMode === 'class' 
-    ? 2 + analysisSlides + (studentRankings.length * 2) // Cover + Overview + Analysis + Student slides
-    : 2; // Individual view: 2 slides
+  const areasList = useMemo(() => {
+    const list: string[] = [];
+    if (periodGrades.some(g => SUBJECT_AREAS[0].subjects.includes(g.subject))) {
+      list.push('Linguagens');
+    }
+    if (periodGrades.some(g => SUBJECT_AREAS[1].subjects.includes(g.subject))) {
+      list.push('Ciências Humanas');
+    }
+    if (periodGrades.some(g => SUBJECT_AREAS[2].subjects.includes(g.subject))) {
+      list.push('Ciências da Natureza');
+    }
+    if (periodGrades.some(g => SUBJECT_AREAS[3].subjects.includes(g.subject))) {
+      list.push('Matemática');
+    }
+    if (professionalSubjects.length > 0 && periodGrades.some(g => professionalSubjects.includes(g.subject))) {
+      list.push('Formação Técnica');
+    }
+    return list;
+  }, [periodGrades, professionalSubjects]);
 
+  const classSlides = useMemo(() => {
+    if (!selectedClass || !classData) return [];
+
+    const slides = [
+      <CoverSlide
+        key="cover"
+        classData={classData}
+        period={selectedPeriod}
+      />,
+      <ClassOverviewSlide
+        key="overview"
+        classData={classData}
+        students={classStudents}
+        grades={classGrades}
+        incidents={classIncidents}
+        period={selectedPeriod}
+      />,
+    ];
+
+    areasList.forEach(area => {
+      slides.push(
+        <AreaAnalysisSlide
+          key={`area-${area}`}
+          areaName={area}
+          grades={classGrades}
+          period={selectedPeriod}
+          professionalSubjects={professionalSubjects}
+        />
+      );
+    });
+
+    studentRankings.forEach(({ student }, index) => {
+      const position = studentRankings.length - index;
+      slides.push(
+        <StudentMetricsSlide
+          key={`student-${student.id}`}
+          student={student}
+          grades={classGrades}
+          incidents={classIncidents}
+          period={selectedPeriod}
+          position={position}
+          totalStudents={studentRankings.length}
+        />
+      );
+      slides.push(
+        <StudentGradesTableSlide
+          key={`student-grades-${student.id}`}
+          student={student}
+          grades={classGrades}
+          period={selectedPeriod}
+        />
+      );
+    });
+
+    return slides;
+  }, [
+    areasList,
+    classData,
+    classGrades,
+    classIncidents,
+    classStudents,
+    professionalSubjects,
+    selectedClass,
+    selectedPeriod,
+    studentRankings,
+  ]);
+
+  const individualSlides = useMemo(() => {
+    if (!selectedStudent || !studentData) return [];
+
+    const studentGrades = classGrades.filter(g => g.studentId === selectedStudent);
+    const position = studentRankings.findIndex(r => r.student.id === selectedStudent);
+    const displayPosition = position >= 0 ? studentRankings.length - position : 0;
+
+    return [
+      <StudentMetricsSlide
+        key="individual-metrics"
+        student={studentData}
+        grades={studentGrades}
+        incidents={classIncidents}
+        period={selectedPeriod}
+        position={displayPosition}
+        totalStudents={studentRankings.length}
+      />,
+      <StudentGradesTableSlide
+        key="individual-grades"
+        student={studentData}
+        grades={studentGrades}
+        period={selectedPeriod}
+      />,
+    ];
+  }, [classGrades, classIncidents, selectedPeriod, selectedStudent, studentData, studentRankings]);
+
+  const activeSlides = viewMode === 'class' ? classSlides : individualSlides;
+  const maxSlides = Math.max(1, activeSlides.length);
+  const effectiveScale = slideScale * (isFullscreen ? 1 : previewZoom);
+
+  useEffect(() => {
+    if (!activeSlides.length) return;
+    if (currentSlide > activeSlides.length) {
+      setCurrentSlide(activeSlides.length);
+    }
+  }, [activeSlides.length, currentSlide]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const handleToggleFullscreen = async () => {
+    const container = slideContainerRef.current;
+    if (!container) return;
+
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        setCurrentSlide(1);
+        await container.requestFullscreen();
+      }
+    } catch {
+      toast({
+        title: 'Não foi possível entrar em tela cheia',
+        description: 'Seu navegador bloqueou a ação. Tente novamente.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (!activeSlides.length) return;
+      if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') {
+        event.preventDefault();
+        setCurrentSlide(prev => Math.min(activeSlides.length, prev + 1));
+      }
+      if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
+        event.preventDefault();
+        setCurrentSlide(prev => Math.max(1, prev - 1));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  }, [activeSlides.length, isFullscreen]);
+
+  useEffect(() => {
+    const container = slideContainerRef.current;
+    if (!container) return;
+
+    const updateScale = () => {
+      const rect = container.getBoundingClientRect();
+      const scale = Math.min(rect.width / SLIDE_WIDTH, rect.height / SLIDE_HEIGHT) || 1;
+      setSlideScale(scale);
+    };
+
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(container);
+
+    return () => observer.disconnect();
+  }, [SLIDE_HEIGHT, SLIDE_WIDTH]);
   const handleExportPDF = async () => {
     const slideElement = document.getElementById('slide-container');
     if (!slideElement) return;
@@ -110,7 +270,7 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
         : `relatorio-aluno-${studentData?.name || 'aluno'}-slide-${currentSlide}.pdf`;
 
       await exportSlideAsPDF('slide-container', fileName);
-      
+
       toast({
         title: 'Slide exportado com sucesso!',
         description: `O slide foi baixado como ${fileName}`,
@@ -126,160 +286,10 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
 
   const renderSlide = () => {
     if (!selectedClass) return null;
-
-    if (viewMode === 'class') {
-      let slideIndex = 1;
-
-      // Slide 1: Capa
-      if (currentSlide === slideIndex++) {
-        return <CoverSlide classData={classData!} period={selectedPeriod} />;
-      }
-
-      // Slide 2: Visão Geral
-      if (currentSlide === slideIndex++) {
-        return <ClassOverviewSlide 
-          classData={classData!} 
-          students={classStudents} 
-          grades={classGrades} 
-          incidents={classIncidents} 
-          period={selectedPeriod} 
-        />;
-      }
-
-      // Slides de análise (apenas para ano completo)
-      if (selectedPeriod === 'all') {
-        // Slide 3: Comparação Entre Bimestres
-        if (currentSlide === slideIndex++) {
-          return <QuarterComparisonSlide 
-            grades={classGrades} 
-            classData={{ name: classData!.name }} 
-          />;
-        }
-
-        // Slide 4: Ranking de Disciplinas
-        if (currentSlide === slideIndex++) {
-          return <SubjectRankingSlide 
-            grades={classGrades} 
-            classData={{ name: classData!.name }}
-            professionalSubjects={professionalSubjects}
-          />;
-        }
-
-        // Slide 5: Linguagens (se houver dados)
-        if (hasLanguagesData && currentSlide === slideIndex++) {
-          return <LanguagesAreaSlide grades={classGrades} period={selectedPeriod} />;
-        } else if (hasLanguagesData) {
-          slideIndex++;
-        }
-
-        // Slide 6: Humanas (se houver dados)
-        if (hasHumanitiesData && currentSlide === slideIndex++) {
-          return <HumanitiesAreaSlide grades={classGrades} period={selectedPeriod} />;
-        } else if (hasHumanitiesData) {
-          slideIndex++;
-        }
-
-        // Slide 7: Natureza (se houver dados)
-        if (hasSciencesData && currentSlide === slideIndex++) {
-          return <SciencesAreaSlide grades={classGrades} period={selectedPeriod} />;
-        } else if (hasSciencesData) {
-          slideIndex++;
-        }
-
-        // Slide 8: Matemática (se houver dados)
-        if (hasMathData && currentSlide === slideIndex++) {
-          return <MathAreaSlide grades={classGrades} period={selectedPeriod} />;
-        } else if (hasMathData) {
-          slideIndex++;
-        }
-
-        // Slide 9: Profissional (se houver dados)
-        if (hasProfessionalData && currentSlide === slideIndex++) {
-          return <ProfessionalAreaSlide 
-            grades={classGrades} 
-            period={selectedPeriod}
-            professionalSubjects={professionalSubjects}
-          />;
-        } else if (hasProfessionalData) {
-          slideIndex++;
-        }
-
-        // Slide 10: Análise de Risco
-        if (currentSlide === slideIndex++) {
-          return <RiskAnalysisSlide 
-            grades={classGrades} 
-            students={classStudents}
-            classData={{ name: classData!.name }}
-          />;
-        }
-
-        // Slide 11: Recomendações
-        if (currentSlide === slideIndex++) {
-          return <RecommendationsSlide 
-            grades={classGrades} 
-            students={classStudents}
-            classData={{ name: classData!.name }}
-            professionalSubjects={professionalSubjects}
-          />;
-        }
-      }
-
-      // Slides de alunos (2 por aluno)
-      const studentSlideOffset = currentSlide - slideIndex;
-      if (studentSlideOffset >= 0) {
-        const studentIndex = Math.floor(studentSlideOffset / 2);
-        const isMetricsSlide = studentSlideOffset % 2 === 0;
-        
-        if (studentIndex < studentRankings.length) {
-          const { student } = studentRankings[studentIndex];
-          const position = studentRankings.length - studentIndex;
-          
-          if (isMetricsSlide) {
-            return <StudentMetricsSlide 
-              student={student} 
-              grades={classGrades} 
-              incidents={classIncidents} 
-              period={selectedPeriod}
-              position={position}
-              totalStudents={studentRankings.length}
-            />;
-          } else {
-            return <StudentGradesTableSlide 
-              student={student} 
-              grades={classGrades} 
-              period={selectedPeriod}
-            />;
-          }
-        }
-      }
-    } else {
-      // Individual view
-      if (!selectedStudent || !studentData) return null;
-      
-      const studentGrades = classGrades.filter(g => g.studentId === selectedStudent);
-      const position = studentRankings.findIndex(r => r.student.id === selectedStudent);
-      const displayPosition = position >= 0 ? studentRankings.length - position : 0;
-
-      if (currentSlide === 1) {
-        return <StudentMetricsSlide 
-          student={studentData} 
-          grades={studentGrades} 
-          incidents={classIncidents} 
-          period={selectedPeriod}
-          position={displayPosition}
-          totalStudents={studentRankings.length}
-        />;
-      } else {
-        return <StudentGradesTableSlide 
-          student={studentData} 
-          grades={studentGrades} 
-          period={selectedPeriod}
-        />;
-      }
-    }
-
-    return null;
+    return activeSlides[currentSlide - 1] ?? null;
   };
+
+  const shouldShowSlides = selectedClass && activeSlides.length > 0 && (viewMode === 'class' || selectedStudent);
 
   return (
     <div className="space-y-6">
@@ -375,12 +385,40 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
             </TabsContent>
           </Tabs>
 
-          {selectedClass && (viewMode === 'class' || selectedStudent) && (
+          {shouldShowSlides && (
             <div className="flex items-center justify-between pt-4 border-t">
-              <Button variant="outline" onClick={handleExportPDF}>
-                <Download className="h-4 w-4 mr-2" />
-                Exportar PDF
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={handleExportPDF}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar PDF
+                </Button>
+                {!isFullscreen && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setPreviewZoom(prev => Math.min(1.3, parseFloat((prev + 0.1).toFixed(2))))}
+                    >
+                      <ZoomIn className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setPreviewZoom(prev => Math.max(0.7, parseFloat((prev - 0.1).toFixed(2))))}
+                    >
+                      <ZoomOut className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+                <Button variant="outline" onClick={handleToggleFullscreen}>
+                  {isFullscreen ? (
+                    <Minimize2 className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Maximize2 className="h-4 w-4 mr-2" />
+                  )}
+                  {isFullscreen ? 'Sair da Tela Cheia' : 'Tela Cheia'}
+                </Button>
+              </div>
 
               <div className="flex items-center gap-2">
                 <Button
@@ -410,10 +448,35 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
         </CardContent>
       </Card>
 
-      {selectedClass && (viewMode === 'class' || selectedStudent) ? (
+      {shouldShowSlides ? (
         <div className="relative">
-          <div id="slide-container" className="aspect-[16/9] bg-background border-2 rounded-lg overflow-hidden shadow-lg">
-            {renderSlide()}
+          <div
+            id="slide-container"
+            ref={slideContainerRef}
+            className="aspect-[16/9] bg-background border-2 rounded-lg shadow-lg relative"
+            style={{ overflow: isFullscreen ? 'hidden' : 'auto' }}
+            onClick={(event) => {
+              if (!isFullscreen || !activeSlides.length) return;
+              if (event.shiftKey) {
+                setCurrentSlide(prev => Math.max(1, prev - 1));
+              } else {
+                setCurrentSlide(prev => Math.min(activeSlides.length, prev + 1));
+              }
+            }}
+          >
+            <div
+              style={{
+                width: SLIDE_WIDTH,
+                height: SLIDE_HEIGHT,
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: `translate(-50%, -50%) scale(${effectiveScale})`,
+                transformOrigin: 'center',
+              }}
+            >
+              {renderSlide()}
+            </div>
           </div>
         </div>
       ) : (

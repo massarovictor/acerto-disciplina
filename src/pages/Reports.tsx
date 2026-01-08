@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useClasses, useStudents, useIncidents, useGrades, useAttendance } from '@/hooks/useLocalStorage';
+import { useClasses, useStudents, useIncidents, useGrades, useAttendance } from '@/hooks/useData';
 import { IntegratedReports } from '@/components/reports/IntegratedReports';
 import { ClassSlides } from '@/components/reports/ClassSlides';
 

@@ -3,8 +3,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { IncidentFormData } from '../IncidentWizard';
 import { calculateSuggestedAction } from '@/lib/incidentActions';
-import { useIncidents } from '@/hooks/useLocalStorage';
-import { useStudents } from '@/hooks/useLocalStorage';
+import { useIncidents } from '@/hooks/useData';
+import { useStudents } from '@/hooks/useData';
 
 interface DetailsStepProps {
   formData: Partial<IncidentFormData>;

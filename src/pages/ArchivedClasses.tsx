@@ -3,14 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { useArchivedClasses, useStudents } from '@/hooks/useLocalStorage';
+import { useArchivedClasses, useStudents } from '@/hooks/useData';
 import { useToast } from '@/hooks/use-toast';
 import { Archive, Search, Eye, RotateCcw, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { useClasses } from '@/hooks/useLocalStorage';
+import { useClasses } from '@/hooks/useData';
 
 const ArchivedClasses = () => {
   const { archivedClasses } = useArchivedClasses();
@@ -34,23 +34,29 @@ const ArchivedClasses = () => {
     );
   });
 
-  const handleUnarchive = () => {
+  const handleUnarchive = async () => {
     if (!unarchivingClass) return;
 
-    // 1. Desarquivar a turma
-    unarchiveClass(unarchivingClass);
+    try {
+      await unarchiveClass(unarchivingClass);
 
-    // 2. Restaurar status dos alunos da turma para 'active'
-    const classStudents = students.filter((s) => s.classId === unarchivingClass);
-    classStudents.forEach((student) => {
-      updateStudent(student.id, { status: 'active' });
-    });
+      const classStudents = students.filter((s) => s.classId === unarchivingClass);
+      await Promise.all(
+        classStudents.map((student) => updateStudent(student.id, { status: 'active' })),
+      );
 
-    toast({
-      title: 'Turma desarquivada',
-      description: `Turma desarquivada com sucesso. ${classStudents.length} aluno(s) reativado(s).`,
-    });
-    setUnarchivingClass(null);
+      toast({
+        title: 'Turma desarquivada',
+        description: `Turma desarquivada com sucesso. ${classStudents.length} aluno(s) reativado(s).`,
+      });
+      setUnarchivingClass(null);
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível desarquivar a turma.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const getClassStudentsCount = (classId: string) => {
@@ -261,4 +267,3 @@ const ArchivedClasses = () => {
 };
 
 export default ArchivedClasses;
-

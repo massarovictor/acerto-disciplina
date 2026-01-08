@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useClasses, useStudents } from '@/hooks/useLocalStorage';
+import { useClasses, useStudents } from '@/hooks/useData';
 import { INCIDENT_EPISODES } from '@/data/mockData';
 import { IncidentFormData } from '../IncidentWizard';
 import { format } from 'date-fns';
@@ -22,7 +22,7 @@ const severityConfig = {
 export const ReviewStep = ({ formData }: ReviewStepProps) => {
   const { classes } = useClasses();
   const { students } = useStudents();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const selectedClass = classes.find((c) => c.id === formData.classId);
   const selectedStudents = students.filter((s) => formData.studentIds?.includes(s.id));
@@ -55,7 +55,7 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Registrado por:</span>
-              <span className="font-medium">{user?.name}</span>
+              <span className="font-medium">{profile?.name || user?.email}</span>
             </div>
           </CardContent>
         </Card>
@@ -102,6 +102,36 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
             </div>
           </CardContent>
         </Card>
+
+        {formData.finalSeverity && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Grau Final</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Calculado:</span>
+                <span className="font-medium">
+                  {formData.calculatedSeverity
+                    ? severityConfig[formData.calculatedSeverity].label
+                    : '-'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Final:</span>
+                <span className="font-medium">
+                  {severityConfig[formData.finalSeverity].label}
+                </span>
+              </div>
+              {formData.severityOverrideReason && (
+                <div className="pt-2">
+                  <div className="text-muted-foreground">Motivo:</div>
+                  <div className="whitespace-pre-wrap">{formData.severityOverrideReason}</div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {formData.description && (
           <Card>

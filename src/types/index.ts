@@ -74,17 +74,18 @@ export interface Class {
   id: string;
   name: string;
   series: string;
+  letter?: string;
   course?: string; // Opcional - pode ser digitado livremente
-  classNumber: string; // Número único da turma (ex: "TURMA-001")
+  classNumber: string; // Número único da turma (ex: "2024-2026-RDC")
   directorId?: string;
   active: boolean;
   startYear?: 1 | 2 | 3; // Ano de início da turma
   currentYear?: 1 | 2 | 3; // Ano atual da turma (calculado automaticamente)
   startYearDate?: string; // Data de início do primeiro ano (para calcular anos seguintes)
   archived?: boolean; // Se a turma foi arquivada
-  archivedAt?: string; // Data de arquivamento
-  archivedReason?: string; // Motivo do arquivamento
-  templateId?: string; // ID do template usado para criar a turma
+  archivedAt?: string | null; // Data de arquivamento
+  archivedReason?: string | null; // Motivo do arquivamento
+  templateId?: string | null; // ID do template usado para criar a turma
 }
 
 export type StudentStatus = 'active' | 'inactive' | 'transferred' | 'approved' | 'recovery' | 'failed';
@@ -101,6 +102,8 @@ export interface Student {
   rg?: string;
   photoUrl?: string;
   status: StudentStatus;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Grade {

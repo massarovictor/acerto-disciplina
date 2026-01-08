@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { ContextStep } from './wizard/ContextStep';
 import { StudentsStep } from './wizard/StudentsStep';
@@ -8,9 +9,10 @@ import { EpisodesStep } from './wizard/EpisodesStep';
 import { DetailsStep } from './wizard/DetailsStep';
 import { ReviewStep } from './wizard/ReviewStep';
 import { IncidentSeverity } from '@/types';
-import { useIncidents } from '@/hooks/useLocalStorage';
+import { useIncidents } from '@/hooks/useData';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { AlertTriangle } from 'lucide-react';
 
 export interface IncidentFormData {
   classId: string;
@@ -66,34 +68,56 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!user || !formData.classId || !formData.studentIds || !formData.episodes) {
       return;
     }
 
-    addIncident({
-      classId: formData.classId,
-      date: formData.date || new Date().toISOString(),
-      studentIds: formData.studentIds,
-      episodes: formData.episodes,
-      calculatedSeverity: formData.calculatedSeverity || 'leve',
-      finalSeverity: formData.finalSeverity || formData.calculatedSeverity || 'leve',
-      description: formData.description || '',
-      actions: formData.actions,
-      suggestedAction: formData.suggestedAction,
-      status: 'aberta',
-      createdBy: user.id,
-    });
+    const calculatedSeverity = formData.calculatedSeverity || 'leve';
+    const finalSeverity = formData.finalSeverity || calculatedSeverity;
 
-    toast({
-      title: 'Ocorrência registrada',
-      description: 'A ocorrência foi registrada com sucesso e aguarda validação.',
-    });
+    if (finalSeverity !== calculatedSeverity && !formData.severityOverrideReason?.trim()) {
+      toast({
+        title: 'Erro',
+        description: 'Informe o motivo da alteracao do grau final.',
+        variant: 'destructive',
+      });
+      setCurrentStep(3);
+      return;
+    }
 
-    if (onComplete) {
-      onComplete();
-    } else {
-      navigate('/');
+    try {
+      await addIncident({
+        classId: formData.classId,
+        date: formData.date || new Date().toISOString().split('T')[0],
+        studentIds: formData.studentIds,
+        episodes: formData.episodes,
+        calculatedSeverity,
+        finalSeverity,
+        severityOverrideReason: formData.severityOverrideReason?.trim() || undefined,
+        description: formData.description || '',
+        actions: formData.actions,
+        suggestedAction: formData.suggestedAction,
+        status: 'aberta',
+        createdBy: user.id,
+      });
+
+      toast({
+        title: 'Ocorrência registrada',
+        description: 'A ocorrência foi registrada com sucesso e aguarda validação.',
+      });
+
+      if (onComplete) {
+        onComplete();
+      } else {
+        navigate('/');
+      }
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível registrar a ocorrência.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -101,44 +125,91 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
   const canGoNext = () => {
     if (currentStep === 1) return !!formData.classId;
     if (currentStep === 2) return formData.studentIds && formData.studentIds.length > 0;
-    if (currentStep === 3) return formData.episodes && formData.episodes.length > 0;
+    if (currentStep === 3) {
+      if (!formData.episodes || formData.episodes.length === 0) return false;
+      const calculatedSeverity = formData.calculatedSeverity || 'leve';
+      const finalSeverity = formData.finalSeverity || calculatedSeverity;
+      if (finalSeverity !== calculatedSeverity && !formData.severityOverrideReason?.trim()) {
+        return false;
+      }
+      return true;
+    }
     if (currentStep === 4) return true;
     return true;
   };
 
+  const getSeverityColor = (severity: IncidentSeverity) => {
+    switch (severity) {
+      case 'leve': return 'bg-severity-light-bg text-severity-light border-severity-light';
+      case 'intermediaria': return 'bg-severity-intermediate-bg text-severity-intermediate border-severity-intermediate';
+      case 'grave': return 'bg-severity-serious-bg text-severity-serious border-severity-serious';
+      case 'gravissima': return 'bg-severity-critical-bg text-severity-critical border-severity-critical';
+      default: return '';
+    }
+  };
+
+  const getSeverityLabel = (severity: IncidentSeverity) => {
+    switch (severity) {
+      case 'leve': return 'Leve';
+      case 'intermediaria': return 'Intermediária';
+      case 'grave': return 'Grave';
+      case 'gravissima': return 'Gravíssima';
+      default: return severity;
+    }
+  };
+
+  // Determina a gravidade a exibir (final se definida, senão calculada)
+  const displaySeverity = formData.finalSeverity || formData.calculatedSeverity;
+
   return (
     <div className="space-y-6">
-      {/* Progress indicator */}
-      <div className="flex items-center justify-between">
-        {steps.map((step, index) => (
-          <div key={step.id} className="flex items-center flex-1">
-            <div className="flex items-center">
-              <div
-                className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${
-                  currentStep >= step.id
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border bg-background text-muted-foreground'
-                }`}
-              >
-                {step.id}
+      {/* Progress indicator with severity badge */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between flex-1">
+          {steps.map((step, index) => (
+            <div key={step.id} className="flex items-center flex-1">
+              <div className="flex items-center">
+                <div
+                  className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${
+                    currentStep >= step.id
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border bg-background text-muted-foreground'
+                  }`}
+                >
+                  {step.id}
+                </div>
+                <span
+                  className={`ml-2 text-sm font-medium ${
+                    currentStep >= step.id ? 'text-foreground' : 'text-muted-foreground'
+                  }`}
+                >
+                  {step.name}
+                </span>
               </div>
-              <span
-                className={`ml-2 text-sm font-medium ${
-                  currentStep >= step.id ? 'text-foreground' : 'text-muted-foreground'
-                }`}
-              >
-                {step.name}
-              </span>
+              {index < steps.length - 1 && (
+                <div
+                  className={`mx-4 h-0.5 flex-1 ${
+                    currentStep > step.id ? 'bg-primary' : 'bg-border'
+                  }`}
+                />
+              )}
             </div>
-            {index < steps.length - 1 && (
-              <div
-                className={`mx-4 h-0.5 flex-1 ${
-                  currentStep > step.id ? 'bg-primary' : 'bg-border'
-                }`}
-              />
-            )}
+          ))}
+        </div>
+        
+        {/* Severity Badge - appears after episodes are selected */}
+        {displaySeverity && formData.episodes && formData.episodes.length > 0 && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-card">
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Gravidade:</span>
+            <Badge 
+              variant="outline" 
+              className={getSeverityColor(displaySeverity)}
+            >
+              {getSeverityLabel(displaySeverity)}
+            </Badge>
           </div>
-        ))}
+        )}
       </div>
 
       {/* Step content */}

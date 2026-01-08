@@ -4,22 +4,23 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useClasses, useStudents, useGrades } from '@/hooks/useLocalStorage';
+import { useClasses, useStudents, useGrades, useProfessionalSubjects } from '@/hooks/useData';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle2, XCircle, AlertTriangle, RefreshCw, Clock, Users, BookOpen } from 'lucide-react';
 import { calculateClassAcademicStatus, checkClassQuarterGrades, QuarterCheckResult } from '@/lib/approvalCalculator';
 import { getAcademicYear } from '@/lib/classYearCalculator';
 import { generateQuarterIncidents, checkLowPerformanceStudents } from '@/lib/autoIncidentGenerator';
-import { useIncidents } from '@/hooks/useLocalStorage';
+import { useIncidents } from '@/hooks/useData';
 import { useAuth } from '@/contexts/AuthContext';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { QUARTERS } from '@/lib/subjects';
+import { QUARTERS, SUBJECT_AREAS } from '@/lib/subjects';
 
 export const StudentApprovalManager = () => {
   const { classes } = useClasses();
   const { students } = useStudents();
   const { grades } = useGrades();
+  const { getProfessionalSubjects } = useProfessionalSubjects();
   const { incidents, addIncident } = useIncidents();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -29,9 +30,19 @@ export const StudentApprovalManager = () => {
   const [selectedQuarter, setSelectedQuarter] = useState('1º Bimestre');
   const [academicStatuses, setAcademicStatuses] = useState<Record<string, any>>({});
   const [quarterResults, setQuarterResults] = useState<(QuarterCheckResult & { studentName: string })[]>([]);
+  const [pendingQuarterResults, setPendingQuarterResults] = useState<
+    { studentId: string; studentName: string; missingSubjects: string[] }[]
+  >([]);
 
   const classStudents = students.filter((s) => s.classId === selectedClass);
   const selectedClassData = classes.find((c) => c.id === selectedClass);
+  const professionalSubjects = selectedClass ? getProfessionalSubjects(selectedClass) : [];
+  const expectedSubjects = Array.from(
+    new Set([
+      ...SUBJECT_AREAS.flatMap((area) => area.subjects),
+      ...professionalSubjects,
+    ]),
+  );
 
   // === HANDLERS POR BIMESTRE ===
   const handleCheckQuarter = () => {
@@ -52,6 +63,32 @@ export const StudentApprovalManager = () => {
     );
 
     setQuarterResults(results);
+    const pendingResults = classStudents
+      .map((student) => {
+        const subjectsWithGrades = new Set(
+          grades
+            .filter(
+              (grade) =>
+                grade.studentId === student.id &&
+                grade.classId === selectedClass &&
+                grade.quarter === selectedQuarter
+            )
+            .map((grade) => grade.subject)
+        );
+
+        const missingSubjects = expectedSubjects.filter(
+          (subject) => !subjectsWithGrades.has(subject)
+        );
+
+        return {
+          studentId: student.id,
+          studentName: student.name,
+          missingSubjects,
+        };
+      })
+      .filter((result) => result.missingSubjects.length > 0);
+
+    setPendingQuarterResults(pendingResults);
 
     if (results.length === 0) {
       toast({
@@ -66,7 +103,7 @@ export const StudentApprovalManager = () => {
     }
   };
 
-  const handleGenerateQuarterIncidents = () => {
+  const handleGenerateQuarterIncidents = async () => {
     if (!user) {
       toast({
         title: 'Erro',
@@ -102,9 +139,16 @@ export const StudentApprovalManager = () => {
       return;
     }
 
-    newIncidents.forEach((incident) => {
-      addIncident(incident);
-    });
+    try {
+      await Promise.all(newIncidents.map((incident) => addIncident(incident)));
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível gerar as convocações.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     toast({
       title: 'Convocações geradas',
@@ -310,6 +354,55 @@ export const StudentApprovalManager = () => {
                                   className="bg-red-500/10 text-red-700 border-red-500/30 text-xs"
                                 >
                                   {subject}: {result.subjectGrades[subject]?.toFixed(1)}
+                                </Badge>
+                              ))}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {pendingQuarterResults.length > 0 && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-gray-600" />
+                    <h3 className="text-lg font-semibold">
+                      Pendências de Notas no {selectedQuarter}
+                    </h3>
+                    <Badge variant="outline">{pendingQuarterResults.length}</Badge>
+                  </div>
+
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Aluno</TableHead>
+                        <TableHead>Disciplinas Pendentes</TableHead>
+                        <TableHead>Lista</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pendingQuarterResults.map((result) => (
+                        <TableRow key={result.studentId}>
+                          <TableCell className="font-medium">
+                            {result.studentName}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {result.missingSubjects.length} disciplina(s)
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {result.missingSubjects.map((subject) => (
+                                <Badge
+                                  key={subject}
+                                  variant="outline"
+                                  className="bg-gray-500/10 text-gray-700 border-gray-500/30 text-xs"
+                                >
+                                  {subject}
                                 </Badge>
                               ))}
                             </div>

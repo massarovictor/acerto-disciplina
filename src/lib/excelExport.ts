@@ -20,7 +20,7 @@ export const generateStudentTemplate = (selectedClass?: Class) => {
   // Linha de exemplo - usar número da turma selecionada se disponível
   const exampleRow = [
     'João Silva Santos',
-    selectedClass?.classNumber || 'TURMA-001',
+    selectedClass?.classNumber || '2024-2026-RDC',
     '15/05/2009',
     'M',
     '2024001',
@@ -36,7 +36,7 @@ export const generateStudentTemplate = (selectedClass?: Class) => {
     ['1. Nome Completo: Obrigatório - Nome completo do aluno'],
     selectedClass 
       ? [`2. Número da Turma: PRÉ-PREENCHIDO - ${selectedClass.classNumber} (não altere este campo)`]
-      : ['2. Número da Turma: Obrigatório - Número da turma (ex: TURMA-001)'],
+      : ['2. Número da Turma: Obrigatório - Número da turma (ex: 2024-2026-RDC)'],
     ['3. Data de Nascimento: Obrigatório - Formato DD/MM/AAAA ou AAAA-MM-DD'],
     ['4. Sexo: Obrigatório - Use M (Masculino), F (Feminino), O (Outro) ou N (Prefiro não informar)'],
     ['5. Matrícula SIGE: Opcional - Número de matrícula no sistema SIGE'],
@@ -49,7 +49,7 @@ export const generateStudentTemplate = (selectedClass?: Class) => {
     ['- Preencha todos os campos obrigatórios'],
     selectedClass 
       ? ['- O número da turma já está pré-selecionado - não altere este campo']
-      : ['- Use o número da turma (ex: TURMA-001) - não use o nome da turma'],
+      : ['- Use o número da turma (ex: 2024-2026-RDC) - não use o nome da turma'],
     ['- Verifique se o CPF não está duplicado'],
     [''],
   ];
@@ -151,4 +151,3 @@ export const exportStudentsList = (students: Student[], classes: Class[]) => {
   const fileName = `Lista_Alunos_${new Date().toISOString().split('T')[0]}.xlsx`;
   XLSX.writeFile(workbook, fileName);
 };
-

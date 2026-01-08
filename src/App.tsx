@@ -14,7 +14,6 @@ import Students from '@/pages/Students';
 import GradesAttendance from '@/pages/GradesAttendance';
 import Reports from '@/pages/Reports';
 import NotFound from './pages/NotFound';
-import { useInitializeData } from '@/hooks/useLocalStorage';
 
 const queryClient = new QueryClient();
 
@@ -41,17 +40,11 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-const AppContent = () => {
-  useInitializeData();
-  return null;
-};
-
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="system">
       <TooltipProvider>
         <AuthProvider>
-          <AppContent />
           <Toaster />
           <Sonner />
           <BrowserRouter>

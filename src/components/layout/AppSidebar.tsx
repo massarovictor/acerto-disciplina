@@ -14,22 +14,18 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 
 const menuItems = [
-  { icon: Home, label: 'Dashboard', path: '/', roles: ['professor', 'diretor', 'coordenador', 'secretaria'] },
-  { icon: AlertTriangle, label: 'Ocorrências', path: '/ocorrencias', roles: ['professor', 'diretor', 'coordenador', 'secretaria'] },
-  { icon: School, label: 'Turmas', path: '/turmas', roles: ['diretor', 'coordenador'] },
-  { icon: Users, label: 'Alunos', path: '/alunos', roles: ['diretor', 'coordenador', 'secretaria'] },
-  { icon: BookOpen, label: 'Notas & Frequência', path: '/notas-frequencia', roles: ['professor', 'diretor', 'coordenador'] },
-  { icon: BarChart3, label: 'Relatórios', path: '/relatorios', roles: ['diretor', 'coordenador'] },
+  { icon: Home, label: 'Dashboard', path: '/' },
+  { icon: AlertTriangle, label: 'Ocorrências', path: '/ocorrencias' },
+  { icon: School, label: 'Turmas', path: '/turmas' },
+  { icon: Users, label: 'Alunos', path: '/alunos' },
+  { icon: BookOpen, label: 'Notas & Frequência', path: '/notas-frequencia' },
+  { icon: BarChart3, label: 'Relatórios', path: '/relatorios' },
 ];
 
 export const AppSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
-
-  const filteredItems = menuItems.filter(item => 
-    user && item.roles.includes(user.role)
-  );
+  const { user, profile } = useAuth();
 
   return (
     <Sidebar>
@@ -40,7 +36,9 @@ export const AppSidebar = () => {
           </div>
           <div className="flex flex-col">
             <span className="font-semibold text-sm">Sistema de Ocorrências</span>
-            <span className="text-xs text-muted-foreground">{user?.name}</span>
+            <span className="text-xs text-muted-foreground">
+              {profile?.name || user?.email}
+            </span>
           </div>
         </div>
       </SidebarHeader>
@@ -49,7 +47,7 @@ export const AppSidebar = () => {
           <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {filteredItems.map((item) => (
+              {menuItems.map((item) => (
                 <SidebarMenuItem key={item.path}>
                   <SidebarMenuButton
                     onClick={() => navigate(item.path)}

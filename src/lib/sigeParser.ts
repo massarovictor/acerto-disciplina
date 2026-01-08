@@ -1,24 +1,76 @@
 /**
- * SIGE PDF Parser
- * Extrai dados de notas do PDF "Mapa de Notas" do SIGE (Sistema de Gestão Escolar do Ceará)
+ * SIGE Parser (Excel)
+ * Extrai dados de notas do arquivo Excel "Mapa de Notas" do SIGE (Sistema de Gestão Escolar do Ceará)
  */
 
-import * as pdfjsLib from 'pdfjs-dist';
-// @ts-ignore - worker import
-import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import * as XLSX from 'xlsx';
 
-// Configurar worker do PDF.js usando import local
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-
 /**
- * Estrutura de uma linha de notas extraída do PDF
+ * Estrutura de uma linha de notas extraída do SIGE
  */
 export interface SigeGradeRow {
     studentName: string;
     grades: Record<string, number | null>; // disciplina -> nota
     rawLine: string; // linha original para debug
 }
+
+const HEADER_NAME_KEYS = ['ALUNO', 'NOME', 'DISCENTE'];
+const HEADER_EXACT_EXCLUDES = new Set([
+    'N',
+    'Nº',
+    'NO',
+    'NUM',
+    'NUMERO',
+    'MATRICULA',
+    'MATRICULA SIGE',
+    'ID',
+    'ID CENSO',
+    'CENSO',
+    'CPF',
+    'RG',
+]);
+const HEADER_CONTAINS_EXCLUDES = [
+    'MATRIC',
+    'CENSO',
+    'TURMA',
+    'SERIE',
+    'SÉRIE',
+    'CURSO',
+    'TURNO',
+    'ANO',
+    'DATA',
+    'NASC',
+    'MOVIMENTO',
+    'STATUS',
+    'SITUACAO',
+    'SITUAÇÃO',
+    'TOTAL',
+    'MEDIA',
+    'MÉDIA',
+    'RESULTADO',
+    'RECUPERACAO',
+    'RECUPERAÇÃO',
+    'FALTAS',
+    'FREQUENCIA',
+    'FREQUÊNCIA',
+    'DIAS',
+    'AULAS',
+    'OBS',
+    'DISCIPLINA',
+    'DISCIPLINAS',
+];
+
+const normalizeHeaderText = (value: string): string => {
+    return value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^A-Za-z0-9 ]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toUpperCase();
+};
+
+const normalizeSubjectKey = (subject: string): string => normalizeHeaderText(subject);
 
 // Mapeamento de abreviações para nomes completos
 const GLOBAL_SUBJECT_MAPPING: Record<string, string> = {
@@ -74,30 +126,48 @@ const GLOBAL_SUBJECT_MAPPING: Record<string, string> = {
     'ADMINISTRACAO': 'Administração',
     'CONTABILIDADE': 'Contabilidade',
     'ENFERMAGEM': 'Enfermagem',
+    // Disciplinas técnicas de Redes de Computadores
+    'BANCO DE DADOS': 'Banco de Dados',
+    'SISTEMA OPERACIONAL': 'Sistema Operacional',
+    'SISTEMAS OPERACIONAIS': 'Sistema Operacional',
+    'GESTÃO DE STARTUPS': 'Gestão de Startups',
+    'GESTAO DE STARTUPS': 'Gestão de Startups',
+    'REDES DE COMPUTADORES': 'Redes de Computadores',
+    'PROGRAMAÇÃO': 'Programação',
+    'PROGRAMACAO': 'Programação',
 };
+
+const SUBJECT_MAPPING = new Map(
+    Object.entries(GLOBAL_SUBJECT_MAPPING).map(([key, value]) => [
+        normalizeSubjectKey(key),
+        value,
+    ]),
+);
 
 /**
  * Normaliza nome de disciplina usando o mapeamento global
  */
 export function normalizeSubjectName(subject: string): string {
-    const upper = subject.toUpperCase().trim();
+    const normalized = normalizeSubjectKey(subject);
     // Tenta match exato
-    if (GLOBAL_SUBJECT_MAPPING[upper]) {
-        return GLOBAL_SUBJECT_MAPPING[upper];
+    const directMatch = SUBJECT_MAPPING.get(normalized);
+    if (directMatch) {
+        return directMatch;
     }
 
-    // Tenta match parcial para casos como "LINGUA ESTRANGEIRA - INGLES (123)"
-    for (const [key, value] of Object.entries(GLOBAL_SUBJECT_MAPPING)) {
-        if (upper.includes(key)) {
+    // Tenta match parcial apenas para chaves com mais de uma palavra
+    for (const [key, value] of SUBJECT_MAPPING.entries()) {
+        if (key.split(' ').length < 2) continue;
+        if (normalized.includes(key)) {
             return value;
         }
     }
 
-    return subject.trim();
+    return subject.replace(/\s+/g, ' ').trim();
 }
 
 /**
- * Resultado da extração do PDF
+ * Resultado da extração do SIGE
  */
 export interface SigeParseResult {
     success: boolean;
@@ -106,28 +176,6 @@ export interface SigeParseResult {
     subjects: string[];
     rows: SigeGradeRow[];
     errors: string[];
-    rawText?: string; // texto bruto para debug
-}
-
-/**
- * Extrai texto de um arquivo PDF
- */
-export async function extractTextFromPdf(file: File): Promise<string> {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-    let fullText = '';
-
-    for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items
-            .map((item: any) => item.str)
-            .join(' ');
-        fullText += pageText + '\n';
-    }
-
-    return fullText;
 }
 
 /**
@@ -220,143 +268,6 @@ export function findBestStudentMatch(
 }
 
 /**
- * Parse do texto do PDF do SIGE para extrair notas
- * O formato esperado é uma tabela com:
- * - Primeira linha: cabeçalhos (NOME DO ALUNO + disciplinas)
- * - Linhas seguintes: nome do aluno + notas
- */
-export function parseSigeText(text: string): SigeParseResult {
-    const errors: string[] = [];
-    const rows: SigeGradeRow[] = [];
-    let subjects: string[] = [];
-    let className: string | undefined;
-    let quarter: string | undefined;
-
-    // Tentar extrair turma do cabeçalho
-    const turmaMatch = text.match(/(\d+\.\d+\.\d+)/);
-    if (turmaMatch) {
-        className = turmaMatch[1];
-    }
-
-    // Tentar extrair bimestre
-    const bimestreMatch = text.match(/(\d)[ºª]?\s*(Bimestre|BIMESTRE|Per[ií]odo)/i);
-    if (bimestreMatch) {
-        quarter = `${bimestreMatch[1]}º Bimestre`;
-    }
-
-    // Disciplinas comuns no ensino médio
-    const commonSubjects = [
-        'PORTUGUÊS', 'MATEMATICA', 'HISTÓRIA', 'GEOGRAFIA',
-        'FÍSICA', 'QUÍMICA', 'BIOLOGIA', 'INGLÊS', 'ESPANHOL',
-        'EDUCAÇÃO FÍSICA', 'ARTE', 'FILOSOFIA', 'SOCIOLOGIA',
-        'LÍNGUA PORTUGUESA', 'LINGUA PORTUGUESA',
-        'LNG', 'MAT', 'HIS', 'GEO', 'FIS', 'QUI', 'BIO', 'ING', 'ESP',
-        'EDF', 'ART', 'FIL', 'SOC', 'RED', 'REDAÇÃO'
-    ];
-
-    // Extrair disciplinas do cabeçalho
-    const lines = text.split('\n').filter(line => line.trim());
-
-    // Procurar linha com disciplinas
-    for (const line of lines) {
-        const upperLine = line.toUpperCase();
-        const foundSubjects: string[] = [];
-
-        for (const subject of commonSubjects) {
-            if (upperLine.includes(subject)) {
-                // Usar a função global de normalização
-                const mappedName = normalizeSubjectName(subject);
-                if (!foundSubjects.includes(mappedName)) {
-                    foundSubjects.push(mappedName);
-                }
-            }
-        }
-
-        if (foundSubjects.length > 3) {
-            subjects = foundSubjects;
-            break;
-        }
-    }
-
-    // Regex para encontrar linhas com notas (número seguido de vírgula ou ponto e mais números)
-    const gradePattern = /(\d+[.,]?\d*)/g;
-
-    // Procurar linhas que parecem ter nomes de alunos seguidos de notas
-    for (const line of lines) {
-        // Pular linhas muito curtas ou que são cabeçalhos
-        if (line.length < 20) continue;
-        if (line.toUpperCase().includes('NOME DO ALUNO')) continue;
-        if (line.toUpperCase().includes('MAPA DE NOTAS')) continue;
-
-        // Verificar se a linha tem números que parecem notas
-        const numbers = line.match(gradePattern);
-        if (!numbers || numbers.length < 3) continue;
-
-        // Extrair o que parece ser o nome (texto antes dos números)
-        const firstNumberIndex = line.search(/\d/);
-        if (firstNumberIndex < 5) continue;
-
-        const potentialName = line.substring(0, firstNumberIndex).trim();
-
-        // Validar que parece um nome (pelo menos 2 palavras)
-        if (potentialName.split(' ').length < 2) continue;
-
-        // Extrair notas
-        const gradeValues: Record<string, number | null> = {};
-        const numericValues = numbers.map(n => {
-            const parsed = parseFloat(n.replace(',', '.'));
-            return isNaN(parsed) ? null : parsed;
-        }).filter(n => n !== null && n >= 0 && n <= 10) as number[];
-
-        // Associar notas às disciplinas
-        subjects.forEach((subject, index) => {
-            gradeValues[subject] = numericValues[index] ?? null;
-        });
-
-        rows.push({
-            studentName: potentialName,
-            grades: gradeValues,
-            rawLine: line,
-        });
-    }
-
-    if (subjects.length === 0) {
-        errors.push('Não foi possível identificar as disciplinas no PDF');
-    }
-
-    if (rows.length === 0) {
-        errors.push('Não foi possível identificar as linhas de notas no PDF');
-    }
-
-    return {
-        success: errors.length === 0 && rows.length > 0,
-        className,
-        quarter,
-        subjects,
-        rows,
-        errors,
-        rawText: text,
-    };
-}
-
-/**
- * Processa um arquivo PDF do SIGE e retorna os dados extraídos
- */
-export async function processSigePdf(file: File): Promise<SigeParseResult> {
-    try {
-        const text = await extractTextFromPdf(file);
-        return parseSigeText(text);
-    } catch (error) {
-        return {
-            success: false,
-            subjects: [],
-            rows: [],
-            errors: [`Erro ao processar PDF: ${error instanceof Error ? error.message : 'Erro desconhecido'}`],
-        };
-    }
-}
-
-/**
  * Grade pronta para ser importada no sistema
  */
 export interface ImportableGrade {
@@ -412,6 +323,122 @@ export function prepareGradesForImport(
     return importableGrades;
 }
 
+const isNameHeaderCell = (value: string): boolean => {
+    const normalized = normalizeHeaderText(value);
+    return HEADER_NAME_KEYS.some((key) => normalized.includes(key));
+};
+
+const isExcludedHeader = (normalized: string): boolean => {
+    if (!normalized) return false;
+    if (HEADER_EXACT_EXCLUDES.has(normalized)) return true;
+    return HEADER_CONTAINS_EXCLUDES.some((part) => normalized.includes(part));
+};
+
+const isLikelySubjectHeader = (value: string): boolean => {
+    const normalized = normalizeHeaderText(value);
+    if (!normalized) return false;
+    
+    // Deve ter pelo menos uma letra
+    if (!/[A-Z]/.test(normalized)) return false;
+    
+    // Não pode ser coluna de nome
+    if (HEADER_NAME_KEYS.some((key) => normalized.includes(key))) return false;
+    
+    // Não pode ser coluna excluída
+    if (isExcludedHeader(normalized)) return false;
+    
+    // Contar caracteres alfabéticos
+    const alphaCount = (normalized.match(/[A-Z]/g) || []).length;
+    
+    // Se tem pelo menos 3 caracteres alfabéticos, provavelmente é uma disciplina
+    if (alphaCount >= 3) return true;
+    
+    // Aceitar abreviações curtas (2-4 letras)
+    if (alphaCount >= 2 && normalized.length <= 5) return true;
+    
+    // Aceitar nomes compostos longos (ex: "SISTEMA OPERACIONAL I")
+    // que são comuns em cursos técnicos
+    const words = normalized.split(/\s+/);
+    if (words.length >= 2) {
+        // Se tem múltiplas palavras com pelo menos 3 letras cada
+        const significantWords = words.filter(w => w.length >= 3);
+        if (significantWords.length >= 2) return true;
+    }
+    
+    return false;
+};
+
+const parseGradeValue = (value: unknown): number | null => {
+    if (value === undefined || value === null || value === '') return null;
+    if (typeof value === 'number') {
+        return value;
+    }
+    const cleaned = String(value).replace(',', '.');
+    const match = cleaned.match(/\d+(\.\d+)?/);
+    if (!match) return null;
+    const parsed = parseFloat(match[0]);
+    return isNaN(parsed) ? null : parsed;
+};
+
+const isLikelyStudentName = (value: unknown): boolean => {
+    const name = String(value || '').trim();
+    if (!name || name.length < 5) return false;
+    const upperName = name.toUpperCase();
+    if (
+        upperName.includes('TOTAL') ||
+        upperName.includes('MÉDIA') ||
+        upperName.includes('MEDIA') ||
+        upperName.includes('ASSINATURA') ||
+        upperName.includes('PROFESSORE') ||
+        upperName.includes('MAPA DE NOTAS')
+    ) {
+        return false;
+    }
+    if (/^\d+$/.test(name)) return false;
+    if (name.split(' ').length < 2) return false;
+    return true;
+};
+
+const findNameColumnIndex = (
+    data: any[][],
+    headerRow: number,
+    nextBlockStart: number,
+    fallbackIndex: number,
+): number => {
+    const header = data[headerRow] || [];
+    const candidateIndices = new Set<number>();
+    const maxCandidate = Math.min(header.length, 8);
+    for (let i = 0; i < maxCandidate; i++) {
+        candidateIndices.add(i);
+    }
+    if (fallbackIndex >= 0) {
+        candidateIndices.add(fallbackIndex);
+        candidateIndices.add(fallbackIndex - 1);
+        candidateIndices.add(fallbackIndex + 1);
+    }
+
+    let bestIndex = fallbackIndex >= 0 ? fallbackIndex : 2;
+    let bestScore = -1;
+    const endRow = Math.min(nextBlockStart, headerRow + 30);
+
+    for (const index of candidateIndices) {
+        if (index < 0 || index >= header.length) continue;
+        let score = 0;
+        for (let rowIndex = headerRow + 1; rowIndex < endRow; rowIndex++) {
+            const cellValue = data[rowIndex]?.[index];
+            if (isLikelyStudentName(cellValue)) {
+                score += 1;
+            }
+        }
+        if (score > bestScore) {
+            bestScore = score;
+            bestIndex = index;
+        }
+    }
+
+    return bestIndex;
+};
+
 // ============================================================
 // SUPORTE A EXCEL (XLS/XLSX)
 // ============================================================
@@ -432,17 +459,34 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
     let className: string | undefined;
     let quarter: string | undefined;
 
-    // Lista de disciplinas conhecidas para identificar linhas de cabeçalho
-    const knownSubjects = [
-        'ARTE', 'BIOLOGIA', 'EDUCAÇÃO FÍSICA', 'FILOSOFIA', 'FÍSICA',
-        'GEOGRAFIA', 'HISTÓRIA', 'INGLÊS', 'LÍNGUA PORTUGUESA', 'MATEMÁTICA',
-        'QUÍMICA', 'SOCIOLOGIA', 'ESPANHOL', 'REDAÇÃO',
-        'LINGUA PORTUGUESA', 'EDUCACAO FISICA', 'LINGUA ESTRANGEIRA',
-        // Disciplinas técnicas/profissionais
-        'INFORMATICA', 'INFORMATICA BASICA', 'INFORMÁTICA', 'INFORMÁTICA BÁSICA',
-        'LOGÍSTICA', 'ADMINISTRAÇÃO', 'CONTABILIDADE', 'GESTÃO',
-        'ENFERMAGEM', 'ELETRICIDADE', 'MECÂNICA', 'ELETRÔNICA'
+    // Lista de disciplinas comuns da Base Nacional Comum (para priorização, não exclusão)
+    const commonSubjects = [
+        'ARTE', 'BIOLOGIA', 'EDUCAÇÃO FÍSICA', 'EDUCACAO FISICA', 'FILOSOFIA', 'FÍSICA', 'FISICA',
+        'GEOGRAFIA', 'HISTÓRIA', 'HISTORIA', 'INGLÊS', 'INGLES', 'LÍNGUA PORTUGUESA', 'LINGUA PORTUGUESA', 
+        'MATEMÁTICA', 'MATEMATICA', 'QUÍMICA', 'QUIMICA', 'SOCIOLOGIA', 'ESPANHOL', 'REDAÇÃO', 'REDACAO',
+        'LINGUA ESTRANGEIRA',
+        // Abreviações comuns
+        'ART', 'BIO', 'EDF', 'FIL', 'FIS', 'GEO', 'HIS', 'ING', 'LNG', 'POR',
+        'MAT', 'QUI', 'SOC', 'ESP', 'RED',
+        // Palavras-chave para identificar disciplinas técnicas
+        'BANCO', 'DADOS', 'SISTEMA', 'OPERACIONAL', 'REDES', 'COMPUTADORES', 'PROGRAMAÇÃO', 'PROGRAMACAO',
+        'DESENVOLVIMENTO', 'HARDWARE', 'SOFTWARE', 'SEGURANÇA', 'INFORMAÇÃO', 'ARQUITETURA',
+        'CABEAMENTO', 'INFORMATICA', 'INFORMÁTICA', 'LOGÍSTICA', 'LOGISTICA', 'ADMINISTRAÇÃO', 'ADMINISTRACAO',
+        'CONTABILIDADE', 'GESTÃO', 'GESTAO', 'ENFERMAGEM', 'ELETRICIDADE', 'MECÂNICA', 'MECANICA',
+        'ELETRÔNICA', 'ELETRONICA', 'STARTUPS', 'EMPREENDEDORISMO', 'PROJETO', 'VIDA', 'FORMAÇÃO', 'FORMACAO',
+        'ELETIVA', 'ESTUDO', 'ORIENTADO', 'TÉCNICO', 'TECNICO', 'PROFISSIONAL'
     ];
+    const commonSubjectsNormalized = commonSubjects.map(normalizeSubjectKey);
+    
+    // Verifica se uma disciplina tem palavras-chave conhecidas (mais flexível)
+    const hasCommonKeywords = (normalized: string): boolean => {
+        return commonSubjectsNormalized.some((known) => {
+            if (normalized === known) return true;
+            if (normalized.includes(known) && known.length >= 3) return true;
+            if (known.includes(normalized) && normalized.length >= 3) return true;
+            return false;
+        });
+    };
 
     // Mapa para combinar notas por aluno (nome normalizado -> dados)
     const studentGradesMap: Map<string, { originalName: string; grades: Record<string, number | null> }> = new Map();
@@ -481,59 +525,95 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
         }
 
         const blocks: Block[] = [];
+        const processedHeaderRows = new Set<number>();
 
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
-            if (!row) continue;
+            if (!row || processedHeaderRows.has(i)) continue;
 
             // Verificar se esta linha tem disciplinas
-            const foundSubjects: { index: number; name: string }[] = [];
+            const subjectColumnsMap = new Map<number, string>();
+            const nameHeaderIndex = row.findIndex((cell: any) => isNameHeaderCell(String(cell || '')));
+            let commonSubjectCount = 0;
 
             for (let j = 0; j < row.length; j++) {
-                const cellValue = String(row[j] || '').trim().toUpperCase();
+                const rawValue = String(row[j] || '').trim();
+                if (!rawValue) continue;
 
-                if (cellValue.length > 2) {
-                    for (const known of knownSubjects) {
-                        if (cellValue.includes(known) || known.includes(cellValue)) {
-                            foundSubjects.push({
-                                index: j,
-                                name: normalizeSubjectName(cellValue)
-                            });
-                            break;
-                        }
+                const normalized = normalizeHeaderText(rawValue);
+                if (!normalized) continue;
+                
+                // Pular apenas colunas antes da coluna de nome (não igual)
+                if (nameHeaderIndex >= 0 && j < nameHeaderIndex) continue;
+                
+                // Se é a coluna de nome, pular
+                if (HEADER_NAME_KEYS.some((key) => normalized.includes(key))) continue;
+                if (isExcludedHeader(normalized)) continue;
+
+                const hasKeywords = hasCommonKeywords(normalized);
+                
+                // NOVA LÓGICA: Mais flexível - aceita qualquer texto que pareça disciplina
+                // Não exige que seja "conhecida", apenas que tenha características de disciplina
+                if (hasKeywords || isLikelySubjectHeader(rawValue)) {
+                    if (hasKeywords) {
+                        commonSubjectCount += 1;
                     }
+                    
+                    const subjectName = normalizeSubjectName(rawValue);
+                    subjectColumnsMap.set(j, subjectName);
+                    
+                    // Log de debug - REMOVER DEPOIS
+                    console.log(`[DEBUG] Linha ${i}, Coluna ${j}: "${rawValue}" -> "${subjectName}" (comum: ${hasKeywords})`);
                 }
             }
 
-            // Se encontrou 3+ disciplinas, é uma linha de cabeçalho
-            if (foundSubjects.length >= 3) {
-                // Encontrar coluna do nome
-                let nameColumnIndex = 2;
-                for (let j = 0; j < 5; j++) {
-                    const cell = String(row[j] || '').toUpperCase();
-                    if (cell.includes('ALUNO') || cell.includes('NOME') || cell.includes('DISCIP')) {
-                        nameColumnIndex = j + 1;
-                        break;
-                    }
-                }
+            const subjectColumns = Array.from(subjectColumnsMap.entries()).map(([index, name]) => ({
+                index,
+                name,
+            }));
 
-                blocks.push({
-                    headerRow: i,
-                    subjectColumns: foundSubjects,
-                    nameColumnIndex
-                });
+            const hasNameHeader = nameHeaderIndex >= 0;
+            
+            // LÓGICA MAIS FLEXÍVEL: aceitar blocos com disciplinas mesmo que não sejam "conhecidas"
+            // Aceitar se:
+            // 1. Tem cabeçalho de nome "Alunos / Disciplinas" E pelo menos 1 disciplina
+            // 2. Tem pelo menos 1 disciplina comum (conhecida)
+            // 3. Tem pelo menos 2 disciplinas que parecem ser nomes de matérias
+            const minSubjects = hasNameHeader ? 1 : 2;
+            if (subjectColumns.length < minSubjects) continue;
+            
+            // Se não tem cabeçalho de nome, exigir pelo menos alguma palavra-chave conhecida ou várias colunas
+            if (!hasNameHeader) {
+                // Precisa ter pelo menos 1 disciplina com palavra-chave conhecida OU 3+ colunas
+                if (commonSubjectCount === 0 && subjectColumns.length < 3) continue;
+            }
 
-                // Adicionar disciplinas à lista única
-                for (const subj of foundSubjects) {
-                    if (!allSubjects.includes(subj.name)) {
-                        allSubjects.push(subj.name);
-                    }
+            const nameColumnIndex = hasNameHeader ? nameHeaderIndex : 2;
+
+            blocks.push({
+                headerRow: i,
+                subjectColumns,
+                nameColumnIndex,
+            });
+            
+            processedHeaderRows.add(i);
+
+            // Adicionar disciplinas à lista única
+            for (const subj of subjectColumns) {
+                if (!allSubjects.includes(subj.name)) {
+                    allSubjects.push(subj.name);
                 }
             }
+            
+            // Log de debug - REMOVER DEPOIS
+            console.log(`[DEBUG] Bloco ${blocks.length} encontrado na linha ${i} com ${subjectColumns.length} disciplinas:`, subjectColumns.map(s => s.name).join(', '));
         }
 
+        console.log(`[DEBUG] Total de blocos identificados: ${blocks.length}`);
+        
         if (blocks.length === 0) {
             errors.push('Não foi possível identificar blocos de disciplinas. Verifique se o arquivo é do SIGE.');
+            console.error('[DEBUG] Nenhum bloco encontrado! Verifique o formato do arquivo.');
             return { success: false, subjects: [], rows: [], errors };
         }
 
@@ -541,58 +621,60 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
         for (let b = 0; b < blocks.length; b++) {
             const block = blocks[b];
             const nextBlockStart = b < blocks.length - 1 ? blocks[b + 1].headerRow : data.length;
+            const nameColumnIndex = findNameColumnIndex(
+                data,
+                block.headerRow,
+                nextBlockStart,
+                block.nameColumnIndex,
+            );
+
+            console.log(`[DEBUG] Processando bloco ${b + 1}/${blocks.length}, linhas ${block.headerRow + 1} até ${nextBlockStart - 1}, coluna de nome: ${nameColumnIndex}`);
 
             // Processar linhas de dados deste bloco
+            let studentsInBlock = 0;
             for (let i = block.headerRow + 1; i < nextBlockStart; i++) {
                 const row = data[i];
                 if (!row) continue;
 
-                const studentName = String(row[block.nameColumnIndex] || '').trim();
+                const studentName = String(row[nameColumnIndex] || '').trim();
 
                 // Validar nome
-                if (!studentName || studentName.length < 5) continue;
-                if (/^\d+$/.test(studentName)) continue;
-                if (studentName.split(' ').length < 2) continue;
+                if (!isLikelyStudentName(studentName)) continue;
 
-                const upperName = studentName.toUpperCase();
-                if (upperName.includes('TOTAL') || upperName.includes('MÉDIA') ||
-                    upperName.includes('ASSINATURA') || upperName.includes('PROFESSORE') ||
-                    upperName.includes('MAPA DE NOTAS')) continue;
-
+                studentsInBlock++;
+                
                 // Normalizar nome para matching
                 const normalizedName = normalizeNameForComparison(studentName);
 
                 // Extrair notas deste bloco
+                let gradesAddedForStudent = 0;
                 for (const subjectCol of block.subjectColumns) {
                     const cellValue = row[subjectCol.index];
+                    const grade = parseGradeValue(cellValue);
 
-                    if (cellValue !== undefined && cellValue !== null && cellValue !== '') {
-                        let grade: number | null = null;
-
-                        if (typeof cellValue === 'number') {
-                            grade = cellValue;
-                        } else {
-                            const parsed = parseFloat(String(cellValue).replace(',', '.'));
-                            if (!isNaN(parsed)) {
-                                grade = parsed;
-                            }
+                    // Validar nota (permitir 0 como nota válida)
+                    if (grade !== null && grade >= 0 && grade <= 10) {
+                        // Adicionar ao mapa do aluno
+                        if (!studentGradesMap.has(normalizedName)) {
+                            studentGradesMap.set(normalizedName, {
+                                originalName: studentName,
+                                grades: {},
+                            });
                         }
-
-                        // Validar nota
-                        if (grade !== null && grade >= 0 && grade <= 10) {
-                            // Adicionar ao mapa do aluno
-                            if (!studentGradesMap.has(normalizedName)) {
-                                studentGradesMap.set(normalizedName, {
-                                    originalName: studentName,
-                                    grades: {}
-                                });
-                            }
-                            const studentData = studentGradesMap.get(normalizedName)!;
-                            studentData.grades[subjectCol.name] = grade;
-                        }
+                        const studentData = studentGradesMap.get(normalizedName)!;
+                        
+                        // Sobrescrever nota se já existir (o último bloco prevalece)
+                        studentData.grades[subjectCol.name] = grade;
+                        gradesAddedForStudent++;
                     }
                 }
+                
+                if (gradesAddedForStudent > 0) {
+                    console.log(`[DEBUG] Aluno "${studentName}" - ${gradesAddedForStudent} notas capturadas neste bloco`);
+                }
             }
+            
+            console.log(`[DEBUG] Bloco ${b + 1}: ${studentsInBlock} alunos processados`);
         }
 
         // Converter mapa para array de rows
@@ -606,6 +688,18 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
                 });
             }
         }
+
+        // Log de resumo - REMOVER DEPOIS
+        console.log(`[DEBUG] === RESUMO DA IMPORTAÇÃO ===`);
+        console.log(`[DEBUG] Total de blocos encontrados: ${blocks.length}`);
+        console.log(`[DEBUG] Total de disciplinas únicas: ${allSubjects.length}`);
+        console.log(`[DEBUG] Disciplinas: ${allSubjects.join(', ')}`);
+        console.log(`[DEBUG] Total de alunos: ${rows.length}`);
+        if (rows.length > 0) {
+            console.log(`[DEBUG] Exemplo - ${rows[0].studentName}: ${Object.keys(rows[0].grades).length} disciplinas`);
+            console.log(`[DEBUG] Disciplinas do aluno: ${Object.keys(rows[0].grades).join(', ')}`);
+        }
+        console.log(`[DEBUG] =============================`);
 
         if (rows.length === 0) {
             errors.push('Não foi possível identificar as linhas de notas.');
@@ -630,23 +724,20 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
 }
 
 /**
- * Processa arquivo do SIGE (detecta formato automaticamente)
- * Suporta PDF e Excel (XLS/XLSX)
+ * Processa arquivo do SIGE (Excel)
+ * Suporta XLS/XLSX
  */
 export async function processSigeFile(file: File): Promise<SigeParseResult> {
     const fileName = file.name.toLowerCase();
 
-    if (fileName.endsWith('.pdf')) {
-        return processSigePdf(file);
-    } else if (fileName.endsWith('.xls') || fileName.endsWith('.xlsx')) {
+    if (fileName.endsWith('.xls') || fileName.endsWith('.xlsx')) {
         return parseSigeExcel(file);
     } else {
         return {
             success: false,
             subjects: [],
             rows: [],
-            errors: ['Formato de arquivo não suportado. Use PDF, XLS ou XLSX.'],
+            errors: ['Formato de arquivo não suportado. Use XLS ou XLSX.'],
         };
     }
 }
-

@@ -1,13 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useClasses, useStudents } from '@/hooks/useLocalStorage';
+import { useClasses, useStudents } from '@/hooks/useData';
 import { School, Users, AlertCircle, CheckCircle, Calendar, Archive } from 'lucide-react';
-import { MOCK_USERS } from '@/data/mockData';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const ClassesOverview = () => {
   const { classes } = useClasses();
   const { students } = useStudents();
+  const { profile } = useAuth();
 
   // Filtrar apenas turmas ativas (não arquivadas)
   const activeClasses = classes.filter(c => !c.archived);
@@ -26,10 +27,10 @@ export const ClassesOverview = () => {
     return acc;
   }, {} as Record<string, number>);
   
-  const directors = MOCK_USERS.filter(u => u.role === 'diretor');
-  const directorLoad = directors.map(director => ({
+  const directors = profile ? [profile] : [];
+  const directorLoad = directors.map((director) => ({
     name: director.name,
-    classes: activeClasses.filter(c => c.directorId === director.id).length
+    classes: activeClasses.filter((c) => c.directorId === director.id).length,
   }));
 
   const courseDistribution = activeClasses.reduce((acc, cls) => {

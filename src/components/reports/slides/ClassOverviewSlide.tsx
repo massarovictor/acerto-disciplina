@@ -1,7 +1,14 @@
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Users, TrendingUp, AlertTriangle, Award } from 'lucide-react';
+/**
+ * ClassOverviewSlide 2.0 - Visual Dashboard
+ * Slide principal com KPIs e gráfico de distribuição.
+ */
+
+import { useMemo } from 'react';
 import { Class, Student, Grade, Incident } from '@/types';
+import { SlideLayout } from './SlideLayout';
+import { ReportDonutChart } from '@/lib/reportCharts';
+import { REPORT_COLORS } from '@/lib/reportDesignSystem';
+import { Users, TrendingUp, AlertTriangle, Award } from 'lucide-react';
 
 interface ClassOverviewSlideProps {
   classData: Class;
@@ -11,148 +18,204 @@ interface ClassOverviewSlideProps {
   period: string;
 }
 
-export const ClassOverviewSlide = ({ classData, students, grades, incidents, period }: ClassOverviewSlideProps) => {
-  const filteredGrades = period === 'all' 
-    ? grades 
-    : grades.filter(g => g.quarter === period);
+export const ClassOverviewSlide = ({
+  classData,
+  students,
+  grades,
+  incidents,
+  period,
+}: ClassOverviewSlideProps) => {
+  const metrics = useMemo(() => {
+    const filteredGrades = period === 'all' ? grades : grades.filter((g) => g.quarter === period);
 
-  const averageGrade = filteredGrades.length > 0
-    ? filteredGrades.reduce((sum, g) => sum + g.grade, 0) / filteredGrades.length
-    : 0;
+    const totalGrades = filteredGrades.length;
+    const average =
+      filteredGrades.length > 0
+        ? filteredGrades.reduce((sum, g) => sum + g.grade, 0) / filteredGrades.length
+        : 0;
 
-  const studentsWithLowGrades = new Set(
-    filteredGrades.filter(g => g.grade < 6).map(g => g.studentId)
-  ).size;
+    const approvalRate =
+      filteredGrades.length > 0
+        ? (filteredGrades.filter((g) => g.grade >= 6).length / filteredGrades.length) * 100
+        : 0;
 
-  const totalIncidents = incidents.length;
-  const criticalIncidents = incidents.filter(i => 
-    i.finalSeverity === 'grave' || i.finalSeverity === 'gravissima'
-  ).length;
+    // Count students by status
+    const studentStats = students.map((student) => {
+      const studentGrades = filteredGrades.filter((g) => g.studentId === student.id);
+      const subjects = [...new Set(studentGrades.map((g) => g.subject))];
+      const avgBySubject = subjects.map((sub) => {
+        const subGrades = studentGrades.filter((g) => g.subject === sub);
+        return subGrades.length
+          ? subGrades.reduce((s, g) => s + g.grade, 0) / subGrades.length
+          : 0;
+      });
+      const recoveryCount = avgBySubject.filter((a) => a < 6).length;
+      return { student, recoveryCount };
+    });
 
-  return (
-    <div className="h-full p-8 bg-gradient-to-br from-primary/5 to-background flex flex-col">
-      <div className="mb-6">
-        <h1 className="text-4xl font-bold mb-2">{classData.name} - Visão Geral</h1>
-        <p className="text-lg text-muted-foreground">
-          {period === 'all' ? 'Ano Letivo Completo' : period} • {new Date().getFullYear()}
+    const approved = studentStats.filter((s) => s.recoveryCount === 0).length;
+    const recovery = studentStats.filter((s) => s.recoveryCount > 0 && s.recoveryCount <= 2).length;
+    const risk = studentStats.filter((s) => s.recoveryCount > 2).length;
+
+    const criticalIncidents = incidents.filter(
+      (i) => i.finalSeverity === 'grave' || i.finalSeverity === 'gravissima'
+    ).length;
+
+    return { average, approvalRate, approved, recovery, risk, criticalIncidents, totalGrades };
+  }, [grades, students, incidents, period]);
+
+  const pieData = [
+    { name: 'Aprovados', value: metrics.approved, color: REPORT_COLORS.success },
+    { name: 'Recuperação', value: metrics.recovery, color: REPORT_COLORS.warning },
+    { name: 'Risco', value: metrics.risk, color: REPORT_COLORS.danger },
+  ];
+  const hasStatusData = metrics.totalGrades > 0;
+
+  const KPICard = ({
+    icon: Icon,
+    label,
+    value,
+    color,
+    suffix = '',
+  }: {
+    icon: any;
+    label: string;
+    value: string | number;
+    color: string;
+    suffix?: string;
+  }) => (
+    <div
+      style={{
+        background: REPORT_COLORS.background.card,
+        borderRadius: 12,
+        padding: 28,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 20,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+        border: `1px solid ${REPORT_COLORS.border}`,
+      }}
+    >
+      <div
+        style={{
+          width: 56,
+          height: 56,
+          borderRadius: 12,
+          background: `${color}15`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Icon size={28} color={color} />
+      </div>
+      <div>
+        <p style={{ fontSize: 14, color: REPORT_COLORS.text.secondary, margin: 0 }}>{label}</p>
+        <p style={{ fontSize: 36, fontWeight: 700, color: REPORT_COLORS.text.primary, margin: 0 }}>
+          {value}
+          {suffix && <span style={{ fontSize: 22, fontWeight: 500 }}>{suffix}</span>}
         </p>
       </div>
+    </div>
+  );
 
-      <div className="flex-1 grid grid-cols-2 gap-6">
-        {/* Left Column */}
-        <div className="space-y-6">
-          <Card className="bg-card/50 backdrop-blur">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4 mb-4">
-                <Users className="h-8 w-8 text-primary" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Total de Alunos</p>
-                  <p className="text-4xl font-bold">{students.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card/50 backdrop-blur">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4 mb-4">
-                <TrendingUp className="h-8 w-8 text-primary" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Média Geral da Turma</p>
-                  <p className="text-4xl font-bold">{averageGrade.toFixed(1)}</p>
-                </div>
-              </div>
-              <Badge variant={averageGrade >= 7 ? 'default' : averageGrade >= 6 ? 'secondary' : 'destructive'}>
-                {averageGrade >= 7 ? 'Excelente' : averageGrade >= 6 ? 'Satisfatório' : 'Requer Atenção'}
-              </Badge>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card/50 backdrop-blur">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4 mb-4">
-                <Award className="h-8 w-8 text-primary" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Taxa de Aprovação</p>
-                  <p className="text-4xl font-bold">
-                    {filteredGrades.length > 0 
-                      ? ((filteredGrades.filter(g => g.grade >= 6).length / filteredGrades.length) * 100).toFixed(0)
-                      : 0}%
-                  </p>
-                </div>
-              </div>
-              <div className="w-full bg-secondary h-3 rounded-full overflow-hidden">
-                <div 
-                  className="bg-primary h-full rounded-full"
-                  style={{ 
-                    width: `${filteredGrades.length > 0 ? (filteredGrades.filter(g => g.grade >= 6).length / filteredGrades.length) * 100 : 0}%` 
-                  }}
-                />
-              </div>
-            </CardContent>
-          </Card>
+  return (
+    <SlideLayout
+      title={`${classData.name} — Visão Geral`}
+      subtitle={`${period === 'all' ? 'Ano Letivo Completo' : period} • ${new Date().getFullYear()}`}
+      footer="Acerto Disciplina System"
+    >
+      <div style={{ display: 'flex', gap: 32, height: '100%' }}>
+        {/* Left Column: KPIs */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <KPICard
+            icon={Users}
+            label="Total de Alunos"
+            value={students.length}
+            color={REPORT_COLORS.primary}
+          />
+          <KPICard
+            icon={TrendingUp}
+            label="Média Geral"
+            value={metrics.average.toFixed(1)}
+            color={metrics.average >= 6 ? REPORT_COLORS.success : REPORT_COLORS.danger}
+          />
+          <KPICard
+            icon={Award}
+            label="Taxa de Aprovação"
+            value={metrics.approvalRate.toFixed(0)}
+            suffix="%"
+            color={REPORT_COLORS.success}
+          />
+          <KPICard
+            icon={AlertTriangle}
+            label="Ocorrências Críticas"
+            value={metrics.criticalIncidents}
+            color={REPORT_COLORS.danger}
+          />
         </div>
 
-        {/* Right Column */}
-        <div className="space-y-6">
-          <Card className="bg-red-500/10 backdrop-blur border-red-500/20">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4 mb-4">
-                <AlertTriangle className="h-8 w-8 text-red-500" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Alunos com Nota Abaixo de 6.0</p>
-                  <p className="text-4xl font-bold text-red-500">{studentsWithLowGrades}</p>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {((studentsWithLowGrades / students.length) * 100).toFixed(0)}% da turma
+        {/* Right Column: Chart */}
+        <div
+          style={{
+            flex: 1,
+            background: REPORT_COLORS.background.card,
+            borderRadius: 12,
+            padding: 32,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+            border: `1px solid ${REPORT_COLORS.border}`,
+          }}
+        >
+          <h3
+            style={{
+              fontSize: 18,
+              fontWeight: 600,
+              color: REPORT_COLORS.text.primary,
+              margin: '0 0 16px',
+            }}
+          >
+            Distribuição de Status
+          </h3>
+          {hasStatusData ? (
+            <>
+              <ReportDonutChart data={pieData} height={360} showLegend />
+              <p
+                style={{
+                  margin: '12px 0 0',
+                  fontSize: 13,
+                  color: REPORT_COLORS.text.secondary,
+                  textAlign: 'center',
+                }}
+              >
+                Aprovados: sem disciplinas abaixo de 6. Recuperação: 1 a 2 disciplinas abaixo de 6.
+                Risco: mais de 2 disciplinas abaixo de 6.
               </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card/50 backdrop-blur">
-            <CardContent className="pt-6">
-              <h3 className="font-semibold mb-4">Ocorrências Disciplinares</h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Total de Ocorrências</span>
-                  <Badge variant="outline">{totalIncidents}</Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Graves/Gravíssimas</span>
-                  <Badge variant="destructive">{criticalIncidents}</Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Taxa</span>
-                  <span className="text-sm font-medium">
-                    {(totalIncidents / students.length).toFixed(1)} por aluno
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-primary/5 backdrop-blur">
-            <CardContent className="pt-6">
-              <h3 className="font-semibold mb-3">Principais Indicadores</h3>
-              <ul className="space-y-2 text-sm">
-                <li className="flex items-start gap-2">
-                  <span className="text-primary">•</span>
-                  <span>Média da turma {averageGrade >= 7 ? 'acima' : 'abaixo'} da meta (7.0)</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-primary">•</span>
-                  <span>{studentsWithLowGrades > 0 ? `${studentsWithLowGrades} aluno(s) necessitam reforço` : 'Todos os alunos com bom desempenho'}</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-primary">•</span>
-                  <span>{criticalIncidents > 0 ? `${criticalIncidents} ocorrência(s) crítica(s) registrada(s)` : 'Sem ocorrências críticas'}</span>
-                </li>
-              </ul>
-            </CardContent>
-          </Card>
+            </>
+          ) : (
+            <div
+              style={{
+                height: 360,
+                width: '100%',
+                border: `1px dashed ${REPORT_COLORS.border}`,
+                borderRadius: 12,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: REPORT_COLORS.text.tertiary,
+                fontSize: 14,
+                textAlign: 'center',
+                padding: 16,
+              }}
+            >
+              Sem dados de notas para o período selecionado.
+            </div>
+          )}
         </div>
       </div>
-    </div>
+    </SlideLayout>
   );
 };

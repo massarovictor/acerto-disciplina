@@ -143,3 +143,10 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+#slide-container:fullscreen {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  background: hsl(var(--background));
+}

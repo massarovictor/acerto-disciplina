@@ -6,7 +6,7 @@ export interface SubjectArea {
   color: string;
 }
 
-// Áreas de conhecimento conforme ENEM
+// Áreas de conhecimento conforme ENEM (Base Nacional Comum)
 export const SUBJECT_AREAS: SubjectArea[] = [
   {
     name: 'Linguagens, Códigos e suas Tecnologias',
@@ -47,6 +47,13 @@ export const SUBJECT_AREAS: SubjectArea[] = [
   },
 ];
 
+// Área de Formação Técnica e Profissional (disciplinas definidas por template)
+export const PROFESSIONAL_AREA: SubjectArea = {
+  name: 'Formação Técnica e Profissional',
+  subjects: [], // Preenchido dinamicamente via template
+  color: 'bg-amber-500/10 text-amber-700 border-amber-500/30',
+};
+
 export const QUARTERS = ['1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre'];
 
 // Obter todas as disciplinas das áreas de conhecimento (base comum ENEM)
@@ -54,7 +61,44 @@ export const getAllSubjects = (): string[] => {
   return SUBJECT_AREAS.flatMap(area => area.subjects);
 };
 
-// Obter área de conhecimento de uma disciplina
-export const getSubjectArea = (subject: string): SubjectArea | undefined => {
-  return SUBJECT_AREAS.find(area => area.subjects.includes(subject));
+// Obter área de conhecimento de uma disciplina (incluindo profissionais se fornecidas)
+export const getSubjectArea = (subject: string, professionalSubjects: string[] = []): SubjectArea | undefined => {
+  // Primeiro verifica nas áreas base
+  const baseArea = SUBJECT_AREAS.find(area => area.subjects.includes(subject));
+  if (baseArea) return baseArea;
+  
+  // Se não encontrou, verifica se é disciplina profissional
+  if (professionalSubjects.includes(subject)) {
+    return { ...PROFESSIONAL_AREA, subjects: professionalSubjects };
+  }
+  
+  return undefined;
+};
+
+// Obter todas as áreas incluindo a profissional (se houver disciplinas)
+export const getAllAreas = (professionalSubjects: string[] = []): SubjectArea[] => {
+  const areas = [...SUBJECT_AREAS];
+  
+  if (professionalSubjects.length > 0) {
+    areas.push({
+      ...PROFESSIONAL_AREA,
+      subjects: professionalSubjects
+    });
+  }
+  
+  return areas;
+};
+
+// Nomes curtos para as áreas (para uso em tabelas e gráficos)
+export const AREA_SHORT_NAMES: Record<string, string> = {
+  'Linguagens, Códigos e suas Tecnologias': 'Linguagens',
+  'Ciências Humanas e suas Tecnologias': 'Humanas',
+  'Ciências da Natureza e suas Tecnologias': 'Natureza',
+  'Matemática e suas Tecnologias': 'Matemática',
+  'Formação Técnica e Profissional': 'Profissional',
+};
+
+// Obter nome curto de uma área
+export const getAreaShortName = (areaName: string): string => {
+  return AREA_SHORT_NAMES[areaName] || areaName;
 };

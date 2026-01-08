@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Plus, 
   Search,
@@ -12,11 +13,11 @@ import {
   Clock,
   CheckCircle2,
   Trash2,
-  Edit
+  Edit,
+  Filter
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { useIncidents, useClasses, useStudents } from '@/hooks/useLocalStorage';
+import { useIncidents, useClasses, useStudents } from '@/hooks/useData';
 import { IncidentDetailsDialog } from '@/components/incidents/IncidentDetailsDialog';
 import { IncidentManagementDialog } from '@/components/incidents/IncidentManagementDialog';
 import { IncidentWizard } from '@/components/incidents/IncidentWizard';
@@ -26,7 +27,6 @@ import { Incident } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 
 const Incidents = () => {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const { incidents, deleteIncident } = useIncidents();
   const { classes } = useClasses();
@@ -34,6 +34,7 @@ const Incidents = () => {
   const { toast } = useToast();
   
   const [searchTerm, setSearchTerm] = useState('');
+  const [classFilter, setClassFilter] = useState<string>('all');
   const [viewingIncident, setViewingIncident] = useState<Incident | null>(null);
   const [managingIncident, setManagingIncident] = useState<Incident | null>(null);
   const [deletingIncident, setDeletingIncident] = useState<Incident | null>(null);
@@ -41,24 +42,37 @@ const Incidents = () => {
   const [activeTab, setActiveTab] = useState<'aberta' | 'acompanhamento' | 'resolvida'>('aberta');
   const [initialTab, setInitialTab] = useState<'info' | 'followup' | 'comments'>('info');
 
+  // Get active classes for filter
+  const activeClasses = classes.filter(c => !c.archived && c.active);
+
   // Filter incidents by status
   const openIncidents = incidents.filter(i => i.status === 'aberta');
   const followUpIncidents = incidents.filter(i => i.status === 'acompanhamento');
   const resolvedIncidents = incidents.filter(i => i.status === 'resolvida');
 
   const filterIncidents = (statusIncidents: Incident[]) => {
-    if (!searchTerm) return statusIncidents;
+    let filtered = statusIncidents;
     
-    return statusIncidents.filter(incident => {
-      const incidentClass = classes.find(c => c.id === incident.classId);
-      const incidentStudents = students.filter(s => incident.studentIds.includes(s.id));
-      
-      return (
-        incidentClass?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        incident.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        incidentStudents.some(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()))
-      );
-    });
+    // Filtro por turma
+    if (classFilter !== 'all') {
+      filtered = filtered.filter(incident => incident.classId === classFilter);
+    }
+    
+    // Filtro por busca textual
+    if (searchTerm) {
+      filtered = filtered.filter(incident => {
+        const incidentClass = classes.find(c => c.id === incident.classId);
+        const incidentStudents = students.filter(s => incident.studentIds.includes(s.id));
+        
+        return (
+          incidentClass?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          incident.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          incidentStudents.some(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()))
+        );
+      });
+    }
+    
+    return filtered;
   };
 
   const getSeverityColor = (severity: string) => {
@@ -140,59 +154,46 @@ const Incidents = () => {
               </div>
 
               <div className="flex gap-2">
-                {(user?.role === 'diretor' || user?.role === 'coordenador') ? (
-                  <>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => {
-                        if (incident.status === 'resolvida') {
-                          setViewingIncident(incident);
-                          return;
-                        }
-                        if (incident.status === 'acompanhamento') {
-                          setInitialTab('followup');
-                        } else {
-                          setInitialTab('info');
-                        }
-                        setManagingIncident(incident);
-                      }}
-                    >
-                      {incident.status === 'aberta' ? (
-                        <>
-                          <Edit className="h-4 w-4 mr-1" />
-                          Gerenciar
-                        </>
-                      ) : incident.status === 'acompanhamento' ? (
-                        <>
-                          <Edit className="h-4 w-4 mr-1" />
-                          Editar
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="h-4 w-4 mr-1" />
-                          Visualizar
-                        </>
-                      )}
-                    </Button>
-                    {incident.status === 'aberta' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setDeletingIncident(incident)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </>
-                ) : (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => {
+                    if (incident.status === 'resolvida') {
+                      setViewingIncident(incident);
+                      return;
+                    }
+                    if (incident.status === 'acompanhamento') {
+                      setInitialTab('followup');
+                    } else {
+                      setInitialTab('info');
+                    }
+                    setManagingIncident(incident);
+                  }}
+                >
+                  {incident.status === 'aberta' ? (
+                    <>
+                      <Edit className="h-4 w-4 mr-1" />
+                      Gerenciar
+                    </>
+                  ) : incident.status === 'acompanhamento' ? (
+                    <>
+                      <Edit className="h-4 w-4 mr-1" />
+                      Editar
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="h-4 w-4 mr-1" />
+                      Visualizar
+                    </>
+                  )}
+                </Button>
+                {incident.status === 'aberta' && (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setViewingIncident(incident)}
+                    onClick={() => setDeletingIncident(incident)}
                   >
-                    <Eye className="h-4 w-4 mr-1" />
-                    Visualizar
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 )}
               </div>
@@ -213,12 +214,10 @@ const Incidents = () => {
             Acompanhe e gerencie as ocorrências por status
           </p>
         </div>
-        {(user?.role === 'professor' || user?.role === 'diretor' || user?.role === 'coordenador') && (
-          <Button size="lg" onClick={() => setShowNewIncidentDialog(true)}>
-            <Plus className="h-5 w-5 mr-2" />
-            Registrar Ocorrência
-          </Button>
-        )}
+        <Button size="lg" onClick={() => setShowNewIncidentDialog(true)}>
+          <Plus className="h-5 w-5 mr-2" />
+          Registrar Ocorrência
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -252,15 +251,31 @@ const Incidents = () => {
         </Card>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por turma, aluno ou descrição..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
+      {/* Search and Filters */}
+      <div className="flex gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por turma, aluno ou descrição..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={classFilter} onValueChange={setClassFilter}>
+          <SelectTrigger className="w-[250px]">
+            <Filter className="h-4 w-4 mr-2" />
+            <SelectValue placeholder="Filtrar por turma" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as Turmas</SelectItem>
+            {activeClasses.map(cls => (
+              <SelectItem key={cls.id} value={cls.id}>
+                {cls.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Tabs by Status */}
@@ -353,14 +368,22 @@ const Incidents = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
+              onClick={async () => {
                 if (deletingIncident) {
-                  deleteIncident(deletingIncident.id);
-                  toast({
-                    title: 'Ocorrência excluída',
-                    description: 'A ocorrência foi removida com sucesso.',
-                  });
-                  setDeletingIncident(null);
+                  try {
+                    await deleteIncident(deletingIncident.id);
+                    toast({
+                      title: 'Ocorrência excluída',
+                      description: 'A ocorrência foi removida com sucesso.',
+                    });
+                    setDeletingIncident(null);
+                  } catch (error) {
+                    toast({
+                      title: 'Erro',
+                      description: 'Não foi possível excluir a ocorrência.',
+                      variant: 'destructive',
+                    });
+                  }
                 }
               }}
             >

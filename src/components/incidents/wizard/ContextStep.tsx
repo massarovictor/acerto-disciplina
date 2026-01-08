@@ -7,7 +7,7 @@ import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { useClasses } from '@/hooks/useLocalStorage';
+import { useClasses } from '@/hooks/useData';
 import { IncidentFormData } from '../IncidentWizard';
 
 interface ContextStepProps {
@@ -39,7 +39,9 @@ export const ContextStep = ({ formData, updateFormData }: ContextStepProps) => {
               <SelectValue placeholder="Selecione a turma" />
             </SelectTrigger>
             <SelectContent>
-              {classes.map((cls) => (
+              {classes
+                .filter((cls) => cls.active && !cls.archived)
+                .map((cls) => (
                 <SelectItem key={cls.id} value={cls.id}>
                   {cls.name}
                 </SelectItem>

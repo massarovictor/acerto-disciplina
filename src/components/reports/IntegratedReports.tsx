@@ -5,17 +5,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Users, FileDown, UserCheck, FileText } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Users, FileDown, UserCheck, Calendar } from 'lucide-react';
 import { Class, Student, Incident } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { useProfessionalSubjects, useGrades, useAttendance } from '@/hooks/useLocalStorage';
+import { useProfessionalSubjects, useGrades, useAttendance } from '@/hooks/useData';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { PrintableClassReport } from '@/components/reports/PrintableClassReport';
+import { generateStudentReportPDF } from '@/lib/studentReportPdfExport';
+import { generateProfessionalClassReportPDF } from '@/lib/classReportPdfExport';
+import { SUBJECT_AREAS, QUARTERS } from '@/lib/subjects';
 
 interface IntegratedReportsProps {
   classes: Class[];
@@ -26,7 +31,9 @@ interface IntegratedReportsProps {
 export const IntegratedReports = ({ classes, students, incidents }: IntegratedReportsProps) => {
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedStudent, setSelectedStudent] = useState('');
-  const [showPrintable, setShowPrintable] = useState(false);
+  const [showPeriodDialog, setShowPeriodDialog] = useState(false);
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('anual');
+  const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
   const { grades } = useGrades();
   const { attendance } = useAttendance();
@@ -58,6 +65,15 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
   );
 
   const professionalSubjects = selectedClass ? getProfessionalSubjects(selectedClass) : [];
+  const reportSubjects = useMemo(() => {
+    if (!selectedClassData) return [];
+    const gradeSubjects = [...new Set(classGrades.map((grade) => grade.subject))];
+    if (gradeSubjects.length > 0) {
+      return gradeSubjects.sort();
+    }
+    const baseSubjects = SUBJECT_AREAS.flatMap((area) => area.subjects);
+    return [...new Set([...baseSubjects, ...professionalSubjects])].sort();
+  }, [selectedClassData, classGrades, professionalSubjects]);
 
   const classAverage = classGrades.length > 0
     ? classGrades.reduce((sum, grade) => sum + grade.grade, 0) / classGrades.length
@@ -104,7 +120,7 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
     };
   }, [selectedStudentData, classGrades, classIncidents, classAttendance]);
 
-  const handleGenerateClassReport = async () => {
+  const handleOpenPeriodDialog = () => {
     if (!selectedClassData) {
       toast({
         variant: 'destructive',
@@ -113,35 +129,43 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
       });
       return;
     }
+    setSelectedPeriod('anual');
+    setShowPeriodDialog(true);
+  };
 
+  const handleGenerateClassReport = async () => {
+    if (!selectedClassData) return;
+
+    setIsGenerating(true);
     try {
-      const { generateCompleteAcademicReport } = await import('@/lib/advancedPdfExport');
-      const pdf = await generateCompleteAcademicReport(
-        classGrades,
+      await generateProfessionalClassReportPDF(
+        selectedClassData,
         classStudents,
+        classGrades,
         classIncidents,
         classAttendance,
-        selectedClassData,
-        professionalSubjects
+        professionalSubjects,
+        selectedPeriod
       );
-      const fileName = `relatorio-turma-${selectedClassData.name}.pdf`;
-      pdf.save(fileName);
 
+      setShowPeriodDialog(false);
       toast({
-        title: 'Relatório gerado',
-        description: `O PDF "${fileName}" foi baixado com sucesso.`,
+        title: 'Relatório Gerado',
+        description: `O relatório qualitativo da turma ${selectedClassData.name} foi baixado.`,
       });
     } catch (error) {
-      console.error(error);
+      console.error('Erro ao gerar relatório de turma:', error);
       toast({
         variant: 'destructive',
         title: 'Erro ao gerar relatório',
         description: 'Não foi possível gerar o PDF. Tente novamente.',
       });
+    } finally {
+      setIsGenerating(false);
     }
   };
 
-  const handleIndividualReport = () => {
+  const handleIndividualReport = async () => {
     if (!selectedClassData || !selectedStudentData) {
       toast({
         variant: 'destructive',
@@ -151,243 +175,282 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
       return;
     }
 
-    toast({
-      title: 'Em breve',
-      description: 'O relatório individual em PDF está em implementação.',
-    });
+    try {
+      await generateStudentReportPDF(
+        selectedStudentData,
+        selectedClassData,
+        classGrades,
+        classIncidents,
+        classAttendance,
+        reportSubjects
+      );
+
+      toast({
+        title: 'Relatório Gerado',
+        description: `O relatório de ${selectedStudentData.name} foi baixado.`,
+      });
+    } catch (error) {
+      console.error('Erro ao gerar relatório individual:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro na geração',
+        description: 'Não foi possível criar o PDF. Tente novamente.',
+      });
+    }
   };
 
   return (
     <>
       <div className="grid gap-6 lg:grid-cols-2">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" />
-                Relatório de Turma
-              </CardTitle>
-              <CardDescription>
-                Gera um PDF completo com panorama, destaques, rankings e análises por área.
-              </CardDescription>
-            </div>
-            {selectedClassData && (
-              <Badge variant="secondary">{selectedClassData.name}</Badge>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label>Selecione a turma</Label>
-            <Select value={selectedClass} onValueChange={(value) => {
-              setSelectedClass(value);
-              setSelectedStudent('');
-            }}>
-              <SelectTrigger>
-                <SelectValue placeholder="Escolha a turma" />
-              </SelectTrigger>
-              <SelectContent>
-                {classes.length === 0 ? (
-                  <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                    Nenhuma turma cadastrada
-                  </div>
-                ) : (
-                  classes
-                    .filter(cls => !cls.archived)
-                    .map(cls => (
-                      <SelectItem key={cls.id} value={cls.id}>
-                        {cls.name}
-                      </SelectItem>
-                    ))
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {selectedClassData ? (
-            <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground space-y-2">
-              <div className="flex items-center justify-between">
-                <span>Total de alunos</span>
-                <span className="font-semibold text-foreground">{classStudents.length}</span>
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" />
+                  Relatório de Turma
+                </CardTitle>
+                <CardDescription>
+                  Gera um boletim da turma com resumo e tabela anual de notas.
+                </CardDescription>
               </div>
-              <div className="flex items-center justify-between">
-                <span>Média geral</span>
-                <span className="font-semibold text-foreground">{classAverage.toFixed(1)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Ocorrências registradas</span>
-                <span className="font-semibold text-foreground">{classIncidents.length}</span>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Escolha uma turma para visualizar o resumo e habilitar o download do PDF.
-            </p>
-          )}
-
-          <Button className="w-full" onClick={handleGenerateClassReport} disabled={!selectedClass}>
-            <FileDown className="mr-2 h-4 w-4" />
-            Gerar PDF da Turma
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            disabled={!selectedClassData}
-            onClick={() => setShowPrintable(true)}
-          >
-            <FileText className="mr-2 h-4 w-4" />
-            Visualizar relatório em página
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <UserCheck className="h-5 w-5 text-primary" />
-                Relatório Individual
-              </CardTitle>
-              <CardDescription>
-                Selecione um estudante para preparar o relatório personalizado (em breve).
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label>Turma</Label>
-            <Select value={selectedClass} onValueChange={(value) => {
-              setSelectedClass(value);
-              setSelectedStudent('');
-            }}>
-              <SelectTrigger>
-                <SelectValue placeholder="Escolha a turma" />
-              </SelectTrigger>
-              <SelectContent>
-                {classes.length === 0 ? (
-                  <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                    Nenhuma turma cadastrada
-                  </div>
-                ) : (
-                  classes
-                    .filter(cls => !cls.archived)
-                    .map(cls => (
-                      <SelectItem key={cls.id} value={cls.id}>
-                        {cls.name}
-                      </SelectItem>
-                    ))
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Aluno</Label>
-            <Select
-              value={selectedStudent}
-              onValueChange={setSelectedStudent}
-              disabled={!selectedClass}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={selectedClass ? 'Escolha o aluno' : 'Selecione a turma primeiro'} />
-              </SelectTrigger>
-              <SelectContent>
-                {classStudents.length === 0 ? (
-                  <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                    Nenhum aluno encontrado
-                  </div>
-                ) : (
-                  classStudents.map(student => (
-                    <SelectItem key={student.id} value={student.id}>
-                      {student.name}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {selectedStudentData && selectedStudentMetrics && (
-            <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground space-y-3">
-              <div className="space-y-1">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Resumo</p>
-                <p className="font-semibold text-foreground">{selectedStudentData.name}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Média geral</p>
-                  <p className="text-lg font-semibold text-foreground">
-                    {selectedStudentMetrics.average.toFixed(1)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Ocorrências</p>
-                  <p className="text-lg font-semibold text-foreground">
-                    {selectedStudentMetrics.incidents}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Disciplinas &lt; 6</p>
-                  <p className="text-lg font-semibold text-foreground">
-                    {selectedStudentMetrics.subjectsBelowAverage.length}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Presença</p>
-                  <p className="text-lg font-semibold text-foreground">
-                    {selectedStudentMetrics.presenceRate.toFixed(1)}%
-                  </p>
-                </div>
-              </div>
-              {selectedStudentMetrics.subjectsBelowAverage.length > 0 && (
-                <>
-                  <Separator />
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Disciplinas em atenção
-                  </p>
-                  <p className="text-sm text-foreground">
-                    {selectedStudentMetrics.subjectsBelowAverage.join(', ')}
-                  </p>
-                </>
+              {selectedClassData && (
+                <Badge variant="secondary">{selectedClassData.name}</Badge>
               )}
             </div>
-          )}
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label>Selecione a turma</Label>
+              <Select value={selectedClass} onValueChange={(value) => {
+                setSelectedClass(value);
+                setSelectedStudent('');
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Escolha a turma" />
+                </SelectTrigger>
+                <SelectContent>
+                  {classes.length === 0 ? (
+                    <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                      Nenhuma turma cadastrada
+                    </div>
+                  ) : (
+                    classes
+                      .filter(cls => !cls.archived)
+                      .map(cls => (
+                        <SelectItem key={cls.id} value={cls.id}>
+                          {cls.name}
+                        </SelectItem>
+                      ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <Button
-            className="w-full"
-            variant="secondary"
-            onClick={handleIndividualReport}
-            disabled={!selectedStudent}
-          >
-            <FileDown className="mr-2 h-4 w-4" />
-            Gerar Relatório Individual
-          </Button>
-          <p className="text-xs text-muted-foreground text-center">
-            O modelo individual seguirá o plano aprovado: capa, histórico, áreas, frequência, risco e plano de ação.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-    <Dialog open={showPrintable} onOpenChange={setShowPrintable}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Relatório para impressão</DialogTitle>
-        </DialogHeader>
-        {selectedClassData && (
-          <PrintableClassReport
-            classData={selectedClassData}
-            students={classStudents}
-            grades={classGrades}
-            incidents={classIncidents}
-            attendance={classAttendance}
-          />
-        )}
-      </DialogContent>
-    </Dialog>
+            {selectedClassData ? (
+              <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground space-y-2">
+                <div className="flex items-center justify-between">
+                  <span>Total de alunos</span>
+                  <span className="font-semibold text-foreground">{classStudents.length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Média geral</span>
+                  <span className="font-semibold text-foreground">{classAverage.toFixed(1)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Ocorrências registradas</span>
+                  <span className="font-semibold text-foreground">{classIncidents.length}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Escolha uma turma para visualizar o resumo e habilitar o download do PDF.
+              </p>
+            )}
+
+            <Button className="w-full" onClick={handleOpenPeriodDialog} disabled={!selectedClass}>
+              <FileDown className="mr-2 h-4 w-4" />
+              Gerar Relatório Qualitativo
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <UserCheck className="h-5 w-5 text-primary" />
+                  Relatório Individual
+                </CardTitle>
+                <CardDescription>
+                  Gera um boletim individual com resumo de atenção, ocorrências e notas do ano.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label>Turma</Label>
+              <Select value={selectedClass} onValueChange={(value) => {
+                setSelectedClass(value);
+                setSelectedStudent('');
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Escolha a turma" />
+                </SelectTrigger>
+                <SelectContent>
+                  {classes.length === 0 ? (
+                    <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                      Nenhuma turma cadastrada
+                    </div>
+                  ) : (
+                    classes
+                      .filter(cls => !cls.archived)
+                      .map(cls => (
+                        <SelectItem key={cls.id} value={cls.id}>
+                          {cls.name}
+                        </SelectItem>
+                      ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Aluno</Label>
+              <Select
+                value={selectedStudent}
+                onValueChange={setSelectedStudent}
+                disabled={!selectedClass}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={selectedClass ? 'Escolha o aluno' : 'Selecione a turma primeiro'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {classStudents.length === 0 ? (
+                    <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                      Nenhum aluno encontrado
+                    </div>
+                  ) : (
+                    classStudents.map(student => (
+                      <SelectItem key={student.id} value={student.id}>
+                        {student.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedStudentData && selectedStudentMetrics && (
+              <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground space-y-3">
+                <div className="space-y-1">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Resumo</p>
+                  <p className="font-semibold text-foreground">{selectedStudentData.name}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Média geral</p>
+                    <p className="text-lg font-semibold text-foreground">
+                      {selectedStudentMetrics.average.toFixed(1)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Ocorrências</p>
+                    <p className="text-lg font-semibold text-foreground">
+                      {selectedStudentMetrics.incidents}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Disciplinas &lt; 6</p>
+                    <p className="text-lg font-semibold text-foreground">
+                      {selectedStudentMetrics.subjectsBelowAverage.length}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Presença</p>
+                    <p className="text-lg font-semibold text-foreground">
+                      {selectedStudentMetrics.presenceRate.toFixed(1)}%
+                    </p>
+                  </div>
+                </div>
+                {selectedStudentMetrics.subjectsBelowAverage.length > 0 && (
+                  <>
+                    <Separator />
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Disciplinas em atenção
+                    </p>
+                    <p className="text-sm text-foreground">
+                      {selectedStudentMetrics.subjectsBelowAverage.join(', ')}
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+
+            <Button
+              className="w-full"
+              variant="secondary"
+              onClick={handleIndividualReport}
+              disabled={!selectedStudent}
+            >
+              <FileDown className="mr-2 h-4 w-4" />
+              Gerar Relatório Individual
+            </Button>
+            <p className="text-xs text-muted-foreground text-center">
+              O modelo individual segue o boletim com resumo, ocorrências e tabela anual de notas.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+      {/* Dialog de seleção de período */}
+      <Dialog open={showPeriodDialog} onOpenChange={setShowPeriodDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Gerar Relatório Qualitativo
+            </DialogTitle>
+            <DialogDescription>
+              Selecione o período para análise. O relatório inclui análise por área do conhecimento, 
+              correlação comportamento x desempenho, predições de risco e recomendações.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <Label className="text-sm font-medium mb-3 block">Período de análise</Label>
+            <RadioGroup value={selectedPeriod} onValueChange={setSelectedPeriod} className="space-y-2">
+              <div className="flex items-center space-x-2 rounded-lg border p-3 hover:bg-muted/50 cursor-pointer">
+                <RadioGroupItem value="anual" id="anual" />
+                <Label htmlFor="anual" className="flex-1 cursor-pointer">
+                  <span className="font-medium">Ano Completo</span>
+                  <p className="text-xs text-muted-foreground">Análise consolidada de todos os bimestres</p>
+                </Label>
+              </div>
+              
+              {QUARTERS.map((quarter) => (
+                <div key={quarter} className="flex items-center space-x-2 rounded-lg border p-3 hover:bg-muted/50 cursor-pointer">
+                  <RadioGroupItem value={quarter} id={quarter} />
+                  <Label htmlFor={quarter} className="flex-1 cursor-pointer">
+                    <span className="font-medium">{quarter}</span>
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowPeriodDialog(false)} disabled={isGenerating}>
+              Cancelar
+            </Button>
+            <Button onClick={handleGenerateClassReport} disabled={isGenerating}>
+              {isGenerating ? 'Gerando...' : 'Gerar PDF'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </>
   );
 };

@@ -14,16 +14,19 @@ import {
   Edit,
   Filter,
   TrendingUp,
-  Clock
+  Clock,
+  Settings
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { useIncidents, useClasses, useStudents } from '@/hooks/useLocalStorage';
+import { useIncidents, useClasses, useStudents } from '@/hooks/useData';
 import { IncidentDetailsDialog } from '@/components/incidents/IncidentDetailsDialog';
-import { Incident } from '@/types';
+import { IncidentManagementDialog } from '@/components/incidents/IncidentManagementDialog';
+import { SchoolConfigDialog } from '@/components/settings/SchoolConfigDialog';
+import { Incident, IncidentStatus } from '@/types';
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   const { incidents } = useIncidents();
   const { classes } = useClasses();
@@ -33,6 +36,9 @@ const Dashboard = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showMyIncidents, setShowMyIncidents] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
+  const [managingIncident, setManagingIncident] = useState<Incident | null>(null);
+  const [initialTab, setInitialTab] = useState<'info' | 'followup' | 'comments'>('info');
+  const [showSchoolConfig, setShowSchoolConfig] = useState(false);
 
   // Calculate metrics
   const openIncidents = incidents.filter(i => i.status === 'aberta');
@@ -127,15 +133,19 @@ const Dashboard = () => {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            Bem-vindo(a), {user?.name}
+            Bem-vindo(a), {profile?.name || user?.email}
           </p>
         </div>
-        {(user?.role === 'professor' || user?.role === 'diretor' || user?.role === 'coordenador') && (
+        <div className="flex gap-2">
+          <Button variant="outline" size="lg" onClick={() => setShowSchoolConfig(true)}>
+            <Settings className="h-5 w-5 mr-2" />
+            Configurar Escola
+          </Button>
           <Button size="lg" onClick={() => navigate('/ocorrencias')}>
             <Plus className="h-5 w-5 mr-2" />
             Registrar Ocorrência
           </Button>
-        )}
+        </div>
       </div>
 
       {/* Main Metrics */}
@@ -228,7 +238,7 @@ const Dashboard = () => {
                   ? 'Registre a primeira ocorrência para começar.'
                   : 'Tente ajustar os filtros de busca.'}
               </p>
-              {incidents.length === 0 && (user?.role === 'professor' || user?.role === 'diretor' || user?.role === 'coordenador') && (
+              {incidents.length === 0 && (
                 <Button onClick={() => navigate('/ocorrencias')}>
                   <Plus className="h-4 w-4 mr-2" />
                   Registrar Ocorrência
@@ -276,14 +286,32 @@ const Dashboard = () => {
                     </div>
 
                     <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedIncident(incident)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        Ver Detalhes
-                      </Button>
+                      {incident.status !== 'resolvida' ? (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => {
+                            if (incident.status === 'acompanhamento') {
+                              setInitialTab('followup');
+                            } else {
+                              setInitialTab('info');
+                            }
+                            setManagingIncident(incident);
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Gerenciar
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedIncident(incident)}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Ver Detalhes
+                        </Button>
+                      )}
                     </div>
                   </div>
                 );
@@ -293,7 +321,7 @@ const Dashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Incident Details Dialog */}
+      {/* Incident Details Dialog (for resolved) */}
       {selectedIncident && (
         <IncidentDetailsDialog
           incident={selectedIncident}
@@ -301,6 +329,33 @@ const Dashboard = () => {
           onOpenChange={(open) => !open && setSelectedIncident(null)}
         />
       )}
+
+      {/* Incident Management Dialog (for open/followup) */}
+      {managingIncident && (
+        <IncidentManagementDialog
+          incident={managingIncident}
+          open={!!managingIncident}
+          onOpenChange={(open) => {
+            if (!open) {
+              setManagingIncident(null);
+              setInitialTab('info');
+            }
+          }}
+          initialTab={initialTab}
+          onStatusChange={(newStatus: IncidentStatus) => {
+            // Atualizar filtro automaticamente se mudar de status
+            if (newStatus === 'resolvida' && statusFilter === 'aberta') {
+              setStatusFilter('all');
+            }
+          }}
+        />
+      )}
+
+      {/* School Config Dialog */}
+      <SchoolConfigDialog
+        open={showSchoolConfig}
+        onOpenChange={setShowSchoolConfig}
+      />
     </div>
   );
 };

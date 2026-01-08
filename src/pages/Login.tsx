@@ -83,12 +83,8 @@ const Login = () => {
             </Button>
           </form>
           <div className="mt-6 text-sm text-muted-foreground space-y-1">
-            <p className="font-medium">Usuários de teste:</p>
-            <p>• professor@escola.com (Professor)</p>
-            <p>• diretor@escola.com (Diretor)</p>
-            <p>• coordenador@escola.com (Coordenador)</p>
-            <p>• secretaria@escola.com (Secretaria)</p>
-            <p className="text-xs mt-2">Qualquer senha funciona nesta demonstração</p>
+            <p className="font-medium">Acesso via Supabase Auth</p>
+            <p>Use o e-mail e a senha cadastrados no Supabase.</p>
           </div>
         </CardContent>
       </Card>

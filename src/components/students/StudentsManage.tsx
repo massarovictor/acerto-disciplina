@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Dialog,
   DialogContent,
@@ -33,10 +35,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useStudents, useClasses, useIncidents, useGrades, useAttendance } from '@/hooks/useLocalStorage';
+import { useStudents, useClasses, useIncidents, useGrades, useAttendance } from '@/hooks/useData';
 import { useToast } from '@/hooks/use-toast';
 import { exportStudentsList } from '@/lib/excelExport';
-import { Search, Edit, Download, Eye, Trash2, Camera, X, CheckCircle2, XCircle, AlertTriangle, ArrowRightLeft } from 'lucide-react';
+import { Search, Edit, Download, Eye, Trash2, Camera, X, CheckCircle2, XCircle, AlertTriangle, ArrowRightLeft, Clock } from 'lucide-react';
 import { Student, StudentStatus } from '@/types';
 import { calculateStudentStatus } from '@/lib/approvalCalculator';
 import { getAcademicYear } from '@/lib/classYearCalculator';
@@ -53,7 +55,11 @@ const calculateAge = (birthDate: string): number => {
   return age;
 };
 
-export const StudentsManage = () => {
+interface StudentsManageProps {
+  highlightId?: string | null;
+}
+
+export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
   const { students, updateStudent, deleteStudent } = useStudents();
   const { classes } = useClasses();
   const { incidents } = useIncidents();
@@ -111,6 +117,15 @@ export const StudentsManage = () => {
 
       const academicYear = getAcademicYear(classData.startYearDate, classData.currentYear);
       const status = calculateStudentStatus(grades, student.id, student.classId, academicYear);
+
+      if (status.isPending) {
+        return (
+          <Badge className="bg-gray-500/10 text-gray-700 border-gray-500/30">
+            <Clock className="h-3 w-3 mr-1" />
+            Pendente
+          </Badge>
+        );
+      }
 
       switch (status.status) {
         case 'approved':
@@ -178,13 +193,23 @@ export const StudentsManage = () => {
     setEditingStudent(student);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingStudent) return;
 
     if (!editFormData.name || !editFormData.classId || !editFormData.birthDate || !editFormData.gender) {
       toast({
         title: 'Erro',
         description: 'Preencha todos os campos obrigatórios.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const targetClass = classes.find(c => c.id === editFormData.classId);
+    if (!targetClass || !targetClass.active || targetClass.archived) {
+      toast({
+        title: 'Turma bloqueada',
+        description: 'A turma selecionada está inativa ou arquivada.',
         variant: 'destructive',
       });
       return;
@@ -206,25 +231,33 @@ export const StudentsManage = () => {
       }
     }
 
-    updateStudent(editingStudent.id, {
-      name: editFormData.name,
-      classId: editFormData.classId,
-      birthDate: editFormData.birthDate,
-      gender: editFormData.gender,
-      enrollment: editFormData.enrollment || undefined,
-      censusId: editFormData.censusId || undefined,
-      cpf: editFormData.cpf ? editFormData.cpf.replace(/\D/g, '') : undefined,
-      rg: editFormData.rg || undefined,
-      photoUrl: editFormData.photoUrl || undefined,
-      status: editFormData.status,
-    });
+    try {
+      await updateStudent(editingStudent.id, {
+        name: editFormData.name,
+        classId: editFormData.classId,
+        birthDate: editFormData.birthDate,
+        gender: editFormData.gender,
+        enrollment: editFormData.enrollment || undefined,
+        censusId: editFormData.censusId || undefined,
+        cpf: editFormData.cpf ? editFormData.cpf.replace(/\D/g, '') : undefined,
+        rg: editFormData.rg || undefined,
+        photoUrl: editFormData.photoUrl || undefined,
+        status: editFormData.status,
+      });
 
-    toast({
-      title: 'Sucesso',
-      description: 'Aluno atualizado com sucesso.',
-    });
+      toast({
+        title: 'Sucesso',
+        description: 'Aluno atualizado com sucesso.',
+      });
 
-    setEditingStudent(null);
+      setEditingStudent(null);
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível atualizar o aluno.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -274,7 +307,7 @@ export const StudentsManage = () => {
     };
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deletingStudent) return;
 
     const links = checkStudentLinks(deletingStudent.id);
@@ -294,12 +327,20 @@ export const StudentsManage = () => {
       return;
     }
 
-    deleteStudent(deletingStudent.id);
-    toast({
-      title: 'Sucesso',
-      description: 'Aluno excluído com sucesso.',
-    });
-    setDeletingStudent(null);
+    try {
+      await deleteStudent(deletingStudent.id);
+      toast({
+        title: 'Sucesso',
+        description: 'Aluno excluído com sucesso.',
+      });
+      setDeletingStudent(null);
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível excluir o aluno.',
+        variant: 'destructive',
+      });
+    }
   };
 
   // Handler de exportação
@@ -312,7 +353,7 @@ export const StudentsManage = () => {
   };
 
   // Handler de transferência
-  const handleTransfer = () => {
+  const handleTransfer = async () => {
     if (!transferringStudent || !transferTargetClassId) return;
 
     const targetClass = classes.find(c => c.id === transferTargetClassId);
@@ -324,21 +365,37 @@ export const StudentsManage = () => {
       });
       return;
     }
+    if (!targetClass.active || targetClass.archived) {
+      toast({
+        title: 'Turma bloqueada',
+        description: 'A turma de destino está inativa ou arquivada.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     const originClass = classes.find(c => c.id === transferringStudent.classId);
 
-    updateStudent(transferringStudent.id, {
-      classId: transferTargetClassId,
-      status: 'active',
-    });
+    try {
+      await updateStudent(transferringStudent.id, {
+        classId: transferTargetClassId,
+        status: 'active',
+      });
 
-    toast({
-      title: 'Transferência concluída',
-      description: `${transferringStudent.name} foi transferido de "${originClass?.name || 'N/A'}" para "${targetClass.name}".`,
-    });
+      toast({
+        title: 'Transferência concluída',
+        description: `${transferringStudent.name} foi transferido de "${originClass?.name || 'N/A'}" para "${targetClass.name}".`,
+      });
 
-    setTransferringStudent(null);
-    setTransferTargetClassId('');
+      setTransferringStudent(null);
+      setTransferTargetClassId('');
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível transferir o aluno.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -415,8 +472,13 @@ export const StudentsManage = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredStudents.map((student) => (
-                    <TableRow key={student.id}>
+                  {filteredStudents.map((student) => {
+                    const isHighlighted = highlightId === student.id;
+                    return (
+                    <TableRow 
+                      key={student.id}
+                      className={isHighlighted ? "bg-primary/10 animate-pulse ring-2 ring-primary/50" : ""}
+                    >
                       <TableCell>
                         <Avatar className="h-10 w-10">
                           {student.photoUrl ? (
@@ -493,7 +555,8 @@ export const StudentsManage = () => {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -504,113 +567,221 @@ export const StudentsManage = () => {
       {/* View Dialog */}
       {viewingStudent && (
         <Dialog open={!!viewingStudent} onOpenChange={(open) => !open && setViewingStudent(null)}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-3xl max-h-[90vh]">
             <DialogHeader>
-              <DialogTitle>Detalhes do Aluno</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-6">
-              {/* Foto */}
-              <div className="flex justify-center">
-                <Avatar className="h-32 w-32">
+              <DialogTitle className="flex items-center gap-3">
+                <Avatar className="h-10 w-10">
                   {viewingStudent.photoUrl ? (
                     <AvatarImage src={viewingStudent.photoUrl} alt={viewingStudent.name} />
                   ) : (
-                    <AvatarFallback className="bg-primary/10 text-primary text-2xl">
+                    <AvatarFallback className="bg-primary/10 text-primary">
                       {viewingStudent.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                     </AvatarFallback>
                   )}
                 </Avatar>
-              </div>
-
-              {/* Informações */}
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <Label className="text-muted-foreground">Nome Completo</Label>
-                  <p className="font-medium">{viewingStudent.name}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Turma</Label>
-                  <p className="font-medium">{getClassName(viewingStudent.classId)}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Data de Nascimento</Label>
-                  <p className="font-medium">
-                    {new Date(viewingStudent.birthDate).toLocaleDateString('pt-BR')}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Idade</Label>
-                  <p className="font-medium">{calculateAge(viewingStudent.birthDate)} anos</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Sexo</Label>
-                  <p className="font-medium">
-                    {viewingStudent.gender === 'M' ? 'Masculino' :
-                      viewingStudent.gender === 'F' ? 'Feminino' :
-                        viewingStudent.gender === 'O' ? 'Outro' : 'Prefiro não informar'}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Status</Label>
-                  <Badge variant="outline" className={
-                    viewingStudent.status === 'active'
-                      ? 'bg-severity-light-bg text-severity-light border-severity-light'
-                      : 'bg-muted text-muted-foreground border-muted'
-                  }>
-                    {viewingStudent.status === 'active' ? 'Ativo' :
-                      viewingStudent.status === 'inactive' ? 'Inativo' : 'Transferido'}
-                  </Badge>
-                </div>
-                {viewingStudent.enrollment && (
-                  <div>
-                    <Label className="text-muted-foreground">Matrícula SIGE</Label>
-                    <p className="font-medium">{viewingStudent.enrollment}</p>
-                  </div>
-                )}
-                {viewingStudent.censusId && (
-                  <div>
-                    <Label className="text-muted-foreground">ID Censo</Label>
-                    <p className="font-medium">{viewingStudent.censusId}</p>
-                  </div>
-                )}
-                {viewingStudent.cpf && (
-                  <div>
-                    <Label className="text-muted-foreground">CPF</Label>
-                    <p className="font-medium">{formatCPF(viewingStudent.cpf)}</p>
-                  </div>
-                )}
-                {viewingStudent.rg && (
-                  <div>
-                    <Label className="text-muted-foreground">RG</Label>
-                    <p className="font-medium">{viewingStudent.rg}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Estatísticas */}
-              {(() => {
-                const links = checkStudentLinks(viewingStudent.id);
-                return (
-                  <div className="border-t pt-4">
-                    <h4 className="font-medium mb-3">Estatísticas</h4>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Ocorrências</p>
-                        <p className="text-2xl font-bold">{links.incidentsCount}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Notas</p>
-                        <p className="text-2xl font-bold">{links.gradesCount}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Frequência</p>
-                        <p className="text-2xl font-bold">{links.attendanceCount}</p>
-                      </div>
+                {viewingStudent.name}
+              </DialogTitle>
+            </DialogHeader>
+            
+            <Tabs defaultValue="info" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="info">Informações</TabsTrigger>
+                <TabsTrigger value="incidents">
+                  Ocorrências ({incidents.filter(i => i.studentIds.includes(viewingStudent.id)).length})
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="info" className="mt-4">
+                <ScrollArea className="h-[400px] pr-4">
+                  <div className="space-y-6">
+                    {/* Foto */}
+                    <div className="flex justify-center">
+                      <Avatar className="h-32 w-32">
+                        {viewingStudent.photoUrl ? (
+                          <AvatarImage src={viewingStudent.photoUrl} alt={viewingStudent.name} />
+                        ) : (
+                          <AvatarFallback className="bg-primary/10 text-primary text-2xl">
+                            {viewingStudent.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
                     </div>
+
+                    {/* Informações */}
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <Label className="text-muted-foreground">Nome Completo</Label>
+                        <p className="font-medium">{viewingStudent.name}</p>
+                      </div>
+                      <div>
+                        <Label className="text-muted-foreground">Turma</Label>
+                        <p className="font-medium">{getClassName(viewingStudent.classId)}</p>
+                      </div>
+                      <div>
+                        <Label className="text-muted-foreground">Data de Nascimento</Label>
+                        <p className="font-medium">
+                          {new Date(viewingStudent.birthDate).toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-muted-foreground">Idade</Label>
+                        <p className="font-medium">{calculateAge(viewingStudent.birthDate)} anos</p>
+                      </div>
+                      <div>
+                        <Label className="text-muted-foreground">Sexo</Label>
+                        <p className="font-medium">
+                          {viewingStudent.gender === 'M' ? 'Masculino' :
+                            viewingStudent.gender === 'F' ? 'Feminino' :
+                              viewingStudent.gender === 'O' ? 'Outro' : 'Prefiro não informar'}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-muted-foreground">Status</Label>
+                        <Badge variant="outline" className={
+                          viewingStudent.status === 'active'
+                            ? 'bg-severity-light-bg text-severity-light border-severity-light'
+                            : 'bg-muted text-muted-foreground border-muted'
+                        }>
+                          {viewingStudent.status === 'active' ? 'Ativo' :
+                            viewingStudent.status === 'inactive' ? 'Inativo' : 'Transferido'}
+                        </Badge>
+                      </div>
+                      {viewingStudent.enrollment && (
+                        <div>
+                          <Label className="text-muted-foreground">Matrícula SIGE</Label>
+                          <p className="font-medium">{viewingStudent.enrollment}</p>
+                        </div>
+                      )}
+                      {viewingStudent.censusId && (
+                        <div>
+                          <Label className="text-muted-foreground">ID Censo</Label>
+                          <p className="font-medium">{viewingStudent.censusId}</p>
+                        </div>
+                      )}
+                      {viewingStudent.cpf && (
+                        <div>
+                          <Label className="text-muted-foreground">CPF</Label>
+                          <p className="font-medium">{formatCPF(viewingStudent.cpf)}</p>
+                        </div>
+                      )}
+                      {viewingStudent.rg && (
+                        <div>
+                          <Label className="text-muted-foreground">RG</Label>
+                          <p className="font-medium">{viewingStudent.rg}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Estatísticas */}
+                    {(() => {
+                      const links = checkStudentLinks(viewingStudent.id);
+                      return (
+                        <div className="border-t pt-4">
+                          <h4 className="font-medium mb-3">Estatísticas</h4>
+                          <div className="grid grid-cols-3 gap-4">
+                            <div>
+                              <p className="text-sm text-muted-foreground">Ocorrências</p>
+                              <p className="text-2xl font-bold">{links.incidentsCount}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-muted-foreground">Notas</p>
+                              <p className="text-2xl font-bold">{links.gradesCount}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-muted-foreground">Frequência</p>
+                              <p className="text-2xl font-bold">{links.attendanceCount}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
-                );
-              })()}
-            </div>
+                </ScrollArea>
+              </TabsContent>
+              
+              <TabsContent value="incidents" className="mt-4">
+                <ScrollArea className="h-[400px] pr-4">
+                  {(() => {
+                    const studentIncidents = incidents.filter(i => i.studentIds.includes(viewingStudent.id));
+                    
+                    if (studentIncidents.length === 0) {
+                      return (
+                        <div className="text-center py-12">
+                          <CheckCircle2 className="h-12 w-12 text-severity-light mx-auto mb-4" />
+                          <h3 className="text-lg font-medium mb-2">Nenhuma ocorrência</h3>
+                          <p className="text-muted-foreground">
+                            Este aluno não possui ocorrências registradas.
+                          </p>
+                        </div>
+                      );
+                    }
+                    
+                    const getSeverityColor = (severity: string) => {
+                      switch (severity) {
+                        case 'leve': return 'bg-severity-light-bg text-severity-light border-severity-light';
+                        case 'intermediaria': return 'bg-severity-intermediate-bg text-severity-intermediate border-severity-intermediate';
+                        case 'grave': return 'bg-severity-serious-bg text-severity-serious border-severity-serious';
+                        case 'gravissima': return 'bg-severity-critical-bg text-severity-critical border-severity-critical';
+                        default: return '';
+                      }
+                    };
+                    
+                    const getStatusColor = (status: string) => {
+                      switch (status) {
+                        case 'aberta': return 'bg-status-open/10 text-status-open border-status-open';
+                        case 'acompanhamento': return 'bg-status-analysis/10 text-status-analysis border-status-analysis';
+                        case 'resolvida': return 'bg-status-resolved/10 text-status-resolved border-status-resolved';
+                        default: return '';
+                      }
+                    };
+                    
+                    return (
+                      <div className="space-y-3">
+                        {studentIncidents.map(incident => {
+                          const incidentClass = classes.find(c => c.id === incident.classId);
+                          
+                          return (
+                            <div 
+                              key={incident.id}
+                              className="border rounded-lg p-4 space-y-2"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className={getSeverityColor(incident.finalSeverity)}>
+                                    {incident.finalSeverity === 'leve' ? 'Leve' :
+                                      incident.finalSeverity === 'intermediaria' ? 'Intermediária' :
+                                        incident.finalSeverity === 'grave' ? 'Grave' : 'Gravíssima'}
+                                  </Badge>
+                                  <Badge variant="outline" className={getStatusColor(incident.status)}>
+                                    {incident.status === 'aberta' ? 'Aberta' :
+                                      incident.status === 'acompanhamento' ? 'Em Acompanhamento' : 'Resolvida'}
+                                  </Badge>
+                                </div>
+                                <span className="text-sm text-muted-foreground">
+                                  {new Date(incident.date).toLocaleDateString('pt-BR')}
+                                </span>
+                              </div>
+                              
+                              <p className="text-sm font-medium">{incidentClass?.name || 'Turma não encontrada'}</p>
+                              
+                              {incident.description && (
+                                <p className="text-sm text-muted-foreground line-clamp-2">
+                                  {incident.description}
+                                </p>
+                              )}
+                              
+                              <p className="text-xs text-muted-foreground">
+                                {incident.episodes.length} episódio(s) • {incident.followUps?.length || 0} acompanhamento(s)
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </ScrollArea>
+              </TabsContent>
+            </Tabs>
           </DialogContent>
         </Dialog>
       )}
@@ -688,7 +859,7 @@ export const StudentsManage = () => {
                       <SelectValue placeholder="Selecione a turma" />
                     </SelectTrigger>
                     <SelectContent>
-                      {classes.filter(c => c.active).map(cls => (
+                      {classes.filter(c => c.active && !c.archived).map(cls => (
                         <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -898,4 +1069,3 @@ export const StudentsManage = () => {
     </div>
   );
 };
-

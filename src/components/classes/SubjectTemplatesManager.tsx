@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useProfessionalSubjectTemplates, useClasses } from '@/hooks/useLocalStorage';
+import { useProfessionalSubjectTemplates, useClasses } from '@/hooks/useData';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, Eye, Save, X, AlertTriangle } from 'lucide-react';
 import { ProfessionalSubjectTemplate } from '@/types';
@@ -31,7 +31,7 @@ export const SubjectTemplatesManager = () => {
     year3Subjects: '',
   });
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!createFormData.name.trim() || !createFormData.course.trim()) {
       toast({
         title: 'Erro',
@@ -94,28 +94,36 @@ export const SubjectTemplatesManager = () => {
       return;
     }
 
-    addTemplate({
-      name: createFormData.name.trim(),
-      course: createFormData.course.trim(),
-      subjectsByYear,
-    });
+    try {
+      await addTemplate({
+        name: createFormData.name.trim(),
+        course: createFormData.course.trim(),
+        subjectsByYear,
+      });
 
-    toast({
-      title: 'Template criado',
-      description: `Template "${createFormData.name.trim()}" criado com sucesso com ${subjectsByYear.reduce((sum, y) => sum + y.subjects.length, 0)} disciplina(s).`,
-    });
+      toast({
+        title: 'Template criado',
+        description: `Template "${createFormData.name.trim()}" criado com sucesso com ${subjectsByYear.reduce((sum, y) => sum + y.subjects.length, 0)} disciplina(s).`,
+      });
 
-    setCreateFormData({
-      name: '',
-      course: '',
-      year1Subjects: '',
-      year2Subjects: '',
-      year3Subjects: '',
-    });
-    setShowCreateDialog(false);
+      setCreateFormData({
+        name: '',
+        course: '',
+        year1Subjects: '',
+        year2Subjects: '',
+        year3Subjects: '',
+      });
+      setShowCreateDialog(false);
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível criar o template.',
+        variant: 'destructive',
+      });
+    }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deletingTemplate) return;
 
     // Verificar se há turmas usando este template
@@ -131,12 +139,20 @@ export const SubjectTemplatesManager = () => {
       return;
     }
 
-    deleteTemplate(deletingTemplate.id);
-    toast({
-      title: 'Template excluído',
-      description: 'O template foi excluído com sucesso.',
-    });
-    setDeletingTemplate(null);
+    try {
+      await deleteTemplate(deletingTemplate.id);
+      toast({
+        title: 'Template excluído',
+        description: 'O template foi excluído com sucesso.',
+      });
+      setDeletingTemplate(null);
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível excluir o template.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const getTemplateUsageCount = (templateId: string) => {
@@ -372,4 +388,3 @@ export const SubjectTemplatesManager = () => {
     </div>
   );
 };
-

@@ -15,7 +15,7 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 export const TopBar = () => {
-  const { user, logout } = useAuth();
+  const { user, profile, logout } = useAuth();
   const navigate = useNavigate();
   const { resolvedTheme, setTheme } = useTheme();
 
@@ -33,16 +33,6 @@ export const TopBar = () => {
       .join('')
       .toUpperCase()
       .slice(0, 2);
-  };
-
-  const getRoleLabel = (role: string) => {
-    const roles = {
-      professor: 'Professor',
-      diretor: 'Diretor de Turma',
-      coordenador: 'Coordenador',
-      secretaria: 'Secretaria',
-    };
-    return roles[role as keyof typeof roles] || role;
   };
 
   return (
@@ -66,14 +56,11 @@ export const TopBar = () => {
           <Button variant="ghost" className="gap-2">
             <Avatar className="h-8 w-8">
               <AvatarFallback className="bg-primary text-primary-foreground">
-                {user ? getInitials(user.name) : 'U'}
+                {profile ? getInitials(profile.name) : user?.email?.[0]?.toUpperCase() || 'U'}
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col items-start text-sm">
-              <span className="font-medium">{user?.name}</span>
-              <span className="text-xs text-muted-foreground">
-                {user && getRoleLabel(user.role)}
-              </span>
+              <span className="font-medium">{profile?.name || user?.email}</span>
             </div>
           </Button>
         </DropdownMenuTrigger>

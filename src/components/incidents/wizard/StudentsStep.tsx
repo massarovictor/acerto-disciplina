@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { useStudents } from '@/hooks/useLocalStorage';
+import { useStudents } from '@/hooks/useData';
 import { IncidentFormData } from '../IncidentWizard';
 import { Search } from 'lucide-react';
 

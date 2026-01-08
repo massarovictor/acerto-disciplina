@@ -3,9 +3,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Incident } from '@/types';
-import { useClasses, useStudents } from '@/hooks/useLocalStorage';
-import { Clock, User, Calendar, FileText } from 'lucide-react';
+import { useClasses, useStudents } from '@/hooks/useData';
+import { Clock, User, Calendar, FileText, ExternalLink, School } from 'lucide-react';
 import { generateIncidentPDF } from '@/lib/incidentPdfExport';
+import { INCIDENT_EPISODES } from '@/data/mockData';
+import { useNavigate } from 'react-router-dom';
 
 interface IncidentDetailsDialogProps {
   incident: Incident;
@@ -16,9 +18,21 @@ interface IncidentDetailsDialogProps {
 export const IncidentDetailsDialog = ({ incident, open, onOpenChange }: IncidentDetailsDialogProps) => {
   const { classes } = useClasses();
   const { students } = useStudents();
+  const navigate = useNavigate();
+  const episodeMap = new Map(INCIDENT_EPISODES.map((episode) => [episode.id, episode.description]));
 
   const incidentClass = classes.find(c => c.id === incident.classId);
   const incidentStudents = students.filter(s => incident.studentIds.includes(s.id));
+
+  const handleNavigateToClass = () => {
+    onOpenChange(false);
+    navigate(`/turmas?highlight=${incident.classId}`);
+  };
+
+  const handleNavigateToStudent = (studentId: string) => {
+    onOpenChange(false);
+    navigate(`/alunos?highlight=${studentId}`);
+  };
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -50,7 +64,13 @@ export const IncidentDetailsDialog = ({ incident, open, onOpenChange }: Incident
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => generateIncidentPDF(incident, incidentClass, incidentStudents)}
+                  onClick={async () => {
+                    try {
+                      await generateIncidentPDF(incident, incidentClass, incidentStudents);
+                    } catch (error) {
+                      console.error('Erro ao gerar PDF:', error);
+                    }
+                  }}
                   className="gap-2"
                 >
                   <FileText className="h-4 w-4" />
@@ -92,7 +112,15 @@ export const IncidentDetailsDialog = ({ incident, open, onOpenChange }: Incident
               </div>
               <div>
                 <p className="text-muted-foreground">Turma</p>
-                <p className="font-medium">{incidentClass?.name || 'Não encontrada'}</p>
+                <Button
+                  variant="link"
+                  className="p-0 h-auto font-medium text-primary hover:underline flex items-center gap-1"
+                  onClick={handleNavigateToClass}
+                >
+                  <School className="h-4 w-4" />
+                  {incidentClass?.name || 'Não encontrada'}
+                  <ExternalLink className="h-3 w-3" />
+                </Button>
               </div>
               <div>
                 <p className="text-muted-foreground">Registrado em</p>
@@ -111,14 +139,19 @@ export const IncidentDetailsDialog = ({ incident, open, onOpenChange }: Incident
             <h3 className="font-semibold mb-3">Alunos Envolvidos ({incidentStudents.length})</h3>
             <div className="space-y-2">
               {incidentStudents.map(student => (
-                <div key={student.id} className="flex items-center gap-3 p-3 bg-accent/50 rounded-lg">
+                <div 
+                  key={student.id} 
+                  className="flex items-center gap-3 p-3 bg-accent/50 rounded-lg hover:bg-accent transition-colors cursor-pointer group"
+                  onClick={() => handleNavigateToStudent(student.id)}
+                >
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                     <User className="h-5 w-5 text-primary" />
                   </div>
-                  <div>
-                    <p className="font-medium">{student.name}</p>
+                  <div className="flex-1">
+                    <p className="font-medium group-hover:text-primary transition-colors">{student.name}</p>
                     <p className="text-sm text-muted-foreground">Matrícula: {student.enrollment}</p>
                   </div>
+                  <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
               ))}
             </div>
@@ -133,7 +166,7 @@ export const IncidentDetailsDialog = ({ incident, open, onOpenChange }: Incident
               {incident.episodes.map((episode, index) => (
                 <li key={index} className="flex items-start gap-2">
                   <span className="text-primary mt-1">•</span>
-                  <span className="text-sm">{episode}</span>
+                  <span className="text-sm">{episodeMap.get(episode) ?? episode}</span>
                 </li>
               ))}
             </ul>

@@ -1,9 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { User } from '@/types';
-import { storage } from '@/lib/localStorage';
+import { supabase } from '@/services/supabase';
 
 interface AuthContextType {
-  user: User | null;
+  user: SupabaseUser | null;
+  profile: User | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
@@ -11,69 +13,84 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users for demonstration
-const MOCK_USERS: User[] = [
-  {
-    id: '1',
-    name: 'Prof. João Silva',
-    email: 'professor@escola.com',
-    role: 'professor',
-    assignedClasses: ['1', '2'],
-  },
-  {
-    id: '2',
-    name: 'Maria Santos',
-    email: 'diretor@escola.com',
-    role: 'diretor',
-    assignedClasses: ['1', '2', '3'],
-  },
-  {
-    id: '3',
-    name: 'Carlos Oliveira',
-    email: 'coordenador@escola.com',
-    role: 'coordenador',
-  },
-  {
-    id: '4',
-    name: 'Ana Costa',
-    email: 'secretaria@escola.com',
-    role: 'secretaria',
-  },
-];
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [profile, setProfile] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is stored in localStorage
-    const storedUser = storage.get<User>('AUTH_USER');
-    if (storedUser) {
-      setUser(storedUser);
-    }
-    setIsLoading(false);
+    let isMounted = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!isMounted) return;
+      setSession(data.session);
+      setUser(data.session?.user ?? null);
+      setIsLoading(false);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+    });
+
+    return () => {
+      isMounted = false;
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
-  const login = async (email: string, password: string) => {
-    // Mock authentication - in production, this would call an API
-    const foundUser = MOCK_USERS.find(u => u.email === email);
-    
-    if (!foundUser) {
-      throw new Error('Usuário não encontrado');
-    }
+  useEffect(() => {
+    const fetchProfile = async (userId: string) => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-    // For demo: any password works (in production, validate properly)
-    setUser(foundUser);
-    storage.set('AUTH_USER', foundUser);
+      if (error) {
+        console.error('Failed to load profile:', error);
+        setProfile(null);
+        return;
+      }
+
+      if (!data) {
+        setProfile(null);
+        return;
+      }
+
+      setProfile({
+        id: data.id,
+        name: data.name,
+        email: user?.email ?? '',
+        role: data.role ?? 'diretor',
+      });
+    };
+
+    if (session?.user?.id) {
+      fetchProfile(session.user.id);
+    } else {
+      setProfile(null);
+    }
+  }, [session?.user?.id, user?.email]);
+
+  const login = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      throw error;
+    }
   };
 
   const logout = () => {
-    setUser(null);
-    storage.remove('AUTH_USER');
+    supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, profile, login, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

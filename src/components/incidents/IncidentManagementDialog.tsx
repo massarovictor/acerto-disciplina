@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Incident, IncidentStatus, FollowUpType } from '@/types';
-import { useIncidents, useClasses, useStudents } from '@/hooks/useLocalStorage';
+import { useIncidents, useClasses, useStudents } from '@/hooks/useData';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Clock, CheckCircle, Plus, FileText } from 'lucide-react';
@@ -44,8 +44,8 @@ export const IncidentManagementDialog = ({
   onStatusChange,
   initialTab = 'info',
 }: IncidentManagementDialogProps) => {
-  const { user } = useAuth();
-  const { incidents, updateIncident, addFollowUp } = useIncidents();
+  const { user, profile } = useAuth();
+  const { incidents, updateIncident, saveFollowUp, addComment } = useIncidents();
   const { classes } = useClasses();
   const { students } = useStudents();
   const { toast } = useToast();
@@ -117,7 +117,7 @@ export const IncidentManagementDialog = ({
   const incidentClass = classes.find(c => c.id === currentIncident.classId);
   const incidentStudents = students.filter(s => currentIncident.studentIds.includes(s.id));
 
-  const canManage = user?.role === 'diretor' || user?.role === 'coordenador';
+  const canManage = true;
   const canStartFollowUp = currentIncident.status === 'aberta' && canManage;
   const canEditFollowUp = currentIncident.status === 'acompanhamento';
   const canResolve = currentIncident.status === 'acompanhamento' &&
@@ -174,61 +174,61 @@ export const IncidentManagementDialog = ({
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!user) return;
 
-    const updatedComments = [...(currentIncident.comments || [])];
-
     if (commentText.trim()) {
-      updatedComments.push({
-        id: Date.now().toString(),
-        userId: user.id,
-        userName: user.name,
-        text: commentText,
-        createdAt: new Date().toISOString(),
-      });
-
-      updateIncident(currentIncident.id, {
-        comments: updatedComments,
-      });
-
-      toast({
-        title: 'Comentário adicionado',
-        description: 'O comentário foi salvo com sucesso.',
-      });
+      try {
+        await addComment(currentIncident.id, commentText.trim());
+        toast({
+          title: 'Comentário adicionado',
+          description: 'O comentário foi salvo com sucesso.',
+        });
+      } catch (error) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível salvar o comentário.',
+          variant: 'destructive',
+        });
+        return;
+      }
     }
 
     setCommentText('');
     onOpenChange(false);
   };
 
-  const handleStartFollowUp = () => {
+  const handleStartFollowUp = async () => {
     if (!user) return;
 
-    // Muda status para acompanhamento
-    updateIncident(incident.id, {
-      status: 'acompanhamento',
-    });
+    try {
+      await updateIncident(incident.id, {
+        status: 'acompanhamento',
+      });
 
-    toast({
-      title: 'Acompanhamento iniciado',
-      description: 'Preencha os detalhes da ação realizada na aba Acompanhamento.',
-    });
+      toast({
+        title: 'Acompanhamento iniciado',
+        description: 'Preencha os detalhes da ação realizada na aba Acompanhamento.',
+      });
 
-    // Notifica mudança de status para o componente pai trocar a aba
-    onStatusChange?.('acompanhamento');
-
-    // Muda para a aba de acompanhamento
-    setTab('followup');
+      onStatusChange?.('acompanhamento');
+      setTab('followup');
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível iniciar o acompanhamento.',
+        variant: 'destructive',
+      });
+    }
   };
 
-  const handleSaveFollowUp = () => {
+  const handleSaveFollowUp = async () => {
     if (!user) return;
 
     const followUp: any = {
       type: followUpType,
       date: followUpDate,
-      responsavel: followUpResponsavel,
+      responsavel: followUpResponsavel || profile?.name || user.email,
       createdBy: user.id,
     };
 
@@ -250,49 +250,50 @@ export const IncidentManagementDialog = ({
       followUp.descricaoSituacao = followUpDescricaoSituacao;
     }
 
-    // Se já existe acompanhamento, atualizar. Se não, adicionar
-    if (currentIncident.followUps?.length > 0) {
-      // Atualizar followUp existente
-      const updatedFollowUps = [followUp];
-      updateIncident(incident.id, {
-        followUps: updatedFollowUps.map((fu, idx) => ({
-          ...fu,
-          id: currentIncident.followUps![idx]?.id || Date.now().toString(),
-          incidentId: incident.id,
-          createdAt: currentIncident.followUps![idx]?.createdAt || new Date().toISOString(),
-        })),
+    const existingFollowUpId = currentIncident.followUps?.[0]?.id;
+    try {
+      await saveFollowUp(incident.id, followUp, existingFollowUpId);
+
+      toast({
+        title: 'Acompanhamento salvo',
+        description: 'O registro foi atualizado com sucesso',
       });
-    } else {
-      // Adicionar novo
-      addFollowUp(incident.id, followUp);
+
+      onOpenChange(false);
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível salvar o acompanhamento.',
+        variant: 'destructive',
+      });
     }
-
-    toast({
-      title: 'Acompanhamento salvo',
-      description: 'O registro foi atualizado com sucesso',
-    });
-
-    onOpenChange(false);
   };
 
-  const handleResolve = () => {
+  const handleResolve = async () => {
     if (!user) return;
 
-    updateIncident(incident.id, {
-      status: 'resolvida',
-    });
+    try {
+      await updateIncident(incident.id, {
+        status: 'resolvida',
+      });
 
-    onStatusChange?.('resolvida');
+      onStatusChange?.('resolvida');
 
-    toast({
-      title: 'Ocorrência resolvida',
-      description: 'A ocorrência foi marcada como resolvida com sucesso.',
-    });
+      toast({
+        title: 'Ocorrência resolvida',
+        description: 'A ocorrência foi marcada como resolvida com sucesso.',
+      });
 
-    // Fecha o dialog após resolver
-    setTimeout(() => {
-      onOpenChange(false);
-    }, 500);
+      setTimeout(() => {
+        onOpenChange(false);
+      }, 500);
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível resolver a ocorrência.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -323,7 +324,13 @@ export const IncidentManagementDialog = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => generateIncidentPDF(currentIncident, incidentClass, incidentStudents)}
+                  onClick={async () => {
+                    try {
+                      await generateIncidentPDF(currentIncident, incidentClass, incidentStudents);
+                    } catch (error) {
+                      console.error('Erro ao gerar PDF:', error);
+                    }
+                  }}
                   className="gap-2"
                 >
                   <FileText className="h-4 w-4" />

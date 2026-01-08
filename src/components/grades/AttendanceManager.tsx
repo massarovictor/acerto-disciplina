@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -7,120 +7,190 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { useClasses, useStudents, useAttendance, useProfessionalSubjects } from '@/hooks/useLocalStorage';
-import { Calendar, Save, Plus, AlertTriangle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useClasses, useStudents, useAttendance } from '@/hooks/useData';
+import { AlertTriangle, Calendar, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { 
   QUARTERS 
 } from '@/lib/subjects';
 
-interface StudentAttendance {
-  studentId: string;
-  totalAbsences: number; // Número total de faltas do bimestre
-}
+const STATUS_LABELS = {
+  presente: 'Presente',
+  falta: 'Falta',
+  falta_justificada: 'Falta Justificada',
+  atestado: 'Atestado',
+};
+
+type AttendanceStatus = keyof typeof STATUS_LABELS;
+
+const parseLocalDate = (value: string) => new Date(`${value}T00:00:00`);
+
+const addMonths = (date: Date, months: number) => {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + months);
+  return next;
+};
+
+const addYears = (date: Date, years: number) => {
+  const next = new Date(date);
+  next.setFullYear(next.getFullYear() + years);
+  return next;
+};
+
+const getQuarterRange = (
+  startYearDate: string | undefined,
+  currentYear: number | undefined,
+  quarter: string
+) => {
+  if (!startYearDate) return null;
+  const index = QUARTERS.indexOf(quarter);
+  if (index < 0) return null;
+
+  const startDate = parseLocalDate(startYearDate);
+  if (Number.isNaN(startDate.getTime())) return null;
+
+  const yearOffset = (currentYear ?? 1) - 1;
+  const currentYearStart = addYears(startDate, yearOffset);
+  const rangeStart = addMonths(currentYearStart, index * 2);
+  const rangeEnd = addMonths(currentYearStart, index * 2 + 2);
+
+  return { start: rangeStart, end: rangeEnd };
+};
+
+const isDateInRange = (value: string, range: { start: Date; end: Date } | null) => {
+  if (!range) return true;
+  const date = parseLocalDate(value);
+  if (Number.isNaN(date.getTime())) return false;
+  return date >= range.start && date < range.end;
+};
+
+const formatDate = (value: string) => parseLocalDate(value).toLocaleDateString('pt-BR');
 
 export const AttendanceManager = () => {
   const { classes } = useClasses();
   const { students } = useStudents();
-  const { attendance, addAttendance } = useAttendance();
+  const { attendance, addAttendance, deleteAttendance } = useAttendance();
   const { toast } = useToast();
-  const { 
-    getProfessionalSubjects, 
-    addProfessionalSubject, 
-    removeProfessionalSubject 
-  } = useProfessionalSubjects();
 
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedQuarter, setSelectedQuarter] = useState('1º Bimestre');
-  const [studentAttendances, setStudentAttendances] = useState<StudentAttendance[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
-  const [newProfessionalSubject, setNewProfessionalSubject] = useState('');
-  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [attendanceForm, setAttendanceForm] = useState<{
+    date: string;
+    status: AttendanceStatus;
+  }>({
+    date: '',
+    status: 'falta',
+  });
 
   const classStudents = students.filter(s => s.classId === selectedClass);
   const selectedClassData = classes.find(c => c.id === selectedClass);
-  
-  // Verificar se a turma está arquivada
+
   const isClassArchived = selectedClassData?.archived === true;
-  
-  // Obter disciplinas profissionais da turma (armazenadas no localStorage)
-  const professionalSubjects = selectedClass ? getProfessionalSubjects(selectedClass) : [];
+  const isClassInactive = selectedClassData?.active === false;
+  const isClassLocked = isClassArchived || isClassInactive;
 
-  // Initialize attendance when class changes
-  useEffect(() => {
-    if (selectedClass && selectedQuarter) {
-      const initialAttendances = classStudents.map(student => {
-        // Contar faltas totais do bimestre para este aluno
-        // Assumindo que cada registro de falta representa uma falta
-        const quarterAttendances = attendance.filter(
-          a => a.studentId === student.id && 
-               a.classId === selectedClass &&
-               (a.status === 'falta' || a.status === 'falta_justificada' || a.status === 'atestado')
-        );
-        
-        return {
-          studentId: student.id,
-          totalAbsences: quarterAttendances.length,
-        };
-      });
+  const quarterRange = useMemo(
+    () =>
+      getQuarterRange(
+        selectedClassData?.startYearDate,
+        selectedClassData?.currentYear,
+        selectedQuarter
+      ),
+    [selectedClassData?.startYearDate, selectedClassData?.currentYear, selectedQuarter]
+  );
 
-      setStudentAttendances(initialAttendances);
-    } else {
-      setStudentAttendances([]);
-    }
-  }, [selectedClass, selectedQuarter, classStudents.length, attendance.length]);
-
-  const handleAddProfessionalSubject = () => {
-    if (newProfessionalSubject.trim() && selectedClass) {
-      addProfessionalSubject(selectedClass, newProfessionalSubject.trim());
-      setNewProfessionalSubject('');
-      setShowAddDialog(false);
-      toast({
-        title: 'Disciplina adicionada',
-        description: 'A disciplina foi adicionada com sucesso e estará disponível em Notas e Frequência.',
-      });
-    }
-  };
-
-  const handleRemoveProfessionalSubject = (subject: string) => {
-    if (selectedClass) {
-      removeProfessionalSubject(selectedClass, subject);
-    }
-  };
-
-  const handleSaveStudentAttendance = () => {
-    if (!selectedStudent || !selectedClass || !selectedQuarter) return;
-
-    const studentAtt = studentAttendances.find(sa => sa.studentId === selectedStudent);
-    if (!studentAtt) return;
-
-    const student = students.find(s => s.id === selectedStudent);
-    const totalAbsences = studentAtt.totalAbsences;
-
-    // Aqui você pode salvar o número total de faltas do bimestre
-    // Por enquanto, apenas mostra uma mensagem
-    toast({
-      title: 'Frequência salva',
-      description: `${totalAbsences} falta(s) de ${student?.name} registrada(s) no ${selectedQuarter}.`,
-    });
-
-    setSelectedStudent(null);
-  };
-
-  const updateAbsences = (studentId: string, value: string) => {
-    const numValue = parseInt(value) || 0;
-    setStudentAttendances(prev =>
-      prev.map(sa => {
-        if (sa.studentId === studentId) {
-          return {
-            ...sa,
-            totalAbsences: Math.max(0, numValue)
-          };
-        }
-        return sa;
-      })
+  const classAttendance = useMemo(() => {
+    if (!selectedClass) return [];
+    return attendance.filter(
+      record => record.classId === selectedClass && isDateInRange(record.date, quarterRange)
     );
+  }, [attendance, selectedClass, quarterRange]);
+
+  const attendanceByStudent = useMemo(() => {
+    const map = new Map<string, typeof classAttendance>();
+    classAttendance.forEach(record => {
+      const list = map.get(record.studentId) || [];
+      list.push(record);
+      map.set(record.studentId, list);
+    });
+    return map;
+  }, [classAttendance]);
+
+  const selectedStudentRecords = useMemo(() => {
+    if (!selectedStudent) return [];
+    const records = attendanceByStudent.get(selectedStudent) || [];
+    return [...records].sort((a, b) => b.date.localeCompare(a.date));
+  }, [attendanceByStudent, selectedStudent]);
+
+  useEffect(() => {
+    if (!selectedStudent) return;
+    const today = new Date().toISOString().slice(0, 10);
+    setAttendanceForm({
+      date: today,
+      status: 'falta',
+    });
+  }, [selectedStudent]);
+
+  const handleAddAttendance = async () => {
+    if (!selectedStudent || !selectedClass || !attendanceForm.date) {
+      toast({
+        title: 'Erro',
+        description: 'Selecione a data e o aluno para registrar a frequência.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (isClassLocked) {
+      toast({
+        title: 'Turma bloqueada',
+        description: isClassArchived
+          ? 'Esta turma está arquivada e não aceita frequência.'
+          : 'Esta turma está inativa e não aceita frequência.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      await addAttendance({
+        studentId: selectedStudent,
+        classId: selectedClass,
+        date: attendanceForm.date,
+        status: attendanceForm.status,
+      });
+
+      toast({
+        title: 'Frequência registrada',
+        description: 'Registro adicionado com sucesso.',
+      });
+
+      setAttendanceForm((prev) => ({
+        ...prev,
+        status: 'falta',
+      }));
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível salvar a frequência.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteAttendance = async (id: string) => {
+    if (isClassLocked) return;
+    try {
+      await deleteAttendance(id);
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível excluir o registro.',
+        variant: 'destructive',
+      });
+    }
   };
 
 
@@ -143,7 +213,7 @@ export const AttendanceManager = () => {
                     </div>
                   ) : (
                     classes
-                      .filter(cls => !cls.archived)
+                      .filter(cls => cls.active && !cls.archived)
                       .map(cls => (
                         <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
                       ))
@@ -167,16 +237,18 @@ export const AttendanceManager = () => {
             </div>
           </div>
 
-          {isClassArchived && (
+          {isClassLocked && (
             <Alert variant="destructive" className="mt-4">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Esta turma está arquivada. Não é possível registrar frequência para turmas arquivadas.
+                {isClassArchived
+                  ? 'Esta turma está arquivada. Não é possível registrar frequência para turmas arquivadas.'
+                  : 'Esta turma está inativa. Não é possível registrar frequência para turmas inativas.'}
               </AlertDescription>
             </Alert>
           )}
 
-          {selectedClass && !isClassArchived && (
+          {selectedClass && !isClassLocked && (
             <Alert className="mt-4">
               <Calendar className="h-4 w-4" />
               <AlertDescription>
@@ -185,44 +257,19 @@ export const AttendanceManager = () => {
               </AlertDescription>
             </Alert>
           )}
+
+          {selectedClass && !selectedClassData?.startYearDate && (
+            <Alert className="mt-4">
+              <AlertDescription>
+                Defina a data de início da turma para organizar os registros por bimestre. Sem essa data, todos os registros serão exibidos.
+              </AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
 
-      {/* Add Professional Subject Button */}
-      {selectedClass && classStudents.length > 0 && !isClassArchived && (
-        <div className="flex justify-end">
-          <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Disciplina Profissional
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Adicionar Disciplina da Base Profissional</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Nome da Disciplina</Label>
-                  <Input
-                    placeholder="Ex: Gestão de Processos"
-                    value={newProfessionalSubject}
-                    onChange={(e) => setNewProfessionalSubject(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddProfessionalSubject()}
-                  />
-                </div>
-                <Button onClick={handleAddProfessionalSubject} className="w-full">
-                  Adicionar
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      )}
-
       {/* Students List */}
-      {selectedClass && classStudents.length > 0 && !isClassArchived && (
+      {selectedClass && classStudents.length > 0 && !isClassLocked && (
         <Card>
           <CardHeader>
             <CardTitle>Alunos - Clique para Registrar Faltas</CardTitle>
@@ -230,8 +277,11 @@ export const AttendanceManager = () => {
           <CardContent>
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
               {classStudents.map((student) => {
-                const studentAtt = studentAttendances.find(sa => sa.studentId === student.id);
-                const totalAbsences = studentAtt?.totalAbsences || 0;
+                const records = attendanceByStudent.get(student.id) || [];
+                const totalAbsences = records.filter(
+                  record => record.status !== 'presente'
+                ).length;
+                const totalRecords = records.length;
 
                 return (
                   <Card 
@@ -256,7 +306,7 @@ export const AttendanceManager = () => {
                             {student.enrollment || 'S/N'}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {totalAbsences} falta(s) no bimestre
+                            {totalAbsences} falta(s) em {totalRecords} registro(s)
                           </p>
                         </div>
                       </div>
@@ -283,52 +333,96 @@ export const AttendanceManager = () => {
               <Alert>
                 <Calendar className="h-4 w-4" />
                 <AlertDescription>
-                  Informe o número total de faltas do aluno no <strong>{selectedQuarter}</strong>.
+                  Registre a data e o status da frequência no <strong>{selectedQuarter}</strong>.
                 </AlertDescription>
               </Alert>
 
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="total-absences">Número Total de Faltas no Bimestre</Label>
-                  <Input
-                    id="total-absences"
-                    type="number"
-                    min="0"
-                    placeholder="Digite o número total de faltas"
-                    value={studentAttendances.find(sa => sa.studentId === selectedStudent)?.totalAbsences || 0}
-                    onChange={(e) => updateAbsences(selectedStudent, e.target.value)}
-                    className="text-2xl font-bold text-center"
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Este número representa todas as faltas do aluno no {selectedQuarter}, independente da disciplina.
-                  </p>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="attendance-date">Data *</Label>
+                    <Input
+                      id="attendance-date"
+                      type="date"
+                      value={attendanceForm.date}
+                      onChange={(e) =>
+                        setAttendanceForm((prev) => ({ ...prev, date: e.target.value }))
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="attendance-status">Status *</Label>
+                    <Select
+                      value={attendanceForm.status}
+                      onValueChange={(value) =>
+                        setAttendanceForm((prev) => ({
+                          ...prev,
+                          status: value as AttendanceStatus,
+                        }))
+                      }
+                    >
+                      <SelectTrigger id="attendance-status">
+                        <SelectValue placeholder="Selecione o status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="presente">Presente</SelectItem>
+                        <SelectItem value="falta">Falta</SelectItem>
+                        <SelectItem value="falta_justificada">Falta Justificada</SelectItem>
+                        <SelectItem value="atestado">Atestado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
-                {/* Mostrar disciplinas profissionais apenas para referência */}
-                {professionalSubjects.length > 0 && (
-                  <div className="space-y-2 pt-4 border-t">
-                    <Label className="text-sm text-muted-foreground">
-                      Disciplinas Profissionais da Turma (apenas referência)
-                    </Label>
-                    <div className="flex flex-wrap gap-2">
-                      {professionalSubjects.map(subject => (
-                        <Badge key={subject} variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/30">
-                          {subject}
-                        </Badge>
+                <Button onClick={handleAddAttendance} className="w-full">
+                  Registrar Frequência
+                </Button>
+
+                <div className="space-y-2 pt-4 border-t">
+                  <Label className="text-sm text-muted-foreground">
+                    Registros do {selectedQuarter}
+                  </Label>
+                  {selectedStudentRecords.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Nenhum registro encontrado para este bimestre.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {selectedStudentRecords.map((record) => (
+                        <div
+                          key={record.id}
+                          className="flex items-center justify-between rounded-md border p-2"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-medium">
+                              {formatDate(record.date)}
+                            </span>
+                            <Badge variant="outline">
+                              {STATUS_LABELS[record.status as AttendanceStatus]}
+                            </Badge>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteAttendance(record.id)}
+                            title="Excluir registro"
+                          >
+                            <Trash2 className="h-4 w-4 text-severity-critical" />
+                          </Button>
+                        </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4 border-t">
-                <Button onClick={handleSaveStudentAttendance} className="flex-1">
-                  <Save className="h-4 w-4 mr-2" />
-                  Salvar Faltas
-                </Button>
                 <Button
                   variant="outline"
+                  className="flex-1"
                   onClick={() => setSelectedStudent(null)}
                 >
                   Cancelar
@@ -339,7 +433,7 @@ export const AttendanceManager = () => {
         </DialogContent>
       </Dialog>
 
-      {selectedClass && classStudents.length === 0 && (
+      {selectedClass && classStudents.length === 0 && !isClassLocked && (
         <Alert>
           <AlertDescription>
             Nenhum aluno cadastrado nesta turma. Cadastre alunos para registrar frequência.
@@ -349,4 +443,3 @@ export const AttendanceManager = () => {
     </div>
   );
 };
-

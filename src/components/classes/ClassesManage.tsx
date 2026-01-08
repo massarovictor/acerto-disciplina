@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -43,8 +43,8 @@ import {
   useAttendance,
   useProfessionalSubjects,
   useIncidents,
-} from "@/hooks/useLocalStorage";
-import { MOCK_USERS, MOCK_COURSES } from "@/data/mockData";
+  useProfessionalSubjectTemplates,
+} from "@/hooks/useData";
 import { useToast } from "@/hooks/use-toast";
 import {
   Search,
@@ -55,18 +55,26 @@ import {
   Calendar,
   AlertTriangle,
   Archive,
+  Clock,
 } from "lucide-react";
 import { Class } from "@/types";
-import { getAcademicYear } from "@/lib/classYearCalculator";
+import { getAcademicYear, shouldArchiveClass } from "@/lib/classYearCalculator";
+import { getCourseCode } from "@/lib/classNumber";
+import { useAuth } from "@/contexts/AuthContext";
 
-export const ClassesManage = () => {
+interface ClassesManageProps {
+  highlightId?: string | null;
+}
+
+export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
   const { classes, updateClass, deleteClass, archiveClass } = useClasses();
   const { students, updateStudent } = useStudents();
   const { grades, deleteGrade } = useGrades();
   const { attendance, deleteAttendance } = useAttendance();
-  const { getProfessionalSubjects, setProfessionalSubjectsForClass } =
-    useProfessionalSubjects();
+  const { setProfessionalSubjectsForClass } = useProfessionalSubjects();
   const { incidents } = useIncidents();
+  const { templates, getTemplate } = useProfessionalSubjectTemplates();
+  const { profile } = useAuth();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<
@@ -82,13 +90,19 @@ export const ClassesManage = () => {
     attendanceCount: number;
     incidentCount: number;
   } | null>(null);
+  const [archiveReason, setArchiveReason] = useState("Arquivamento manual");
   const [editFormData, setEditFormData] = useState({
+    templateId: "",
     series: "",
     letter: "",
     course: "",
     directorId: "",
     active: true,
+    startYear: undefined as 1 | 2 | 3 | undefined,
+    currentYear: undefined as 1 | 2 | 3 | undefined,
+    startYearDate: "",
   });
+  const [templateSubjects, setTemplateSubjects] = useState<string[]>([]);
   const [archivingClass, setArchivingClass] = useState<Class | null>(null);
 
   const filteredClasses = classes.filter((cls) => {
@@ -109,8 +123,8 @@ export const ClassesManage = () => {
 
   const getDirectorName = (directorId?: string) => {
     if (!directorId) return null;
-    const director = MOCK_USERS.find((u) => u.id === directorId);
-    return director?.name || "Não encontrado";
+    if (directorId === profile?.id) return profile?.name || "Diretor";
+    return "Não encontrado";
   };
 
   const getStudentCount = (classId: string) => {
@@ -118,22 +132,72 @@ export const ClassesManage = () => {
   };
 
   const handleEditClick = (cls: Class) => {
-    const parts = cls.name.split(" - ");
-    const seriesLetter = parts[0].split(" ");
     setEditFormData({
-      series: seriesLetter[0] || "",
-      letter: seriesLetter[1] || "",
+      templateId: cls.templateId || "",
+      series: cls.series || "",
+      letter: cls.letter || "",
       course: cls.course || "",
       directorId: cls.directorId || "",
       active: cls.active,
+      startYear: cls.startYear,
+      currentYear: cls.currentYear,
+      startYearDate: cls.startYearDate || "",
     });
     setEditingClass(cls);
   };
 
-  const handleSaveEdit = () => {
+  useEffect(() => {
+    if (!editingClass) {
+      setTemplateSubjects([]);
+      return;
+    }
+
+    const hasTemplate = !!editFormData.templateId && editFormData.templateId !== "none" && editFormData.templateId !== "";
+    if (!hasTemplate) {
+      setTemplateSubjects([]);
+      return;
+    }
+
+    const template = getTemplate(editFormData.templateId);
+    if (!template) {
+      setTemplateSubjects([]);
+      return;
+    }
+
+    // CORREÇÃO: Usar currentYear (ano atual) em vez de startYear (ano de início)
+    // Se a turma está no 3º ano, deve usar disciplinas do 3º ano, não do 1º!
+    const preferredYear = editFormData.currentYear || editFormData.startYear;
+    
+    const yearFromTemplate = preferredYear &&
+      template.subjectsByYear.some((y) => y.year === preferredYear)
+      ? preferredYear
+      : template.subjectsByYear[0]?.year;
+
+    if (yearFromTemplate && yearFromTemplate !== editFormData.startYear && !editFormData.currentYear) {
+      setEditFormData((prev) => ({ ...prev, startYear: yearFromTemplate }));
+    }
+
+    if (editFormData.course !== template.course) {
+      setEditFormData((prev) => ({ ...prev, course: template.course }));
+    }
+
+    const yearData = yearFromTemplate
+      ? template.subjectsByYear.find((y) => y.year === yearFromTemplate)
+      : undefined;
+    setTemplateSubjects(yearData?.subjects ?? []);
+  }, [editingClass, editFormData.templateId, editFormData.startYear, editFormData.currentYear, editFormData.course, getTemplate]);
+
+  const handleSaveEdit = async () => {
     if (!editingClass) return;
 
-    // Validação - apenas série e letra são obrigatórios
+    const trimmedCourse = editFormData.course.trim();
+    const hasTemplate =
+      !!editFormData.templateId && editFormData.templateId !== "none" && editFormData.templateId !== "";
+    const selectedTemplate = hasTemplate
+      ? getTemplate(editFormData.templateId)
+      : undefined;
+
+    // Validação - série, letra, ano e data de início são obrigatórios
     if (!editFormData.series || !editFormData.letter) {
       toast({
         title: "Erro",
@@ -143,9 +207,81 @@ export const ClassesManage = () => {
       return;
     }
 
+    if (!editFormData.startYear) {
+      toast({
+        title: "Erro",
+        description: "Selecione o ano de início da turma.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!editFormData.startYearDate) {
+      toast({
+        title: "Erro",
+        description: "Informe a data de início do ano letivo.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (hasTemplate && !selectedTemplate) {
+      toast({
+        title: "Erro",
+        description: "Template selecionado não encontrado.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (trimmedCourse && !hasTemplate) {
+      toast({
+        title: "Erro",
+        description:
+          "Para turmas com curso técnico, você deve selecionar um template de disciplinas.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const resolvedCourse = selectedTemplate?.course ?? trimmedCourse;
+
+    if (!resolvedCourse) {
+      toast({
+        title: "Erro",
+        description: "Informe o curso tecnico da turma.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!getCourseCode(resolvedCourse)) {
+      toast({
+        title: "Erro",
+        description:
+          "Curso tecnico nao reconhecido. Use um dos cursos cadastrados.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (hasTemplate && editFormData.startYear) {
+      const yearData = selectedTemplate?.subjectsByYear.find(
+        (y) => y.year === editFormData.startYear,
+      );
+      if (!yearData || yearData.subjects.length === 0) {
+        toast({
+          title: "Erro",
+          description: `O template selecionado não possui disciplinas para o ${editFormData.startYear}º ano.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     // Gerar nome: se houver curso, incluir; senão, apenas série e letra
-    const newName = editFormData.course.trim()
-      ? `${editFormData.series} ${editFormData.letter} - ${editFormData.course.trim()}`
+    const newName = resolvedCourse.trim()
+      ? `${editFormData.series} ${editFormData.letter} - ${resolvedCourse.trim()}`
       : `${editFormData.series} ${editFormData.letter}`;
 
     const duplicate = classes.find(
@@ -160,20 +296,38 @@ export const ClassesManage = () => {
       return;
     }
 
-    updateClass(editingClass.id, {
-      name: newName,
-      series: editFormData.series,
-      course: editFormData.course.trim() || undefined,
-      directorId: editFormData.directorId || undefined,
-      active: editFormData.active,
-    });
+    try {
+      await updateClass(editingClass.id, {
+        name: newName,
+        series: editFormData.series,
+        letter: editFormData.letter,
+        course: resolvedCourse.trim() || undefined,
+        directorId: editFormData.directorId || undefined,
+        active: editFormData.active,
+        startYear: editFormData.startYear,
+        currentYear: editFormData.currentYear,
+        startYearDate: editFormData.startYearDate,
+        templateId: hasTemplate && editFormData.templateId ? editFormData.templateId : null,
+      });
 
-    toast({
-      title: "Sucesso",
-      description: "Turma atualizada com sucesso.",
-    });
+      await setProfessionalSubjectsForClass(
+        editingClass.id,
+        hasTemplate ? templateSubjects : [],
+      );
 
-    setEditingClass(null);
+      toast({
+        title: "Sucesso",
+        description: "Turma atualizada com sucesso.",
+      });
+
+      setEditingClass(null);
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar a turma.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDeleteClick = (cls: Class) => {
@@ -204,62 +358,81 @@ export const ClassesManage = () => {
     });
   };
 
-  const handleCascadeDelete = () => {
+  const handleCascadeDelete = async () => {
     if (!deleteConfirmData) return;
 
     const { classData, studentCount, gradeCount, attendanceCount } =
       deleteConfirmData;
 
-    // 1. Deletar todas as notas da turma
-    grades
-      .filter((g) => g.classId === classData.id)
-      .forEach((grade) => deleteGrade(grade.id));
-
-    // 2. Deletar todas as frequências da turma
-    attendance
-      .filter((a) => a.classId === classData.id)
-      .forEach((att) => deleteAttendance(att.id));
-
-    // 3. Atualizar status dos alunos para 'transferred'
-    students
-      .filter((s) => s.classId === classData.id)
-      .forEach((student) =>
-        updateStudent(student.id, { status: "transferred" }),
+    try {
+      await Promise.all(
+        grades
+          .filter((g) => g.classId === classData.id)
+          .map((grade) => deleteGrade(grade.id)),
       );
 
-    // 4. Remover disciplinas profissionais da turma
-    setProfessionalSubjectsForClass(classData.id, []);
+      await Promise.all(
+        attendance
+          .filter((a) => a.classId === classData.id)
+          .map((att) => deleteAttendance(att.id)),
+      );
 
-    // 5. Deletar a turma
-    deleteClass(classData.id);
+      await Promise.all(
+        students
+          .filter((s) => s.classId === classData.id)
+          .map((student) =>
+            updateStudent(student.id, { status: "transferred" }),
+          ),
+      );
 
-    toast({
-      title: "Turma excluída",
-      description: `Turma excluída com sucesso. ${studentCount} aluno(s) transferido(s), ${gradeCount} nota(s) e ${attendanceCount} registro(s) de frequência removidos.`,
-    });
+      await setProfessionalSubjectsForClass(classData.id, []);
+      await deleteClass(classData.id);
 
-    setDeleteConfirmData(null);
+      toast({
+        title: "Turma excluída",
+        description: `Turma excluída com sucesso. ${studentCount} aluno(s) transferido(s), ${gradeCount} nota(s) e ${attendanceCount} registro(s) de frequência removidos.`,
+      });
+
+      setDeleteConfirmData(null);
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir a turma.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const directors = MOCK_USERS.filter((u) => u.role === "diretor");
+  const directors = profile ? [profile] : [];
+  const editHasTemplate =
+    !!editFormData.templateId && editFormData.templateId !== "none" && editFormData.templateId !== "";
 
-  const handleArchive = () => {
+  const handleArchive = async () => {
     if (!archivingClass) return;
 
-    // 1. Arquivar a turma
-    archiveClass(archivingClass.id, "Arquivamento manual");
+    try {
+      await archiveClass(archivingClass.id, archiveReason);
 
-    // 2. Marcar alunos como inativos
-    students
-      .filter((s) => s.classId === archivingClass.id)
-      .forEach((student) => updateStudent(student.id, { status: "inactive" }));
+      await Promise.all(
+        students
+          .filter((s) => s.classId === archivingClass.id)
+          .map((student) => updateStudent(student.id, { status: "inactive" })),
+      );
 
-    toast({
-      title: "Turma arquivada",
-      description: `A turma ${archivingClass.name} foi arquivada com sucesso.`,
-    });
+      toast({
+        title: "Turma arquivada",
+        description: `A turma ${archivingClass.name} foi arquivada com sucesso.`,
+      });
 
-    setArchivingClass(null);
+      setArchivingClass(null);
+      setArchiveReason("Arquivamento manual");
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível arquivar a turma.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -348,8 +521,18 @@ export const ClassesManage = () => {
                         ? getAcademicYear(cls.startYearDate, cls.currentYear)
                         : null;
 
+                    const shouldSuggestArchive =
+                      !!cls.startYearDate &&
+                      !!cls.startYear &&
+                      shouldArchiveClass(cls.startYearDate, cls.startYear);
+
+                    const isHighlighted = highlightId === cls.id;
+                    
                     return (
-                      <TableRow key={cls.id}>
+                      <TableRow 
+                        key={cls.id}
+                        className={isHighlighted ? "bg-primary/10 animate-pulse ring-2 ring-primary/50" : ""}
+                      >
                         <TableCell className="font-mono font-medium">
                           {cls.classNumber}
                         </TableCell>
@@ -416,10 +599,26 @@ export const ClassesManage = () => {
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
+                            {shouldSuggestArchive && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setArchiveReason("Conclusão do curso");
+                                  setArchivingClass(cls);
+                                }}
+                                title="Tempo concluído - arquivar turma"
+                              >
+                                <Clock className="h-4 w-4 text-amber-600" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => setArchivingClass(cls)}
+                              onClick={() => {
+                                setArchiveReason("Arquivamento manual");
+                                setArchivingClass(cls);
+                              }}
                               title="Arquivar turma"
                             >
                               <Archive className="h-4 w-4 text-amber-600" />
@@ -565,6 +764,55 @@ export const ClassesManage = () => {
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="edit-template">Template de Disciplinas</Label>
+                  <Select
+                    value={editFormData.templateId || "none"}
+                    onValueChange={(value) =>
+                      setEditFormData({
+                        ...editFormData,
+                        templateId: value === "none" ? "" : value,
+                      })
+                    }
+                  >
+                    <SelectTrigger id="edit-template">
+                      <SelectValue placeholder="Selecione um template" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">
+                        Sem template (Ensino Médio Regular)
+                      </SelectItem>
+                      {templates.length === 0 ? (
+                        <SelectItem value="no-templates" disabled>
+                          Nenhum template cadastrado
+                        </SelectItem>
+                      ) : (
+                        templates.map((template) => {
+                          const totalSubjects = template.subjectsByYear.reduce(
+                            (sum, y) => sum + y.subjects.length,
+                            0,
+                          );
+                          return (
+                            <SelectItem key={template.id} value={template.id}>
+                              {template.name} - {template.course} (
+                              {totalSubjects} disciplinas)
+                            </SelectItem>
+                          );
+                        })
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {templates.length === 0 ? (
+                    <p className="text-sm text-destructive">
+                      ⚠️ Nenhum template cadastrado. Vá em "Templates de Disciplinas" para criar um.
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      O curso e as disciplinas profissionais serão definidos pelo template.
+                    </p>
+                  )}
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="edit-series">Série *</Label>
                   <Select
@@ -612,11 +860,94 @@ export const ClassesManage = () => {
                         course: e.target.value,
                       })
                     }
+                    disabled={editHasTemplate}
                   />
                   <p className="text-sm text-muted-foreground">
                     Exemplos: Técnico em Informática, Ensino Médio Regular, etc.
                   </p>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-startYear">Ano de Início *</Label>
+                  <Select
+                    value={editFormData.startYear?.toString() || ""}
+                    onValueChange={(value) =>
+                      setEditFormData({
+                        ...editFormData,
+                        startYear: parseInt(value) as 1 | 2 | 3,
+                      })
+                    }
+                  >
+                    <SelectTrigger id="edit-startYear">
+                      <SelectValue placeholder="Selecione o ano de início" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1º ano</SelectItem>
+                      <SelectItem value="2">2º ano</SelectItem>
+                      <SelectItem value="3">3º ano</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-currentYear">Ano Atual (Opcional)</Label>
+                  <Select
+                    value={editFormData.currentYear?.toString() || ""}
+                    onValueChange={(value) =>
+                      setEditFormData({
+                        ...editFormData,
+                        currentYear: parseInt(value) as 1 | 2 | 3,
+                      })
+                    }
+                  >
+                    <SelectTrigger id="edit-currentYear">
+                      <SelectValue placeholder="Selecione o ano atual" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1º ano</SelectItem>
+                      <SelectItem value="2">2º ano</SelectItem>
+                      <SelectItem value="3">3º ano</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="edit-startYearDate">Data de Início do Ano *</Label>
+                  <Input
+                    id="edit-startYearDate"
+                    type="date"
+                    value={editFormData.startYearDate}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        startYearDate: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+                {editHasTemplate && editFormData.startYear && (
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Disciplinas Profissionais do {editFormData.startYear}º Ano</Label>
+                    {templateSubjects.length === 0 ? (
+                      <p className="text-sm text-destructive">
+                        O template selecionado não possui disciplinas para este ano.
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2 p-3 border rounded-md bg-muted/50">
+                        {templateSubjects.map((subject, index) => (
+                          <Badge
+                            key={`${subject}-${index}`}
+                            variant="outline"
+                            className="bg-amber-500/10 text-amber-700 border-amber-500/30"
+                          >
+                            {subject}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="edit-director">Diretor</Label>
@@ -765,4 +1096,3 @@ export const ClassesManage = () => {
     </div>
   );
 };
-
