@@ -161,7 +161,7 @@ export const ClassSlide5 = ({ classData, students, incidents }: ClassSlide5Props
             Gerado em {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR')}
           </span>
         </div>
-        <span>Sistema de Gestão Escolar | Confidencial</span>
+        <span>MAVIC - Sistema de Acompanhamento Escolar | Confidencial</span>
       </div>
     </div>
   );

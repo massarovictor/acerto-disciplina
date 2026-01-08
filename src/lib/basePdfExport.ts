@@ -178,7 +178,7 @@ export class BasePDFGenerator {
     
     this.setFont('2xs', 'normal', REPORT_COLORS.text.tertiary);
     this.drawText(
-      `Gerado por Acerto Disciplina System em ${new Date().toLocaleDateString('pt-BR')}`,
+      `Gerado por MAVIC - Sistema de Acompanhamento Escolar em ${new Date().toLocaleDateString('pt-BR')}`,
       this.margin,
       footerY
     );

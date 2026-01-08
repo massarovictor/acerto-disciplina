@@ -24,7 +24,7 @@ const Login = () => {
       await login(email, password);
       toast({
         title: 'Login realizado',
-        description: 'Bem-vindo ao Sistema de Ocorrências',
+        description: 'Bem-vindo ao MAVIC',
       });
       navigate('/');
     } catch (error) {
@@ -48,9 +48,9 @@ const Login = () => {
             </div>
           </div>
           <div>
-            <CardTitle className="text-2xl">Sistema de Ocorrências Escolares</CardTitle>
+            <CardTitle className="text-2xl">MAVIC</CardTitle>
             <CardDescription className="mt-2">
-              Faça login para acessar o sistema
+              Sistema de Acompanhamento Escolar
             </CardDescription>
           </div>
         </CardHeader>

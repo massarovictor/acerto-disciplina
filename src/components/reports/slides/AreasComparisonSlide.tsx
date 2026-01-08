@@ -62,7 +62,7 @@ export const AreasComparisonSlide = ({
         <SlideLayout
             title="Comparativo Entre Áreas"
             subtitle={`Visão holística do desempenho • ${period === 'all' ? 'Ano Letivo' : period}`}
-            footer="Acerto Disciplina System"
+            footer="MAVIC - Sistema de Acompanhamento Escolar"
         >
             <div style={{ display: 'flex', gap: 24, height: '100%' }}>
                 {/* Left: Radar Chart */}

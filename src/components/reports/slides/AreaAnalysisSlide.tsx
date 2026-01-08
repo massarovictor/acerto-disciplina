@@ -86,7 +86,7 @@ export const AreaAnalysisSlide = ({
         <SlideLayout
             title={areaName}
             subtitle={`Análise detalhada • ${period === 'all' ? 'Ano Letivo' : period}`}
-            footer="Acerto Disciplina System"
+            footer="MAVIC - Sistema de Acompanhamento Escolar"
         >
             <div style={{ display: 'flex', gap: 24, height: '100%' }}>
                 {/* Left: Chart */}

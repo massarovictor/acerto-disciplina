@@ -35,7 +35,7 @@ export const AppSidebar = () => {
             <GraduationCap className="h-5 w-5" />
           </div>
           <div className="flex flex-col">
-            <span className="font-semibold text-sm">Sistema de Ocorrências</span>
+            <span className="font-semibold text-sm">MAVIC</span>
             <span className="text-xs text-muted-foreground">
               {profile?.name || user?.email}
             </span>

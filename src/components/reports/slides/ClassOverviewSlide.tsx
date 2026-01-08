@@ -123,7 +123,7 @@ export const ClassOverviewSlide = ({
     <SlideLayout
       title={`${classData.name} — Visão Geral`}
       subtitle={`${period === 'all' ? 'Ano Letivo Completo' : period} • ${new Date().getFullYear()}`}
-      footer="Acerto Disciplina System"
+      footer="MAVIC - Sistema de Acompanhamento Escolar"
     >
       <div style={{ display: 'flex', gap: 32, height: '100%' }}>
         {/* Left Column: KPIs */}
