@@ -187,7 +187,7 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
 
   const activeSlides = viewMode === 'class' ? classSlides : individualSlides;
   const maxSlides = Math.max(1, activeSlides.length);
-  const effectiveScale = slideScale * (isFullscreen ? 1 : previewZoom);
+  const effectiveScale = slideScale * previewZoom;
 
   useEffect(() => {
     if (!activeSlides.length) return;
@@ -199,6 +199,7 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(Boolean(document.fullscreenElement));
+      setPreviewZoom(1); // Reset zoom to 100% when entering/exiting fullscreen
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
@@ -212,7 +213,6 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
       if (document.fullscreenElement) {
         await document.exitFullscreen();
       } else {
-        setCurrentSlide(1);
         await container.requestFullscreen();
       }
     } catch {
@@ -259,6 +259,26 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
 
     return () => observer.disconnect();
   }, [SLIDE_HEIGHT, SLIDE_WIDTH]);
+
+  // Mouse wheel zoom
+  useEffect(() => {
+    const container = slideContainerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        setPreviewZoom(prev => {
+          const next = parseFloat((prev + delta).toFixed(2));
+          return Math.min(5, Math.max(0.1, next));
+        });
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, []);
   const handleExportPDF = async () => {
     const slideElement = document.getElementById('slide-container');
     if (!slideElement) return;
@@ -386,30 +406,45 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
           </Tabs>
 
           {shouldShowSlides && (
-            <div className="flex items-center justify-between pt-4 border-t">
+            <div className="flex flex-col md:flex-row items-center justify-between pt-4 border-t gap-4">
               <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={handleExportPDF}>
                   <Download className="h-4 w-4 mr-2" />
                   Exportar PDF
                 </Button>
-                {!isFullscreen && (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setPreviewZoom(prev => Math.min(1.3, parseFloat((prev + 0.1).toFixed(2))))}
-                    >
-                      <ZoomIn className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setPreviewZoom(prev => Math.max(0.7, parseFloat((prev - 0.1).toFixed(2))))}
-                    >
-                      <ZoomOut className="h-4 w-4" />
-                    </Button>
-                  </>
-                )}
+
+                <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-md border">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setPreviewZoom(prev => Math.max(0.2, parseFloat((prev - 0.1).toFixed(2))))}
+                    title="Diminuir Zoom"
+                  >
+                    <ZoomOut className="h-4 w-4" />
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-xs font-mono"
+                    onClick={() => setPreviewZoom(1)}
+                    title="Resetar Zoom"
+                  >
+                    {Math.round(previewZoom * 100)}%
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setPreviewZoom(prev => Math.min(3, parseFloat((prev + 0.1).toFixed(2))))}
+                    title="Aumentar Zoom"
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                  </Button>
+                </div>
+
                 <Button variant="outline" onClick={handleToggleFullscreen}>
                   {isFullscreen ? (
                     <Minimize2 className="h-4 w-4 mr-2" />
@@ -430,7 +465,7 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
 
-                <span className="text-sm font-medium px-4">
+                <span className="text-sm font-medium px-4 min-w-[120px] text-center">
                   Slide {currentSlide} de {maxSlides}
                 </span>
 
@@ -453,8 +488,7 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
           <div
             id="slide-container"
             ref={slideContainerRef}
-            className="aspect-[16/9] bg-background border-2 rounded-lg shadow-lg relative"
-            style={{ overflow: isFullscreen ? 'hidden' : 'auto' }}
+            className="aspect-[16/9] bg-slate-900 border-2 rounded-lg shadow-xl relative overflow-hidden"
             onClick={(event) => {
               if (!isFullscreen || !activeSlides.length) return;
               if (event.shiftKey) {
@@ -472,13 +506,17 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
                 top: '50%',
                 left: '50%',
                 transform: `translate(-50%, -50%) scale(${effectiveScale})`,
-                transformOrigin: 'center',
+                transformOrigin: 'center center',
+                transition: 'transform 0.2s ease-out',
+                background: 'white',
               }}
             >
               {renderSlide()}
             </div>
           </div>
         </div>
+
+
       ) : (
         <Card>
           <CardContent className="py-12">

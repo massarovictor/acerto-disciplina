@@ -1,8 +1,13 @@
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+/**
+ * StudentGradesTableSlide - Tabela de Notas do Aluno
+ * Exibe tabela detalhada de notas por disciplina.
+ * Usa inline styles para compatibilidade com exportação PDF.
+ */
+
+import { useMemo } from 'react';
 import { Student, Grade } from '@/types';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { SlideLayout } from './SlideLayout';
+import { REPORT_COLORS, STATUS_COLORS, getGradeColor } from '@/lib/reportDesignSystem';
 
 interface StudentGradesTableSlideProps {
   student: Student;
@@ -11,157 +16,200 @@ interface StudentGradesTableSlideProps {
 }
 
 export const StudentGradesTableSlide = ({ student, grades, period }: StudentGradesTableSlideProps) => {
-  const filteredGrades = period === 'all' 
-    ? grades 
-    : grades.filter(g => g.quarter === period);
+  const { sortedSubjects, overallAverage, approvedCount, recoveryCount } = useMemo(() => {
+    const filteredGrades = period === 'all'
+      ? grades
+      : grades.filter(g => g.quarter === period);
 
-  const studentGrades = filteredGrades.filter(g => g.studentId === student.id);
+    const studentGrades = filteredGrades.filter(g => g.studentId === student.id);
 
-  // Group grades by subject and calculate average
-  const gradesBySubject = studentGrades.reduce((acc, grade) => {
-    if (!acc[grade.subject]) {
-      acc[grade.subject] = [];
-    }
-    acc[grade.subject].push(grade);
-    return acc;
-  }, {} as Record<string, Grade[]>);
+    // Group grades by subject
+    const gradesBySubject = studentGrades.reduce((acc, grade) => {
+      if (!acc[grade.subject]) acc[grade.subject] = [];
+      acc[grade.subject].push(grade);
+      return acc;
+    }, {} as Record<string, Grade[]>);
 
-  // Sort subjects by average (lowest to highest)
-  const sortedSubjects = Object.entries(gradesBySubject)
-    .map(([subject, subjectGrades]) => ({
-      subject,
-      grades: subjectGrades,
-      average: subjectGrades.reduce((sum, g) => sum + g.grade, 0) / subjectGrades.length
-    }))
-    .sort((a, b) => a.average - b.average);
-  const overallAverage = sortedSubjects.length > 0
-    ? sortedSubjects.reduce((sum, s) => sum + s.average, 0) / sortedSubjects.length
-    : 0;
+    // Sort subjects by average (lowest to highest)
+    const sorted = Object.entries(gradesBySubject)
+      .map(([subject, subjectGrades]) => ({
+        subject,
+        grades: subjectGrades,
+        average: subjectGrades.reduce((sum, g) => sum + g.grade, 0) / subjectGrades.length
+      }))
+      .sort((a, b) => a.average - b.average);
+
+    const overall = sorted.length > 0
+      ? sorted.reduce((sum, s) => sum + s.average, 0) / sorted.length
+      : 0;
+
+    return {
+      sortedSubjects: sorted,
+      overallAverage: overall,
+      approvedCount: sorted.filter(s => s.average >= 6).length,
+      recoveryCount: sorted.filter(s => s.average < 6).length,
+    };
+  }, [grades, period, student.id]);
+
+  const initials = student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  const quarters = ['1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre'];
+
+  const GradeBadge = ({ value }: { value: number }) => {
+    const color = getGradeColor(value);
+    return (
+      <span style={{
+        padding: '4px 12px',
+        borderRadius: 6,
+        background: `${color}15`,
+        color: color,
+        fontWeight: 600,
+        fontSize: 13,
+      }}>
+        {value.toFixed(1)}
+      </span>
+    );
+  };
+
+  const StatusBadge = ({ approved }: { approved: boolean }) => {
+    const colors = approved ? STATUS_COLORS.approved : STATUS_COLORS.critical;
+    return (
+      <span style={{
+        padding: '4px 12px',
+        borderRadius: 6,
+        background: colors.bg,
+        color: colors.text,
+        fontWeight: 600,
+        fontSize: 12,
+      }}>
+        {approved ? 'Aprovado' : 'Recuperação'}
+      </span>
+    );
+  };
 
   return (
-    <div className="h-full p-10 bg-gradient-to-br from-primary/5 to-background flex flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-6 mb-6">
-        <Avatar className="h-16 w-16 border-2 border-primary/20">
+    <SlideLayout
+      title="Boletim Detalhado por Disciplina"
+      subtitle={`${period === 'all' ? 'Todas as Notas' : period} • Ordenado do pior para o melhor`}
+      footer="MAVIC - Sistema de Acompanhamento Escolar"
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {/* Header with Avatar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
           {student.photoUrl ? (
-            <AvatarImage src={student.photoUrl} alt={student.name} />
+            <img
+              src={student.photoUrl}
+              alt={student.name}
+              style={{ width: 48, height: 48, borderRadius: 24, objectFit: 'cover' }}
+            />
           ) : (
-            <AvatarFallback className="bg-primary/10 text-lg">
-              {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-            </AvatarFallback>
+            <div style={{
+              width: 48,
+              height: 48,
+              borderRadius: 24,
+              background: `${REPORT_COLORS.primary}15`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 18,
+              fontWeight: 700,
+              color: REPORT_COLORS.primary,
+            }}>
+              {initials}
+            </div>
           )}
-        </Avatar>
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold">{student.name} - Notas por Disciplina</h1>
-          <p className="text-base text-muted-foreground">
-            {period === 'all' ? 'Todas as Notas' : period} • Ordenado do pior para o melhor
-          </p>
+          <div>
+            <p style={{ margin: 0, fontSize: 14, color: REPORT_COLORS.text.secondary }}>
+              Matrícula: {student.enrollment || 'Não informada'}
+            </p>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div style={{
+          flex: 1,
+          background: REPORT_COLORS.background.card,
+          borderRadius: 12,
+          border: `1px solid ${REPORT_COLORS.border}`,
+          overflowY: 'auto',
+          maxHeight: '520px',
+        }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: REPORT_COLORS.background.surface }}>
+                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: REPORT_COLORS.text.secondary, width: 50 }}>#</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: REPORT_COLORS.text.secondary }}>Disciplina</th>
+                {period === 'all' && quarters.map(q => (
+                  <th key={q} style={{ padding: '12px 8px', textAlign: 'center', fontSize: 12, fontWeight: 600, color: REPORT_COLORS.text.secondary, width: 80 }}>
+                    {q.replace(' Bimestre', '')}
+                  </th>
+                ))}
+                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: 13, fontWeight: 600, color: REPORT_COLORS.text.secondary, width: 90 }}>Média</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: 13, fontWeight: 600, color: REPORT_COLORS.text.secondary, width: 110 }}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedSubjects.map((item, index) => (
+                <tr
+                  key={index}
+                  style={{
+                    borderBottom: `1px solid ${REPORT_COLORS.border}`,
+                    background: index % 2 === 0 ? 'transparent' : REPORT_COLORS.background.surface,
+                  }}
+                >
+                  <td style={{ padding: '10px 16px', fontSize: 13, color: REPORT_COLORS.text.tertiary }}>{index + 1}</td>
+                  <td style={{ padding: '10px 16px', fontSize: 13, fontWeight: 500, color: REPORT_COLORS.text.primary }}>{item.subject}</td>
+                  {period === 'all' && quarters.map(quarter => {
+                    const quarterGrade = item.grades.find(g => g.quarter === quarter);
+                    return (
+                      <td key={quarter} style={{ padding: '10px 8px', textAlign: 'center' }}>
+                        {quarterGrade ? (
+                          <GradeBadge value={quarterGrade.grade} />
+                        ) : (
+                          <span style={{ color: REPORT_COLORS.text.tertiary }}>—</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td style={{ padding: '10px 16px', textAlign: 'center' }}>
+                    <GradeBadge value={item.average} />
+                  </td>
+                  <td style={{ padding: '10px 16px', textAlign: 'center' }}>
+                    <StatusBadge approved={item.average >= 6} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Summary Footer */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: 16,
+          marginTop: 24,
+          padding: 20,
+          background: REPORT_COLORS.background.surface,
+          borderRadius: 12,
+        }}>
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ margin: 0, fontSize: 12, color: REPORT_COLORS.text.secondary }}>Total Disciplinas</p>
+            <p style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 700, color: REPORT_COLORS.text.primary }}>{sortedSubjects.length}</p>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ margin: 0, fontSize: 12, color: REPORT_COLORS.text.secondary }}>Aprovado</p>
+            <p style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 700, color: STATUS_COLORS.approved.solid }}>{approvedCount}</p>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ margin: 0, fontSize: 12, color: REPORT_COLORS.text.secondary }}>Recuperação</p>
+            <p style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 700, color: STATUS_COLORS.critical.solid }}>{recoveryCount}</p>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ margin: 0, fontSize: 12, color: REPORT_COLORS.text.secondary }}>Média Geral</p>
+            <p style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 700, color: REPORT_COLORS.text.primary }}>{overallAverage.toFixed(1)}</p>
+          </div>
         </div>
       </div>
-
-      {/* Grades Table */}
-      <Card className="flex-1 bg-card/50 backdrop-blur overflow-hidden">
-        <CardContent className="pt-6 h-full min-h-0 flex flex-col">
-          <div className="flex-1 min-h-0 overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[60px] text-base">#</TableHead>
-                  <TableHead className="text-base">Disciplina</TableHead>
-                  {period === 'all' && (
-                    <>
-                      <TableHead className="text-center w-[110px] text-base">1º Bim</TableHead>
-                      <TableHead className="text-center w-[110px] text-base">2º Bim</TableHead>
-                      <TableHead className="text-center w-[110px] text-base">3º Bim</TableHead>
-                      <TableHead className="text-center w-[110px] text-base">4º Bim</TableHead>
-                    </>
-                  )}
-                  <TableHead className="text-center w-[110px] text-base">Média</TableHead>
-                  <TableHead className="text-center w-[140px] text-base">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedSubjects.map((item, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="font-medium text-base">{index + 1}</TableCell>
-                    <TableCell className="font-medium text-base">{item.subject}</TableCell>
-                    {period === 'all' && (
-                      <>
-                        {['1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre'].map(quarter => {
-                          const quarterGrade = item.grades.find(g => g.quarter === quarter);
-                          return (
-                            <TableCell key={quarter} className="text-center">
-                              {quarterGrade ? (
-                                <Badge 
-                                  variant={
-                                    quarterGrade.grade >= 7 ? 'default' : 
-                                    quarterGrade.grade >= 6 ? 'secondary' : 
-                                    'destructive'
-                                  }
-                                  className="text-sm"
-                                >
-                                  {quarterGrade.grade.toFixed(1)}
-                                </Badge>
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
-                              )}
-                            </TableCell>
-                          );
-                        })}
-                      </>
-                    )}
-                    <TableCell className="text-center">
-                      <Badge 
-                        variant={
-                          item.average >= 7 ? 'default' : 
-                          item.average >= 6 ? 'secondary' : 
-                          'destructive'
-                        }
-                        className="text-base px-4 py-1"
-                      >
-                        {item.average.toFixed(1)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {item.average >= 6 ? (
-                        <Badge variant="default" className="bg-green-500 text-sm px-3 py-1">Aprovado</Badge>
-                      ) : (
-                        <Badge variant="destructive" className="text-sm px-3 py-1">Recuperação</Badge>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Summary */}
-          <div className="mt-6 pt-6 border-t grid grid-cols-4 gap-4">
-            <div className="text-center">
-              <p className="text-xs text-muted-foreground">Total Disciplinas</p>
-              <p className="text-2xl font-bold">{sortedSubjects.length}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs text-muted-foreground">Aprovado</p>
-              <p className="text-2xl font-bold text-green-500">
-                {sortedSubjects.filter(s => s.average >= 6).length}
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs text-muted-foreground">Recuperação</p>
-              <p className="text-2xl font-bold text-red-500">
-                {sortedSubjects.filter(s => s.average < 6).length}
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs text-muted-foreground">Média Geral</p>
-              <p className="text-2xl font-bold">
-                {overallAverage.toFixed(1)}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    </SlideLayout>
   );
 };

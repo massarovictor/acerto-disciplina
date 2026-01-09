@@ -161,38 +161,65 @@ export const CHART_CONFIG = {
 // ================ SEMANTIC STATUS COLORS ================
 
 export const STATUS_COLORS = {
+    excellence: {
+        bg: '#DBEAFE',      // Blue 100
+        text: '#1E40AF',    // Blue 800
+        border: '#93C5FD',  // Blue 300
+        solid: '#3B82F6',   // Blue 500
+    },
     approved: {
         bg: '#D1FAE5',      // Emerald 100
         text: '#065F46',    // Emerald 800
         border: '#6EE7B7',  // Emerald 300
+        solid: '#10B981',   // Emerald 500
     },
-    recovery: {
+    attention: {
         bg: '#FEF3C7',      // Amber 100
         text: '#92400E',    // Amber 800
         border: '#FCD34D',  // Amber 300
+        solid: '#F59E0B',   // Amber 500
     },
-    risk: {
+    critical: {
         bg: '#FEE2E2',      // Red 100
         text: '#991B1B',    // Red 800
         border: '#FCA5A5',  // Red 300
+        solid: '#EF4444',   // Red 500
     },
     neutral: {
         bg: '#F1F5F9',      // Slate 100
         text: '#475569',    // Slate 600
         border: '#CBD5E1',  // Slate 300
+        solid: '#64748B',   // Slate 500
     },
 };
 
-// ================ HELPERS ================
+// ================ STUDENT CLASSIFICATION ================
+
+export type StudentClassification = 'excellence' | 'approved' | 'attention' | 'critical';
 
 /**
- * Retorna a cor de status baseada na quantidade de disciplinas em recuperação.
+ * Classifica um aluno com base na média geral e quantidade de disciplinas abaixo de 6.
+ * Regras (iguais a advancedAnalytics.ts):
+ * - Crítico (critical): 3+ disciplinas com média < 6.0
+ * - Atenção (attention): 1-2 disciplinas com média < 6.0
+ * - Aprovado (approved): Todas disciplinas >= 6.0, média geral < 8.0
+ * - Excelência (excellence): Todas disciplinas >= 6.0 E média geral >= 8.0
  */
-export function getStatusColor(recoveryCount: number) {
-    if (recoveryCount === 0) return STATUS_COLORS.approved;
-    if (recoveryCount <= 2) return STATUS_COLORS.recovery;
-    return STATUS_COLORS.risk;
+export function classifyStudent(overallAvg: number, redGradesCount: number): StudentClassification {
+    if (redGradesCount >= 3) return 'critical';
+    if (redGradesCount >= 1) return 'attention';
+    if (overallAvg >= 8.0) return 'excellence';
+    return 'approved';
 }
+
+/**
+ * Retorna as cores de status baseado na classificação.
+ */
+export function getStatusColor(classification: StudentClassification) {
+    return STATUS_COLORS[classification];
+}
+
+// ================ HELPERS ================
 
 /**
  * Retorna a cor do gráfico para um índice.

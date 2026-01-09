@@ -23,6 +23,7 @@ import {
     Radar,
     LineChart,
     Line,
+    LabelList,
 } from 'recharts';
 import { REPORT_COLORS, CHART_CONFIG, getChartColor, getGradeColor } from './reportDesignSystem';
 
@@ -95,7 +96,7 @@ export const ReportBarChart: React.FC<BarChartProps> = ({
             <BarChart
                 data={data}
                 layout={isHorizontal ? 'vertical' : 'horizontal'}
-                margin={{ top: 10, right: 30, left: 20, bottom: 10 }}
+                margin={{ top: 20, right: 60, left: 40, bottom: 20 }}
             >
                 {showGrid && (
                     <CartesianGrid
@@ -107,23 +108,35 @@ export const ReportBarChart: React.FC<BarChartProps> = ({
                 )}
                 {isHorizontal ? (
                     <>
-                        <XAxis type="number" domain={[0, 10]} tick={{ fontSize: 11 }} />
-                        <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
+                        <XAxis type="number" domain={[0, 10]} tick={{ fontSize: 14, fontWeight: 500 }} hide />
+                        <YAxis
+                            type="category"
+                            dataKey="name"
+                            tick={{ fontSize: 16, fontWeight: 700, fill: REPORT_COLORS.text.primary }}
+                            width={180}
+                        />
                     </>
                 ) : (
                     <>
-                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                        <YAxis domain={[0, 10]} tick={{ fontSize: 11 }} />
+                        <XAxis dataKey="name" tick={{ fontSize: 14, fontWeight: 500 }} />
+                        <YAxis domain={[0, 10]} tick={{ fontSize: 14, fontWeight: 500 }} />
                     </>
                 )}
                 <Tooltip content={<CustomTooltip />} />
                 {showLegend && <Legend />}
                 <Bar
                     dataKey="value"
-                    radius={[4, 4, 4, 4]}
+                    radius={[0, 10, 10, 0]}
                     isAnimationActive={animate}
                     animationDuration={CHART_CONFIG.animationDuration}
+                    barSize={40}
                 >
+                    <LabelList
+                        dataKey="value"
+                        position={isHorizontal ? "right" : "top"}
+                        style={{ fill: REPORT_COLORS.text.primary, fontSize: 20, fontWeight: 800 }}
+                        offset={15}
+                    />
                     {data.map((entry, index) => (
                         <Cell
                             key={`cell-${index}`}
@@ -139,8 +152,8 @@ export const ReportBarChart: React.FC<BarChartProps> = ({
 // ================ PIE CHART ================
 
 interface PieChartProps extends ChartProps {
-    innerRadius?: number;
-    outerRadius?: number;
+    innerRadius?: number | string;
+    outerRadius?: number | string;
     showLabels?: boolean;
 }
 
@@ -156,9 +169,23 @@ export const ReportPieChart: React.FC<PieChartProps> = ({
 }) => {
     const RADIAN = Math.PI / 180;
 
-    const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
-        if (percent < 0.05) return null;
-        const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, value }: any) => {
+        if (percent < 0.01) return null;
+
+        // Recharts typically passes pixels here, but let's be safe
+        let rInner = typeof innerRadius === 'string' ? parseFloat(innerRadius) : (innerRadius || 0);
+        let rOuter = typeof outerRadius === 'string' ? parseFloat(outerRadius) : (outerRadius || 0);
+
+        // If they are percentages (e.g. 55), we need to estimate if we don't have the real radius
+        // Actually Recharts passes PIXELS to this label function. 
+        // If it looks like a small number (< 100 on a 500px chart), it might be a percentage.
+        if (rOuter < 100 && rOuter > 0) {
+            // Estimate based on a standard 250px radius (half of 500)
+            rInner = 250 * (rInner / 100);
+            rOuter = 250 * (rOuter / 100);
+        }
+
+        const radius = rInner + (rOuter - rInner) * 0.5;
         const x = cx + radius * Math.cos(-midAngle * RADIAN);
         const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
@@ -166,20 +193,21 @@ export const ReportPieChart: React.FC<PieChartProps> = ({
             <text
                 x={x}
                 y={y}
-                fill="white"
+                fill="#FFFFFF"
                 textAnchor="middle"
                 dominantBaseline="central"
-                fontSize={12}
-                fontWeight={600}
+                fontSize={42}
+                fontWeight={900}
+                style={{ filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.3))' }}
             >
-                {`${(percent * 100).toFixed(0)}%`}
+                {value}
             </text>
         );
     };
 
     return (
-        <ResponsiveContainer width={width} height={height}>
-            <PieChart>
+        <div style={{ width: width, height: height, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <PieChart width={typeof width === 'number' ? width : 600} height={height}>
                 <Pie
                     data={data}
                     cx="50%"
@@ -213,7 +241,7 @@ export const ReportPieChart: React.FC<PieChartProps> = ({
                     />
                 )}
             </PieChart>
-        </ResponsiveContainer>
+        </div>
     );
 };
 
@@ -307,5 +335,5 @@ export const ReportLineChart: React.FC<LineChartProps> = ({
 // ================ DONUT CHART (Alias) ================
 
 export const ReportDonutChart: React.FC<PieChartProps> = (props) => (
-    <ReportPieChart {...props} innerRadius={50} outerRadius={80} />
+    <ReportPieChart innerRadius="55%" outerRadius="80%" {...props} />
 );

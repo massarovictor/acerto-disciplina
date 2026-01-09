@@ -19,27 +19,28 @@ export const CoverSlide = ({ classData, period }: CoverSlideProps) => {
       {/* Icon */}
       <div
         style={{
-          width: 80,
-          height: 80,
+          width: 120,
+          height: 120,
           borderRadius: '50%',
           background: 'rgba(255,255,255,0.1)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          marginBottom: 32,
+          margin: '0 auto 40px',
         }}
       >
-        <GraduationCap size={48} color={REPORT_COLORS.text.inverted} />
+        <GraduationCap size={64} color={REPORT_COLORS.text.inverted} />
       </div>
 
       {/* Class Name */}
       <h1
         style={{
-          fontSize: 72,
+          fontSize: 84,
           fontWeight: 800,
           margin: 0,
           letterSpacing: '-0.02em',
           lineHeight: 1.1,
+          textAlign: 'center',
         }}
       >
         {classData.name}
@@ -48,10 +49,11 @@ export const CoverSlide = ({ classData, period }: CoverSlideProps) => {
       {/* Course & Series */}
       <p
         style={{
-          fontSize: 24,
-          margin: '16px 0 0',
+          fontSize: 32,
+          margin: '24px 0 0',
           opacity: 0.9,
           fontWeight: 500,
+          textAlign: 'center',
         }}
       >
         {classData.course} • {classData.series}
@@ -60,31 +62,31 @@ export const CoverSlide = ({ classData, period }: CoverSlideProps) => {
       {/* Divider */}
       <div
         style={{
-          width: 96,
-          height: 5,
+          width: 120,
+          height: 6,
           background: REPORT_COLORS.primary,
-          borderRadius: 2,
-          margin: '32px 0',
+          borderRadius: 3,
+          margin: '48px auto',
         }}
       />
 
       {/* Period */}
-      <div>
+      <div style={{ textAlign: 'center' }}>
         <p
           style={{
-          fontSize: 18,
+            fontSize: 24,
             fontWeight: 600,
             margin: 0,
             textTransform: 'uppercase',
-            letterSpacing: '0.1em',
+            letterSpacing: '0.15em',
           }}
         >
           Relatório de Desempenho
         </p>
         <p
           style={{
-          fontSize: 22,
-            margin: '8px 0 0',
+            fontSize: 28,
+            margin: '12px 0 0',
             opacity: 0.8,
           }}
         >
