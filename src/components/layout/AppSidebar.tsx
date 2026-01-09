@@ -11,7 +11,7 @@ import {
   SidebarMenuItem,
   SidebarHeader,
 } from '@/components/ui/sidebar';
-import { useAuth } from '@/contexts/AuthContext';
+
 
 const menuItems = [
   { icon: Home, label: 'Dashboard', path: '/' },
@@ -26,7 +26,7 @@ const menuItems = [
 export const AppSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+
 
   return (
     <Sidebar>
@@ -37,9 +37,7 @@ export const AppSidebar = () => {
           </div>
           <div className="flex flex-col">
             <span className="font-semibold text-sm">MAVIC</span>
-            <span className="text-xs text-muted-foreground">
-              {profile?.name || user?.email}
-            </span>
+            <span className="text-xs text-muted-foreground">Sistema de Acompanhamento</span>
           </div>
         </div>
       </SidebarHeader>
