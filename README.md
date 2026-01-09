@@ -1,73 +1,65 @@
-# Welcome to your Lovable project
+# MAVIC - Sistema de Acompanhamento Escolar
 
-## Project info
+O **MAVIC** (Monitoramento, Avaliação e Visão Integrada de Classes) é um sistema completo para gestão acadêmica e disciplinar, focado em escolas técnicas e regulares.
 
-**URL**: https://lovable.dev/projects/c5c12378-07b5-46a3-ad6a-421819de0683
+## 🚀 Funcionalidades Principais
 
-## How can I edit this code?
+- **Gestão de Turmas e Alunos**:
+  - Cadastro completo com suporte a importação em lote (Excel).
+  - Suporte a templates de curso técnico (Disciplinas Profissionais).
+  - Organização por série e ano letivo.
+  
+- **Notas e Frequência**:
+  - Lançamento ágil de notas por aluno ou turma.
+  - Controle de faltas com justificativas.
+  - Cálculo automático de médias e status (Aprovado, Recuperação, Reprovado).
+  
+- **Gestão de Ocorrências**:
+  - Registro de incidentes disciplinares com níveis de severidade.
+  - Geração automática de documentos de convocação de pais.
+  - Histórico comportamental do aluno.
 
-There are several ways of editing your application.
+- **Relatórios e Analytics**:
+  - **Boletins Individuais**: PDF gerado automaticamente com notas, ocorrências e análise.
+  - **Relatórios de Turma / Atas**: Visão consolidada para conselhos de classe.
+  - **Dashboard Analytics**: Gráficos de desempenho, tendências comportamentais e identificação de alunos em risco.
 
-**Use Lovable**
+## 🛠️ Tecnologias Utilizadas
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/c5c12378-07b5-46a3-ad6a-421819de0683) and start prompting.
+- **Frontend**: React, TypeScript, Vite.
+- **UI**: Shadcn/ui (Tailwind CSS), Lucide Icons.
+- **Dados**: Supabase (Auth & Database).
+- **Visualização**: Recharts para gráficos de analytics.
+- **Exportação**: PDFMake e HTML2Canvas para relatórios.
 
-Changes made via Lovable will be committed automatically to this repo.
+## 📦 Instalação e Execução
 
-**Use your preferred IDE**
+1. Clone o repositório:
+```bash
+git clone https://github.com/seu-usuario/acerto-disciplina.git
+```
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+2. Instale as dependências:
+```bash
+npm install
+```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+3. Configure as variáveis de ambiente (`.env`):
+```env
+VITE_SUPABASE_URL=sua_url
+VITE_SUPABASE_ANON_KEY=sua_chave
+```
 
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+4. Execute o projeto:
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## 📄 Scripts Disponíveis
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- `npm run dev`: Inicia o servidor de desenvolvimento.
+- `npm run build`: Gera a build de produção.
+- `npm run preview`: Visualiza a build geradagetLocalmente.
 
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/c5c12378-07b5-46a3-ad6a-421819de0683) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+---
+Desenvolvido para otimizar a gestão escolar e promover o sucesso do aluno.
