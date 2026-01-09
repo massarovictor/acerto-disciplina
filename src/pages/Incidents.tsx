@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Plus, 
+import {
+  Plus,
   Search,
   Eye,
   AlertTriangle,
@@ -32,7 +32,7 @@ const Incidents = () => {
   const { classes } = useClasses();
   const { students } = useStudents();
   const { toast } = useToast();
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [classFilter, setClassFilter] = useState<string>('all');
   const [viewingIncident, setViewingIncident] = useState<Incident | null>(null);
@@ -50,20 +50,21 @@ const Incidents = () => {
   const followUpIncidents = incidents.filter(i => i.status === 'acompanhamento');
   const resolvedIncidents = incidents.filter(i => i.status === 'resolvida');
 
-  const filterIncidents = (statusIncidents: Incident[]) => {
+  // Filter and search logic with useMemo
+  const getFilteredIncidents = (statusIncidents: Incident[]) => {
     let filtered = statusIncidents;
-    
-    // Filtro por turma
+
+    // Filter by Class
     if (classFilter !== 'all') {
       filtered = filtered.filter(incident => incident.classId === classFilter);
     }
-    
-    // Filtro por busca textual
+
+    // Filter by Search Term
     if (searchTerm) {
       filtered = filtered.filter(incident => {
         const incidentClass = classes.find(c => c.id === incident.classId);
         const incidentStudents = students.filter(s => incident.studentIds.includes(s.id));
-        
+
         return (
           incidentClass?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           incident.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -71,9 +72,14 @@ const Incidents = () => {
         );
       });
     }
-    
+
     return filtered;
   };
+
+  // Memoized lists to prevent unnecessary re-filtering
+  const filteredOpenIncidents = useMemo(() => getFilteredIncidents(openIncidents), [openIncidents, classFilter, searchTerm, classes, students]);
+  const filteredFollowUpIncidents = useMemo(() => getFilteredIncidents(followUpIncidents), [followUpIncidents, classFilter, searchTerm, classes, students]);
+  const filteredResolvedIncidents = useMemo(() => getFilteredIncidents(resolvedIncidents), [resolvedIncidents, classFilter, searchTerm, classes, students]);
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -105,10 +111,8 @@ const Incidents = () => {
     }
   };
 
-  const renderIncidentsList = (statusIncidents: Incident[]) => {
-    const filtered = filterIncidents(statusIncidents);
-
-    if (filtered.length === 0) {
+  const renderIncidentsList = (incidentsList: Incident[]) => {
+    if (incidentsList.length === 0) {
       return (
         <div className="text-center py-12">
           <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -122,17 +126,17 @@ const Incidents = () => {
 
     return (
       <div className="space-y-3">
-        {filtered.map((incident) => {
+        {incidentsList.map((incident) => {
           const incidentClass = classes.find(c => c.id === incident.classId);
           const incidentStudents = students.filter(s => incident.studentIds.includes(s.id));
-          
+
           return (
             <div
               key={incident.id}
               className="flex items-center gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors"
             >
               <div className={`w-3 h-3 rounded-full ${getUrgencyDot(incident.finalSeverity)}`} />
-              
+
               <div className="flex-1 min-w-0 space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="outline" className={getSeverityColor(incident.finalSeverity)}>
@@ -282,45 +286,45 @@ const Incidents = () => {
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'aberta' | 'acompanhamento' | 'resolvida')} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="aberta">
-            Abertas ({openIncidents.length})
+            Abertas ({filteredOpenIncidents.length})
           </TabsTrigger>
           <TabsTrigger value="acompanhamento">
-            Em Acompanhamento ({followUpIncidents.length})
+            Em Acompanhamento ({filteredFollowUpIncidents.length})
           </TabsTrigger>
           <TabsTrigger value="resolvida">
-            Resolvidas ({resolvedIncidents.length})
+            Resolvidas ({filteredResolvedIncidents.length})
           </TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="aberta" className="mt-6">
           <Card>
             <CardHeader>
               <CardTitle>Ocorrências Abertas</CardTitle>
             </CardHeader>
             <CardContent>
-              {renderIncidentsList(openIncidents)}
+              {renderIncidentsList(filteredOpenIncidents)}
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="acompanhamento" className="mt-6">
           <Card>
             <CardHeader>
               <CardTitle>Ocorrências em Acompanhamento</CardTitle>
             </CardHeader>
             <CardContent>
-              {renderIncidentsList(followUpIncidents)}
+              {renderIncidentsList(filteredFollowUpIncidents)}
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="resolvida" className="mt-6">
           <Card>
             <CardHeader>
               <CardTitle>Ocorrências Resolvidas</CardTitle>
             </CardHeader>
             <CardContent>
-              {renderIncidentsList(resolvedIncidents)}
+              {renderIncidentsList(filteredResolvedIncidents)}
             </CardContent>
           </Card>
         </TabsContent>
