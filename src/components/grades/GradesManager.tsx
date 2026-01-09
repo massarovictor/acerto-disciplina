@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -44,7 +44,7 @@ export const GradesManager = () => {
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [lastInitialized, setLastInitialized] = useState<{ class: string; quarter: string } | null>(null);
 
-  const classStudents = students.filter(s => s.classId === selectedClass);
+  const classStudents = useMemo(() => students.filter(s => s.classId === selectedClass), [students, selectedClass]);
   const selectedClassData = classes.find(c => c.id === selectedClass);
 
   // Verificar se a turma está arquivada
@@ -53,7 +53,7 @@ export const GradesManager = () => {
   const isClassLocked = isClassArchived || isClassInactive;
 
   // Obter disciplinas profissionais da turma
-  const professionalSubjects = selectedClass ? getProfessionalSubjects(selectedClass) : [];
+  const professionalSubjects = useMemo(() => selectedClass ? getProfessionalSubjects(selectedClass) : [], [selectedClass, getProfessionalSubjects]);
 
   // Usar uma string para rastrear mudanças nas disciplinas profissionais
   const professionalSubjectsStr = professionalSubjects.join(',');

@@ -11,8 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useClasses, useStudents, useAttendance } from '@/hooks/useData';
 import { AlertTriangle, Calendar, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  QUARTERS 
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  QUARTERS
 } from '@/lib/subjects';
 
 const STATUS_LABELS = {
@@ -72,6 +73,7 @@ export const AttendanceManager = () => {
   const { students } = useStudents();
   const { attendance, addAttendance, deleteAttendance } = useAttendance();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedQuarter, setSelectedQuarter] = useState('1º Bimestre');
@@ -84,7 +86,7 @@ export const AttendanceManager = () => {
     status: 'falta',
   });
 
-  const classStudents = students.filter(s => s.classId === selectedClass);
+  const classStudents = useMemo(() => students.filter(s => s.classId === selectedClass), [students, selectedClass]);
   const selectedClassData = classes.find(c => c.id === selectedClass);
 
   const isClassArchived = selectedClassData?.archived === true;
@@ -160,6 +162,7 @@ export const AttendanceManager = () => {
         classId: selectedClass,
         date: attendanceForm.date,
         status: attendanceForm.status,
+        recordedBy: user?.id || 'system',
       });
 
       toast({
@@ -284,8 +287,8 @@ export const AttendanceManager = () => {
                 const totalRecords = records.length;
 
                 return (
-                  <Card 
-                    key={student.id} 
+                  <Card
+                    key={student.id}
                     className="cursor-pointer hover:bg-accent/50 transition-colors"
                     onClick={() => setSelectedStudent(student.id)}
                   >
@@ -327,7 +330,7 @@ export const AttendanceManager = () => {
               Registrar Faltas - {students.find(s => s.id === selectedStudent)?.name}
             </DialogTitle>
           </DialogHeader>
-          
+
           {selectedStudent && (
             <div className="space-y-6">
               <Alert>
