@@ -31,6 +31,14 @@ export const SubjectTemplatesManager = () => {
     year3Subjects: '',
   });
 
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    course: '',
+    year1Subjects: '',
+    year2Subjects: '',
+    year3Subjects: '',
+  });
+
   const handleCreate = async () => {
     if (!createFormData.name.trim() || !createFormData.course.trim()) {
       toast({
@@ -128,7 +136,7 @@ export const SubjectTemplatesManager = () => {
 
     // Verificar se há turmas usando este template
     const classesUsingTemplate = classes.filter(c => c.templateId === deletingTemplate.id);
-    
+
     if (classesUsingTemplate.length > 0) {
       toast({
         title: 'Aviso',
@@ -157,6 +165,102 @@ export const SubjectTemplatesManager = () => {
 
   const getTemplateUsageCount = (templateId: string) => {
     return classes.filter(c => c.templateId === templateId).length;
+  };
+
+  // Abrir dialog de edição com dados do template
+  const openEditDialog = (template: ProfessionalSubjectTemplate) => {
+    const year1 = template.subjectsByYear.find(y => y.year === 1)?.subjects.join(', ') || '';
+    const year2 = template.subjectsByYear.find(y => y.year === 2)?.subjects.join(', ') || '';
+    const year3 = template.subjectsByYear.find(y => y.year === 3)?.subjects.join(', ') || '';
+
+    setEditFormData({
+      name: template.name,
+      course: template.course,
+      year1Subjects: year1,
+      year2Subjects: year2,
+      year3Subjects: year3,
+    });
+    setEditingTemplate(template);
+  };
+
+  // Salvar edição do template
+  const handleEdit = async () => {
+    if (!editingTemplate) return;
+
+    if (!editFormData.name.trim() || !editFormData.course.trim()) {
+      toast({
+        title: 'Erro',
+        description: 'Preencha nome e curso do template.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validar duplicatas (excluindo o próprio template)
+    const duplicateName = templates.some(
+      t => t.id !== editingTemplate.id && t.name.toLowerCase() === editFormData.name.trim().toLowerCase()
+    );
+    if (duplicateName) {
+      toast({
+        title: 'Erro',
+        description: 'Já existe outro template com este nome.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const subjectsByYear: { year: 1 | 2 | 3; subjects: string[] }[] = [];
+
+    if (editFormData.year1Subjects.trim()) {
+      const subjects = editFormData.year1Subjects.split(',').map((s) => s.trim()).filter(Boolean);
+      if (subjects.length > 0) {
+        subjectsByYear.push({ year: 1, subjects });
+      }
+    }
+
+    if (editFormData.year2Subjects.trim()) {
+      const subjects = editFormData.year2Subjects.split(',').map((s) => s.trim()).filter(Boolean);
+      if (subjects.length > 0) {
+        subjectsByYear.push({ year: 2, subjects });
+      }
+    }
+
+    if (editFormData.year3Subjects.trim()) {
+      const subjects = editFormData.year3Subjects.split(',').map((s) => s.trim()).filter(Boolean);
+      if (subjects.length > 0) {
+        subjectsByYear.push({ year: 3, subjects });
+      }
+    }
+
+    if (subjectsByYear.length === 0) {
+      toast({
+        title: 'Erro',
+        description: 'Adicione pelo menos uma disciplina em pelo menos um ano.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      await updateTemplate(editingTemplate.id, {
+        name: editFormData.name.trim(),
+        course: editFormData.course.trim(),
+        subjectsByYear,
+      });
+
+      toast({
+        title: 'Template atualizado',
+        description: `Template "${editFormData.name.trim()}" atualizado com sucesso.`,
+      });
+
+      setEditingTemplate(null);
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível atualizar o template.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -301,6 +405,9 @@ export const SubjectTemplatesManager = () => {
                           <Button variant="ghost" size="icon" onClick={() => setViewingTemplate(template)}>
                             <Eye className="h-4 w-4" />
                           </Button>
+                          <Button variant="ghost" size="icon" onClick={() => openEditDialog(template)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => setDeletingTemplate(template)}>
                             <Trash2 className="h-4 w-4 text-severity-critical" />
                           </Button>
@@ -354,6 +461,82 @@ export const SubjectTemplatesManager = () => {
         </Dialog>
       )}
 
+      {/* Edit Template Dialog */}
+      {editingTemplate && (
+        <Dialog open={!!editingTemplate} onOpenChange={(open) => !open && setEditingTemplate(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Editar Template</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-template-name">Nome do Template *</Label>
+                <Input
+                  id="edit-template-name"
+                  placeholder="Ex: Técnico em Informática - Padrão"
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-template-course">Curso *</Label>
+                <Input
+                  id="edit-template-course"
+                  placeholder="Ex: Técnico em Informática"
+                  value={editFormData.course}
+                  onChange={(e) => setEditFormData({ ...editFormData, course: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-year1">Disciplinas do 1º Ano</Label>
+                <Input
+                  id="edit-year1"
+                  placeholder="Separadas por vírgula (ex: Algoritmos, Lógica de Programação)"
+                  value={editFormData.year1Subjects}
+                  onChange={(e) => setEditFormData({ ...editFormData, year1Subjects: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-year2">Disciplinas do 2º Ano</Label>
+                <Input
+                  id="edit-year2"
+                  placeholder="Separadas por vírgula"
+                  value={editFormData.year2Subjects}
+                  onChange={(e) => setEditFormData({ ...editFormData, year2Subjects: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-year3">Disciplinas do 3º Ano</Label>
+                <Input
+                  id="edit-year3"
+                  placeholder="Separadas por vírgula"
+                  value={editFormData.year3Subjects}
+                  onChange={(e) => setEditFormData({ ...editFormData, year3Subjects: e.target.value })}
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <Button onClick={handleEdit} className="flex-1">
+                  <Save className="h-4 w-4 mr-2" />
+                  Salvar Alterações
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditingTemplate(null)}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Delete Template Dialog */}
       <AlertDialog open={!!deletingTemplate} onOpenChange={(open) => !open && setDeletingTemplate(null)}>
         <AlertDialogContent>
@@ -365,7 +548,7 @@ export const SubjectTemplatesManager = () => {
                   <Alert variant="destructive">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription>
-                      Este template está sendo usado por {getTemplateUsageCount(deletingTemplate.id)} turma(s). 
+                      Este template está sendo usado por {getTemplateUsageCount(deletingTemplate.id)} turma(s).
                       Não é possível excluí-lo enquanto houver turmas associadas.
                     </AlertDescription>
                   </Alert>

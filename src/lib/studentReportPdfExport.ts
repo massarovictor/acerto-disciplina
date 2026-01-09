@@ -1,225 +1,699 @@
-import { Student, Class, Grade, Incident, AttendanceRecord } from '@/types';
-import { QUARTERS } from '@/lib/subjects';
-import { BasePDFGenerator } from './basePdfExport';
-import { REPORT_COLORS } from './reportDesignSystem';
-
 /**
- * Gerador de Relatório Individual do Aluno
+ * Relatório Individual do Aluno - Versão com pdfmake
+ * 
+ * Estrutura:
+ * 1. Informações do Estudante + Métricas (Média, Frequência, Ocorrências)
+ * 2. Quadro de Aproveitamento
+ * 3. Resumo Textual (análise qualitativa)
+ * 4. Seção Comportamental
  */
 
-class StudentReportPDF extends BasePDFGenerator {
-  constructor() {
-    super();
+import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
+
+import { Student, Class, Grade, Incident, AttendanceRecord } from '@/types';
+import { getSchoolConfig, getDefaultConfig, SchoolConfig } from './schoolConfig';
+import { PDF_COLORS, PDF_STYLES } from './pdfGenerator';
+import { 
+  classifyStudent, 
+  SubjectGradeInfo,
+  CLASSIFICATION_LABELS,
+  CLASSIFICATION_COLORS 
+} from './advancedAnalytics';
+import { QUARTERS } from './subjects';
+import { analyzeTrend } from './mlAnalytics';
+
+// pdfMake será carregado dinamicamente
+let pdfMakeInstance: any = null;
+
+async function getPdfMake() {
+  if (pdfMakeInstance) return pdfMakeInstance;
+  
+  const pdfMakeModule = await import('pdfmake/build/pdfmake');
+  const pdfFontsModule = await import('pdfmake/build/vfs_fonts');
+  
+  pdfMakeInstance = pdfMakeModule.default || pdfMakeModule;
+  
+  const vfs = (pdfFontsModule as any).pdfMake?.vfs 
+    || (pdfFontsModule as any).default?.pdfMake?.vfs 
+    || (pdfFontsModule as any).vfs
+    || (pdfFontsModule as any).default?.vfs;
+  
+  if (vfs) {
+    pdfMakeInstance.vfs = vfs;
+  }
+  
+  return pdfMakeInstance;
+}
+
+// ============================================
+// CLASSE PRINCIPAL
+// ============================================
+
+class StudentReportPDFGenerator {
+  private config: SchoolConfig;
+  private student: Student | null = null;
+  private studentClass: Class | undefined;
+  private grades: Grade[] = [];
+  private incidents: Incident[] = [];
+  private attendance: AttendanceRecord[] = [];
+
+    constructor() {
+    this.config = getDefaultConfig();
   }
 
-  public async generate(
+  async generate(
     student: Student,
     studentClass: Class | undefined,
     grades: Grade[],
     incidents: Incident[],
     attendance: AttendanceRecord[],
     subjects?: string[]
-  ) {
+  ): Promise<void> {
     try {
-      await this.loadConfig();
-      this.renderHeader();
-
-      // Título - formato profissional
-      this.setFont('md', 'bold', '#000000');
-      this.drawText('Relatório Individual de Desempenho', this.margin, this.y);
-      this.y += 8;
-
-      // Identificação
-      this.renderIdentification(student, studentClass);
-
-      // Métricas Resumidas (Cards)
-      this.renderMetrics(grades, attendance, student.id);
-
-      // Quadro de Notas
-      this.renderGradesTable(grades, student.id, subjects);
-
-      // Histórico Disciplinar
-      this.renderIncidents(incidents, student.id);
-
-      // Assinaturas
-      this.renderSignatures(student);
-
+      this.config = await getSchoolConfig();
+      this.student = student;
+      this.studentClass = studentClass;
+      this.grades = grades.filter(g => g.studentId === student.id);
+      this.incidents = incidents.filter(i => i.studentIds.includes(student.id));
+      this.attendance = attendance.filter(a => a.studentId === student.id);
+      
+      // Construir documento
+      const content = this.buildDocumentContent(subjects);
+      const docDefinition = this.createDocDefinition(content);
+      
+      // Download
       const safeName = (student.name || 'Aluno').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-      this.save(`Relatorio_${safeName}.pdf`);
+      const filename = `Relatorio_${safeName}.pdf`;
+      
+      const pdfMake = await getPdfMake();
+      pdfMake.createPdf(docDefinition).download(filename);
+      
     } catch (error) {
-      console.error('Erro fatal ao gerar relatório individual:', error);
+      console.error('Erro ao gerar relatório individual:', error);
       throw error;
     }
   }
 
-  private renderIdentification(student: Student, studentClass: Class | undefined) {
-    // Caixa de identificação - preto e branco
-    this.drawRect(this.margin, this.y, this.contentWidth, 18, { fill: '#F5F5F5', stroke: '#000000' });
-    
-    const col1 = this.colX(1) + 4;
-    const col2 = this.colX(7) + 4;
-    const startY = this.y + 5;
+  // ============================================
+  // CÁLCULOS
+  // ============================================
 
-    this.renderField('Estudante', student.name, col1, startY, this.colWidth(6) - 8);
-    this.renderField('Turma', studentClass?.name || 'Não informado', col2, startY, this.colWidth(6) - 8);
-    
-    if (student.enrollment) {
-      this.renderField('Matrícula', student.enrollment, col1, startY + 9, this.colWidth(6) - 8);
-    }
-
-    this.y += 23;
+  private calculateAverage(): number {
+    if (this.grades.length === 0) return 0;
+    return this.grades.reduce((sum, g) => sum + g.grade, 0) / this.grades.length;
   }
 
-  private renderMetrics(grades: Grade[], attendance: AttendanceRecord[], studentId: string) {
-    const studentGrades = grades.filter(g => g.studentId === studentId);
-    const avg = studentGrades.length > 0 ? studentGrades.reduce((a, b) => a + b.grade, 0) / studentGrades.length : 0;
-    
-    const studentAtt = attendance.filter(a => a.studentId === studentId);
-    const total = studentAtt.length;
-    const absences = studentAtt.filter(a => a.status !== 'presente').length;
-    const freq = total > 0 ? ((total - absences) / total) * 100 : 100;
-
-    const cardW = (this.contentWidth - 10) / 3;
-    
-    const renderCard = (x: number, label: string, value: string, isWarning: boolean = false) => {
-      this.drawRect(x, this.y, cardW, 15, { stroke: '#000000', radius: 1 });
-      this.setFont('xs', 'bold', '#000000');
-      this.drawText(label, x + 3, this.y + 5);
-      this.setFont('md', 'bold', isWarning ? '#000000' : '#000000');
-      this.drawText(value, x + 3, this.y + 11);
-    };
-
-    renderCard(this.margin, 'Média Geral', avg.toFixed(1), avg < 6);
-    renderCard(this.margin + cardW + 5, 'Frequência', `${freq.toFixed(1)}%`, freq < 75);
-    renderCard(this.margin + (cardW + 5) * 2, 'Total Faltas', absences.toString());
-
-    this.y += 22;
+  private calculateFrequency(): number {
+    if (this.attendance.length === 0) return 100;
+    const present = this.attendance.filter(a => a.status === 'presente').length;
+    return (present / this.attendance.length) * 100;
   }
 
-  private renderGradesTable(grades: Grade[], studentId: string, subjects?: string[]) {
-    this.renderSectionTitle('Quadro de Aproveitamento');
-    
-    const studentGrades = grades.filter(g => g.studentId === studentId);
-    const subjectList = subjects && subjects.length > 0
-        ? [...subjects].sort()
-        : [...new Set(studentGrades.map(g => g.subject))].sort();
-
-    const colSub = 70;
-    const colQ = (this.contentWidth - colSub) / 5;
-
-    // Header - preto e branco
-    this.drawRect(this.margin, this.y, this.contentWidth, 7, { fill: '#000000' });
-    this.setFont('xs', 'bold', '#FFFFFF');
-    this.drawText('Disciplina', this.margin + 2, this.y + 4.5);
-    
-    ['1º Bim', '2º Bim', '3º Bim', '4º Bim', 'Média'].forEach((h, i) => {
-      this.drawText(h, this.margin + colSub + (i * colQ) + (colQ/2), this.y + 4.5, { align: 'center' });
+  private getSubjectAverages(): Record<string, number> {
+    const subjectGrades: Record<string, number[]> = {};
+    this.grades.forEach(g => {
+      if (!subjectGrades[g.subject]) subjectGrades[g.subject] = [];
+      subjectGrades[g.subject].push(g.grade);
     });
+    
+    const averages: Record<string, number> = {};
+    Object.entries(subjectGrades).forEach(([subject, gradeList]) => {
+      averages[subject] = gradeList.reduce((a, b) => a + b, 0) / gradeList.length;
+    });
+    
+    return averages;
+  }
 
-    this.y += 7;
+  // ============================================
+  // GERAÇÃO DE NARRATIVA
+  // ============================================
 
-    subjectList.forEach((sub, idx) => {
-      this.checkPageBreak(7);
-      if (idx % 2 === 0) this.drawRect(this.margin, this.y, this.contentWidth, 6, { fill: '#F5F5F5' });
+  private generateNarrative(): string {
+    if (!this.student) return '';
+    
+    const classification = classifyStudent(this.grades, this.attendance);
+    const subjectAverages = this.getSubjectAverages();
+    const average = this.calculateAverage();
+    const frequency = this.calculateFrequency();
+    const incidentCount = this.incidents.length;
+    
+    // Calcular tendência
+    const quarterAverages = QUARTERS.map(quarter => {
+      const qGrades = this.grades.filter(g => g.quarter === quarter);
+      return qGrades.length > 0 ? qGrades.reduce((s, g) => s + g.grade, 0) / qGrades.length : 0;
+    }).filter(v => v > 0);
+    
+    const trend = analyzeTrend(quarterAverages);
+    
+    // Identificar pontos fortes e fracos
+    const sortedSubjects = Object.entries(subjectAverages).sort((a, b) => b[1] - a[1]);
+    const strengths = sortedSubjects.filter(([_, avg]) => avg >= 7).slice(0, 5).map(([s]) => s);
+    const weaknesses = sortedSubjects.filter(([_, avg]) => avg < 6).map(([s]) => s);
+    
+    const parts: string[] = [];
+    
+    // 1. SITUAÇÃO ATUAL
+    const classLabel = CLASSIFICATION_LABELS[classification.classification];
+    if (classification.classification === 'critico') {
+      parts.push(`Situação crítica: ${classification.subjectsBelow6Count} disciplina(s) abaixo da média mínima.`);
+    } else if (classification.classification === 'atencao') {
+      parts.push(`Situação de atenção: ${classification.subjectsBelow6Count} disciplina(s) em recuperação.`);
+    } else if (classification.classification === 'excelencia') {
+      parts.push(`Situação de excelência: aprovado em todas as disciplinas com média geral superior a 8,0.`);
+    } else {
+      parts.push(`Situação regular: aprovado em todas as disciplinas.`);
+    }
+    
+    // 2. DISCIPLINAS EM DIFICULDADE
+    if (classification.subjectsBelow6.length > 0) {
+      const disciplinasFormatadas = classification.subjectsBelow6
+        .map(s => `${s.subject} (${s.average.toFixed(1)})`)
+        .join(', ');
+      parts.push(`Disciplinas abaixo de 6,0: ${disciplinasFormatadas}.`);
+    }
+    
+    // 3. PONTOS FORTES
+    if (strengths.length > 0) {
+      const fortesFormatados = strengths
+        .map(s => `${s} (${subjectAverages[s].toFixed(1)})`)
+        .join(', ');
+      parts.push(`Pontos fortes: ${fortesFormatados}.`);
+    }
+    
+    // 4. TENDÊNCIA
+    if (trend.direction === 'crescente' && trend.confidence > 30) {
+      parts.push(`Tendência: melhora progressiva ao longo dos bimestres (confiança ${trend.confidence.toFixed(0)}%).`);
+    } else if (trend.direction === 'decrescente' && trend.confidence > 30) {
+      parts.push(`Tendência: queda de desempenho ao longo dos bimestres (confiança ${trend.confidence.toFixed(0)}%).`);
+    } else if (trend.direction === 'estavel') {
+      parts.push(`Tendência: desempenho estável ao longo dos bimestres.`);
+    }
+    
+    // 5. COMPORTAMENTO
+    if (incidentCount > 0) {
+      const graveCount = this.incidents.filter(i => 
+        i.finalSeverity === 'grave' || i.finalSeverity === 'gravissima'
+      ).length;
       
-      this.setFont('xs', 'normal', '#000000');
-      this.drawText(sub.length > 35 ? sub.substring(0, 32) + '...' : sub, this.margin + 2, this.y + 4);
+      if (graveCount > 0) {
+        parts.push(`Comportamento: ${incidentCount} ocorrência(s) registrada(s), sendo ${graveCount} grave(s) ou gravíssima(s), o que pode estar impactando o desempenho acadêmico.`);
+      } else {
+        parts.push(`Comportamento: ${incidentCount} ocorrência(s) registrada(s), requerendo atenção.`);
+      }
+    } else {
+      parts.push(`Comportamento: sem ocorrências disciplinares registradas.`);
+    }
+    
+    // 6. PREDIÇÃO
+    if (trend.prediction > 0 && trend.confidence > 20) {
+      const prediction = Math.max(0, Math.min(10, trend.prediction));
+      parts.push(`Projeção: média final estimada de ${prediction.toFixed(1)} com base nos dados acumulados dos bimestres anteriores.`);
+    }
+    
+    // 7. RECOMENDAÇÃO
+    let recommendation: string;
+    if (classification.classification === 'critico') {
+      recommendation = `Requer intervenção imediata: convocar responsáveis e elaborar plano de recuperação individualizado.`;
+    } else if (classification.classification === 'atencao') {
+      recommendation = `Requer acompanhamento pedagógico: intensificar apoio nas disciplinas em dificuldade.`;
+    } else if (classification.classification === 'excelencia') {
+      recommendation = `Manter estímulo: indicar para monitoria, projetos especiais ou olimpíadas.`;
+    } else {
+      recommendation = `Manter acompanhamento regular para consolidar desempenho.`;
+    }
+    parts.push(`Ação: ${recommendation}`);
+    
+    return parts.join(' ');
+  }
 
-      const subGrades = studentGrades.filter(g => g.subject === sub);
-      let sum = 0;
-      let count = 0;
+  // ============================================
+  // CONSTRUÇÃO DO DOCUMENTO
+  // ============================================
 
-      QUARTERS.forEach((q, i) => {
-        const grade = subGrades.find(g => g.quarter === q);
+  private createDocDefinition(content: Content[]): TDocumentDefinitions {
+    return {
+      pageSize: 'A4',
+      pageMargins: [40, 60, 40, 60],
+      header: (currentPage) => this.createPageHeader(currentPage),
+      footer: (currentPage, pageCount) => this.createPageFooter(currentPage, pageCount),
+      styles: PDF_STYLES,
+      defaultStyle: { fontSize: 10 },
+      content,
+    };
+  }
+
+  private createPageHeader(currentPage: number): Content {
+    if (currentPage === 1) {
+      return {
+        margin: [40, 20, 40, 10],
+        stack: [
+          { text: this.config.schoolName, style: 'h1', margin: [0, 0, 0, 2] },
+          {
+            text: [
+              this.config.inep ? `INEP: ${this.config.inep}` : '',
+              this.config.phone ? ` | Tel: ${this.config.phone}` : '',
+              this.config.email ? ` | ${this.config.email}` : '',
+            ].filter(Boolean).join(''),
+            style: 'bodySmall',
+            margin: [0, 0, 0, 2],
+          },
+          this.config.address ? {
+            text: `${this.config.address}${this.config.city ? `, ${this.config.city}` : ''}${this.config.state ? ` - ${this.config.state}` : ''}`,
+            style: 'bodySmall',
+          } : '',
+          {
+            canvas: [{ type: 'line', x1: 0, y1: 5, x2: 515, y2: 5, lineWidth: 1, lineColor: PDF_COLORS.primary }],
+          },
+        ],
+      };
+    }
+    
+    return {
+      margin: [40, 20, 40, 10],
+      columns: [
+        { text: this.config.schoolName, style: 'bodySmall', width: '*' },
+        { text: `Aluno: ${this.student?.name || ''}`, style: 'bodySmall', alignment: 'right', width: 'auto' },
+      ],
+    };
+  }
+
+  private createPageFooter(currentPage: number, pageCount: number): Content {
+    return {
+      margin: [40, 0, 40, 20],
+      columns: [
+        {
+          text: `Gerado por MAVIC - Sistema de Acompanhamento Escolar em ${new Date().toLocaleDateString('pt-BR')}`,
+          style: 'caption',
+          alignment: 'left',
+        },
+        {
+          text: `Página ${currentPage} de ${pageCount}`,
+          style: 'caption',
+          alignment: 'right',
+        },
+      ],
+    };
+  }
+
+  private buildDocumentContent(subjects?: string[]): Content[] {
+    const content: Content[] = [];
+    
+    // 1. Título
+    content.push(this.buildTitleSection());
+    
+    // 2. Informações do Estudante + Métricas
+    content.push(this.buildStudentInfoSection());
+    
+    // 3. Quadro de Aproveitamento
+    content.push(this.buildGradesTableSection(subjects));
+    
+    // 4. Resumo Textual
+    content.push(this.buildNarrativeSection());
+    
+    // 5. Seção Comportamental
+    content.push(this.buildBehaviorSection());
+    
+    // 6. Assinaturas
+    content.push(this.buildSignaturesSection());
+    
+    return content;
+  }
+
+  // ============================================
+  // SEÇÕES DO DOCUMENTO
+  // ============================================
+
+  private buildTitleSection(): Content {
+    return {
+      stack: [
+        {
+          text: 'RELATÓRIO INDIVIDUAL DE DESEMPENHO',
+          fontSize: 18,
+          bold: true,
+          alignment: 'center',
+          color: PDF_COLORS.primary,
+          margin: [0, 10, 0, 5],
+        },
+      ],
+    };
+  }
+
+  private buildStudentInfoSection(): Content {
+    if (!this.student) return '';
+    
+    const average = this.calculateAverage();
+    const frequency = this.calculateFrequency();
+    const incidentCount = this.incidents.length;
+    const classification = classifyStudent(this.grades, this.attendance);
+    const color = CLASSIFICATION_COLORS[classification.classification];
+    const label = CLASSIFICATION_LABELS[classification.classification];
+    
+    return {
+      stack: [
+        // Informações do estudante
+        {
+          table: {
+            widths: ['*', '*'],
+            body: [[
+              {
+                stack: [
+                  { text: 'Estudante', fontSize: 8, color: PDF_COLORS.secondary },
+                  { text: this.student.name, fontSize: 11, bold: true },
+                ],
+                fillColor: '#F8FAFC',
+                margin: [10, 8, 10, 8],
+              },
+              {
+                stack: [
+                  { text: 'Turma', fontSize: 8, color: PDF_COLORS.secondary },
+                  { text: this.studentClass?.name || 'Não informado', fontSize: 11, bold: true },
+                ],
+                fillColor: '#F8FAFC',
+                margin: [10, 8, 10, 8],
+              },
+            ]],
+          },
+          layout: {
+            hLineWidth: () => 1,
+            vLineWidth: () => 1,
+            hLineColor: () => PDF_COLORS.border,
+            vLineColor: () => PDF_COLORS.border,
+          },
+          margin: [0, 0, 0, 10],
+        },
+        
+        // Métricas: Média, Frequência, Ocorrências
+        {
+          table: {
+            widths: ['*', '*', '*'],
+            body: [[
+              {
+                stack: [
+                  { text: 'Média Geral', fontSize: 9, color: PDF_COLORS.secondary, alignment: 'center' },
+                  { text: average.toFixed(1), fontSize: 20, bold: true, alignment: 'center' },
+                ],
+                fillColor: '#F8FAFC',
+                margin: [10, 8, 10, 8],
+              },
+              {
+                stack: [
+                  { text: 'Frequência', fontSize: 9, color: PDF_COLORS.secondary, alignment: 'center' },
+                  { text: `${frequency.toFixed(0)}%`, fontSize: 20, bold: true, alignment: 'center' },
+                ],
+                fillColor: '#F8FAFC',
+                margin: [10, 8, 10, 8],
+              },
+              {
+                stack: [
+                  { text: 'Total de Ocorrências', fontSize: 9, color: PDF_COLORS.secondary, alignment: 'center' },
+                  { text: incidentCount.toString(), fontSize: 20, bold: true, alignment: 'center' },
+                ],
+                fillColor: '#F8FAFC',
+                margin: [10, 8, 10, 8],
+              },
+            ]],
+          },
+          layout: {
+            hLineWidth: () => 1,
+            vLineWidth: () => 1,
+            hLineColor: () => PDF_COLORS.border,
+            vLineColor: () => PDF_COLORS.border,
+          },
+          margin: [0, 0, 0, 10],
+        },
+        
+        // Classificação
+        {
+          table: {
+            widths: ['*'],
+            body: [[{
+              stack: [
+                { text: 'Classificação', fontSize: 9, color: PDF_COLORS.secondary, margin: [0, 0, 0, 4] },
+                {
+                  table: {
+                    body: [[{
+                      text: label.toUpperCase(),
+                      fontSize: 10,
+                      bold: true,
+                      color: classification.classification === 'atencao' ? '#000000' : '#FFFFFF',
+                      fillColor: color,
+                      margin: [8, 4, 8, 4],
+                    }]],
+                  },
+                  layout: 'noBorders',
+                },
+              ],
+              fillColor: '#F8FAFC',
+              margin: [10, 8, 10, 8],
+            }]],
+          },
+          layout: {
+            hLineWidth: () => 1,
+            vLineWidth: () => 1,
+            hLineColor: () => PDF_COLORS.border,
+            vLineColor: () => PDF_COLORS.border,
+          },
+        },
+      ],
+    };
+  }
+
+  private buildGradesTableSection(subjects?: string[]): Content {
+    const subjectList = subjects && subjects.length > 0
+      ? [...subjects].sort()
+      : [...new Set(this.grades.map(g => g.subject))].sort();
+    
+    const subjectAverages = this.getSubjectAverages();
+    
+    // Construir tabela
+    const tableBody: TableCell[][] = [
+      [
+        { text: 'Disciplina', style: 'tableHeader' },
+        { text: '1º Bim', style: 'tableHeader' },
+        { text: '2º Bim', style: 'tableHeader' },
+        { text: '3º Bim', style: 'tableHeader' },
+        { text: '4º Bim', style: 'tableHeader' },
+        { text: 'Média', style: 'tableHeader' },
+      ],
+    ];
+    
+    subjectList.forEach(subject => {
+      const subGrades = this.grades.filter(g => g.subject === subject);
+      const row: TableCell[] = [
+        { text: subject, style: 'tableCellLeft', fontSize: 9 },
+      ];
+      
+      QUARTERS.forEach(quarter => {
+        const grade = subGrades.find(g => g.quarter === quarter);
         if (grade) {
-          const val = grade.grade;
-          this.setFont('xs', val < 6 ? 'bold' : 'normal', '#000000');
-          this.drawText(val.toFixed(1), this.margin + colSub + (i * colQ) + (colQ/2), this.y + 4, { align: 'center' });
-          sum += val;
-          count++;
+          row.push({
+            text: grade.grade.toFixed(1),
+            style: 'tableCell',
+            fontSize: 9,
+            color: grade.grade < 6 ? PDF_COLORS.status.critico : PDF_COLORS.primary,
+            bold: grade.grade < 6,
+          });
         } else {
-          this.setFont('xs', 'normal', '#666666');
-          this.drawText('-', this.margin + colSub + (i * colQ) + (colQ/2), this.y + 4, { align: 'center' });
+          row.push({ text: '-', style: 'tableCell', fontSize: 9, color: PDF_COLORS.tertiary });
         }
       });
-
-      const finalAvg = count > 0 ? sum / count : 0;
-      this.setFont('xs', 'bold', '#000000');
-      this.drawText(count > 0 ? finalAvg.toFixed(1) : '-', this.margin + colSub + (4 * colQ) + (colQ/2), this.y + 4, { align: 'center' });
-
-      this.y += 6;
+      
+      // Média final
+      const avg = subjectAverages[subject] || 0;
+      row.push({
+        text: avg > 0 ? avg.toFixed(1) : '-',
+        style: 'tableCell',
+        fontSize: 9,
+        bold: true,
+        color: avg < 6 ? PDF_COLORS.status.critico : PDF_COLORS.primary,
+      });
+      
+      tableBody.push(row);
     });
-
-    this.y += 10;
+    
+    return {
+      stack: [
+        { text: '', margin: [0, 0, 0, 0] }, // Quebra de linha
+        { text: '', margin: [0, 0, 0, 0] }, // Quebra de linha
+        { text: 'QUADRO DE APROVEITAMENTO', style: 'h2', margin: [0, 0, 0, 10] },
+        {
+          table: {
+            headerRows: 1,
+            widths: ['*', 50, 50, 50, 50, 50],
+            body: tableBody,
+          },
+          layout: {
+            hLineWidth: (i, node) => i === 0 || i === 1 || i === node.table.body.length ? 1 : 0.5,
+            vLineWidth: () => 0,
+            hLineColor: (i) => i === 1 ? PDF_COLORS.primary : PDF_COLORS.border,
+            fillColor: (rowIndex) => rowIndex === 0 ? PDF_COLORS.primary : rowIndex % 2 === 0 ? '#FFFFFF' : '#F8FAFC',
+            paddingTop: () => 4,
+            paddingBottom: () => 4,
+            paddingLeft: () => 4,
+            paddingRight: () => 4,
+          },
+          margin: [0, 0, 0, 15],
+        },
+      ],
+    };
   }
 
-  private renderIncidents(incidents: Incident[], studentId: string) {
-    const studentIncidents = incidents
-        .filter(i => i.studentIds.includes(studentId))
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  private buildNarrativeSection(): Content {
+    const narrative = this.generateNarrative();
+    
+    return {
+      stack: [
+        { text: '', margin: [0, 0, 0, 0] }, // Quebra de linha
+        { text: '', margin: [0, 0, 0, 0] }, // Quebra de linha
+        { text: 'ANÁLISE QUALITATIVA', style: 'h2', margin: [0, 0, 0, 10] },
+        {
+          text: narrative,
+          fontSize: 9,
+          alignment: 'justify',
+          lineHeight: 1.3,
+          margin: [0, 0, 0, 15],
+        },
+      ],
+    };
+  }
 
-    if (studentIncidents.length === 0) return;
-
-    this.renderSectionTitle('Histórico Disciplinar');
-
+  private buildBehaviorSection(): Content {
+    if (this.incidents.length === 0) {
+      return {
+        stack: [
+          { text: '', margin: [0, 0, 0, 0] }, // Quebra de linha
+          { text: '', margin: [0, 0, 0, 0] }, // Quebra de linha
+          { text: 'HISTÓRICO COMPORTAMENTAL', style: 'h2', margin: [0, 0, 0, 10] },
+          {
+            text: 'Sem ocorrências disciplinares registradas.',
+            fontSize: 9,
+            italics: true,
+            color: PDF_COLORS.tertiary,
+          },
+        ],
+      };
+    }
+    
+    const sortedIncidents = [...this.incidents].sort((a, b) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+    
     const SEVERITY_LABELS: Record<string, string> = {
       leve: 'Leve',
       intermediaria: 'Intermediária',
       grave: 'Grave',
       gravissima: 'Gravíssima',
     };
-
-    studentIncidents.forEach(incident => {
-      this.checkPageBreak(15);
-      
-      // Barra lateral preta (sem cor)
-      this.drawRect(this.margin, this.y, 1.5, 10, { fill: '#000000' });
-      
+    
+    const incidentCards: Content[] = sortedIncidents.map(incident => {
       const severityLabel = SEVERITY_LABELS[incident.finalSeverity] || incident.finalSeverity;
-      this.setFont('xs', 'bold', '#000000');
-      this.drawText(`${new Date(incident.date).toLocaleDateString('pt-BR')} - ${severityLabel}`, this.margin + 4, this.y + 4);
+      const severityColor = incident.finalSeverity === 'grave' || incident.finalSeverity === 'gravissima'
+        ? PDF_COLORS.status.critico
+        : incident.finalSeverity === 'intermediaria'
+        ? PDF_COLORS.status.atencao
+        : PDF_COLORS.tertiary;
       
-      this.setFont('xs', 'normal', '#000000');
-      const desc = incident.description.length > 120 ? incident.description.substring(0, 117) + '...' : incident.description;
-      this.drawText(desc, this.margin + 4, this.y + 8);
-
-      this.y += 12;
+      return {
+        table: {
+          widths: [3, '*'],
+          body: [[
+            { text: '', fillColor: severityColor },
+            {
+              stack: [
+                {
+                  text: `${new Date(incident.date).toLocaleDateString('pt-BR')} - ${severityLabel}`,
+                  fontSize: 10,
+                  bold: true,
+                  margin: [0, 0, 0, 4],
+                },
+                {
+                  text: incident.description || 'Sem descrição',
+                  fontSize: 9,
+                  alignment: 'justify',
+                  lineHeight: 1.2,
+                },
+              ],
+              margin: [10, 8, 10, 8],
+            },
+          ]],
+        },
+        layout: 'noBorders',
+        margin: [0, 0, 0, 8],
+        unbreakable: true,
+      };
     });
+    
+    return {
+      stack: [
+        { text: '', margin: [0, 0, 0, 0] }, // Quebra de linha
+        { text: '', margin: [0, 0, 0, 0] }, // Quebra de linha
+        { text: 'HISTÓRICO COMPORTAMENTAL', style: 'h2', margin: [0, 0, 0, 10] },
+        {
+          text: `${this.incidents.length} ocorrência(s) registrada(s) no período.`,
+          fontSize: 9,
+          color: PDF_COLORS.secondary,
+          margin: [0, 0, 0, 10],
+        },
+        ...incidentCards,
+      ],
+    };
   }
 
-  private renderSignatures(student: Student) {
-    this.checkPageBreak(40);
-    this.y += 15;
-    const sigY = this.y + 15;
-    const colW = this.contentWidth / 2;
-
-    this.pdf.setLineWidth(0.3);
-    this.pdf.setDrawColor('#000000');
-    
-    // Responsável pela Unidade
-    this.pdf.line(this.margin, sigY, this.margin + colW - 10, sigY);
-    this.setFont('xs', 'normal', '#000000');
-    this.drawText('Responsável pela Unidade', this.margin + (colW-10)/2, sigY + 4, { align: 'center' });
-    if (this.config.directorName) {
-      this.setFont('xs', 'bold', '#000000');
-      this.drawText(this.config.directorName, this.margin + (colW-10)/2, sigY + 8, { align: 'center' });
-    }
-
-    // Responsável Legal
-    this.pdf.line(this.margin + colW + 10, sigY, this.pageWidth - this.margin, sigY);
-    this.setFont('xs', 'normal', '#000000');
-    this.drawText('Pai / Mãe / Responsável', this.margin + colW + 10 + (colW-10)/2, sigY + 4, { align: 'center' });
+  private buildSignaturesSection(): Content {
+    return {
+      stack: [
+        { text: '', margin: [0, 0, 0, 0] }, // Quebra de linha
+        { text: '', margin: [0, 0, 0, 0] }, // Quebra de linha
+        {
+          columns: [
+            {
+              stack: [
+                {
+                  canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 0.5, lineColor: PDF_COLORS.primary }],
+                  margin: [0, 0, 0, 4],
+                },
+                { text: 'Responsável pela Unidade', fontSize: 9, alignment: 'center' },
+                this.config.directorName ? {
+                  text: this.config.directorName,
+                  fontSize: 9,
+                  bold: true,
+                  alignment: 'center',
+                  margin: [0, 4, 0, 0],
+                } : '',
+              ],
+              width: '*',
+            },
+            {
+              stack: [
+                {
+                  canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 0.5, lineColor: PDF_COLORS.primary }],
+                  margin: [0, 0, 0, 4],
+                },
+                { text: 'Pai / Mãe / Responsável', fontSize: 9, alignment: 'center' },
+              ],
+              width: '*',
+            },
+          ],
+          columnGap: 20,
+          margin: [0, 30, 0, 0],
+        },
+      ],
+    };
   }
 }
 
+// ============================================
+// EXPORT
+// ============================================
+
 export async function generateStudentReportPDF(
-  student: Student,
-  studentClass: Class | undefined,
-  grades: Grade[],
-  incidents: Incident[],
-  attendance: AttendanceRecord[],
-  subjects?: string[]
-) {
-  const generator = new StudentReportPDF();
+    student: Student,
+    studentClass: Class | undefined,
+    grades: Grade[],
+    incidents: Incident[],
+    attendance: AttendanceRecord[],
+    subjects?: string[]
+): Promise<void> {
+  const generator = new StudentReportPDFGenerator();
   await generator.generate(student, studentClass, grades, incidents, attendance, subjects);
 }

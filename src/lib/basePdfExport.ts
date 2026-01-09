@@ -84,6 +84,7 @@ export class BasePDFGenerator {
     this.pdf.setFont('helvetica', weight === 'bold' ? 'bold' : 'normal');
     this.pdf.setFontSize(fontSize);
     this.pdf.setTextColor(color);
+    this.pdf.setLineHeightFactor(1.0);
   }
 
   protected drawText(text: string | string[], x: number, y: number, options: { align?: 'left' | 'center' | 'right'; maxWidth?: number } = {}) {
@@ -194,14 +195,19 @@ export class BasePDFGenerator {
   protected renderSectionTitle(title: string) {
     this.checkPageBreak(15);
     
-    // Barra lateral preta fina
-    this.drawRect(this.margin, this.y, 1.5, 6, { fill: '#000000' });
+    // Linha separadora destacada antes do título
+    this.y += 4;
+    this.drawLine(this.y, 0.3, '#000000');
+    this.y += 6;
+    
+    // Barra lateral preta mais espessa
+    this.drawRect(this.margin, this.y, 2, 7, { fill: '#000000' });
     // Título em formato título (primeira letra maiúscula)
     const titleFormatted = title.charAt(0).toUpperCase() + title.slice(1).toLowerCase();
     this.setFont('sm', 'bold', '#000000');
-    this.drawText(titleFormatted, this.margin + 4, this.y + 5);
+    this.drawText(titleFormatted, this.margin + 5, this.y + 5.5);
     
-    this.y += 10;
+    this.y += 12;
   }
 
   /**

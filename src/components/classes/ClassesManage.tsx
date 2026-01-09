@@ -167,7 +167,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
     // CORREÇÃO: Usar currentYear (ano atual) em vez de startYear (ano de início)
     // Se a turma está no 3º ano, deve usar disciplinas do 3º ano, não do 1º!
     const preferredYear = editFormData.currentYear || editFormData.startYear;
-    
+
     const yearFromTemplate = preferredYear &&
       template.subjectsByYear.some((y) => y.year === preferredYear)
       ? preferredYear
@@ -527,9 +527,9 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                       shouldArchiveClass(cls.startYearDate, cls.startYear);
 
                     const isHighlighted = highlightId === cls.id;
-                    
+
                     return (
-                      <TableRow 
+                      <TableRow
                         key={cls.id}
                         className={isHighlighted ? "bg-primary/10 animate-pulse ring-2 ring-primary/50" : ""}
                       >
@@ -928,7 +928,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
 
                 {editHasTemplate && editFormData.startYear && (
                   <div className="space-y-2 md:col-span-2">
-                    <Label>Disciplinas Profissionais do {editFormData.startYear}º Ano</Label>
+                    <Label>Disciplinas Profissionais do {editFormData.currentYear || editFormData.startYear}º Ano</Label>
                     {templateSubjects.length === 0 ? (
                       <p className="text-sm text-destructive">
                         O template selecionado não possui disciplinas para este ano.

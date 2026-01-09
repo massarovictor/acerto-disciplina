@@ -32,7 +32,8 @@ import {
     processSigeFile,
     ImportableGrade,
     SigeParseResult,
-    calculateNameSimilarity
+    calculateNameSimilarity,
+    normalizeSubjectName
 } from '@/lib/sigeParser';
 import { ChevronsUpDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -56,6 +57,13 @@ interface StudentMatch {
     isManual: boolean;
 }
 
+// Mapeamento de disciplina do Excel para disciplina do sistema
+interface SubjectMapping {
+    excelSubject: string;           // Nome como veio do Excel
+    systemSubject: string | null;   // Disciplina do sistema (null = ignorar)
+    autoMatched: boolean;           // Se foi match automático ou manual
+}
+
 interface SigeImportDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -68,7 +76,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
     const { professionalSubjects } = useProfessionalSubjects();
     const { toast } = useToast();
 
-    const [step, setStep] = useState<'configure' | 'upload' | 'match-students' | 'review-subjects' | 'preview'>('configure');
+    const [step, setStep] = useState<'configure' | 'upload' | 'match-students' | 'map-subjects' | 'review-subjects' | 'preview'>('configure');
     const [isProcessing, setIsProcessing] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
@@ -79,23 +87,108 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
     const [replaceExisting, setReplaceExisting] = useState(true); // Por padrão, substituir
     const [importableGrades, setImportableGrades] = useState<ImportableGrade[]>([]);
     const [studentMatches, setStudentMatches] = useState<StudentMatch[]>([]);
+    const [subjectMappings, setSubjectMappings] = useState<SubjectMapping[]>([]);
 
     const activeClasses = classes.filter(c => !c.archived && c.active);
 
     // Função para obter disciplinas válidas de uma turma
-    const getValidSubjectsForClass = (classId: string): string[] => {
+    // Retorna tanto o nome original quanto o normalizado para comparação flexível
+    const getValidSubjectsForClass = (classId: string): { original: string; normalized: string }[] => {
         // Disciplinas da Base Nacional Comum (ENEM)
-        const baseSubjects = getAllSubjects();
-        
+        const baseSubjects = getAllSubjects().map(s => ({
+            original: s,
+            normalized: normalizeSubjectName(s).toLowerCase()
+        }));
+
         // Disciplinas Profissionais da turma (verificar se existe antes de filtrar)
         const classSubjects = (professionalSubjects || [])
             .filter(ps => ps.classId === classId)
-            .map(ps => ps.subject);
-        
-        // Combinar ambas (sem duplicatas)
-        const allValidSubjects = [...new Set([...baseSubjects, ...classSubjects])];
-        
+            .map(ps => ({
+                original: ps.subject,
+                normalized: normalizeSubjectName(ps.subject).toLowerCase()
+            }));
+
+        // Combinar ambas (sem duplicatas por nome normalizado)
+        const seenNormalized = new Set<string>();
+        const allValidSubjects: { original: string; normalized: string }[] = [];
+
+        for (const subj of [...baseSubjects, ...classSubjects]) {
+            if (!seenNormalized.has(subj.normalized)) {
+                seenNormalized.add(subj.normalized);
+                allValidSubjects.push(subj);
+            }
+        }
+
         return allValidSubjects;
+    };
+
+    // Função para verificar se uma disciplina é válida (comparação flexível)
+    // Agora também considera os mapeamentos manuais
+    const isValidSubject = (
+        subject: string,
+        validSubjects: { original: string; normalized: string }[],
+        mappings: SubjectMapping[] = []
+    ): string | null => {
+        // Primeiro: verificar se há mapeamento manual
+        const manualMapping = mappings.find(m => m.excelSubject === subject);
+        if (manualMapping) {
+            return manualMapping.systemSubject; // Pode ser null se foi ignorado
+        }
+
+        const normalizedSubject = normalizeSubjectName(subject).toLowerCase();
+
+        // Segundo: match exato pelo nome normalizado
+        const exactMatch = validSubjects.find(vs => vs.normalized === normalizedSubject);
+        if (exactMatch) return exactMatch.original;
+
+        // Terceiro: match por inclusão flexível (palavras principais)
+        const subjectWords = normalizedSubject.split(' ').filter(w => w.length >= 3);
+
+        for (const vs of validSubjects) {
+            const vsWords = vs.normalized.split(' ').filter(w => w.length >= 3);
+
+            // Se todas as palavras principais do Excel estão no template (ou vice-versa)
+            const matchingWords = subjectWords.filter(sw =>
+                vsWords.some(vw => vw.includes(sw) || sw.includes(vw))
+            );
+
+            // Se 70% ou mais das palavras principais casam
+            const matchRatio = matchingWords.length / Math.max(subjectWords.length, 1);
+            if (matchRatio >= 0.7 && matchingWords.length >= 1) {
+                return vs.original;
+            }
+        }
+
+        return null; // Não encontrou match
+    };
+
+    // Função para preparar mapeamentos de disciplinas
+    const prepareSubjectMappings = () => {
+        if (!parseResult || !selectedClass) return;
+
+        const validSubjects = getValidSubjectsForClass(selectedClass);
+        const mappings: SubjectMapping[] = [];
+
+        for (const excelSubject of parseResult.subjects) {
+            const autoMatch = isValidSubject(excelSubject, validSubjects, []);
+            mappings.push({
+                excelSubject,
+                systemSubject: autoMatch,
+                autoMatched: autoMatch !== null
+            });
+        }
+
+        setSubjectMappings(mappings);
+        setStep('map-subjects');
+    };
+
+    // Função para atualizar um mapeamento
+    const updateSubjectMapping = (excelSubject: string, systemSubject: string | null) => {
+        setSubjectMappings(prev => prev.map(m =>
+            m.excelSubject === excelSubject
+                ? { ...m, systemSubject, autoMatched: false }
+                : m
+        ));
     };
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,10 +216,10 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
             const result = await processSigeFile(file);
 
             if (result.success) {
-                const subjectsSummary = result.subjects.length <= 5 
+                const subjectsSummary = result.subjects.length <= 5
                     ? result.subjects.join(', ')
                     : `${result.subjects.slice(0, 5).join(', ')}... (+${result.subjects.length - 5})`;
-                    
+
                 toast({
                     title: 'Excel processado com sucesso',
                     description: `${result.rows.length} alunos e ${result.subjects.length} disciplinas encontradas: ${subjectsSummary}`,
@@ -226,8 +319,8 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
     };
 
     const handleConfirmMatches = () => {
-        // Ir para o passo de revisão de disciplinas
-        setStep('review-subjects');
+        // Ir para o passo de mapeamento de disciplinas
+        prepareSubjectMappings();
     };
 
     const handleConfirmSubjects = () => {
@@ -247,7 +340,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
         // Para cada match confirmado
         for (const match of studentMatches) {
             const systemStudent = classStudents.find(s => s.id === match.systemStudentId);
-            
+
             // Encontrar TODAS as linhas de notas para este nome do arquivo
             const studentRows = parseResult.rows.filter(r => r.studentName === match.fileStudentName);
 
@@ -266,7 +359,9 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                         continue;
                     }
 
-                    if (!validSubjects.includes(subject)) {
+                    // Verificar se a disciplina é válida (usando mapeamentos manuais)
+                    const matchedSubject = isValidSubject(subject, validSubjects, subjectMappings);
+                    if (!matchedSubject) {
                         notasDescartadasPorDisciplina++;
                         continue;
                     }
@@ -279,7 +374,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                         extractedName: match.fileStudentName,
                         similarity: match.similarity,
                         classId: selectedClass,
-                        subject,
+                        subject: matchedSubject, // Usar o nome normalizado/oficial
                         quarter: selectedQuarter,
                         grade,
                         selected: true,
@@ -364,22 +459,22 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                 const gradesToDelete = existingGrades.filter(
                     g => g.classId === selectedClass && g.quarter === selectedQuarter
                 );
-                
+
                 setImportPhase('deleting');
                 setImportProgress({ current: 0, total: gradesToDelete.length });
-                
+
                 console.log(`🗑️ Deletando ${gradesToDelete.length} notas antigas...`);
-                
+
                 const DELETE_BATCH_SIZE = 50; // Deletar 50 por vez em paralelo
                 const deleteBatches = [];
-                
+
                 for (let i = 0; i < gradesToDelete.length; i += DELETE_BATCH_SIZE) {
                     deleteBatches.push(gradesToDelete.slice(i, i + DELETE_BATCH_SIZE));
                 }
 
                 for (let batchIndex = 0; batchIndex < deleteBatches.length; batchIndex++) {
                     const batch = deleteBatches[batchIndex];
-                    
+
                     // Deletar TODAS as notas do lote em PARALELO
                     const deletePromises = batch.map(async (grade) => {
                         try {
@@ -394,12 +489,12 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                     });
 
                     await Promise.all(deletePromises);
-                    
+
                     // Atualizar progresso após cada lote
                     const deletedCount = Math.min((batchIndex + 1) * DELETE_BATCH_SIZE, gradesToDelete.length);
                     setImportProgress({ current: deletedCount, total: gradesToDelete.length });
                 }
-                
+
                 console.log(`✅ ${deleted} notas antigas deletadas`);
             }
 
@@ -409,7 +504,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
 
             const BATCH_SIZE = 50; // Processar 50 notas por vez em paralelo
             const batches = [];
-            
+
             for (let i = 0; i < toImport.length; i += BATCH_SIZE) {
                 batches.push(toImport.slice(i, i + BATCH_SIZE));
             }
@@ -418,7 +513,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
 
             for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
                 const batch = batches[batchIndex];
-                
+
                 // Processar TODAS as notas do lote em PARALELO
                 const batchPromises = batch.map(async (grade) => {
                     try {
@@ -437,13 +532,13 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                             quarter: grade.quarter,
                             grade: grade.grade,
                         });
-                        
+
                         if (existing) {
                             updated++;
                         } else {
                             imported++;
                         }
-                        
+
                         return { success: true };
                     } catch (error) {
                         console.error(`Erro ao importar nota:`, error);
@@ -454,15 +549,15 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
 
                 // Aguardar TODAS as notas do lote serem processadas
                 await Promise.all(batchPromises);
-                
+
                 // Atualizar progresso após cada lote
                 const processedCount = Math.min((batchIndex + 1) * BATCH_SIZE, toImport.length);
-                setImportProgress({ 
-                    current: processedCount, 
-                    total: toImport.length 
+                setImportProgress({
+                    current: processedCount,
+                    total: toImport.length
                 });
             }
-            
+
             console.log(`✅ Importação concluída: ${imported} importadas, ${updated} atualizadas, ${errors} erros`);
         } finally {
             setIsImporting(false);
@@ -471,7 +566,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
         if (errors > 0) {
             toast({
                 title: 'Importação concluída com erros',
-                description: replaceExisting 
+                description: replaceExisting
                     ? `${deleted} deletada(s), ${imported} importada(s), ${errors} erro(s).`
                     : `${imported} importada(s), ${updated} atualizada(s), ${errors} erro(s).`,
                 variant: 'destructive',
@@ -562,13 +657,13 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                                         Substituir notas existentes
                                     </Label>
                                     <p className="text-sm text-muted-foreground">
-                                        {replaceExisting 
+                                        {replaceExisting
                                             ? 'Todas as notas antigas deste bimestre serão deletadas e substituídas pelas novas'
                                             : 'As notas do arquivo serão adicionadas/atualizadas sem deletar as existentes'
                                         }
                                     </p>
                                 </div>
-                                <Checkbox 
+                                <Checkbox
                                     checked={replaceExisting}
                                     onCheckedChange={(checked) => setReplaceExisting(!!checked)}
                                 />
@@ -695,20 +790,111 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                     </div>
                 )}
 
-                {/* Step 4: Review Subjects (NOVO) */}
+                {/* Step 4: Map Subjects - Mapeamento de Disciplinas */}
+                {step === 'map-subjects' && parseResult && (
+                    <div className="space-y-4">
+                        <Alert>
+                            <AlertDescription>
+                                <strong>Relacione as disciplinas do SIGE com as disciplinas do sistema.</strong>
+                                <br />
+                                Disciplinas não mapeadas serão descartadas. Selecione "Ignorar" para não importar uma disciplina.
+                            </AlertDescription>
+                        </Alert>
+
+                        <ScrollArea className="h-[400px] border rounded-lg">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-[45%]">Disciplina no SIGE</TableHead>
+                                        <TableHead className="w-[45%]">Disciplina no Sistema</TableHead>
+                                        <TableHead className="w-[10%]">Status</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {subjectMappings.map((mapping) => {
+                                        const validSubjects = getValidSubjectsForClass(selectedClass);
+                                        return (
+                                            <TableRow
+                                                key={mapping.excelSubject}
+                                                className={!mapping.systemSubject ? 'opacity-60 bg-muted/40' : ''}
+                                            >
+                                                <TableCell className="font-medium">
+                                                    {mapping.excelSubject}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Select
+                                                        value={mapping.systemSubject || 'ignore'}
+                                                        onValueChange={(val) => updateSubjectMapping(
+                                                            mapping.excelSubject,
+                                                            val === 'ignore' ? null : val
+                                                        )}
+                                                    >
+                                                        <SelectTrigger className="w-full h-8">
+                                                            <SelectValue placeholder="Selecione..." />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="ignore" className="text-muted-foreground italic">
+                                                                -- Ignorar (Não importar) --
+                                                            </SelectItem>
+                                                            {validSubjects.map(vs => (
+                                                                <SelectItem key={vs.original} value={vs.original}>
+                                                                    {vs.original}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {mapping.systemSubject ? (
+                                                        <Badge
+                                                            variant={mapping.autoMatched ? 'default' : 'outline'}
+                                                            className={mapping.autoMatched ? 'bg-green-500 hover:bg-green-600' : ''}
+                                                        >
+                                                            {mapping.autoMatched ? 'Auto' : 'Manual'}
+                                                        </Badge>
+                                                    ) : (
+                                                        <Badge variant="outline" className="text-muted-foreground border-dashed">
+                                                            Ignorado
+                                                        </Badge>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        </ScrollArea>
+
+                        <div className="border rounded-lg p-4 bg-muted/50">
+                            <h4 className="font-semibold mb-2">Resumo</h4>
+                            <div className="space-y-1 text-sm">
+                                <p>📊 Total de disciplinas: {subjectMappings.length}</p>
+                                <p className="text-green-700 dark:text-green-400">
+                                    ✓ Mapeadas automaticamente: {subjectMappings.filter(m => m.autoMatched && m.systemSubject).length}
+                                </p>
+                                <p className="text-blue-700 dark:text-blue-400">
+                                    ✓ Mapeadas manualmente: {subjectMappings.filter(m => !m.autoMatched && m.systemSubject).length}
+                                </p>
+                                <p className="text-amber-700 dark:text-amber-400">
+                                    ⚠ Serão ignoradas: {subjectMappings.filter(m => !m.systemSubject).length}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Step 5: Review Subjects */}
                 {step === 'review-subjects' && parseResult && (
                     <div className="space-y-4">
                         <Alert>
                             <AlertDescription>
-                                Revise as disciplinas encontradas no arquivo. Apenas disciplinas cadastradas no sistema serão importadas.
+                                Confirme as disciplinas que serão importadas com base nos mapeamentos definidos.
                             </AlertDescription>
                         </Alert>
 
                         {(() => {
-                            const validSubjects = getValidSubjectsForClass(selectedClass);
-                            const allSubjectsInFile = parseResult.subjects;
-                            const validFromFile = allSubjectsInFile.filter(s => validSubjects.includes(s));
-                            const discardedFromFile = allSubjectsInFile.filter(s => !validSubjects.includes(s));
+                            const mappedSubjects = subjectMappings.filter(m => m.systemSubject !== null);
+                            const unmappedSubjects = subjectMappings.filter(m => m.systemSubject === null);
 
                             return (
                                 <div className="space-y-4">
@@ -717,65 +903,57 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                                         <div className="flex items-center gap-2 mb-3">
                                             <CheckCircle2 className="h-5 w-5 text-green-600" />
                                             <h3 className="font-semibold text-green-900 dark:text-green-100">
-                                                Disciplinas que serão importadas ({validFromFile.length})
+                                                Disciplinas que serão importadas ({mappedSubjects.length})
                                             </h3>
                                         </div>
-                                        {validFromFile.length > 0 ? (
-                                            <div className="flex flex-wrap gap-2">
-                                                {validFromFile.map(subject => (
-                                                    <Badge 
-                                                        key={subject} 
-                                                        variant="outline" 
-                                                        className="bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/30"
-                                                    >
-                                                        ✓ {subject}
-                                                    </Badge>
+                                        {mappedSubjects.length > 0 ? (
+                                            <div className="space-y-1">
+                                                {mappedSubjects.map(m => (
+                                                    <div key={m.excelSubject} className="flex items-center gap-2 text-sm">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/30"
+                                                        >
+                                                            ✓ {m.excelSubject}
+                                                        </Badge>
+                                                        <span className="text-muted-foreground">→</span>
+                                                        <span className="font-medium">{m.systemSubject}</span>
+                                                        {!m.autoMatched && (
+                                                            <Badge variant="outline" className="text-xs">Manual</Badge>
+                                                        )}
+                                                    </div>
                                                 ))}
                                             </div>
                                         ) : (
                                             <p className="text-sm text-muted-foreground">
-                                                Nenhuma disciplina válida encontrada.
+                                                Nenhuma disciplina mapeada. Volte e mapeie pelo menos uma disciplina.
                                             </p>
                                         )}
                                     </div>
 
-                                    {/* Disciplinas Descartadas */}
-                                    {discardedFromFile.length > 0 && (
-                                        <div className="border rounded-lg p-4 bg-red-50 dark:bg-red-950/20">
+                                    {/* Disciplinas Ignoradas */}
+                                    {unmappedSubjects.length > 0 && (
+                                        <div className="border rounded-lg p-4 bg-amber-50 dark:bg-amber-950/20">
                                             <div className="flex items-center gap-2 mb-3">
-                                                <X className="h-5 w-5 text-red-600" />
-                                                <h3 className="font-semibold text-red-900 dark:text-red-100">
-                                                    Disciplinas que serão descartadas ({discardedFromFile.length})
+                                                <AlertTriangle className="h-5 w-5 text-amber-600" />
+                                                <h3 className="font-semibold text-amber-900 dark:text-amber-100">
+                                                    Disciplinas ignoradas ({unmappedSubjects.length})
                                                 </h3>
                                             </div>
-                                            <div className="flex flex-wrap gap-2 mb-3">
-                                                {discardedFromFile.map(subject => (
-                                                    <Badge 
-                                                        key={subject} 
-                                                        variant="outline" 
-                                                        className="bg-red-500/10 text-red-700 dark:text-red-300 border-red-500/30"
+                                            <div className="flex flex-wrap gap-2">
+                                                {unmappedSubjects.map(m => (
+                                                    <Badge
+                                                        key={m.excelSubject}
+                                                        variant="outline"
+                                                        className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30"
                                                     >
-                                                        ✗ {subject}
+                                                        ⚠ {m.excelSubject}
                                                     </Badge>
                                                 ))}
                                             </div>
-                                            <Alert variant="destructive" className="mt-3">
-                                                <AlertTriangle className="h-4 w-4" />
-                                                <AlertDescription>
-                                                    <p className="font-medium mb-2">
-                                                        Essas disciplinas não estão cadastradas no sistema
-                                                    </p>
-                                                    <p className="text-sm">
-                                                        Para importá-las, cadastre-as no template de disciplinas profissionais da turma:
-                                                    </p>
-                                                    <ol className="text-sm mt-2 ml-4 list-decimal">
-                                                        <li>Ir em Turmas → Templates de Disciplinas</li>
-                                                        <li>Criar ou editar template do curso</li>
-                                                        <li>Adicionar as disciplinas profissionais</li>
-                                                        <li>Aplicar o template à turma</li>
-                                                    </ol>
-                                                </AlertDescription>
-                                            </Alert>
+                                            <p className="text-sm text-muted-foreground mt-2">
+                                                Se deseja importar estas disciplinas, volte à etapa anterior e mapeie-as.
+                                            </p>
                                         </div>
                                     )}
 
@@ -783,23 +961,23 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                                     <div className="border rounded-lg p-4 bg-muted/50">
                                         <h4 className="font-semibold mb-2">Resumo da Importação</h4>
                                         <div className="space-y-1 text-sm">
-                                            <p>📊 Total de disciplinas no arquivo: {allSubjectsInFile.length}</p>
+                                            <p>📊 Total de disciplinas no arquivo: {subjectMappings.length}</p>
                                             <p className="text-green-700 dark:text-green-400">
-                                                ✓ Serão importadas: {validFromFile.length}
+                                                ✓ Serão importadas: {mappedSubjects.length}
                                             </p>
-                                            {discardedFromFile.length > 0 && (
-                                                <p className="text-red-700 dark:text-red-400">
-                                                    ✗ Serão descartadas: {discardedFromFile.length}
+                                            {unmappedSubjects.length > 0 && (
+                                                <p className="text-amber-700 dark:text-amber-400">
+                                                    ⚠ Ignoradas: {unmappedSubjects.length}
                                                 </p>
                                             )}
                                         </div>
                                     </div>
 
-                                    {validFromFile.length === 0 && (
+                                    {mappedSubjects.length === 0 && (
                                         <Alert variant="destructive">
                                             <AlertTriangle className="h-4 w-4" />
                                             <AlertDescription>
-                                                Nenhuma disciplina válida para importar. Cadastre as disciplinas profissionais antes de continuar.
+                                                Nenhuma disciplina mapeada para importar. Volte e mapeie pelo menos uma disciplina.
                                             </AlertDescription>
                                         </Alert>
                                     )}
@@ -838,7 +1016,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                                             <span className="ml-2 font-semibold">{new Set(importableGrades.map(g => g.subject)).size}</span>
                                         </div>
                                     </div>
-                                    
+
                                     {/* Disciplinas */}
                                     <div>
                                         <p className="text-xs text-muted-foreground mb-1">Disciplinas validadas:</p>
@@ -861,8 +1039,8 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                                     <div className="space-y-2">
                                         <div className="flex justify-between text-sm">
                                             <span>
-                                                {importPhase === 'deleting' 
-                                                    ? '🗑️ Removendo notas antigas...' 
+                                                {importPhase === 'deleting'
+                                                    ? '🗑️ Removendo notas antigas...'
                                                     : '📝 Importando novas notas...'
                                                 }
                                             </span>
@@ -870,8 +1048,8 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                                                 {importProgress.current} / {importProgress.total}
                                             </span>
                                         </div>
-                                        <Progress 
-                                            value={importProgress.total > 0 ? (importProgress.current / importProgress.total) * 100 : 0} 
+                                        <Progress
+                                            value={importProgress.total > 0 ? (importProgress.current / importProgress.total) * 100 : 0}
                                             className="h-2"
                                         />
                                         {importPhase === 'deleting' && (
@@ -883,7 +1061,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                                 </AlertDescription>
                             </Alert>
                         )}
-                        
+
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <Checkbox
@@ -975,18 +1153,28 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                         </>
                     )}
 
-                    {step === 'review-subjects' && parseResult && (
+                    {step === 'map-subjects' && parseResult && (
                         <>
                             <Button variant="outline" onClick={() => setStep('match-students')}>
                                 Voltar
                             </Button>
-                            <Button 
+                            <Button
+                                onClick={() => setStep('review-subjects')}
+                                disabled={subjectMappings.filter(m => m.systemSubject).length === 0}
+                            >
+                                Continuar para Revisão
+                            </Button>
+                        </>
+                    )}
+
+                    {step === 'review-subjects' && parseResult && (
+                        <>
+                            <Button variant="outline" onClick={() => setStep('map-subjects')}>
+                                Voltar
+                            </Button>
+                            <Button
                                 onClick={handleConfirmSubjects}
-                                disabled={(() => {
-                                    const validSubjects = getValidSubjectsForClass(selectedClass);
-                                    const validFromFile = parseResult.subjects.filter(s => validSubjects.includes(s));
-                                    return validFromFile.length === 0;
-                                })()}
+                                disabled={subjectMappings.filter(m => m.systemSubject).length === 0}
                             >
                                 Continuar para Preview
                             </Button>
@@ -995,8 +1183,8 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
 
                     {step === 'preview' && (
                         <>
-                            <Button 
-                                variant="outline" 
+                            <Button
+                                variant="outline"
                                 onClick={() => setStep('review-subjects')}
                                 disabled={isImporting}
                             >

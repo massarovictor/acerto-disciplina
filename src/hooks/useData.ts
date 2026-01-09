@@ -969,6 +969,7 @@ export function useProfessionalSubjects() {
   };
 
   return {
+    professionalSubjects: items,
     getProfessionalSubjects,
     addProfessionalSubject,
     removeProfessionalSubject,

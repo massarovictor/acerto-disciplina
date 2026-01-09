@@ -1,29 +1,33 @@
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { 
-  FileText, 
-  Users, 
-  AlertTriangle, 
-  CheckCircle2, 
-  Plus, 
-  Search,
-  Eye,
-  Edit,
-  Filter,
+import {
+  Users,
+  GraduationCap,
+  ClipboardList,
+  AlertTriangle,
+  FileBarChart,
   TrendingUp,
-  Clock,
-  Settings
+  Settings,
+  ArrowRight,
+  Sparkles
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useIncidents, useClasses, useStudents } from '@/hooks/useData';
-import { IncidentDetailsDialog } from '@/components/incidents/IncidentDetailsDialog';
-import { IncidentManagementDialog } from '@/components/incidents/IncidentManagementDialog';
 import { SchoolConfigDialog } from '@/components/settings/SchoolConfigDialog';
-import { Incident, IncidentStatus } from '@/types';
+
+interface NavigationCard {
+  title: string;
+  description: string;
+  icon: React.ElementType;
+  path: string;
+  iconBg: string;
+  iconColor: string;
+  badge?: string | number;
+  badgeVariant?: 'default' | 'destructive' | 'secondary';
+}
 
 const Dashboard = () => {
   const { user, profile } = useAuth();
@@ -31,325 +35,183 @@ const Dashboard = () => {
   const { incidents } = useIncidents();
   const { classes } = useClasses();
   const { students } = useStudents();
-  
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [showMyIncidents, setShowMyIncidents] = useState(false);
-  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
-  const [managingIncident, setManagingIncident] = useState<Incident | null>(null);
-  const [initialTab, setInitialTab] = useState<'info' | 'followup' | 'comments'>('info');
+
   const [showSchoolConfig, setShowSchoolConfig] = useState(false);
 
-  // Calculate metrics
-  const openIncidents = incidents.filter(i => i.status === 'aberta');
-  const followUpIncidents = incidents.filter(i => i.status === 'acompanhamento');
-  const thisMonthIncidents = incidents.filter(i => {
-    const incidentDate = new Date(i.createdAt);
-    const now = new Date();
-    return incidentDate.getMonth() === now.getMonth() && 
-           incidentDate.getFullYear() === now.getFullYear();
-  });
-  const resolvedThisMonth = thisMonthIncidents.filter(i => i.status === 'resolvida');
-  const resolutionRate = thisMonthIncidents.length > 0 
-    ? Math.round((resolvedThisMonth.length / thisMonthIncidents.length) * 100) 
-    : 0;
+  // Calculate badges
+  const activeClasses = classes.filter(c => !c.archived);
+  const activeStudents = students.filter(s => s.status === 'active');
+  const pendingIncidents = incidents.filter(i => i.status !== 'resolvida');
 
-  // Filter incidents
-  const filteredIncidents = incidents.filter(incident => {
-    const matchesSearch = searchTerm === '' || 
-      classes.find(c => c.id === incident.classId)?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      incident.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || incident.status === statusFilter;
-    const matchesUser = !showMyIncidents || incident.createdBy === user?.id;
-    
-    return matchesSearch && matchesStatus && matchesUser;
-  });
-
-  const stats = [
+  const navigationCards: NavigationCard[] = [
     {
-      title: 'Abertas',
-      value: openIncidents.length.toString(),
+      title: 'Turmas',
+      description: 'Gerencie e visualize todas as turmas e cursos',
+      icon: GraduationCap,
+      path: '/turmas',
+      iconBg: 'bg-blue-500/10',
+      iconColor: 'text-blue-500',
+      badge: activeClasses.length > 0 ? activeClasses.length : undefined,
+      badgeVariant: 'secondary',
+    },
+    {
+      title: 'Alunos',
+      description: 'Acesso completo ao perfil e dados dos estudantes',
+      icon: Users,
+      path: '/alunos',
+      iconBg: 'bg-emerald-500/10',
+      iconColor: 'text-emerald-500',
+      badge: activeStudents.length > 0 ? activeStudents.length : undefined,
+      badgeVariant: 'secondary',
+    },
+    {
+      title: 'Notas e Frequência',
+      description: 'Lançamento e acompanhamento de desempenho',
+      icon: ClipboardList,
+      path: '/notas-frequencia',
+      iconBg: 'bg-violet-500/10',
+      iconColor: 'text-violet-500',
+    },
+    {
+      title: 'Ocorrências',
+      description: 'Registro de eventos disciplinares e avisos',
       icon: AlertTriangle,
-      trend: `+${openIncidents.filter(i => {
-        const weekAgo = new Date();
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        return new Date(i.createdAt) > weekAgo;
-      }).length} esta semana`,
-      color: 'text-status-open',
-      bgColor: 'bg-status-open/10',
+      path: '/ocorrencias',
+      iconBg: 'bg-amber-500/10',
+      iconColor: 'text-amber-500',
+      badge: pendingIncidents.length > 0 ? pendingIncidents.length : undefined,
+      badgeVariant: 'destructive',
     },
     {
-      title: 'Em Acompanhamento',
-      value: followUpIncidents.length.toString(),
-      icon: Clock,
-      trend: 'Aguardando resolução',
-      color: 'text-status-analysis',
-      bgColor: 'bg-status-analysis/10',
+      title: 'Relatórios',
+      description: 'Geração e análise de relatórios escolares',
+      icon: FileBarChart,
+      path: '/relatorios',
+      iconBg: 'bg-pink-500/10',
+      iconColor: 'text-pink-500',
     },
     {
-      title: 'Total do Mês',
-      value: thisMonthIncidents.length.toString(),
+      title: 'Analytics',
+      description: 'Painéis de indicadores e métricas da escola',
       icon: TrendingUp,
-      trend: `${resolutionRate}% resolvidas`,
-      color: 'text-primary',
-      bgColor: 'bg-primary/10',
+      path: '/analytics',
+      iconBg: 'bg-orange-500/10',
+      iconColor: 'text-orange-500',
     },
   ];
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'leve': return 'bg-severity-light-bg text-severity-light border-severity-light';
-      case 'intermediaria': return 'bg-severity-intermediate-bg text-severity-intermediate border-severity-intermediate';
-      case 'grave': return 'bg-severity-serious-bg text-severity-serious border-severity-serious';
-      case 'gravissima': return 'bg-severity-critical-bg text-severity-critical border-severity-critical';
-      default: return '';
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'aberta': return 'bg-status-open/10 text-status-open border-status-open';
-      case 'acompanhamento': return 'bg-status-analysis/10 text-status-analysis border-status-analysis';
-      case 'resolvida': return 'bg-status-resolved/10 text-status-resolved border-status-resolved';
-      default: return '';
-    }
-  };
-
-  const getUrgencyDot = (severity: string) => {
-    switch (severity) {
-      case 'leve': return 'bg-severity-light';
-      case 'intermediaria': return 'bg-severity-intermediate';
-      case 'grave': return 'bg-severity-serious';
-      case 'gravissima': return 'bg-severity-critical';
-      default: return 'bg-muted';
-    }
-  };
-
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Bem-vindo(a), {profile?.name || user?.email}
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-6 w-6 text-primary" />
+            <h1 className="text-3xl font-bold tracking-tight">
+              Olá, {profile?.name?.split(' ')[0] || 'Usuário'}
+            </h1>
+          </div>
+          <p className="text-muted-foreground">
+            O que você gostaria de fazer hoje?
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="lg" onClick={() => setShowSchoolConfig(true)}>
-            <Settings className="h-5 w-5 mr-2" />
-            Configurar Escola
-          </Button>
-          <Button size="lg" onClick={() => navigate('/ocorrencias')}>
-            <Plus className="h-5 w-5 mr-2" />
-            Registrar Ocorrência
-          </Button>
+        <Button
+          variant="outline"
+          size="lg"
+          onClick={() => setShowSchoolConfig(true)}
+          className="gap-2"
+        >
+          <Settings className="h-5 w-5" />
+          Configurar Escola
+        </Button>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50 border">
+          <div className="p-2 rounded-lg bg-blue-500/10">
+            <GraduationCap className="h-5 w-5 text-blue-500" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold">{activeClasses.length}</p>
+            <p className="text-xs text-muted-foreground">Turmas Ativas</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50 border">
+          <div className="p-2 rounded-lg bg-emerald-500/10">
+            <Users className="h-5 w-5 text-emerald-500" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold">{activeStudents.length}</p>
+            <p className="text-xs text-muted-foreground">Alunos Ativos</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50 border">
+          <div className="p-2 rounded-lg bg-amber-500/10">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold">{pendingIncidents.length}</p>
+            <p className="text-xs text-muted-foreground">Ocorrências Pendentes</p>
+          </div>
         </div>
       </div>
 
-      {/* Main Metrics */}
-      <div className="grid gap-4 md:grid-cols-3">
-        {stats.map((stat) => (
-          <Card key={stat.title}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {stat.title}
-              </CardTitle>
-              <div className={`${stat.bgColor} ${stat.color} p-2 rounded-lg`}>
-                <stat.icon className="h-4 w-4" />
+      {/* Navigation Cards Grid */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {navigationCards.map((card) => (
+          <Card
+            key={card.path}
+            className="
+              group cursor-pointer overflow-hidden transition-all duration-300
+              hover:border-primary/50 hover:shadow-lg hover:-translate-y-1
+              bg-muted/50 border
+            "
+            onClick={() => navigate(card.path)}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className={`p-2 rounded-lg ${card.iconBg}`}>
+                  <card.icon className={`h-5 w-5 ${card.iconColor}`} />
+                </div>
+                {card.badge !== undefined && (
+                  <Badge
+                    variant={card.badgeVariant || 'default'}
+                    className="text-xs font-semibold"
+                  >
+                    {card.badge}
+                  </Badge>
+                )}
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {stat.trend}
+
+              <h3 className="text-xl font-semibold mb-2 group-hover:text-primary transition-colors">
+                {card.title}
+              </h3>
+
+              <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                {card.description}
               </p>
+
+              <div className="flex items-center text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                Acessar
+                <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
+              </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="flex-1">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por turma ou descrição..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            variant={statusFilter === 'all' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setStatusFilter('all')}
-          >
-            Todas
-          </Button>
-          <Button
-            variant={statusFilter === 'aberta' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setStatusFilter('aberta')}
-          >
-            Abertas
-          </Button>
-          <Button
-            variant={statusFilter === 'acompanhamento' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setStatusFilter('acompanhamento')}
-          >
-            Em Acompanhamento
-          </Button>
-          <Button
-            variant={statusFilter === 'resolvida' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setStatusFilter('resolvida')}
-          >
-            Resolvidas
-          </Button>
-        </div>
+      {/* Archived Classes Link */}
+      <div className="flex justify-center">
         <Button
-          variant={showMyIncidents ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setShowMyIncidents(!showMyIncidents)}
+          variant="ghost"
+          className="text-muted-foreground hover:text-foreground"
+          onClick={() => navigate('/turmas-arquivadas')}
         >
-          <Filter className="h-4 w-4 mr-2" />
-          Minhas Ocorrências
+          Ver turmas arquivadas
+          <ArrowRight className="h-4 w-4 ml-1" />
         </Button>
       </div>
-
-      {/* Incidents Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Ocorrências</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {filteredIncidents.length === 0 ? (
-            <div className="text-center py-12">
-              <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">Nenhuma ocorrência encontrada</h3>
-              <p className="text-muted-foreground mb-4">
-                {incidents.length === 0 
-                  ? 'Registre a primeira ocorrência para começar.'
-                  : 'Tente ajustar os filtros de busca.'}
-              </p>
-              {incidents.length === 0 && (
-                <Button onClick={() => navigate('/ocorrencias')}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Registrar Ocorrência
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {filteredIncidents.map((incident) => {
-                const incidentClass = classes.find(c => c.id === incident.classId);
-                const incidentStudents = students.filter(s => incident.studentIds.includes(s.id));
-                
-                return (
-                  <div
-                    key={incident.id}
-                    className="flex items-center gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors"
-                  >
-                    <div className={`w-3 h-3 rounded-full ${getUrgencyDot(incident.finalSeverity)}`} />
-                    
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="outline" className={getSeverityColor(incident.finalSeverity)}>
-                          {incident.finalSeverity === 'leve' ? 'Leve' :
-                           incident.finalSeverity === 'intermediaria' ? 'Intermediária' :
-                           incident.finalSeverity === 'grave' ? 'Grave' : 'Gravíssima'}
-                        </Badge>
-                        <span className="text-sm font-medium">{incidentClass?.name || 'Turma não encontrada'}</span>
-                        <Badge variant="outline" className={getStatusColor(incident.status)}>
-                          {incident.status === 'aberta' ? 'Aberta' :
-                           incident.status === 'acompanhamento' ? 'Em Acompanhamento' :
-                           'Resolvida'}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {incidentStudents.map(s => s.name).join(', ')} • {incident.episodes.length} episódio(s)
-                      </p>
-                      {incident.description && (
-                        <p className="text-sm text-muted-foreground line-clamp-1">
-                          {incident.description}
-                        </p>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(incident.createdAt).toLocaleDateString('pt-BR')} às {new Date(incident.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    </div>
-
-                    <div className="flex gap-2">
-                      {incident.status !== 'resolvida' ? (
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => {
-                            if (incident.status === 'acompanhamento') {
-                              setInitialTab('followup');
-                            } else {
-                              setInitialTab('info');
-                            }
-                            setManagingIncident(incident);
-                          }}
-                        >
-                          <Edit className="h-4 w-4 mr-1" />
-                          Gerenciar
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedIncident(incident)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          Ver Detalhes
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Incident Details Dialog (for resolved) */}
-      {selectedIncident && (
-        <IncidentDetailsDialog
-          incident={selectedIncident}
-          open={!!selectedIncident}
-          onOpenChange={(open) => !open && setSelectedIncident(null)}
-        />
-      )}
-
-      {/* Incident Management Dialog (for open/followup) */}
-      {managingIncident && (
-        <IncidentManagementDialog
-          incident={managingIncident}
-          open={!!managingIncident}
-          onOpenChange={(open) => {
-            if (!open) {
-              setManagingIncident(null);
-              setInitialTab('info');
-            }
-          }}
-          initialTab={initialTab}
-          onStatusChange={(newStatus: IncidentStatus) => {
-            // Atualizar filtro automaticamente se mudar de status
-            if (newStatus === 'resolvida' && statusFilter === 'aberta') {
-              setStatusFilter('all');
-            }
-          }}
-        />
-      )}
 
       {/* School Config Dialog */}
       <SchoolConfigDialog

@@ -3,11 +3,15 @@ import { QUARTERS } from '@/lib/subjects';
 
 /**
  * Calcula a média final de um aluno em uma disciplina específica
- * Média = (B1 + B2 + B3 + B4) / 4
+ * Média = soma das notas / número de notas lançadas
+ * 
+ * NOTA: Disciplinas semestrais têm apenas 2 notas (1º e 2º OU 3º e 4º bimestre),
+ * então a média é calculada dividindo pelo número de notas existentes, não por 4.
+ * 
  * @param grades Todas as notas do aluno
  * @param studentId ID do aluno
  * @param subject Disciplina
- * @returns Média final ou null se não houver notas suficientes
+ * @returns Média final ou null se não houver notas
  */
 export function calculateFinalGrade(
   grades: Grade[],
@@ -22,13 +26,13 @@ export function calculateFinalGrade(
     return null;
   }
 
-  // Buscar notas dos 4 bimestres
+  // Buscar notas dos bimestres existentes
   const quarterGrades: Record<string, number> = {};
   studentGrades.forEach((grade) => {
     quarterGrades[grade.quarter] = grade.grade;
   });
 
-  // Verificar se tem pelo menos uma nota
+  // Obter apenas os valores das notas existentes (não usar 0 para bimestres sem nota)
   const quarterValues = QUARTERS.map((quarter) => quarterGrades[quarter] ?? null).filter(
     (v) => v !== null
   ) as number[];
@@ -37,12 +41,11 @@ export function calculateFinalGrade(
     return null;
   }
 
-  // Calcular média: se faltar algum bimestre, usar 0 para aquele bimestre
-  const sum = QUARTERS.reduce((acc, quarter) => {
-    return acc + (quarterGrades[quarter] ?? 0);
-  }, 0);
+  // Calcular média: dividir pela quantidade de notas lançadas
+  // Isso permite que disciplinas semestrais (2 notas) tenham média correta
+  const sum = quarterValues.reduce((acc, val) => acc + val, 0);
 
-  return sum / 4;
+  return sum / quarterValues.length;
 }
 
 /**
