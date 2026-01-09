@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -94,19 +94,24 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
     return `${classData.classNumber} - ${classData.name}${archived}`;
   };
 
-  const filteredStudents = students.filter(student => {
+  const filteredStudents = useMemo(() => students.filter(student => {
     // Se não há termo de busca (ou apenas espaços), mostrar todos (respeitando apenas filtro de turma)
     const trimmedSearch = searchTerm.trim();
+    const classData = classes.find(c => c.id === student.classId);
+    const className = classData ? `${classData.classNumber} - ${classData.name}` : '';
+    const archived = classData?.archived ? ' (Arquivada)' : '';
+    const fullClassName = `${className}${archived}`;
+
     const matchesSearch = !trimmedSearch ||
       student.name.toLowerCase().includes(trimmedSearch.toLowerCase()) ||
       student.enrollment?.toLowerCase().includes(trimmedSearch.toLowerCase()) ||
       student.cpf?.includes(trimmedSearch) ||
-      getClassName(student.classId).toLowerCase().includes(trimmedSearch.toLowerCase());
+      fullClassName.toLowerCase().includes(trimmedSearch.toLowerCase());
 
     const matchesClass = classFilter === 'all' || student.classId === classFilter;
 
     return matchesSearch && matchesClass;
-  });
+  }), [students, searchTerm, classFilter, classes]);
 
   const getAcademicStatusBadge = (student: Student) => {
     try {
@@ -475,86 +480,86 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                   {filteredStudents.map((student) => {
                     const isHighlighted = highlightId === student.id;
                     return (
-                    <TableRow 
-                      key={student.id}
-                      className={isHighlighted ? "bg-primary/10 animate-pulse ring-2 ring-primary/50" : ""}
-                    >
-                      <TableCell>
-                        <Avatar className="h-10 w-10">
-                          {student.photoUrl ? (
-                            <AvatarImage src={student.photoUrl} alt={student.name} />
-                          ) : (
-                            <AvatarFallback className="bg-primary/10 text-primary">
-                              {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                            </AvatarFallback>
+                      <TableRow
+                        key={student.id}
+                        className={isHighlighted ? "bg-primary/10 animate-pulse ring-2 ring-primary/50" : ""}
+                      >
+                        <TableCell>
+                          <Avatar className="h-10 w-10">
+                            {student.photoUrl ? (
+                              <AvatarImage src={student.photoUrl} alt={student.name} />
+                            ) : (
+                              <AvatarFallback className="bg-primary/10 text-primary">
+                                {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            )}
+                          </Avatar>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-medium">{student.name}</span>
+                        </TableCell>
+                        <TableCell>{student.enrollment || '-'}</TableCell>
+                        <TableCell>{student.censusId || '-'}</TableCell>
+                        <TableCell>{getClassName(student.classId)}</TableCell>
+                        <TableCell>
+                          {student.gender === 'M' ? 'M' :
+                            student.gender === 'F' ? 'F' :
+                              student.gender === 'O' ? 'Outro' : 'N/I'}
+                        </TableCell>
+                        <TableCell>
+                          {calculateAge(student.birthDate)} anos
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={
+                            student.status === 'active'
+                              ? 'bg-severity-light-bg text-severity-light border-severity-light'
+                              : 'bg-muted text-muted-foreground border-muted'
+                          }>
+                            {student.status === 'active' ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {getAcademicStatusBadge(student) || (
+                            <span className="text-muted-foreground text-sm">Não calculado</span>
                           )}
-                        </Avatar>
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-medium">{student.name}</span>
-                      </TableCell>
-                      <TableCell>{student.enrollment || '-'}</TableCell>
-                      <TableCell>{student.censusId || '-'}</TableCell>
-                      <TableCell>{getClassName(student.classId)}</TableCell>
-                      <TableCell>
-                        {student.gender === 'M' ? 'M' :
-                          student.gender === 'F' ? 'F' :
-                            student.gender === 'O' ? 'Outro' : 'N/I'}
-                      </TableCell>
-                      <TableCell>
-                        {calculateAge(student.birthDate)} anos
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={
-                          student.status === 'active'
-                            ? 'bg-severity-light-bg text-severity-light border-severity-light'
-                            : 'bg-muted text-muted-foreground border-muted'
-                        }>
-                          {student.status === 'active' ? 'Ativo' : 'Inativo'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {getAcademicStatusBadge(student) || (
-                          <span className="text-muted-foreground text-sm">Não calculado</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex gap-2 justify-end">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setViewingStudent(student)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEditClick(student)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setTransferringStudent(student);
-                              setTransferTargetClassId('');
-                            }}
-                            title="Transferir aluno"
-                          >
-                            <ArrowRightLeft className="h-4 w-4 text-blue-600" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeletingStudent(student)}
-                          >
-                            <Trash2 className="h-4 w-4 text-severity-critical" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-2 justify-end">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setViewingStudent(student)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEditClick(student)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setTransferringStudent(student);
+                                setTransferTargetClassId('');
+                              }}
+                              title="Transferir aluno"
+                            >
+                              <ArrowRightLeft className="h-4 w-4 text-blue-600" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeletingStudent(student)}
+                            >
+                              <Trash2 className="h-4 w-4 text-severity-critical" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
                     );
                   })}
                 </TableBody>
@@ -582,7 +587,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                 {viewingStudent.name}
               </DialogTitle>
             </DialogHeader>
-            
+
             <Tabs defaultValue="info" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="info">Informações</TabsTrigger>
@@ -590,7 +595,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                   Ocorrências ({incidents.filter(i => i.studentIds.includes(viewingStudent.id)).length})
                 </TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="info" className="mt-4">
                 <ScrollArea className="h-[400px] pr-4">
                   <div className="space-y-6">
@@ -698,12 +703,12 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                   </div>
                 </ScrollArea>
               </TabsContent>
-              
+
               <TabsContent value="incidents" className="mt-4">
                 <ScrollArea className="h-[400px] pr-4">
                   {(() => {
                     const studentIncidents = incidents.filter(i => i.studentIds.includes(viewingStudent.id));
-                    
+
                     if (studentIncidents.length === 0) {
                       return (
                         <div className="text-center py-12">
@@ -715,7 +720,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                         </div>
                       );
                     }
-                    
+
                     const getSeverityColor = (severity: string) => {
                       switch (severity) {
                         case 'leve': return 'bg-severity-light-bg text-severity-light border-severity-light';
@@ -725,7 +730,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                         default: return '';
                       }
                     };
-                    
+
                     const getStatusColor = (status: string) => {
                       switch (status) {
                         case 'aberta': return 'bg-status-open/10 text-status-open border-status-open';
@@ -734,14 +739,14 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                         default: return '';
                       }
                     };
-                    
+
                     return (
                       <div className="space-y-3">
                         {studentIncidents.map(incident => {
                           const incidentClass = classes.find(c => c.id === incident.classId);
-                          
+
                           return (
-                            <div 
+                            <div
                               key={incident.id}
                               className="border rounded-lg p-4 space-y-2"
                             >
@@ -761,15 +766,15 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                                   {new Date(incident.date).toLocaleDateString('pt-BR')}
                                 </span>
                               </div>
-                              
+
                               <p className="text-sm font-medium">{incidentClass?.name || 'Turma não encontrada'}</p>
-                              
+
                               {incident.description && (
                                 <p className="text-sm text-muted-foreground line-clamp-2">
                                   {incident.description}
                                 </p>
                               )}
-                              
+
                               <p className="text-xs text-muted-foreground">
                                 {incident.episodes.length} episódio(s) • {incident.followUps?.length || 0} acompanhamento(s)
                               </p>
