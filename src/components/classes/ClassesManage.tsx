@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -105,7 +105,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
   const [templateSubjects, setTemplateSubjects] = useState<string[]>([]);
   const [archivingClass, setArchivingClass] = useState<Class | null>(null);
 
-  const filteredClasses = classes.filter((cls) => {
+  const filteredClasses = useMemo(() => classes.filter((cls) => {
     // Filtrar apenas turmas não arquivadas
     if (cls.archived) return false;
 
@@ -119,7 +119,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
     if (filterStatus === "without-director")
       return matchesSearch && !cls.directorId;
     return matchesSearch;
-  });
+  }), [classes, searchTerm, filterStatus]);
 
   const getDirectorName = (directorId?: string) => {
     if (!directorId) return null;
