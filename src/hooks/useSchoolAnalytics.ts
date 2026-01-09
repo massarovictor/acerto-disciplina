@@ -269,15 +269,34 @@ export function useSchoolAnalytics(
     // CALCULAR ANALYTICS POR TURMA
     // ============================================
 
+    // ============================================
+    // CALCULAR ANALYTICS POR TURMA
+    // ============================================
+
     const classAnalyticsList: ClassAnalytics[] = filteredClasses.map(cls => {
       const classStudents = studentAnalyticsList.filter(s => s.student.classId === cls.id);
       const classGrades = filteredGrades.filter(g => g.classId === cls.id);
       const classAttendance = filteredAttendance.filter(a => a.classId === cls.id);
       const classIncidents = filteredIncidents.filter(i => i.classId === cls.id);
 
-      const average = classGrades.length > 0
-        ? classGrades.reduce((s, g) => s + g.grade, 0) / classGrades.length
-        : 0;
+      // Calcular média da turma: Média das médias dos alunos
+      let totalStudentAverages = 0;
+      let studentCountWithGrades = 0;
+
+      classStudents.forEach(studentAnalytics => {
+        const student = studentAnalytics.student;
+        const studentGrades = classGrades.filter(g => g.studentId === student.id);
+
+        if (studentGrades.length > 0) {
+          // Média do aluno = Soma das notas / Quantidade de notas
+          // Nota: Assumindo que todas as notas têm o mesmo peso
+          const studentAvg = studentGrades.reduce((s, g) => s + g.grade, 0) / studentGrades.length;
+          totalStudentAverages += studentAvg;
+          studentCountWithGrades++;
+        }
+      });
+
+      const average = studentCountWithGrades > 0 ? totalStudentAverages / studentCountWithGrades : 0;
 
       const present = classAttendance.filter(a => a.status === 'presente').length;
       const frequency = classAttendance.length > 0 ? (present / classAttendance.length) * 100 : 100;
@@ -289,7 +308,7 @@ export function useSchoolAnalytics(
         excelencia: classStudents.filter(s => s.classification.classification === 'excelencia').length,
       };
 
-      // Calcular tendência da turma
+      // Calcular tendência da turma (média mensal)
       const quarterAverages = QUARTERS.map(q => {
         const qGrades = grades.filter(g => g.classId === cls.id && g.quarter === q);
         return qGrades.length > 0 ? qGrades.reduce((s, g) => s + g.grade, 0) / qGrades.length : 0;
@@ -320,19 +339,36 @@ export function useSchoolAnalytics(
     // CALCULAR ANALYTICS POR DISCIPLINA
     // ============================================
 
-    const subjectGradesMap: Record<string, { grades: number[], studentIds: Set<string> }> = {};
+    // Agrupar por disciplina e aluno para calcular médias individuais primeiro
+    const subjectStudentMap: Record<string, Record<string, number[]>> = {};
 
     filteredGrades.forEach(g => {
-      if (!subjectGradesMap[g.subject]) {
-        subjectGradesMap[g.subject] = { grades: [], studentIds: new Set() };
+      if (!subjectStudentMap[g.subject]) {
+        subjectStudentMap[g.subject] = {};
       }
-      subjectGradesMap[g.subject].grades.push(g.grade);
-      subjectGradesMap[g.subject].studentIds.add(g.studentId);
+      if (!subjectStudentMap[g.subject][g.studentId]) {
+        subjectStudentMap[g.subject][g.studentId] = [];
+      }
+      subjectStudentMap[g.subject][g.studentId].push(g.grade);
     });
 
-    const subjectAnalytics: SubjectAnalytics[] = Object.entries(subjectGradesMap).map(([subject, data]) => {
-      const average = data.grades.reduce((a, b) => a + b, 0) / data.grades.length;
-      const below6 = data.grades.filter(g => g < 6).length;
+    const subjectAnalytics: SubjectAnalytics[] = Object.entries(subjectStudentMap).map(([subject, studentsData]) => {
+      // Calcular média de cada aluno na disciplina
+      const studentFinalGrades: number[] = [];
+
+      Object.values(studentsData).forEach(grades => {
+        if (grades.length > 0) {
+          const studentAvg = grades.reduce((a, b) => a + b, 0) / grades.length;
+          studentFinalGrades.push(studentAvg);
+        }
+      });
+
+      // Média da disciplina = Média das médias dos alunos
+      const average = studentFinalGrades.length > 0
+        ? studentFinalGrades.reduce((a, b) => a + b, 0) / studentFinalGrades.length
+        : 0;
+
+      const below6 = studentFinalGrades.filter(g => g < 6).length;
       const area = getSubjectArea(subject);
 
       return {
@@ -340,8 +376,8 @@ export function useSchoolAnalytics(
         area: area?.name || 'Outros',
         average,
         studentsBelow6: below6,
-        studentsBelow6Percent: (below6 / data.grades.length) * 100,
-        totalStudents: data.studentIds.size,
+        studentsBelow6Percent: studentFinalGrades.length > 0 ? (below6 / studentFinalGrades.length) * 100 : 0,
+        totalStudents: studentFinalGrades.length,
       };
     });
 
@@ -357,10 +393,11 @@ export function useSchoolAnalytics(
     });
 
     const areaAnalytics: AreaAnalytics[] = Object.entries(areaMap).map(([area, subjects]) => {
-      const allGrades = subjects.flatMap(s =>
-        filteredGrades.filter(g => g.subject === s.subject).map(g => g.grade)
-      );
-      const average = allGrades.length > 0 ? allGrades.reduce((a, b) => a + b, 0) / allGrades.length : 0;
+      // Média da área = Média das médias das disciplinas
+      // Poderíamos ponderar pelo número de alunos, mas média simples das disciplinas é aceitável para analytics geral
+      const average = subjects.length > 0
+        ? subjects.reduce((acc, s) => acc + s.average, 0) / subjects.length
+        : 0;
 
       return { area, average, subjects };
     });

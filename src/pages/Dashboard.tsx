@@ -126,37 +126,6 @@ const Dashboard = () => {
         </Button>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50 border">
-          <div className="p-2 rounded-lg bg-blue-500/10">
-            <GraduationCap className="h-5 w-5 text-blue-500" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold">{activeClasses.length}</p>
-            <p className="text-xs text-muted-foreground">Turmas Ativas</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50 border">
-          <div className="p-2 rounded-lg bg-emerald-500/10">
-            <Users className="h-5 w-5 text-emerald-500" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold">{activeStudents.length}</p>
-            <p className="text-xs text-muted-foreground">Alunos Ativos</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50 border">
-          <div className="p-2 rounded-lg bg-amber-500/10">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold">{pendingIncidents.length}</p>
-            <p className="text-xs text-muted-foreground">Ocorrências Pendentes</p>
-          </div>
-        </div>
-      </div>
-
       {/* Navigation Cards Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {navigationCards.map((card) => (
