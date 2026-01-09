@@ -64,7 +64,7 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
     [attendance, selectedClass]
   );
 
-  const professionalSubjects = selectedClass ? getProfessionalSubjects(selectedClass) : [];
+  const professionalSubjects = useMemo(() => selectedClass ? getProfessionalSubjects(selectedClass) : [], [selectedClass, getProfessionalSubjects]);
   const reportSubjects = useMemo(() => {
     if (!selectedClassData) return [];
     const gradeSubjects = [...new Set(classGrades.map((grade) => grade.subject))];
@@ -413,11 +413,11 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
               Gerar Relatório Qualitativo
             </DialogTitle>
             <DialogDescription>
-              Selecione o período para análise. O relatório inclui análise por área do conhecimento, 
+              Selecione o período para análise. O relatório inclui análise por área do conhecimento,
               correlação comportamento x desempenho, predições de risco e recomendações.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="py-4">
             <Label className="text-sm font-medium mb-3 block">Período de análise</Label>
             <RadioGroup value={selectedPeriod} onValueChange={setSelectedPeriod} className="space-y-2">
@@ -428,7 +428,7 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
                   <p className="text-xs text-muted-foreground">Análise consolidada de todos os bimestres</p>
                 </Label>
               </div>
-              
+
               {QUARTERS.map((quarter) => (
                 <div key={quarter} className="flex items-center space-x-2 rounded-lg border p-3 hover:bg-muted/50 cursor-pointer">
                   <RadioGroupItem value={quarter} id={quarter} />
