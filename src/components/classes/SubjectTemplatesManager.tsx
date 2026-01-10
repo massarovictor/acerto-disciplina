@@ -49,6 +49,7 @@ export const SubjectTemplatesManager = () => {
       return;
     }
 
+
     // Validar duplicatas
     const duplicateName = templates.some(t => t.name.toLowerCase() === createFormData.name.trim().toLowerCase());
     if (duplicateName) {
@@ -195,6 +196,7 @@ export const SubjectTemplatesManager = () => {
       });
       return;
     }
+
 
     // Validar duplicatas (excluindo o próprio template)
     const duplicateName = templates.some(

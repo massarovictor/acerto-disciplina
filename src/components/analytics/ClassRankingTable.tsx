@@ -27,7 +27,7 @@ interface ClassRankingTableProps {
   onSelectForComparison: (classIds: string[]) => void;
 }
 
-type SortKey = 'rank' | 'average' | 'frequency' | 'excelencia' | 'critico';
+type SortKey = 'rank' | 'average' | 'frequency' | 'excelencia' | 'critico' | 'growth';
 
 export function ClassRankingTable({ classRanking, onSelectForComparison }: ClassRankingTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('rank');
@@ -57,6 +57,9 @@ export function ClassRankingTable({ classRanking, onSelectForComparison }: Class
         break;
       case 'critico':
         comparison = a.classifications.critico - b.classifications.critico;
+        break;
+      case 'growth':
+        comparison = (b.growth ?? 0) - (a.growth ?? 0);
         break;
       default:
         comparison = b.average - a.average;
@@ -99,6 +102,35 @@ export function ClassRankingTable({ classRanking, onSelectForComparison }: Class
     </Button>
   );
 
+  const GrowthIndicator = ({ value }: { value: number | null }) => {
+    if (value === null) {
+      return <span className="text-muted-foreground">--</span>;
+    }
+    const formatted = formatNumber(Math.abs(value));
+    if (value > 0.2) {
+      return (
+        <span className="flex items-center justify-center gap-1 text-emerald-600">
+          <TrendingUp className="h-4 w-4" />
+          +{formatted}
+        </span>
+      );
+    }
+    if (value < -0.2) {
+      return (
+        <span className="flex items-center justify-center gap-1 text-red-600">
+          <TrendingDown className="h-4 w-4" />
+          -{formatted}
+        </span>
+      );
+    }
+    return (
+      <span className="flex items-center justify-center gap-1 text-muted-foreground">
+        <Minus className="h-4 w-4" />
+        {formatted}
+      </span>
+    );
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -136,6 +168,9 @@ export function ClassRankingTable({ classRanking, onSelectForComparison }: Class
                 <TableHead className="text-center">
                   <SortButton column="critico" label="Críticos" />
                 </TableHead>
+                <TableHead className="text-center">
+                  <SortButton column="growth" label="Crescimento" />
+                </TableHead>
                 <TableHead className="text-center">Tendência</TableHead>
                 <TableHead className="w-12"></TableHead>
               </TableRow>
@@ -143,7 +178,7 @@ export function ClassRankingTable({ classRanking, onSelectForComparison }: Class
             <TableBody>
               {sortedData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                     Nenhuma turma encontrada com os filtros atuais
                   </TableCell>
                 </TableRow>
@@ -204,6 +239,9 @@ export function ClassRankingTable({ classRanking, onSelectForComparison }: Class
                         >
                           {cls.classifications.critico}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <GrowthIndicator value={cls.growth} />
                       </TableCell>
                       <TableCell className="text-center">
                         <TrendIcon trend={cls.trend} />

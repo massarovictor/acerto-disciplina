@@ -12,7 +12,7 @@ import { AreaAnalysisSlide } from './slides/AreaAnalysisSlide';
 import { StudentMetricsSlide } from './slides/StudentMetricsSlide';
 import { StudentGradesTableSlide } from './slides/StudentGradesTableSlide';
 import { useToast } from '@/hooks/use-toast';
-import { useProfessionalSubjects } from '@/hooks/useData';
+import { useProfessionalSubjects, useProfessionalSubjectTemplates } from '@/hooks/useData';
 import { QUARTERS, SUBJECT_AREAS } from '@/lib/subjects';
 
 interface ClassSlidesProps {
@@ -27,25 +27,111 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedStudent, setSelectedStudent] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('all');
+  const [selectedSchoolYear, setSelectedSchoolYear] = useState<1 | 2 | 3>(1);
   const [currentSlide, setCurrentSlide] = useState(1);
   const [viewMode, setViewMode] = useState<'class' | 'individual'>('class');
   const { getProfessionalSubjects } = useProfessionalSubjects();
+  const { templates } = useProfessionalSubjectTemplates();
   const { toast } = useToast();
   const slideContainerRef = useRef<HTMLDivElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [slideScale, setSlideScale] = useState(1);
   const [previewZoom, setPreviewZoom] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportingIndex, setExportingIndex] = useState<number | null>(null);
   const SLIDE_WIDTH = 1920;
   const SLIDE_HEIGHT = 1080;
 
-  const professionalSubjects = selectedClass
-    ? getProfessionalSubjects(selectedClass)
-    : [];
+  const schoolYearOptions: Array<{ value: 1 | 2 | 3; label: string }> = [
+    { value: 1, label: '1º ano' },
+    { value: 2, label: '2º ano' },
+    { value: 3, label: '3º ano' },
+  ];
 
   const classData = classes.find(c => c.id === selectedClass);
+  useEffect(() => {
+    if (!selectedClass) {
+      setSelectedSchoolYear(1);
+      return;
+    }
+    const defaultYear = classData?.currentYear ?? 1;
+    const normalizedYear = [1, 2, 3].includes(defaultYear as number)
+      ? (defaultYear as 1 | 2 | 3)
+      : 1;
+    setSelectedSchoolYear(normalizedYear);
+  }, [selectedClass, classData?.currentYear]);
+
+  const parseLocalDate = (value: string) => new Date(`${value}T00:00:00`);
+  const addMonths = (date: Date, months: number) => {
+    const next = new Date(date);
+    next.setMonth(next.getMonth() + months);
+    return next;
+  };
+  const addYears = (date: Date, years: number) => {
+    const next = new Date(date);
+    next.setFullYear(next.getFullYear() + years);
+    return next;
+  };
+  const getSchoolYearRange = (startYearDate: string | undefined, schoolYear: number) => {
+    if (!startYearDate) return null;
+    const startDate = parseLocalDate(startYearDate);
+    if (Number.isNaN(startDate.getTime())) return null;
+    const yearOffset = schoolYear - 1;
+    const yearStart = addYears(startDate, yearOffset);
+    const yearEnd = addMonths(yearStart, 8);
+    return { start: yearStart, end: yearEnd };
+  };
+  const isDateInRange = (value: string, range: { start: Date; end: Date } | null) => {
+    if (!range) return true;
+    const date = parseLocalDate(value);
+    if (Number.isNaN(date.getTime())) return false;
+    return date >= range.start && date < range.end;
+  };
+
+  const templateSubjects = useMemo(() => {
+    if (!classData?.templateId) return [];
+    const template = templates.find((t) => t.id === classData.templateId);
+    const yearData = template?.subjectsByYear.find((y) => y.year === selectedSchoolYear);
+    return yearData?.subjects ?? [];
+  }, [templates, classData?.templateId, selectedSchoolYear]);
+
+  const manualSubjects = useMemo(
+    () => (selectedClass ? getProfessionalSubjects(selectedClass) : []),
+    [selectedClass, getProfessionalSubjects],
+  );
+
+  const professionalSubjects = useMemo(() => {
+    const unique = new Set<string>();
+    [...templateSubjects, ...manualSubjects].forEach((subject) => {
+      if (subject?.trim()) {
+        unique.add(subject.trim());
+      }
+    });
+    return Array.from(unique);
+  }, [templateSubjects, manualSubjects]);
   const classStudents = selectedClass ? students.filter(s => s.classId === selectedClass) : [];
-  const classIncidents = selectedClass ? incidents.filter(i => i.classId === selectedClass) : [];
-  const classGrades = selectedClass ? grades.filter(g => g.classId === selectedClass) : [];
+  const fallbackStartYearDate = classData?.startCalendarYear
+    ? `${classData.startCalendarYear}-02-01`
+    : undefined;
+  const effectiveStartYearDate = classData?.startYearDate || fallbackStartYearDate;
+  const schoolYearRange = useMemo(
+    () => getSchoolYearRange(effectiveStartYearDate, selectedSchoolYear),
+    [effectiveStartYearDate, selectedSchoolYear],
+  );
+  const classIncidents = selectedClass
+    ? incidents.filter(
+        i =>
+          i.classId === selectedClass &&
+          isDateInRange(i.date, schoolYearRange),
+      )
+    : [];
+  const classGrades = selectedClass
+    ? grades.filter(
+        g =>
+          g.classId === selectedClass &&
+          (g.schoolYear ?? 1) === selectedSchoolYear,
+      )
+    : [];
   const studentData = students.find(s => s.id === selectedStudent);
 
   const periodGrades = useMemo(() => {
@@ -280,27 +366,57 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
     return () => container.removeEventListener('wheel', handleWheel);
   }, []);
   const handleExportPDF = async () => {
-    const slideElement = document.getElementById('slide-container');
-    if (!slideElement) return;
+    if (isExporting || !activeSlides.length) return;
+
+    setIsExporting(true);
+    setExportingIndex(0);
+
+    const toast_id = toast({
+      title: 'Iniciando exportação...',
+      description: 'Preparando os slides para o PDF.',
+    });
 
     try {
-      const { exportSlideAsPDF } = await import('@/lib/pdfExport');
-      const fileName = viewMode === 'class'
-        ? `relatorio-turma-${classData?.name || 'turma'}-slide-${currentSlide}.pdf`
-        : `relatorio-aluno-${studentData?.name || 'aluno'}-slide-${currentSlide}.pdf`;
+      const { startSequentialPDF, addSlideToPDF, finishSequentialPDF } = await import('@/lib/pdfExport');
 
-      await exportSlideAsPDF('slide-container', fileName);
+      const fileName = viewMode === 'class'
+        ? `apresentacao-turma-${classData?.name || 'turma'}.pdf`
+        : `apresentacao-aluno-${studentData?.name || 'aluno'}.pdf`;
+
+      startSequentialPDF();
+
+      for (let i = 0; i < activeSlides.length; i++) {
+        setExportingIndex(i);
+
+        // Update toast progress
+        toast({
+          title: `Processando apresentação...`,
+          description: `Capturando slide ${i + 1} de ${activeSlides.length}`,
+        });
+
+        // Wait for React to render the new slide in the hidden container
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        const success = await addSlideToPDF('export-slide-single', i === 0);
+        if (!success) throw new Error(`Falha ao capturar o slide ${i + 1}`);
+      }
+
+      finishSequentialPDF(fileName);
 
       toast({
-        title: 'Slide exportado com sucesso!',
-        description: `O slide foi baixado como ${fileName}`,
+        title: 'Exportação concluída!',
+        description: `A apresentação foi gerada com sucesso.`,
       });
     } catch (error) {
+      console.error('Export error:', error);
       toast({
         title: 'Erro ao exportar',
-        description: 'Ocorreu um erro ao gerar o PDF. Tente novamente.',
+        description: 'Ocorreu um erro ao processar os slides sequencialmente.',
         variant: 'destructive',
       });
+    } finally {
+      setIsExporting(false);
+      setExportingIndex(null);
     }
   };
 
@@ -325,7 +441,7 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
             </TabsList>
 
             <TabsContent value="class" className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
                   <Label>Selecione a Turma</Label>
                   <Select value={selectedClass} onValueChange={(v) => { setSelectedClass(v); setCurrentSlide(1); }}>
@@ -335,6 +451,26 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
                     <SelectContent>
                       {classes.map(cls => (
                         <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Ano da turma</Label>
+                  <Select
+                    value={String(selectedSchoolYear)}
+                    onValueChange={(value) => { setSelectedSchoolYear(Number(value) as 1 | 2 | 3); setCurrentSlide(1); }}
+                    disabled={!selectedClass}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o ano" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {schoolYearOptions.map(option => (
+                        <SelectItem key={option.value} value={String(option.value)}>
+                          {option.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -358,7 +494,7 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
             </TabsContent>
 
             <TabsContent value="individual" className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-4">
                 <div className="space-y-2">
                   <Label>Turma</Label>
                   <Select value={selectedClass} onValueChange={(v) => { setSelectedClass(v); setSelectedStudent(''); setCurrentSlide(1); }}>
@@ -368,6 +504,26 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
                     <SelectContent>
                       {classes.map(cls => (
                         <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Ano da turma</Label>
+                  <Select
+                    value={String(selectedSchoolYear)}
+                    onValueChange={(value) => { setSelectedSchoolYear(Number(value) as 1 | 2 | 3); setCurrentSlide(1); }}
+                    disabled={!selectedClass}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o ano" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {schoolYearOptions.map(option => (
+                        <SelectItem key={option.value} value={String(option.value)}>
+                          {option.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -408,9 +564,9 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
           {shouldShowSlides && (
             <div className="flex flex-col md:flex-row items-center justify-between pt-4 border-t gap-4">
               <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={handleExportPDF}>
+                <Button variant="outline" onClick={handleExportPDF} disabled={isExporting}>
                   <Download className="h-4 w-4 mr-2" />
-                  Exportar PDF
+                  {isExporting ? 'Processando...' : 'Exportar Apresentação (PDF)'}
                 </Button>
 
                 <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-md border">
@@ -515,8 +671,6 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
             </div>
           </div>
         </div>
-
-
       ) : (
         <Card>
           <CardContent className="py-12">
@@ -526,6 +680,29 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Hidden container for PDF export - renders one slide at a time to be ultra-light */}
+      {shouldShowSlides && exportingIndex !== null && (
+        <div style={{
+          position: 'fixed',
+          top: '-10000px',
+          left: '-10000px',
+          zIndex: -1,
+          pointerEvents: 'none'
+        }}>
+          <div
+            id="export-slide-single"
+            style={{
+              width: SLIDE_WIDTH,
+              height: SLIDE_HEIGHT,
+              background: 'white',
+              overflow: 'hidden'
+            }}
+          >
+            {activeSlides[exportingIndex]}
+          </div>
+        </div>
       )}
     </div>
   );

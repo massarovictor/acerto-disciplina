@@ -639,79 +639,87 @@ export function analyzeStudentProfiles(
     const studentAttendance = attendance.filter(a => a.studentId === student.id);
     const studentIncidents = incidents.filter(i => i.studentIds.includes(student.id));
     
-    if (studentGrades.length === 0) return;
-    
-    const avgGrade = mean(studentGrades.map(g => g.grade));
-    const frequency = studentAttendance.length > 0
-      ? (studentAttendance.filter(a => a.status === 'presente').length / studentAttendance.length) * 100
-      : 100;
-    const incidentCount = studentIncidents.length;
-    const subjectsBelow6 = new Set(
-      studentGrades.filter(g => g.grade < 6).map(g => g.subject)
-    ).size;
-    
-    // Normalizar dados para clustering (0-1)
-    clusterData.push([
-      avgGrade / 10,
-      frequency / 100,
-      Math.min(incidentCount / 5, 1), // Normalizar incidentes
-      Math.min(subjectsBelow6 / 10, 1), // Normalizar disciplinas abaixo
-    ]);
-    studentMapping.push(student);
+    if (studentGrades.length > 0) {
+      const avgGrade = mean(studentGrades.map(g => g.grade));
+      const frequency = studentAttendance.length > 0
+        ? (studentAttendance.filter(a => a.status === 'presente').length / studentAttendance.length) * 100
+        : 100;
+      const incidentCount = studentIncidents.length;
+      const subjectsBelow6 = new Set(
+        studentGrades.filter(g => g.grade < 6).map(g => g.subject)
+      ).size;
+      
+      // Normalizar dados para clustering (0-1)
+      clusterData.push([
+        avgGrade / 10,
+        frequency / 100,
+        Math.min(incidentCount / 5, 1), // Normalizar incidentes
+        Math.min(subjectsBelow6 / 10, 1), // Normalizar disciplinas abaixo
+      ]);
+      studentMapping.push(student);
+    }
   });
   
-  // Determinar número ideal de clusters e executar clustering
-  const optimalK = findOptimalClusters(clusterData, 4);
-  const clusterResults = kMeansClustering(clusterData, optimalK);
-  
-  // Nomear clusters baseado nas características
+  let clusterResults: ClusterResult[] = [];
   const clusterNames: Record<number, string> = {};
   const clusterChars: Record<number, string[]> = {};
-  
-  clusterResults.forEach(cluster => {
-    const centroid = cluster.centroid;
-    const avgGrade = centroid[0] * 10;
-    const avgFreq = centroid[1] * 100;
-    const avgIncidents = centroid[2] * 5;
-    const avgBelow = centroid[3] * 10;
+  const studentClusterMap = new Map<string, number>();
+
+  if (clusterData.length > 0) {
+    const optimalK = findOptimalClusters(clusterData, 4);
+    clusterResults = kMeansClustering(clusterData, optimalK);
     
-    let name: string;
-    let chars: string[] = [];
-    
-    if (avgGrade >= 7.5 && avgFreq >= 90 && avgIncidents < 0.5) {
-      name = 'Excelência';
-      chars = ['Alto desempenho', 'Boa frequência', 'Sem ocorrências'];
-    } else if (avgGrade >= 6 && avgBelow <= 2) {
-      name = 'Regular';
-      chars = ['Desempenho satisfatório', 'Poucas dificuldades'];
-    } else if (avgGrade < 6 || avgBelow >= 3) {
-      name = 'Atenção Necessária';
-      chars = ['Desempenho abaixo do esperado', 'Múltiplas disciplinas em risco'];
-    } else {
-      name = 'Acompanhamento';
-      chars = ['Desempenho intermediário', 'Potencial de melhoria'];
-    }
-    
-    clusterNames[cluster.clusterId] = name;
-    clusterChars[cluster.clusterId] = chars;
-  });
+    // Nomear clusters baseado nas características
+    clusterResults.forEach(cluster => {
+      const centroid = cluster.centroid;
+      const avgGrade = centroid[0] * 10;
+      const avgFreq = centroid[1] * 100;
+      const avgIncidents = centroid[2] * 5;
+      const avgBelow = centroid[3] * 10;
+      
+      let name: string;
+      let chars: string[] = [];
+      
+      if (avgGrade >= 7.5 && avgFreq >= 90 && avgIncidents < 0.5) {
+        name = 'Excelência';
+        chars = ['Alto desempenho', 'Boa frequência', 'Sem ocorrências'];
+      } else if (avgGrade >= 6 && avgBelow <= 2) {
+        name = 'Regular';
+        chars = ['Desempenho satisfatório', 'Poucas dificuldades'];
+      } else if (avgGrade < 6 || avgBelow >= 3) {
+        name = 'Atenção Necessária';
+        chars = ['Desempenho abaixo do esperado', 'Múltiplas disciplinas em risco'];
+      } else {
+        name = 'Acompanhamento';
+        chars = ['Desempenho intermediário', 'Potencial de melhoria'];
+      }
+      
+      clusterNames[cluster.clusterId] = name;
+      clusterChars[cluster.clusterId] = chars;
+    });
+
+    clusterResults.forEach(cluster => {
+      cluster.members.forEach((idx) => {
+        const student = studentMapping[idx];
+        if (student) {
+          studentClusterMap.set(student.id, cluster.clusterId);
+        }
+      });
+    });
+  }
   
   // Criar perfis individuais
-  studentMapping.forEach((student, idx) => {
+  students.forEach((student) => {
     const studentGrades = grades.filter(g => g.studentId === student.id);
     const studentAttendance = attendance.filter(a => a.studentId === student.id);
     const studentIncidents = incidents.filter(i => i.studentIds.includes(student.id));
+    const hasGrades = studentGrades.length > 0;
     
     // Usar função centralizada de classificação
     const classificationResult = classifyStudent(studentGrades, studentAttendance);
     
     // Identificar cluster do aluno
-    let studentCluster = 0;
-    clusterResults.forEach(cluster => {
-      if (cluster.members.includes(idx)) {
-        studentCluster = cluster.clusterId;
-      }
-    });
+    const studentCluster = studentClusterMap.get(student.id);
     
     // Calcular tendência
     const quarterAverages = quarters.map(quarter => {
@@ -774,7 +782,9 @@ export function analyzeStudentProfiles(
     
     // Gerar recomendação clara e objetiva baseada na classificação
     let recommendation: string;
-    if (classificationResult.classification === 'critico') {
+    if (!hasGrades) {
+      recommendation = 'Dados insuficientes: aguardar lançamento de notas para análise completa.';
+    } else if (classificationResult.classification === 'critico') {
       recommendation = `Requer intervenção imediata: convocar responsáveis e elaborar plano de recuperação individualizado.`;
     } else if (classificationResult.classification === 'atencao') {
       recommendation = `Requer acompanhamento pedagógico: intensificar apoio nas disciplinas em dificuldade.`;
@@ -788,7 +798,7 @@ export function analyzeStudentProfiles(
       studentId: student.id,
       studentName: student.name,
       classification: classificationResult.classification,
-      cluster: clusterNames[studentCluster] || 'Não classificado',
+      cluster: hasGrades ? (clusterNames[studentCluster ?? -1] || 'Não classificado') : 'Sem dados',
       riskScore,
       average: classificationResult.average,
       frequency: classificationResult.frequency,

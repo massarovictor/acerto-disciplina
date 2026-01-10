@@ -14,6 +14,7 @@ import Students from '@/pages/Students';
 import GradesAttendance from '@/pages/GradesAttendance';
 import Reports from '@/pages/Reports';
 import Analytics from '@/pages/Analytics';
+import Users from '@/pages/Users';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -67,6 +68,7 @@ const App = () => (
                 <Route path="notas-frequencia" element={<GradesAttendance />} />
                 <Route path="relatorios" element={<Reports />} />
                 <Route path="analytics" element={<Analytics />} />
+                <Route path="usuarios" element={<Users />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

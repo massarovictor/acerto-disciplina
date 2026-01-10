@@ -14,12 +14,13 @@ export function checkLowPerformanceStudents(
   grades: Grade[],
   students: Student[],
   classId: string,
-  quarter: string
+  quarter: string,
+  schoolYear?: number
 ): (QuarterCheckResult & { studentName: string })[] {
   const results: (QuarterCheckResult & { studentName: string })[] = [];
 
   students.forEach((student) => {
-    const quarterCheck = checkQuarterGrades(grades, student.id, classId, quarter);
+    const quarterCheck = checkQuarterGrades(grades, student.id, classId, quarter, schoolYear);
 
     if (quarterCheck.hasLowPerformance) {
       results.push({
@@ -48,7 +49,8 @@ export function generateQuarterIncidents(
   classData: Class,
   quarter: string,
   existingIncidents: Incident[],
-  createdBy: string
+  createdBy: string,
+  schoolYear?: number
 ): Omit<Incident, 'id' | 'createdAt' | 'updatedAt'>[] {
   const newIncidents: Omit<Incident, 'id' | 'createdAt' | 'updatedAt'>[] = [];
 
@@ -56,7 +58,8 @@ export function generateQuarterIncidents(
     grades,
     students,
     classData.id,
-    quarter
+    quarter,
+    schoolYear
   );
 
   const quarterNames: Record<string, string> = {

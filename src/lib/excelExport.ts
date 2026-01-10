@@ -8,7 +8,7 @@ export const generateStudentTemplate = (selectedClass?: Class) => {
   // Cabeçalhos das colunas
   const headers = [
     'Nome Completo',
-    'Número da Turma',
+    'Nome da Turma',
     'Data de Nascimento',
     'Sexo',
     'Matrícula SIGE',
@@ -17,10 +17,10 @@ export const generateStudentTemplate = (selectedClass?: Class) => {
     'RG'
   ];
 
-  // Linha de exemplo - usar número da turma selecionada se disponível
+  // Linha de exemplo - usar nome da turma selecionada se disponível
   const exampleRow = [
     'João Silva Santos',
-    selectedClass?.classNumber || '2024-2026-RDC',
+    selectedClass?.name || '2024-2026 Informática A',
     '15/05/2009',
     'M',
     '2024001',
@@ -35,8 +35,8 @@ export const generateStudentTemplate = (selectedClass?: Class) => {
     [''],
     ['1. Nome Completo: Obrigatório - Nome completo do aluno'],
     selectedClass 
-      ? [`2. Número da Turma: PRÉ-PREENCHIDO - ${selectedClass.classNumber} (não altere este campo)`]
-      : ['2. Número da Turma: Obrigatório - Número da turma (ex: 2024-2026-RDC)'],
+      ? [`2. Nome da Turma: PRÉ-PREENCHIDO - ${selectedClass.name} (não altere este campo)`]
+      : ['2. Nome da Turma: Obrigatório - Nome da turma (ex: 2024-2026 Informática A)'],
     ['3. Data de Nascimento: Obrigatório - Formato DD/MM/AAAA ou AAAA-MM-DD'],
     ['4. Sexo: Obrigatório - Use M (Masculino), F (Feminino), O (Outro) ou N (Prefiro não informar)'],
     ['5. Matrícula SIGE: Opcional - Número de matrícula no sistema SIGE'],
@@ -48,8 +48,8 @@ export const generateStudentTemplate = (selectedClass?: Class) => {
     ['- Não altere os nomes das colunas'],
     ['- Preencha todos os campos obrigatórios'],
     selectedClass 
-      ? ['- O número da turma já está pré-selecionado - não altere este campo']
-      : ['- Use o número da turma (ex: 2024-2026-RDC) - não use o nome da turma'],
+      ? ['- O nome da turma já está pré-selecionado - não altere este campo']
+      : ['- Use o nome da turma exatamente como está no sistema'],
     ['- Verifique se o CPF não está duplicado'],
     [''],
   ];
@@ -64,7 +64,7 @@ export const generateStudentTemplate = (selectedClass?: Class) => {
   // Definir largura das colunas
   worksheet['!cols'] = [
     { wch: 25 }, // Nome
-    { wch: 18 }, // Número da Turma
+    { wch: 32 }, // Nome da Turma
     { wch: 18 }, // Data
     { wch: 8 },  // Sexo
     { wch: 15 }, // Matrícula

@@ -44,6 +44,8 @@ import {
   useProfessionalSubjects,
   useIncidents,
   useProfessionalSubjectTemplates,
+  useAuthorizedEmails,
+  useProfiles,
 } from "@/hooks/useData";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -59,7 +61,6 @@ import {
 } from "lucide-react";
 import { Class } from "@/types";
 import { getAcademicYear, shouldArchiveClass } from "@/lib/classYearCalculator";
-import { getCourseCode } from "@/lib/classNumber";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface ClassesManageProps {
@@ -74,6 +75,8 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
   const { setProfessionalSubjectsForClass } = useProfessionalSubjects();
   const { incidents } = useIncidents();
   const { templates, getTemplate } = useProfessionalSubjectTemplates();
+  const { authorizedEmails } = useAuthorizedEmails();
+  const { profiles } = useProfiles();
   const { profile } = useAuth();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
@@ -93,17 +96,24 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
   const [archiveReason, setArchiveReason] = useState("Arquivamento manual");
   const [editFormData, setEditFormData] = useState({
     templateId: "",
-    series: "",
     letter: "",
     course: "",
     directorId: "",
+    directorEmail: "",
     active: true,
-    startYear: undefined as 1 | 2 | 3 | undefined,
-    currentYear: undefined as 1 | 2 | 3 | undefined,
+    startCalendarYear: undefined as number | undefined,
+    endCalendarYear: undefined as number | undefined,
+    currentSeries: 1 as 1 | 2 | 3,
     startYearDate: "",
   });
   const [templateSubjects, setTemplateSubjects] = useState<string[]>([]);
+  const [templateSubjectsByYear, setTemplateSubjectsByYear] = useState<
+    { year: number; subjects: string[] }[]
+  >([]);
+  const [syncTemplateSubjects, setSyncTemplateSubjects] = useState(false);
   const [archivingClass, setArchivingClass] = useState<Class | null>(null);
+  const normalizeName = (value: string) =>
+    value.trim().replace(/\s+/g, ' ').toLowerCase();
 
   const filteredClasses = useMemo(() => classes.filter((cls) => {
     // Filtrar apenas turmas não arquivadas
@@ -112,19 +122,23 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
     const matchesSearch =
       cls.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       cls.course?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cls.classNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+      cls.series.toLowerCase().includes(searchTerm.toLowerCase());
 
     if (filterStatus === "with-director")
-      return matchesSearch && cls.directorId;
+      return matchesSearch && (cls.directorId || cls.directorEmail);
     if (filterStatus === "without-director")
-      return matchesSearch && !cls.directorId;
+      return matchesSearch && !cls.directorId && !cls.directorEmail;
     return matchesSearch;
   }), [classes, searchTerm, filterStatus]);
 
-  const getDirectorName = (directorId?: string) => {
-    if (!directorId) return null;
-    if (directorId === profile?.id) return profile?.name || "Diretor";
-    return "Não encontrado";
+  const getDirectorName = (cls: Class) => {
+    if (cls.directorId) {
+      if (cls.directorId === profile?.id) return profile?.name || profile?.email || "Diretor (Eu)";
+      const foundProfile = profiles.find(p => p.id === cls.directorId);
+      if (foundProfile) return foundProfile.name || foundProfile.email;
+    }
+    if (cls.directorEmail) return cls.directorEmail;
+    return null;
   };
 
   const getStudentCount = (classId: string) => {
@@ -132,60 +146,94 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
   };
 
   const handleEditClick = (cls: Class) => {
+    // Calcular série atual
+    const currentYear = new Date().getFullYear();
+    let currentSeries: 1 | 2 | 3 = 1;
+    if (cls.startCalendarYear) {
+      const yearsElapsed = currentYear - cls.startCalendarYear + 1;
+      currentSeries = Math.min(Math.max(yearsElapsed, 1), 3) as 1 | 2 | 3;
+    }
+
     setEditFormData({
       templateId: cls.templateId || "",
-      series: cls.series || "",
       letter: cls.letter || "",
       course: cls.course || "",
       directorId: cls.directorId || "",
+      directorEmail: cls.directorEmail || "",
       active: cls.active,
-      startYear: cls.startYear,
-      currentYear: cls.currentYear,
-      startYearDate: cls.startYearDate || "",
+      startCalendarYear: cls.startCalendarYear,
+      endCalendarYear: cls.endCalendarYear,
+      currentSeries,
+      startYearDate:
+        cls.startYearDate || (cls.startCalendarYear ? `${cls.startCalendarYear}-02-01` : ""),
     });
+    setSyncTemplateSubjects(false);
     setEditingClass(cls);
   };
+
 
   useEffect(() => {
     if (!editingClass) {
       setTemplateSubjects([]);
+      setTemplateSubjectsByYear([]);
       return;
     }
 
     const hasTemplate = !!editFormData.templateId && editFormData.templateId !== "none" && editFormData.templateId !== "";
     if (!hasTemplate) {
       setTemplateSubjects([]);
+      setTemplateSubjectsByYear([]);
       return;
     }
 
-    const template = getTemplate(editFormData.templateId);
+    const template = templates.find((t) => t.id === editFormData.templateId);
     if (!template) {
       setTemplateSubjects([]);
+      setTemplateSubjectsByYear([]);
       return;
     }
 
-    // CORREÇÃO: Usar currentYear (ano atual) em vez de startYear (ano de início)
-    // Se a turma está no 3º ano, deve usar disciplinas do 3º ano, não do 1º!
-    const preferredYear = editFormData.currentYear || editFormData.startYear;
+    setTemplateSubjectsByYear(template.subjectsByYear);
+    const yearData = template.subjectsByYear.find((y) => y.year === editFormData.currentSeries);
+    setTemplateSubjects(yearData?.subjects ?? template.subjectsByYear[0]?.subjects ?? []);
 
-    const yearFromTemplate = preferredYear &&
-      template.subjectsByYear.some((y) => y.year === preferredYear)
-      ? preferredYear
-      : template.subjectsByYear[0]?.year;
+    if (template.course && editFormData.course !== template.course) {
+      setEditFormData((prev) => ({
+        ...prev,
+        course: template.course,
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingClass, editFormData.templateId, editFormData.currentSeries, templates]);
 
-    if (yearFromTemplate && yearFromTemplate !== editFormData.startYear && !editFormData.currentYear) {
-      setEditFormData((prev) => ({ ...prev, startYear: yearFromTemplate }));
+  useEffect(() => {
+    if (!editingClass) return;
+    setSyncTemplateSubjects(false);
+  }, [editingClass, editFormData.templateId]);
+
+  useEffect(() => {
+    if (!editingClass) return;
+    if (!editFormData.startCalendarYear || !editFormData.endCalendarYear) return;
+
+    const currentYear = new Date().getFullYear();
+    let nextSeries: 1 | 2 | 3 = 1;
+
+    if (currentYear < editFormData.startCalendarYear) {
+      nextSeries = 1;
+    } else if (currentYear > editFormData.endCalendarYear) {
+      nextSeries = 3;
+    } else {
+      const yearsElapsed = currentYear - editFormData.startCalendarYear + 1;
+      nextSeries = Math.min(Math.max(yearsElapsed, 1), 3) as 1 | 2 | 3;
     }
 
-    if (editFormData.course !== template.course) {
-      setEditFormData((prev) => ({ ...prev, course: template.course }));
+    if (editFormData.currentSeries !== nextSeries) {
+      setEditFormData((prev) => ({
+        ...prev,
+        currentSeries: nextSeries,
+      }));
     }
-
-    const yearData = yearFromTemplate
-      ? template.subjectsByYear.find((y) => y.year === yearFromTemplate)
-      : undefined;
-    setTemplateSubjects(yearData?.subjects ?? []);
-  }, [editingClass, editFormData.templateId, editFormData.startYear, editFormData.currentYear, editFormData.course, getTemplate]);
+  }, [editingClass, editFormData.startCalendarYear, editFormData.endCalendarYear, editFormData.currentSeries]);
 
   const handleSaveEdit = async () => {
     if (!editingClass) return;
@@ -194,51 +242,32 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
     const hasTemplate =
       !!editFormData.templateId && editFormData.templateId !== "none" && editFormData.templateId !== "";
     const selectedTemplate = hasTemplate
-      ? getTemplate(editFormData.templateId)
+      ? templates.find((t) => t.id === editFormData.templateId)
       : undefined;
 
-    // Validação - série, letra, ano e data de início são obrigatórios
-    if (!editFormData.series || !editFormData.letter) {
+    // Validação
+    if (!editFormData.letter) {
       toast({
         title: "Erro",
-        description: "Preencha série e letra (campos obrigatórios).",
+        description: "Preencha a letra da turma.",
         variant: "destructive",
       });
       return;
     }
 
-    if (!editFormData.startYear) {
+    if (!editFormData.startCalendarYear || !editFormData.endCalendarYear) {
       toast({
         title: "Erro",
-        description: "Selecione o ano de início da turma.",
+        description: "Informe o ano de início e término da turma.",
         variant: "destructive",
       });
       return;
     }
 
-    if (!editFormData.startYearDate) {
+    if (editFormData.endCalendarYear < editFormData.startCalendarYear) {
       toast({
         title: "Erro",
-        description: "Informe a data de início do ano letivo.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (hasTemplate && !selectedTemplate) {
-      toast({
-        title: "Erro",
-        description: "Template selecionado não encontrado.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (trimmedCourse && !hasTemplate) {
-      toast({
-        title: "Erro",
-        description:
-          "Para turmas com curso técnico, você deve selecionar um template de disciplinas.",
+        description: "O ano de término deve ser maior ou igual ao ano de início.",
         variant: "destructive",
       });
       return;
@@ -249,43 +278,18 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
     if (!resolvedCourse) {
       toast({
         title: "Erro",
-        description: "Informe o curso tecnico da turma.",
+        description: "Informe o curso da turma.",
         variant: "destructive",
       });
       return;
     }
 
-    if (!getCourseCode(resolvedCourse)) {
-      toast({
-        title: "Erro",
-        description:
-          "Curso tecnico nao reconhecido. Use um dos cursos cadastrados.",
-        variant: "destructive",
-      });
-      return;
-    }
+    const normalizedLetter = editFormData.letter.trim().toUpperCase();
+    const newName = `${editFormData.startCalendarYear}-${editFormData.endCalendarYear} ${resolvedCourse.trim()} ${normalizedLetter}`.trim();
 
-    if (hasTemplate && editFormData.startYear) {
-      const yearData = selectedTemplate?.subjectsByYear.find(
-        (y) => y.year === editFormData.startYear,
-      );
-      if (!yearData || yearData.subjects.length === 0) {
-        toast({
-          title: "Erro",
-          description: `O template selecionado não possui disciplinas para o ${editFormData.startYear}º ano.`,
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-
-    // Gerar nome: se houver curso, incluir; senão, apenas série e letra
-    const newName = resolvedCourse.trim()
-      ? `${editFormData.series} ${editFormData.letter} - ${resolvedCourse.trim()}`
-      : `${editFormData.series} ${editFormData.letter}`;
-
+    const normalizedName = normalizeName(newName);
     const duplicate = classes.find(
-      (c) => c.name === newName && c.id !== editingClass.id,
+      (c) => !c.archived && c.id !== editingClass.id && normalizeName(c.name) === normalizedName,
     );
     if (duplicate) {
       toast({
@@ -299,21 +303,23 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
     try {
       await updateClass(editingClass.id, {
         name: newName,
-        series: editFormData.series,
-        letter: editFormData.letter,
+        series: `${editFormData.currentSeries}º ano`,
+        letter: normalizedLetter,
         course: resolvedCourse.trim() || undefined,
         directorId: editFormData.directorId || undefined,
+        directorEmail: editFormData.directorEmail || undefined,
         active: editFormData.active,
-        startYear: editFormData.startYear,
-        currentYear: editFormData.currentYear,
-        startYearDate: editFormData.startYearDate,
+        startYear: 1,
+        currentYear: editFormData.currentSeries,
+        startCalendarYear: editFormData.startCalendarYear,
+        endCalendarYear: editFormData.endCalendarYear,
+        startYearDate: editFormData.startYearDate || undefined,
         templateId: hasTemplate && editFormData.templateId ? editFormData.templateId : null,
       });
 
-      await setProfessionalSubjectsForClass(
-        editingClass.id,
-        hasTemplate ? templateSubjects : [],
-      );
+      if (hasTemplate && syncTemplateSubjects) {
+        await setProfessionalSubjectsForClass(editingClass.id, templateSubjects);
+      }
 
       toast({
         title: "Sucesso",
@@ -329,6 +335,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
       });
     }
   };
+
 
   const handleDeleteClick = (cls: Class) => {
     // Coletar informações sobre dados vinculados
@@ -403,7 +410,6 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
     }
   };
 
-  const directors = profile ? [profile] : [];
   const editHasTemplate =
     !!editFormData.templateId && editFormData.templateId !== "none" && editFormData.templateId !== "";
 
@@ -445,7 +451,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar por nome, número, série ou curso..."
+                  placeholder="Buscar por nome, série ou curso..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -504,10 +510,9 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Número</TableHead>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Curso</TableHead>
-                    <TableHead>Ano Atual</TableHead>
+                    <TableHead>Turma</TableHead>
+                    <TableHead>Período</TableHead>
+                    <TableHead>Série Atual</TableHead>
                     <TableHead>Diretor</TableHead>
                     <TableHead>Alunos</TableHead>
                     <TableHead>Status</TableHead>
@@ -516,15 +521,15 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                 </TableHeader>
                 <TableBody>
                   {filteredClasses.map((cls) => {
-                    const academicYear =
-                      cls.startYearDate && cls.currentYear
-                        ? getAcademicYear(cls.startYearDate, cls.currentYear)
-                        : null;
+                    const currentYear = new Date().getFullYear();
+                    const cycleComplete = cls.endCalendarYear && currentYear > cls.endCalendarYear;
 
-                    const shouldSuggestArchive =
-                      !!cls.startYearDate &&
-                      !!cls.startYear &&
-                      shouldArchiveClass(cls.startYearDate, cls.startYear);
+                    // Calcular série atual baseado nos anos
+                    let computedSeries = cls.currentYear || 1;
+                    if (cls.startCalendarYear) {
+                      const yearsElapsed = currentYear - cls.startCalendarYear + 1;
+                      computedSeries = Math.min(Math.max(yearsElapsed, 1), 3) as 1 | 2 | 3;
+                    }
 
                     const isHighlighted = highlightId === cls.id;
 
@@ -533,32 +538,40 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                         key={cls.id}
                         className={isHighlighted ? "bg-primary/10 animate-pulse ring-2 ring-primary/50" : ""}
                       >
-                        <TableCell className="font-mono font-medium">
-                          {cls.classNumber}
-                        </TableCell>
                         <TableCell className="font-medium">
-                          {cls.name}
+                          <div>
+                            <div className="font-semibold">{cls.name}</div>
+                            {cls.course && (
+                              <div className="text-sm text-muted-foreground">{cls.course}</div>
+                            )}
+                          </div>
                         </TableCell>
-                        <TableCell>{cls.course || "-"}</TableCell>
                         <TableCell>
-                          {cls.currentYear ? (
-                            <Badge
-                              variant="outline"
-                              className="bg-blue-500/10 text-blue-700 border-blue-500/30"
-                            >
-                              <Calendar className="h-3 w-3 mr-1" />
-                              {cls.currentYear}º ano
-                              {academicYear && ` (${academicYear})`}
+                          {cls.startCalendarYear && cls.endCalendarYear ? (
+                            <Badge variant="outline">
+                              {cls.startCalendarYear} - {cls.endCalendarYear}
                             </Badge>
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
                         <TableCell>
-                          {cls.directorId ? (
+                          <Badge
+                            variant="outline"
+                            className={cycleComplete
+                              ? "bg-amber-500/10 text-amber-700 border-amber-500/30"
+                              : "bg-blue-500/10 text-blue-700 border-blue-500/30"
+                            }
+                          >
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {cycleComplete ? "Concluído" : `${computedSeries}º ano`}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {(cls.directorId || cls.directorEmail) ? (
                             <div>
                               <p className="font-medium">
-                                {getDirectorName(cls.directorId)}
+                                {getDirectorName(cls)}
                               </p>
                             </div>
                           ) : (
@@ -599,30 +612,43 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            {shouldSuggestArchive && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => {
-                                  setArchiveReason("Conclusão do curso");
-                                  setArchivingClass(cls);
-                                }}
-                                title="Tempo concluído - arquivar turma"
-                              >
-                                <Clock className="h-4 w-4 text-amber-600" />
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setArchiveReason("Arquivamento manual");
-                                setArchivingClass(cls);
-                              }}
-                              title="Arquivar turma"
-                            >
-                              <Archive className="h-4 w-4 text-amber-600" />
-                            </Button>
+                            {/* Botão de arquivamento - pisca quando ciclo completo */}
+                            {(() => {
+                              const currentYear = new Date().getFullYear();
+                              const cycleComplete = cls.endCalendarYear && currentYear > cls.endCalendarYear;
+
+                              if (cycleComplete) {
+                                return (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setArchiveReason("Conclusão do curso - ciclo completo");
+                                      setArchivingClass(cls);
+                                    }}
+                                    title="⚠️ Ciclo concluído - ARQUIVAR TURMA"
+                                    className="animate-pulse bg-amber-500/20 border-amber-500 text-amber-700 hover:bg-amber-500/30"
+                                  >
+                                    <Archive className="h-4 w-4 mr-1" />
+                                    Arquivar
+                                  </Button>
+                                );
+                              }
+
+                              return (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    setArchiveReason("Arquivamento manual");
+                                    setArchivingClass(cls);
+                                  }}
+                                  title="Arquivar turma"
+                                >
+                                  <Archive className="h-4 w-4 text-amber-600" />
+                                </Button>
+                              );
+                            })()}
                             <Button
                               variant="ghost"
                               size="icon"
@@ -635,6 +661,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                       </TableRow>
                     );
                   })}
+
                 </TableBody>
               </Table>
             </div>
@@ -653,12 +680,6 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
               <DialogTitle>Detalhes da Turma</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              <div>
-                <Label className="text-muted-foreground">Número da Turma</Label>
-                <p className="font-medium font-mono">
-                  {viewingClass.classNumber}
-                </p>
-              </div>
               <div>
                 <Label className="text-muted-foreground">Nome</Label>
                 <p className="font-medium">{viewingClass.name}</p>
@@ -705,9 +726,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
               <div>
                 <Label className="text-muted-foreground">Diretor</Label>
                 <p className="font-medium">
-                  {viewingClass.directorId
-                    ? getDirectorName(viewingClass.directorId)
-                    : "Não atribuído"}
+                  {getDirectorName(viewingClass) || "Não atribuído"}
                 </p>
               </div>
               <div>
@@ -744,26 +763,21 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
           open={!!editingClass}
           onOpenChange={(open) => !open && setEditingClass(null)}
         >
-          <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Editar Turma</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              {/* Número da Turma (read-only) */}
-              <div className="space-y-2">
-                <Label htmlFor="edit-classNumber">Número da Turma</Label>
-                <Input
-                  id="edit-classNumber"
-                  value={editingClass.classNumber}
-                  disabled
-                  className="font-mono bg-muted"
-                />
-                <p className="text-sm text-muted-foreground">
-                  O número da turma não pode ser alterado.
+              {/* Preview do nome */}
+              <div className="p-3 border rounded-md bg-muted/50">
+                <Label className="text-muted-foreground text-xs">Nome da Turma</Label>
+                <p className="font-semibold text-lg">
+                  {editFormData.startCalendarYear}-{editFormData.endCalendarYear} {editFormData.course} {editFormData.letter}
                 </p>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
+                {/* Template */}
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="edit-template">Template de Disciplinas</Label>
                   <Select
@@ -779,59 +793,110 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                       <SelectValue placeholder="Selecione um template" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">
-                        Sem template (Ensino Médio Regular)
-                      </SelectItem>
-                      {templates.length === 0 ? (
-                        <SelectItem value="no-templates" disabled>
-                          Nenhum template cadastrado
+                      <SelectItem value="none">Sem template</SelectItem>
+                      {templates.map((template) => (
+                        <SelectItem key={template.id} value={template.id}>
+                          {template.name} - {template.course}
                         </SelectItem>
-                      ) : (
-                        templates.map((template) => {
-                          const totalSubjects = template.subjectsByYear.reduce(
-                            (sum, y) => sum + y.subjects.length,
-                            0,
-                          );
-                          return (
-                            <SelectItem key={template.id} value={template.id}>
-                              {template.name} - {template.course} (
-                              {totalSubjects} disciplinas)
-                            </SelectItem>
-                          );
-                        })
-                      )}
+                      ))}
                     </SelectContent>
                   </Select>
-                  {templates.length === 0 ? (
-                    <p className="text-sm text-destructive">
-                      ⚠️ Nenhum template cadastrado. Vá em "Templates de Disciplinas" para criar um.
-                    </p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      O curso e as disciplinas profissionais serão definidos pelo template.
-                    </p>
-                  )}
                 </div>
 
+                {/* Ano de Início */}
                 <div className="space-y-2">
-                  <Label htmlFor="edit-series">Série *</Label>
+                  <Label htmlFor="edit-startCalendarYear">Ano de Início *</Label>
                   <Select
-                    value={editFormData.series}
+                    value={editFormData.startCalendarYear?.toString() || ""}
                     onValueChange={(value) =>
-                      setEditFormData({ ...editFormData, series: value })
+                      setEditFormData({
+                        ...editFormData,
+                        startCalendarYear: parseInt(value),
+                        endCalendarYear: parseInt(value) + 2,
+                        startYearDate: editFormData.startYearDate || `${parseInt(value)}-02-01`,
+                      })
                     }
                   >
-                    <SelectTrigger id="edit-series">
-                      <SelectValue placeholder="Selecione a série" />
+                    <SelectTrigger id="edit-startCalendarYear">
+                      <SelectValue placeholder="Selecione o ano" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="1º">1º ano</SelectItem>
-                      <SelectItem value="2º">2º ano</SelectItem>
-                      <SelectItem value="3º">3º ano</SelectItem>
+                      {Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i).map((year) => (
+                        <SelectItem key={year} value={year.toString()}>
+                          {year}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
 
+                {/* Ano de Término */}
+                <div className="space-y-2">
+                  <Label htmlFor="edit-endCalendarYear">Ano de Término *</Label>
+                  <Select
+                    value={editFormData.endCalendarYear?.toString() || ""}
+                    onValueChange={(value) =>
+                      setEditFormData((prev) => {
+                        const nextEnd = parseInt(value);
+                        if (prev.startCalendarYear && nextEnd < prev.startCalendarYear) {
+                          return {
+                            ...prev,
+                            endCalendarYear: prev.startCalendarYear + 2,
+                          };
+                        }
+                        return {
+                          ...prev,
+                          endCalendarYear: nextEnd,
+                        };
+                      })
+                    }
+                  >
+                    <SelectTrigger id="edit-endCalendarYear">
+                      <SelectValue placeholder="Selecione o ano" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i).map((year) => (
+                        <SelectItem key={year} value={year.toString()}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Data de Início do 1º Ano */}
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="edit-startYearDate">Data de Início do 1º Ano</Label>
+                  <Input
+                    id="edit-startYearDate"
+                    type="date"
+                    value={editFormData.startYearDate}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        startYearDate: e.target.value,
+                      })
+                    }
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Usada para organizar bimestres e relatórios por ano letivo.
+                  </p>
+                </div>
+
+                {/* Série Atual */}
+                <div className="space-y-2">
+                  <Label>Série Atual</Label>
+                  <div className="flex items-center gap-2 h-10">
+                    <Badge variant="secondary" className="text-base">
+                      {editFormData.currentSeries}º ano
+                    </Badge>
+                    <span className="text-sm text-muted-foreground">
+                      (calculado)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Letra */}
                 <div className="space-y-2">
                   <Label htmlFor="edit-letter">Letra *</Label>
                   <Input
@@ -848,11 +913,12 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                   />
                 </div>
 
+                {/* Curso */}
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="edit-course">Curso Técnico (Opcional)</Label>
+                  <Label htmlFor="edit-course">Curso *</Label>
                   <Input
                     id="edit-course"
-                    placeholder="Digite o curso técnico ou deixe em branco"
+                    placeholder="Ex: Informática, Redes de Computadores"
                     value={editFormData.course}
                     onChange={(e) =>
                       setEditFormData({
@@ -862,114 +928,93 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                     }
                     disabled={editHasTemplate}
                   />
-                  <p className="text-sm text-muted-foreground">
-                    Exemplos: Técnico em Informática, Ensino Médio Regular, etc.
-                  </p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="edit-startYear">Ano de Início *</Label>
-                  <Select
-                    value={editFormData.startYear?.toString() || ""}
-                    onValueChange={(value) =>
-                      setEditFormData({
-                        ...editFormData,
-                        startYear: parseInt(value) as 1 | 2 | 3,
-                      })
-                    }
-                  >
-                    <SelectTrigger id="edit-startYear">
-                      <SelectValue placeholder="Selecione o ano de início" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1º ano</SelectItem>
-                      <SelectItem value="2">2º ano</SelectItem>
-                      <SelectItem value="3">3º ano</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="edit-currentYear">Ano Atual (Opcional)</Label>
-                  <Select
-                    value={editFormData.currentYear?.toString() || ""}
-                    onValueChange={(value) =>
-                      setEditFormData({
-                        ...editFormData,
-                        currentYear: parseInt(value) as 1 | 2 | 3,
-                      })
-                    }
-                  >
-                    <SelectTrigger id="edit-currentYear">
-                      <SelectValue placeholder="Selecione o ano atual" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1º ano</SelectItem>
-                      <SelectItem value="2">2º ano</SelectItem>
-                      <SelectItem value="3">3º ano</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="edit-startYearDate">Data de Início do Ano *</Label>
-                  <Input
-                    id="edit-startYearDate"
-                    type="date"
-                    value={editFormData.startYearDate}
-                    onChange={(e) =>
-                      setEditFormData({
-                        ...editFormData,
-                        startYearDate: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-
-                {editHasTemplate && editFormData.startYear && (
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>Disciplinas Profissionais do {editFormData.currentYear || editFormData.startYear}º Ano</Label>
-                    {templateSubjects.length === 0 ? (
-                      <p className="text-sm text-destructive">
-                        O template selecionado não possui disciplinas para este ano.
-                      </p>
-                    ) : (
-                      <div className="flex flex-wrap gap-2 p-3 border rounded-md bg-muted/50">
-                        {templateSubjects.map((subject, index) => (
-                          <Badge
-                            key={`${subject}-${index}`}
-                            variant="outline"
-                            className="bg-amber-500/10 text-amber-700 border-amber-500/30"
-                          >
-                            {subject}
-                          </Badge>
-                        ))}
+                {/* Disciplinas do Template */}
+                {editHasTemplate && templateSubjectsByYear.length > 0 && (
+                  <div className="space-y-3 md:col-span-2">
+                    <Label>Disciplinas Profissionais por Ano</Label>
+                    {templateSubjectsByYear.map((yearData) => {
+                      const isCurrent = yearData.year === editFormData.currentSeries;
+                      return (
+                      <div key={yearData.year} className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-muted-foreground">
+                            {yearData.year}º Ano
+                          </p>
+                          {isCurrent && (
+                            <Badge variant="secondary" className="text-xs">
+                              Atual
+                            </Badge>
+                          )}
+                        </div>
+                        <div
+                          className={`flex flex-wrap gap-2 p-3 border rounded-md ${
+                            isCurrent ? "bg-amber-50/50 border-amber-200" : "bg-muted/50"
+                          }`}
+                        >
+                          {yearData.subjects.map((subject, index) => (
+                            <Badge
+                              key={`${yearData.year}-${index}`}
+                              variant="outline"
+                              className="bg-amber-500/10 text-amber-700 border-amber-500/30"
+                            >
+                              {subject}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
+                    )})}
+                  </div>
+                )}
+
+                {editHasTemplate && (
+                  <div className="space-y-2 md:col-span-2">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="sync-template-subjects"
+                        checked={syncTemplateSubjects}
+                        onCheckedChange={setSyncTemplateSubjects}
+                      />
+                      <Label htmlFor="sync-template-subjects">
+                        Atualizar disciplinas profissionais da turma com este template
+                      </Label>
+                    </div>
+                    {syncTemplateSubjects && (
+                      <p className="text-sm text-amber-700">
+                        Isso substituirá as disciplinas profissionais atuais pela lista do ano corrente do template.
+                      </p>
                     )}
                   </div>
                 )}
 
+                {/* Diretor */}
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="edit-director">Diretor</Label>
+                  <Label htmlFor="edit-director">Diretor de Turma</Label>
                   <Select
-                    value={editFormData.directorId || undefined}
+                    value={editFormData.directorEmail || "none"}
                     onValueChange={(value) =>
-                      setEditFormData({ ...editFormData, directorId: value })
+                      setEditFormData({
+                        ...editFormData,
+                        directorEmail: value === "none" ? "" : value,
+                      })
                     }
                   >
                     <SelectTrigger id="edit-director">
-                      <SelectValue placeholder="Selecione um diretor (opcional)" />
+                      <SelectValue placeholder="Selecione o diretor" />
                     </SelectTrigger>
                     <SelectContent>
-                      {directors.map((director) => (
-                        <SelectItem key={director.id} value={director.id}>
-                          {director.name}
+                      <SelectItem value="none">Sem diretor atribuído</SelectItem>
+                      {authorizedEmails.map((auth) => (
+                        <SelectItem key={auth.email} value={auth.email}>
+                          {auth.email} ({auth.role})
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
+                {/* Status */}
                 <div className="flex items-center space-x-2 md:col-span-2">
                   <Switch
                     id="edit-active"
@@ -992,6 +1037,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
           </DialogContent>
         </Dialog>
       )}
+
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog

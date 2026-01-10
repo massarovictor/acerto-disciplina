@@ -21,9 +21,11 @@
  *    - Insights de risco
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { GraduationCap, AlertTriangle, Users, CheckCircle2, AlertCircle, Lightbulb } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { GraduationCap, AlertTriangle, Users, CheckCircle2, AlertCircle, Lightbulb, Sparkles } from 'lucide-react';
 import { useClasses, useStudents, useGrades, useAttendance, useIncidents } from '@/hooks/useData';
 import { useSchoolAnalytics, AnalyticsFilters, Insight } from '@/hooks/useSchoolAnalytics';
 import { AnalyticsFilters as FiltersBar } from '@/components/analytics/AnalyticsFilters';
@@ -34,6 +36,8 @@ import { StudentRankingPanel } from '@/components/analytics/StudentRankingPanel'
 import { SubjectAnalysisPanel } from '@/components/analytics/SubjectAnalysisPanel';
 import { ClassComparisonDialog } from '@/components/analytics/ClassComparisonDialog';
 import { BehaviorAnalyticsPanel } from '@/components/analytics/BehaviorAnalyticsPanel';
+import { CohortComparisonTable } from '@/components/analytics/CohortComparisonTable';
+import { PredictionDialog } from '@/components/analytics/PredictionDialog';
 
 // Componente de Insights Inline
 const InlineInsights = ({
@@ -107,10 +111,14 @@ const Analytics = () => {
     series: [],
     classIds: [],
     quarter: 'all',
+    schoolYear: 'all',
+    calendarYear: 'all',
+    includeArchived: false,
     comparisonClassIds: [],
   });
 
   const [showComparison, setShowComparison] = useState(false);
+  const [showPredictions, setShowPredictions] = useState(false);
 
   const analytics = useSchoolAnalytics(
     students,
@@ -121,6 +129,40 @@ const Analytics = () => {
     filters
   );
 
+  const lastClassIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const primaryClassId = filters.classIds[0] ?? filters.comparisonClassIds[0];
+    if (!primaryClassId) {
+      lastClassIdRef.current = null;
+      return;
+    }
+
+    if (lastClassIdRef.current === primaryClassId) return;
+    lastClassIdRef.current = primaryClassId;
+
+    if (filters.schoolYear === 'all') return;
+
+    const classData = classes.find((c) => c.id === primaryClassId);
+    const defaultYear = classData?.currentYear;
+    if (defaultYear && [1, 2, 3].includes(defaultYear)) {
+      const startYear =
+        classData?.startCalendarYear ||
+        (classData?.startYearDate ? new Date(`${classData.startYearDate}T00:00:00`).getFullYear() : undefined);
+      const calendarYear = startYear ? startYear + (defaultYear - 1) : undefined;
+      const nextSchoolYear = defaultYear as 1 | 2 | 3;
+      const nextCalendarYear = calendarYear ?? 'all';
+
+      if (filters.schoolYear !== nextSchoolYear || filters.calendarYear !== nextCalendarYear) {
+        setFilters((prev) => ({
+          ...prev,
+          schoolYear: nextSchoolYear,
+          calendarYear: nextCalendarYear,
+        }));
+      }
+    }
+  }, [classes, filters.classIds, filters.comparisonClassIds, filters.schoolYear, filters.calendarYear]);
+
   const handleFilterChange = (newFilters: Partial<AnalyticsFilters>) => {
     setFilters(prev => ({ ...prev, ...newFilters }));
   };
@@ -129,6 +171,9 @@ const Analytics = () => {
     setFilters(prev => ({ ...prev, comparisonClassIds: classIds }));
     setShowComparison(true);
   };
+
+  const predictionYearLabel =
+    filters.schoolYear === 'all' ? 'Ano atual das turmas' : `${filters.schoolYear}º ano`;
 
   return (
     <div className="p-6 space-y-8">
@@ -183,6 +228,77 @@ const Analytics = () => {
           onSelectForComparison={handleCompare}
         />
 
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-amber-500" />
+                Predições de Desempenho
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Badge variant="outline" className="w-fit">
+                {predictionYearLabel}
+              </Badge>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                  <span className="text-sm">Alto risco</span>
+                  <Badge variant="destructive">{analytics.predictionSummary.highRisk}</Badge>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  <span className="text-sm">Médio risco</span>
+                  <Badge className="bg-amber-500">{analytics.predictionSummary.mediumRisk}</Badge>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  <span className="text-sm">Baixo risco</span>
+                  <Badge className="bg-emerald-500">{analytics.predictionSummary.lowRisk}</Badge>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
+                  <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Dados insuficientes</span>
+                  <Badge variant="outline">{analytics.predictionSummary.insufficient}</Badge>
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                {analytics.predictionSummary.total === 0
+                  ? 'Nenhum aluno encontrado com os filtros atuais.'
+                  : analytics.predictionSummary.insufficient > 0
+                    ? 'Alguns alunos (especialmente do 1º ano) ainda não possuem dados suficientes para predição.'
+                    : 'Predições geradas com base nas notas atuais e no histórico disponível.'}
+              </p>
+
+              <Button
+                onClick={() => setShowPredictions(true)}
+                disabled={analytics.predictionSummary.total === 0}
+              >
+                Ver predições
+              </Button>
+            </CardContent>
+          </Card>
+
+          {filters.schoolYear === 'all' ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Comparação por Ano Calendário</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Selecione um ano específico para comparar turmas por calendário.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <CohortComparisonTable
+              cohorts={analytics.cohortAnalytics}
+              schoolYear={filters.schoolYear}
+            />
+          )}
+        </div>
+
         {/* Insights Acadêmicos */}
         <InlineInsights
           insights={analytics.categorizedInsights.academic}
@@ -227,6 +343,14 @@ const Analytics = () => {
         open={showComparison}
         onOpenChange={setShowComparison}
         comparisonData={analytics.comparisonData}
+      />
+
+      <PredictionDialog
+        open={showPredictions}
+        onOpenChange={setShowPredictions}
+        predictions={analytics.studentPredictions}
+        summary={analytics.predictionSummary}
+        schoolYearLabel={predictionYearLabel}
       />
     </div>
   );

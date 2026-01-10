@@ -11,86 +11,9 @@ begin
 end;
 $$;
 
-create or replace function public.course_to_code(course text)
-returns text
-language plpgsql
-stable
-as $$
-declare
-  normalized text;
-begin
-  if course is null or btrim(course) = '' then
-    return null;
-  end if;
-
-  normalized := regexp_replace(unaccent(lower(trim(course))), '[[:space:]]+', ' ', 'g');
-
-  if normalized = 'redes de computadores' then
-    return 'RDC';
-  elseif normalized = 'desenvolvimento de sistemas' then
-    return 'DS';
-  elseif normalized in ('administracao financas', 'administracao e financas', 'administracao de financas', 'administracao financeira') then
-    return 'ADF';
-  elseif normalized = 'comercio' then
-    return 'COM';
-  elseif normalized = 'agronegocio' then
-    return 'AGR';
-  elseif normalized = 'fruticultura' then
-    return 'FRU';
-  else
-    raise exception 'Curso "%" nao mapeado para sigla', course;
-  end if;
-end;
-$$;
-
-create or replace function public.build_class_number(
-  course text,
-  start_year_date date,
-  start_year smallint
-)
-returns text
-language plpgsql
-stable
-as $$
-declare
-  start_year_value int;
-  end_year_value int;
-  start_year_number int;
-  course_code text;
-begin
-  if start_year_date is null then
-    raise exception 'start_year_date is required to build class_number';
-  end if;
-
-  start_year_value := extract(year from start_year_date)::int;
-  start_year_number := coalesce(start_year, 1);
-
-  if start_year_number < 1 or start_year_number > 3 then
-    raise exception 'start_year must be between 1 and 3';
-  end if;
-
-  end_year_value := start_year_value + (3 - start_year_number);
-  course_code := public.course_to_code(course);
-
-  if course_code is null then
-    raise exception 'course is required to build class_number';
-  end if;
-
-  return format('%s-%s-%s', start_year_value, end_year_value, course_code);
-end;
-$$;
-
-create or replace function public.set_class_number()
-returns trigger
-language plpgsql
-as $$
-begin
-  new.class_number := public.build_class_number(new.course, new.start_year_date, new.start_year);
-  return new;
-end;
-$$;
-
 create or replace function public.build_class_name(
+  start_calendar_year int,
+  end_calendar_year int,
   series text,
   letter text,
   course text
@@ -102,18 +25,18 @@ as $$
 declare
   base_name text;
 begin
-  if series is null or btrim(series) = '' then
-    raise exception 'series is required to build class name';
-  end if;
-
-  base_name := series;
-
-  if letter is not null and btrim(letter) <> '' then
-    base_name := base_name || ' ' || btrim(letter);
+  if start_calendar_year is not null and end_calendar_year is not null then
+    base_name := format('%s-%s', start_calendar_year, end_calendar_year);
+  else
+    base_name := btrim(series);
   end if;
 
   if course is not null and btrim(course) <> '' then
-    return base_name || ' - ' || btrim(course);
+    base_name := base_name || ' ' || btrim(course);
+  end if;
+
+  if letter is not null and btrim(letter) <> '' then
+    base_name := base_name || ' ' || upper(btrim(letter));
   end if;
 
   return base_name;
@@ -125,7 +48,13 @@ returns trigger
 language plpgsql
 as $$
 begin
-  new.name := public.build_class_name(new.series, new.letter, new.course);
+  new.name := public.build_class_name(
+    new.start_calendar_year,
+    new.end_calendar_year,
+    new.series,
+    new.letter,
+    new.course
+  );
   return new;
 end;
 $$;
@@ -167,25 +96,22 @@ create table if not exists public.classes (
   series text not null,
   letter text,
   course text,
-  class_number text not null,
   director_id uuid references public.profiles(id),
+  director_email text,
   active boolean not null default true,
   start_year smallint,
   current_year smallint,
   start_year_date date,
+  start_calendar_year int,
+  end_calendar_year int,
   archived boolean not null default false,
   archived_at timestamptz,
   archived_reason text,
   template_id uuid,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (owner_id, class_number)
+  unique (owner_id, name)
 );
-
-drop trigger if exists set_class_number on public.classes;
-create trigger set_class_number
-before insert or update on public.classes
-for each row execute function public.set_class_number();
 
 drop trigger if exists set_class_name on public.classes;
 create trigger set_class_name
@@ -216,12 +142,13 @@ create table if not exists public.grades (
   class_id uuid not null references public.classes(id) on delete cascade,
   subject text not null,
   quarter text not null,
+  school_year smallint not null default 1,
   grade numeric(4,1) not null,
   observation text,
   recorded_at timestamptz not null default now(),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (student_id, class_id, subject, quarter)
+  unique (student_id, class_id, subject, quarter, school_year)
 );
 
 create table if not exists public.attendance (
@@ -464,3 +391,7 @@ alter table public.follow_ups
 alter table public.grades
   add constraint grades_grade_check
   check (grade >= 0 and grade <= 10);
+
+alter table public.grades
+  add constraint grades_school_year_check
+  check (school_year between 1 and 3);

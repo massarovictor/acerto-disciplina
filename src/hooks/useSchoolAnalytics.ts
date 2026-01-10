@@ -8,6 +8,7 @@
 import { useMemo } from 'react';
 import { Student, Class, Grade, Incident, AttendanceRecord } from '@/types';
 import { classifyStudent, StudentClassification, ClassificationResult } from '@/lib/advancedAnalytics';
+import { analyzeStudentPerformance } from '@/lib/performancePrediction';
 import { getSubjectArea, SUBJECT_AREAS } from '@/lib/subjects';
 import { QUARTERS } from '@/lib/subjects';
 
@@ -16,10 +17,13 @@ import { QUARTERS } from '@/lib/subjects';
 // ============================================
 
 export interface AnalyticsFilters {
-  series: string[];           // ['1º', '2º', '3º']
-  classIds: string[];         // IDs das turmas selecionadas
-  quarter: string;            // 'all' | '1º Bimestre' | etc
-  comparisonClassIds: string[]; // Turmas para comparação lado a lado
+  series: string[];              // ['1º', '2º', '3º']
+  classIds: string[];            // IDs das turmas selecionadas
+  quarter: string;               // 'all' | '1º Bimestre' | etc
+  schoolYear: 1 | 2 | 3 | 'all'; // Ano/série da turma ou todos os anos
+  calendarYear: 'all' | number;  // Ano calendário para comparação entre turmas
+  includeArchived: boolean;      // Incluir turmas arquivadas
+  comparisonClassIds: string[];  // Turmas para comparação lado a lado
 }
 
 export interface StudentAnalytics {
@@ -30,11 +34,35 @@ export interface StudentAnalytics {
   trend: 'up' | 'down' | 'stable';
 }
 
+export interface StudentPrediction {
+  student: Student;
+  classId: string;
+  className: string;
+  predicted: number;
+  confidence: number;
+  method: string;
+  risk: number;
+  trend: string;
+  currentAverage: number;
+  dataPoints: number;
+  hasSufficientData: boolean;
+}
+
+export interface PredictionSummary {
+  total: number;
+  highRisk: number;
+  mediumRisk: number;
+  lowRisk: number;
+  insufficient: number;
+}
+
 export interface ClassAnalytics {
   classData: Class;
+  calendarYear?: number;
   studentCount: number;
   average: number;
   frequency: number;
+  growth: number | null;
   classifications: {
     critico: number;
     atencao: number;
@@ -138,6 +166,10 @@ export interface SchoolAnalyticsResult {
   topStudents: StudentAnalytics[];
   criticalStudents: StudentAnalytics[];
 
+  // Predições
+  studentPredictions: StudentPrediction[];
+  predictionSummary: PredictionSummary;
+
   // Subject Analysis
   subjectAnalytics: SubjectAnalytics[];
   areaAnalytics: AreaAnalytics[];
@@ -153,6 +185,17 @@ export interface SchoolAnalyticsResult {
 
   // Comparison data
   comparisonData: ClassAnalytics[];
+
+  // Cohorts (ano calendário)
+  cohortAnalytics: {
+    calendarYear: number;
+    classCount: number;
+    studentCount: number;
+    average: number;
+    frequency: number;
+    incidentCount: number;
+    growthAverage: number | null;
+  }[];
 }
 
 // ============================================
@@ -192,10 +235,75 @@ export function useSchoolAnalytics(
   incidents: Incident[],
   filters: AnalyticsFilters
 ): SchoolAnalyticsResult {
+  const parseLocalDate = (value: string) => new Date(`${value}T00:00:00`);
+  const addMonths = (date: Date, months: number) => {
+    const next = new Date(date);
+    next.setMonth(next.getMonth() + months);
+    return next;
+  };
+  const addYears = (date: Date, years: number) => {
+    const next = new Date(date);
+    next.setFullYear(next.getFullYear() + years);
+    return next;
+  };
+  const getQuarterRange = (
+    startYearDate: string | undefined,
+    schoolYear: number,
+    quarter: string
+  ) => {
+    if (!startYearDate) return null;
+    const index = QUARTERS.indexOf(quarter);
+    if (index < 0) return null;
+
+    const startDate = parseLocalDate(startYearDate);
+    if (Number.isNaN(startDate.getTime())) return null;
+
+    const yearOffset = schoolYear - 1;
+    const currentYearStart = addYears(startDate, yearOffset);
+    const rangeStart = addMonths(currentYearStart, index * 2);
+    const rangeEnd = addMonths(currentYearStart, index * 2 + 2);
+    return { start: rangeStart, end: rangeEnd };
+  };
+  const getSchoolYearRange = (startYearDate: string | undefined, schoolYear: number) => {
+    if (!startYearDate) return null;
+    const startDate = parseLocalDate(startYearDate);
+    if (Number.isNaN(startDate.getTime())) return null;
+    const yearOffset = schoolYear - 1;
+    const yearStart = addYears(startDate, yearOffset);
+    const yearEnd = addMonths(yearStart, 8);
+    return { start: yearStart, end: yearEnd };
+  };
+  const isDateInRange = (value: string, range: { start: Date; end: Date } | null) => {
+    if (!range) return true;
+    const date = parseLocalDate(value);
+    if (Number.isNaN(date.getTime())) return false;
+    return date >= range.start && date < range.end;
+  };
+  const resolveStartYearDate = (cls: Class) =>
+    cls.startYearDate || (cls.startCalendarYear ? `${cls.startCalendarYear}-02-01` : undefined);
 
   return useMemo(() => {
+    const targetSchoolYear = filters.schoolYear === 'all' ? null : (filters.schoolYear ?? 1);
+    const useAllYears = targetSchoolYear === null;
     // Filtrar turmas ativas (não arquivadas)
-    const activeClasses = classes.filter(c => !c.archived);
+    const activeClasses = filters.includeArchived ? classes : classes.filter(c => !c.archived);
+
+    const getStartCalendarYear = (cls: Class) => {
+      if (cls.startCalendarYear) return cls.startCalendarYear;
+      if (cls.startYearDate) return parseLocalDate(cls.startYearDate).getFullYear();
+      return undefined;
+    };
+
+    const classCalendarYearMap = new Map<string, number | null>();
+    activeClasses.forEach((cls) => {
+      if (useAllYears || targetSchoolYear === null) {
+        classCalendarYearMap.set(cls.id, null);
+        return;
+      }
+      const startYear = getStartCalendarYear(cls);
+      const calendarYear = startYear ? startYear + (targetSchoolYear - 1) : null;
+      classCalendarYearMap.set(cls.id, calendarYear);
+    });
 
     // Aplicar filtros
     let filteredClasses = activeClasses;
@@ -212,6 +320,13 @@ export function useSchoolAnalytics(
       );
     }
 
+    if (!useAllYears && filters.calendarYear !== 'all') {
+      filteredClasses = filteredClasses.filter((cls) => {
+        const calendarYear = classCalendarYearMap.get(cls.id);
+        return calendarYear === filters.calendarYear;
+      });
+    }
+
     const filteredClassIds = new Set(filteredClasses.map(c => c.id));
 
     // Filtrar alunos das turmas selecionadas
@@ -219,17 +334,52 @@ export function useSchoolAnalytics(
       filteredClassIds.has(s.classId) && s.status === 'active'
     );
 
-    // Filtrar notas por período
-    let filteredGrades = grades.filter(g => filteredClassIds.has(g.classId));
+    const classById = new Map(classes.map((cls) => [cls.id, cls]));
+    const getLatestQuarter = (gradesList: Grade[]) => {
+      for (let i = QUARTERS.length - 1; i >= 0; i -= 1) {
+        const quarter = QUARTERS[i];
+        if (gradesList.some((grade) => grade.quarter === quarter)) {
+          return quarter;
+        }
+      }
+      return QUARTERS[0];
+    };
+
+    const allGrades = grades.filter(g => filteredClassIds.has(g.classId));
+    const yearGrades = useAllYears
+      ? allGrades
+      : allGrades.filter(g => (g.schoolYear ?? 1) === targetSchoolYear);
+
+    let filteredGrades = useAllYears ? allGrades : yearGrades;
     if (filters.quarter !== 'all') {
       filteredGrades = filteredGrades.filter(g => g.quarter === filters.quarter);
     }
 
-    // Filtrar frequência
-    const filteredAttendance = attendance.filter(a => filteredClassIds.has(a.classId));
+    let filteredAttendance = attendance.filter(a => filteredClassIds.has(a.classId));
+    let filteredIncidents = incidents.filter(i => filteredClassIds.has(i.classId));
 
-    // Filtrar ocorrências
-    const filteredIncidents = incidents.filter(i => filteredClassIds.has(i.classId));
+    if (!useAllYears && targetSchoolYear !== null) {
+      const classRanges = new Map<string, { start: Date; end: Date } | null>();
+      filteredClasses.forEach(cls => {
+        const startYearDate = resolveStartYearDate(cls);
+        const range = filters.quarter !== 'all'
+          ? getQuarterRange(startYearDate, targetSchoolYear, filters.quarter)
+          : getSchoolYearRange(startYearDate, targetSchoolYear);
+        classRanges.set(cls.id, range);
+      });
+
+      filteredAttendance = attendance.filter(a => {
+        if (!filteredClassIds.has(a.classId)) return false;
+        const range = classRanges.get(a.classId) ?? null;
+        return isDateInRange(a.date, range);
+      });
+
+      filteredIncidents = incidents.filter(i => {
+        if (!filteredClassIds.has(i.classId)) return false;
+        const range = classRanges.get(i.classId) ?? null;
+        return isDateInRange(i.date, range);
+      });
+    }
 
     // ============================================
     // CALCULAR ANALYTICS POR ALUNO
@@ -243,9 +393,10 @@ export function useSchoolAnalytics(
       const classification = classifyStudent(studentGrades, studentAttendance);
       const studentClass = filteredClasses.find(c => c.id === student.classId);
 
-      // Calcular tendência
+      // Calcular tendência (considera o ano letivo inteiro)
+      const trendGrades = yearGrades.filter(g => g.studentId === student.id);
       const quarterAverages = QUARTERS.map(q => {
-        const qGrades = grades.filter(g => g.studentId === student.id && g.quarter === q);
+        const qGrades = trendGrades.filter(g => g.quarter === q);
         return qGrades.length > 0 ? qGrades.reduce((s, g) => s + g.grade, 0) / qGrades.length : 0;
       }).filter(v => v > 0);
 
@@ -276,6 +427,7 @@ export function useSchoolAnalytics(
     const classAnalyticsList: ClassAnalytics[] = filteredClasses.map(cls => {
       const classStudents = studentAnalyticsList.filter(s => s.student.classId === cls.id);
       const classGrades = filteredGrades.filter(g => g.classId === cls.id);
+      const classYearGrades = yearGrades.filter(g => g.classId === cls.id);
       const classAttendance = filteredAttendance.filter(a => a.classId === cls.id);
       const classIncidents = filteredIncidents.filter(i => i.classId === cls.id);
 
@@ -310,7 +462,7 @@ export function useSchoolAnalytics(
 
       // Calcular tendência da turma (média mensal)
       const quarterAverages = QUARTERS.map(q => {
-        const qGrades = grades.filter(g => g.classId === cls.id && g.quarter === q);
+        const qGrades = classYearGrades.filter(g => g.quarter === q);
         return qGrades.length > 0 ? qGrades.reduce((s, g) => s + g.grade, 0) / qGrades.length : 0;
       }).filter(v => v > 0);
 
@@ -321,11 +473,17 @@ export function useSchoolAnalytics(
         else if (diff < -0.2) trend = 'down';
       }
 
+      const growth = quarterAverages.length >= 2
+        ? quarterAverages[quarterAverages.length - 1] - quarterAverages[0]
+        : null;
+
       return {
         classData: cls,
+        calendarYear: classCalendarYearMap.get(cls.id) ?? undefined,
         studentCount: classStudents.length,
         average,
         frequency,
+        growth,
         classifications,
         incidentCount: classIncidents.length,
         trend,
@@ -334,6 +492,90 @@ export function useSchoolAnalytics(
 
     // Ordenar ranking de turmas por média
     const classRanking = [...classAnalyticsList].sort((a, b) => b.average - a.average);
+
+    // ============================================
+    // COMPARAÇÃO POR COORTE (ANO CALENDÁRIO)
+    // ============================================
+
+    const cohortMap = new Map<
+      number,
+      {
+        classIds: Set<string>;
+        studentIds: Set<string>;
+        gradeSum: number;
+        gradeCount: number;
+        attendancePresent: number;
+        attendanceTotal: number;
+        incidentCount: number;
+        growthValues: number[];
+      }
+    >();
+
+    filteredClasses.forEach((cls) => {
+      const calendarYear = classCalendarYearMap.get(cls.id);
+      if (!calendarYear) return;
+
+      const entry =
+        cohortMap.get(calendarYear) ||
+        {
+          classIds: new Set<string>(),
+          studentIds: new Set<string>(),
+          gradeSum: 0,
+          gradeCount: 0,
+          attendancePresent: 0,
+          attendanceTotal: 0,
+          incidentCount: 0,
+          growthValues: [],
+        };
+
+      entry.classIds.add(cls.id);
+
+      filteredStudents
+        .filter((student) => student.classId === cls.id)
+        .forEach((student) => entry.studentIds.add(student.id));
+
+      const classGrades = filteredGrades.filter((grade) => grade.classId === cls.id);
+      classGrades.forEach((grade) => {
+        entry.gradeSum += grade.grade;
+        entry.gradeCount += 1;
+      });
+
+      const classAttendance = filteredAttendance.filter((record) => record.classId === cls.id);
+      entry.attendanceTotal += classAttendance.length;
+      entry.attendancePresent += classAttendance.filter((record) => record.status === 'presente').length;
+
+      entry.incidentCount += filteredIncidents.filter((incident) => incident.classId === cls.id).length;
+
+      const classGrowth = classAnalyticsList.find((c) => c.classData.id === cls.id)?.growth;
+      if (typeof classGrowth === 'number') {
+        entry.growthValues.push(classGrowth);
+      }
+
+      cohortMap.set(calendarYear, entry);
+    });
+
+    const cohortAnalytics = useAllYears
+      ? []
+      : Array.from(cohortMap.entries())
+          .map(([calendarYear, entry]) => {
+            const growthAverage =
+              entry.growthValues.length > 0
+                ? entry.growthValues.reduce((sum, value) => sum + value, 0) / entry.growthValues.length
+                : null;
+            return {
+              calendarYear,
+              classCount: entry.classIds.size,
+              studentCount: entry.studentIds.size,
+              average: entry.gradeCount > 0 ? entry.gradeSum / entry.gradeCount : 0,
+              frequency:
+                entry.attendanceTotal > 0
+                  ? (entry.attendancePresent / entry.attendanceTotal) * 100
+                  : 100,
+              incidentCount: entry.incidentCount,
+              growthAverage,
+            };
+          })
+          .sort((a, b) => a.calendarYear - b.calendarYear);
 
     // ============================================
     // CALCULAR ANALYTICS POR DISCIPLINA
@@ -421,6 +663,75 @@ export function useSchoolAnalytics(
         return a.classification.average - b.classification.average;
       })
       .slice(0, 15);
+
+    // ============================================
+    // PREDIÇÕES (com histórico opcional)
+    // ============================================
+
+    const studentPredictions: StudentPrediction[] = filteredStudents.map((student) => {
+      const classInfo = classById.get(student.classId);
+      const studentGradesAll = allGrades.filter(
+        (grade) => grade.studentId === student.id && grade.classId === student.classId,
+      );
+      const resolvePredictionYear = () => {
+        if (targetSchoolYear) return targetSchoolYear;
+        const classYear = classInfo?.currentYear;
+        if (classYear === 1 || classYear === 2 || classYear === 3) return classYear;
+        const availableYears = studentGradesAll.map((grade) => grade.schoolYear ?? 1);
+        if (availableYears.length === 0) return 1;
+        return Math.max(...availableYears);
+      };
+
+      const predictionYear = resolvePredictionYear();
+      const currentGrades = studentGradesAll.filter(
+        (grade) => (grade.schoolYear ?? 1) === predictionYear,
+      );
+
+      const historyGrades = grades.filter((grade) => {
+        if (grade.studentId !== student.id) return false;
+        const gradeYear = grade.schoolYear ?? 1;
+        if (gradeYear >= predictionYear) return false;
+        if (filters.includeArchived) return true;
+        const historyClass = classById.get(grade.classId);
+        return historyClass ? !historyClass.archived : true;
+      });
+
+      const currentQuarter = filters.quarter !== 'all'
+        ? filters.quarter
+        : getLatestQuarter(currentGrades);
+
+      const analysis = analyzeStudentPerformance(currentGrades, currentQuarter, {
+        schoolYear: predictionYear,
+        historicalGrades: historyGrades,
+        minQuartersForPrediction: 2,
+        includeHistoricalFallback: true,
+      });
+
+      const currentAverage = analysis.prediction.currentAverage ?? 0;
+      const hasSufficientData = analysis.prediction.method !== 'insufficient_data';
+
+      return {
+        student,
+        classId: student.classId,
+        className: classInfo?.name || 'Sem turma',
+        predicted: analysis.prediction.predicted,
+        confidence: analysis.prediction.confidence,
+        method: analysis.prediction.method,
+        risk: analysis.risk,
+        trend: analysis.trend.trend,
+        currentAverage,
+        dataPoints: analysis.prediction.dataPoints,
+        hasSufficientData,
+      };
+    });
+
+    const predictionSummary: PredictionSummary = {
+      total: studentPredictions.length,
+      highRisk: studentPredictions.filter((p) => p.risk >= 70 && p.hasSufficientData).length,
+      mediumRisk: studentPredictions.filter((p) => p.risk >= 40 && p.risk < 70 && p.hasSufficientData).length,
+      lowRisk: studentPredictions.filter((p) => p.risk < 40 && p.hasSufficientData).length,
+      insufficient: studentPredictions.filter((p) => !p.hasSufficientData).length,
+    };
 
     // ============================================
     // OVERVIEW
@@ -645,6 +956,36 @@ export function useSchoolAnalytics(
       });
     }
 
+    // Insight: Crescimento de desempenho
+    const growthClasses = classRanking.filter((c) => typeof c.growth === 'number');
+    if (growthClasses.length > 0) {
+      const bestGrowth = growthClasses.reduce((best, current) =>
+        (current.growth ?? 0) > (best.growth ?? 0) ? current : best,
+      );
+      if ((bestGrowth.growth ?? 0) >= 0.5) {
+        insights.push({
+          id: 'best-growth',
+          type: 'success',
+          category: 'academic',
+          title: `${bestGrowth.classData.name} teve maior crescimento`,
+          description: `Evolução de ${(bestGrowth.growth ?? 0).toFixed(1)} pontos entre o primeiro e o último bimestre disponível.`,
+        });
+      }
+
+      const worstGrowth = growthClasses.reduce((worst, current) =>
+        (current.growth ?? 0) < (worst.growth ?? 0) ? current : worst,
+      );
+      if ((worstGrowth.growth ?? 0) <= -0.5) {
+        insights.push({
+          id: 'worst-growth',
+          type: 'warning',
+          category: 'academic',
+          title: `${worstGrowth.classData.name} apresentou queda de desempenho`,
+          description: `Queda de ${(Math.abs(worstGrowth.growth ?? 0)).toFixed(1)} ponto(s) entre o primeiro e o último bimestre disponível.`,
+        });
+      }
+    }
+
     // === INSIGHTS COMPORTAMENTAIS ===
 
     // Insight: Ocorrências altas
@@ -728,6 +1069,8 @@ export function useSchoolAnalytics(
       classRanking,
       topStudents,
       criticalStudents,
+      studentPredictions,
+      predictionSummary,
       subjectAnalytics,
       areaAnalytics,
       bestSubjects,
@@ -736,6 +1079,7 @@ export function useSchoolAnalytics(
       insights,
       categorizedInsights,
       comparisonData,
+      cohortAnalytics,
     };
   }, [students, classes, grades, attendance, incidents, filters]);
 }

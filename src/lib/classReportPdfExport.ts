@@ -296,6 +296,11 @@ class ClassReportPDFGenerator {
 
   private generateStudentNarrative(profile: StudentProfile): string {
     const parts: string[] = [];
+    const hasGrades = Object.keys(profile.subjectAverages).length > 0;
+
+    if (!hasGrades) {
+      return 'Sem dados suficientes para análise acadêmica neste período. Aguardar lançamento de notas para avaliações mais precisas.';
+    }
     
     // 1. SITUAÇÃO ATUAL - Claro e direto
     if (profile.classification === 'critico') {

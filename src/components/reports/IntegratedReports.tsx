@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Users, FileDown, UserCheck, Calendar } from 'lucide-react';
 import { Class, Student, Incident } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { useProfessionalSubjects, useGrades, useAttendance } from '@/hooks/useData';
+import { useProfessionalSubjects, useProfessionalSubjectTemplates, useGrades, useAttendance } from '@/hooks/useData';
 import {
   Dialog,
   DialogContent,
@@ -33,38 +33,144 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
   const [selectedStudent, setSelectedStudent] = useState('');
   const [showPeriodDialog, setShowPeriodDialog] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<string>('anual');
+  const [selectedSchoolYear, setSelectedSchoolYear] = useState<1 | 2 | 3>(1);
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
   const { grades } = useGrades();
   const { attendance } = useAttendance();
   const { getProfessionalSubjects } = useProfessionalSubjects();
+  const { templates } = useProfessionalSubjectTemplates();
+
+  const schoolYearOptions: Array<{ value: 1 | 2 | 3; label: string }> = [
+    { value: 1, label: '1º ano' },
+    { value: 2, label: '2º ano' },
+    { value: 3, label: '3º ano' },
+  ];
 
   const selectedClassData = useMemo(
     () => classes.find(cls => cls.id === selectedClass) || null,
     [classes, selectedClass]
   );
 
+  useEffect(() => {
+    if (!selectedClass) {
+      setSelectedSchoolYear(1);
+      return;
+    }
+    const defaultYear = selectedClassData?.currentYear ?? 1;
+    const normalizedYear = [1, 2, 3].includes(defaultYear as number)
+      ? (defaultYear as 1 | 2 | 3)
+      : 1;
+    setSelectedSchoolYear(normalizedYear);
+  }, [selectedClass, selectedClassData?.currentYear]);
+
+  const parseLocalDate = (value: string) => new Date(`${value}T00:00:00`);
+  const addMonths = (date: Date, months: number) => {
+    const next = new Date(date);
+    next.setMonth(next.getMonth() + months);
+    return next;
+  };
+  const addYears = (date: Date, years: number) => {
+    const next = new Date(date);
+    next.setFullYear(next.getFullYear() + years);
+    return next;
+  };
+  const getQuarterRange = (startYearDate: string | undefined, schoolYear: number, quarter: string) => {
+    if (!startYearDate) return null;
+    const index = QUARTERS.indexOf(quarter);
+    if (index < 0) return null;
+    const startDate = parseLocalDate(startYearDate);
+    if (Number.isNaN(startDate.getTime())) return null;
+    const yearOffset = schoolYear - 1;
+    const currentYearStart = addYears(startDate, yearOffset);
+    const rangeStart = addMonths(currentYearStart, index * 2);
+    const rangeEnd = addMonths(currentYearStart, index * 2 + 2);
+    return { start: rangeStart, end: rangeEnd };
+  };
+  const getSchoolYearRange = (startYearDate: string | undefined, schoolYear: number) => {
+    if (!startYearDate) return null;
+    const startDate = parseLocalDate(startYearDate);
+    if (Number.isNaN(startDate.getTime())) return null;
+    const yearOffset = schoolYear - 1;
+    const yearStart = addYears(startDate, yearOffset);
+    const yearEnd = addMonths(yearStart, 8);
+    return { start: yearStart, end: yearEnd };
+  };
+  const isDateInRange = (value: string, range: { start: Date; end: Date } | null) => {
+    if (!range) return true;
+    const date = parseLocalDate(value);
+    if (Number.isNaN(date.getTime())) return false;
+    return date >= range.start && date < range.end;
+  };
+
   const classStudents = useMemo(
     () => (selectedClass ? students.filter(s => s.classId === selectedClass) : []),
     [selectedClass, students]
   );
 
+  const fallbackStartYearDate =
+    selectedClassData?.startCalendarYear ? `${selectedClassData.startCalendarYear}-02-01` : undefined;
+  const effectiveStartYearDate = selectedClassData?.startYearDate || fallbackStartYearDate;
+  const schoolYearRange = useMemo(
+    () => getSchoolYearRange(effectiveStartYearDate, selectedSchoolYear),
+    [effectiveStartYearDate, selectedSchoolYear],
+  );
+
   const classGrades = useMemo(
-    () => (selectedClass ? grades.filter(g => g.classId === selectedClass) : []),
-    [grades, selectedClass]
+    () =>
+      selectedClass
+        ? grades.filter(
+            g => g.classId === selectedClass && (g.schoolYear ?? 1) === selectedSchoolYear
+          )
+        : [],
+    [grades, selectedClass, selectedSchoolYear]
   );
 
   const classIncidents = useMemo(
-    () => (selectedClass ? incidents.filter(i => i.classId === selectedClass) : []),
-    [incidents, selectedClass]
+    () =>
+      selectedClass
+        ? incidents.filter(
+            i =>
+              i.classId === selectedClass &&
+              isDateInRange(i.date, schoolYearRange)
+          )
+        : [],
+    [incidents, selectedClass, schoolYearRange]
   );
 
   const classAttendance = useMemo(
-    () => (selectedClass ? attendance.filter(a => a.classId === selectedClass) : []),
-    [attendance, selectedClass]
+    () =>
+      selectedClass
+        ? attendance.filter(
+            a =>
+              a.classId === selectedClass &&
+              isDateInRange(a.date, schoolYearRange)
+          )
+        : [],
+    [attendance, selectedClass, schoolYearRange]
   );
 
-  const professionalSubjects = useMemo(() => selectedClass ? getProfessionalSubjects(selectedClass) : [], [selectedClass, getProfessionalSubjects]);
+  const templateSubjects = useMemo(() => {
+    if (!selectedClassData?.templateId) return [];
+    const template = templates.find((t) => t.id === selectedClassData.templateId);
+    const yearData = template?.subjectsByYear.find((y) => y.year === selectedSchoolYear);
+    return yearData?.subjects ?? [];
+  }, [templates, selectedClassData?.templateId, selectedSchoolYear]);
+
+  const manualSubjects = useMemo(
+    () => (selectedClass ? getProfessionalSubjects(selectedClass) : []),
+    [selectedClass, getProfessionalSubjects],
+  );
+
+  const professionalSubjects = useMemo(() => {
+    const unique = new Set<string>();
+    [...templateSubjects, ...manualSubjects].forEach((subject) => {
+      if (subject?.trim()) {
+        unique.add(subject.trim());
+      }
+    });
+    return Array.from(unique);
+  }, [templateSubjects, manualSubjects]);
   const reportSubjects = useMemo(() => {
     if (!selectedClassData) return [];
     const gradeSubjects = [...new Set(classGrades.map((grade) => grade.subject))];
@@ -138,12 +244,23 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
 
     setIsGenerating(true);
     try {
+      const periodRange =
+        selectedPeriod !== 'anual'
+          ? getQuarterRange(effectiveStartYearDate, selectedSchoolYear, selectedPeriod)
+          : schoolYearRange;
+      const reportAttendance = classAttendance.filter((record) =>
+        isDateInRange(record.date, periodRange),
+      );
+      const reportIncidents = classIncidents.filter((incident) =>
+        isDateInRange(incident.date, periodRange),
+      );
+
       await generateProfessionalClassReportPDF(
         selectedClassData,
         classStudents,
         classGrades,
-        classIncidents,
-        classAttendance,
+        reportIncidents,
+        reportAttendance,
         professionalSubjects,
         selectedPeriod
       );
@@ -247,6 +364,26 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
               </Select>
             </div>
 
+            <div className="space-y-2">
+              <Label>Ano da turma</Label>
+              <Select
+                value={String(selectedSchoolYear)}
+                onValueChange={(value) => setSelectedSchoolYear(Number(value) as 1 | 2 | 3)}
+                disabled={!selectedClass}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o ano" />
+                </SelectTrigger>
+                <SelectContent>
+                  {schoolYearOptions.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {selectedClassData ? (
               <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground space-y-2">
                 <div className="flex items-center justify-between">
@@ -313,6 +450,26 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
                         </SelectItem>
                       ))
                   )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Ano da turma</Label>
+              <Select
+                value={String(selectedSchoolYear)}
+                onValueChange={(value) => setSelectedSchoolYear(Number(value) as 1 | 2 | 3)}
+                disabled={!selectedClass}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o ano" />
+                </SelectTrigger>
+                <SelectContent>
+                  {schoolYearOptions.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

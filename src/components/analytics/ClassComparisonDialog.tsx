@@ -37,6 +37,7 @@ export function ClassComparisonDialog({
   const bestFrequency = Math.max(...comparisonData.map(c => c.frequency));
   const mostExcellence = Math.max(...comparisonData.map(c => c.classifications.excelencia));
   const leastCritical = Math.min(...comparisonData.map(c => c.classifications.critico));
+  const bestGrowth = Math.max(...comparisonData.map(c => c.growth ?? 0));
   
   const MetricRow = ({ 
     label, 
@@ -152,6 +153,13 @@ export function ClassComparisonDialog({
                   bestValue={Math.min(...comparisonData.map(c => c.incidentCount))}
                   format={(v) => v.toString()}
                   higherIsBetter={false}
+                />
+                <MetricRow
+                  label="Crescimento"
+                  values={comparisonData.map(c => c.growth ?? 0)}
+                  bestValue={bestGrowth}
+                  format={(v) => v.toFixed(1)}
+                  higherIsBetter={true}
                 />
               </div>
             </CardContent>

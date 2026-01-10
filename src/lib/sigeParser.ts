@@ -278,6 +278,7 @@ export interface ImportableGrade {
     classId: string;
     subject: string;
     quarter: string;
+    schoolYear?: 1 | 2 | 3;
     grade: number;
     selected: boolean; // se o usuário quer importar
 }

@@ -36,13 +36,9 @@ export const TopBar = () => {
   };
 
   return (
-    <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background px-6">
+    <header className="sticky top-0 z-10 flex h-16 items-center gap-4 bg-background px-6">
       <SidebarTrigger />
       <div className="flex-1" />
-      <Button variant="ghost" size="icon" className="relative">
-        <Bell className="h-5 w-5" />
-        <span className="absolute top-1 right-1 h-2 w-2 bg-destructive rounded-full" />
-      </Button>
       <Button
         variant="ghost"
         size="icon"
@@ -53,14 +49,14 @@ export const TopBar = () => {
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="gap-2">
+          <Button variant="ghost" className="gap-2 p-1">
             <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-primary text-primary-foreground">
+              <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                 {profile ? getInitials(profile.name) : user?.email?.[0]?.toUpperCase() || 'U'}
               </AvatarFallback>
             </Avatar>
-            <div className="flex flex-col items-start text-sm">
-              <span className="font-medium">{profile?.name || user?.email}</span>
+            <div className="flex flex-col items-start text-sm pr-2">
+              <span className="font-medium leading-none">{profile?.name || user?.email}</span>
             </div>
           </Button>
         </DropdownMenuTrigger>

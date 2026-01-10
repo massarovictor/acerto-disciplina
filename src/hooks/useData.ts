@@ -33,7 +33,6 @@ import {
   mapTemplateFromDb,
   mapTemplateToDb,
 } from '@/services/supabase/mappers';
-import { buildClassNumber } from '@/lib/classNumber';
 
 const logError = (scope: string, error: unknown) => {
   console.error(`[Supabase:${scope}]`, error);
@@ -87,6 +86,33 @@ export function useProfiles() {
   return { profiles, refreshProfiles: fetchProfiles };
 }
 
+export function useAuthorizedEmails() {
+  const { user } = useAuth();
+  const [authorizedEmails, setAuthorizedEmails] = useState<{ email: string; role: string }[]>([]);
+
+  const fetchAuthorizedEmails = useCallback(async () => {
+    if (!user?.id) return;
+
+    const { data, error } = await supabase
+      .from('authorized_emails')
+      .select('email, role')
+      .order('email');
+
+    if (error) {
+      logError('authorized_emails.select', error);
+      return;
+    }
+
+    setAuthorizedEmails(data || []);
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchAuthorizedEmails();
+  }, [fetchAuthorizedEmails]);
+
+  return { authorizedEmails, refreshAuthorizedEmails: fetchAuthorizedEmails };
+}
+
 export function useClasses() {
   const { user } = useAuth();
   const [classes, setClasses] = useState<Class[]>([]);
@@ -133,31 +159,10 @@ export function useClasses() {
     };
   }, [user?.id, fetchClasses]);
 
-  const getClassNumberFromData = (
-    classData: Pick<Class, 'course' | 'startYearDate' | 'startYear'>,
-  ): string => {
-    const classNumber = buildClassNumber({
-      course: classData.course,
-      startYearDate: classData.startYearDate,
-      startYear: classData.startYear,
-    });
-
-    if (!classNumber) {
-      throw new Error('Dados insuficientes para gerar o numero da turma.');
-    }
-
-    return classNumber;
-  };
-
-  const addClass = async (classData: Omit<Class, 'id' | 'classNumber'>) => {
+  const addClass = async (classData: Omit<Class, 'id'>) => {
     if (!user?.id) return null;
 
-    const classNumber = getClassNumberFromData(classData);
-    const payload = mapClassToDb(
-      { ...classData, classNumber },
-      user.id,
-      { omitName: true },
-    );
+    const payload = mapClassToDb(classData, user.id);
 
     const { data, error } = await supabase
       .from('classes')
@@ -183,17 +188,15 @@ export function useClasses() {
     const hasArchivedAt = Object.prototype.hasOwnProperty.call(updates, 'archivedAt');
     const hasArchivedReason = Object.prototype.hasOwnProperty.call(updates, 'archivedReason');
     const hasTemplateId = Object.prototype.hasOwnProperty.call(updates, 'templateId');
+    const hasName = Object.prototype.hasOwnProperty.call(updates, 'name');
 
     const nextCourse = updates.course ?? base.course;
     const nextStartYear = updates.startYear ?? base.startYear;
     const nextStartYearDate = updates.startYearDate ?? base.startYearDate;
+    const nextStartCalendarYear = updates.startCalendarYear ?? base.startCalendarYear;
+    const nextEndCalendarYear = updates.endCalendarYear ?? base.endCalendarYear;
+    const nextLetter = updates.letter ?? base.letter;
     const nextTemplateId = hasTemplateId ? updates.templateId ?? null : base.templateId;
-    const nextClassNumber =
-      buildClassNumber({
-        course: nextCourse,
-        startYearDate: nextStartYearDate,
-        startYear: nextStartYear,
-      }) ?? base.classNumber;
 
     const payload = mapClassToDb(
       {
@@ -201,12 +204,14 @@ export function useClasses() {
         series: updates.series ?? base.series,
         letter: updates.letter ?? base.letter,
         course: nextCourse,
-        classNumber: nextClassNumber,
         directorId: updates.directorId ?? base.directorId,
+        directorEmail: updates.directorEmail ?? base.directorEmail,
         active: updates.active ?? base.active,
         startYear: nextStartYear,
         currentYear: updates.currentYear ?? base.currentYear,
         startYearDate: nextStartYearDate,
+        startCalendarYear: nextStartCalendarYear,
+        endCalendarYear: nextEndCalendarYear,
         archived: updates.archived ?? base.archived,
         archivedAt: hasArchivedAt ? updates.archivedAt ?? null : base.archivedAt ?? null,
         archivedReason: hasArchivedReason
@@ -215,7 +220,7 @@ export function useClasses() {
         templateId: nextTemplateId,
       },
       user.id,
-      { omitName: true },
+      { omitName: !hasName },
     );
 
     const { data, error } = await supabase
@@ -439,7 +444,7 @@ export function useGrades() {
     const { data, error } = await supabase
       .from('grades')
       .upsert(payload, {
-        onConflict: 'student_id,class_id,subject,quarter',
+        onConflict: 'student_id,class_id,subject,quarter,school_year',
       })
       .select('*')
       .single();
@@ -472,6 +477,7 @@ export function useGrades() {
         classId: updates.classId ?? base.classId,
         subject: updates.subject ?? base.subject,
         quarter: updates.quarter ?? base.quarter,
+        schoolYear: updates.schoolYear ?? base.schoolYear,
         grade: updates.grade ?? base.grade,
         observation: updates.observation ?? base.observation,
       },
@@ -702,12 +708,9 @@ export function useIncidents() {
   ) => {
     if (!user?.id) return null;
 
+    const { followUps, comments, ...incidentData } = incident;
     const payload = mapIncidentToDb(
-      {
-        ...incident,
-        followUps: undefined,
-        comments: undefined,
-      },
+      incidentData,
       user.id,
       user.id,
     );

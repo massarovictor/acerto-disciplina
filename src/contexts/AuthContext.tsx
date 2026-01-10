@@ -9,6 +9,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
+  isAdmin: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -89,8 +90,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     supabase.auth.signOut();
   };
 
+  const isAdmin = () => {
+    return profile?.role === 'admin';
+  };
+
   return (
-    <AuthContext.Provider value={{ user, profile, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, profile, login, logout, isLoading, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );

@@ -91,14 +91,14 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
     const classData = classes.find(c => c.id === classId);
     if (!classData) return 'Turma não encontrada';
     const archived = classData.archived ? ' (Arquivada)' : '';
-    return `${classData.classNumber} - ${classData.name}${archived}`;
+    return `${classData.name}${archived}`;
   };
 
   const filteredStudents = useMemo(() => students.filter(student => {
     // Se não há termo de busca (ou apenas espaços), mostrar todos (respeitando apenas filtro de turma)
     const trimmedSearch = searchTerm.trim();
     const classData = classes.find(c => c.id === student.classId);
-    const className = classData ? `${classData.classNumber} - ${classData.name}` : '';
+    const className = classData ? classData.name : '';
     const archived = classData?.archived ? ' (Arquivada)' : '';
     const fullClassName = `${className}${archived}`;
 
@@ -116,12 +116,22 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
   const getAcademicStatusBadge = (student: Student) => {
     try {
       const classData = classes.find(c => c.id === student.classId);
-      if (!classData || !classData.startYearDate || !classData.currentYear) {
+      const startYearDate =
+        classData?.startYearDate ||
+        (classData?.startCalendarYear ? `${classData.startCalendarYear}-02-01` : undefined);
+
+      if (!classData || !startYearDate || !classData.currentYear) {
         return null;
       }
 
-      const academicYear = getAcademicYear(classData.startYearDate, classData.currentYear);
-      const status = calculateStudentStatus(grades, student.id, student.classId, academicYear);
+      const academicYear = getAcademicYear(startYearDate, classData.currentYear);
+      const status = calculateStudentStatus(
+        grades,
+        student.id,
+        student.classId,
+        academicYear,
+        classData.currentYear,
+      );
 
       if (status.isPending) {
         return (
@@ -413,7 +423,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar por nome, número da turma, matrícula ou CPF..."
+                  placeholder="Buscar por nome, turma, matrícula ou CPF..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -429,7 +439,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                   <SelectItem value="all">Todas as turmas</SelectItem>
                   {classes.filter(c => !c.archived).map(cls => (
                     <SelectItem key={cls.id} value={cls.id}>
-                      {cls.classNumber} - {cls.name}
+                      {cls.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1049,7 +1059,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                     .filter(c => c.active && !c.archived && c.id !== transferringStudent?.classId)
                     .map(cls => (
                       <SelectItem key={cls.id} value={cls.id}>
-                        {cls.classNumber} - {cls.name}
+                        {cls.name}
                       </SelectItem>
                     ))
                   }

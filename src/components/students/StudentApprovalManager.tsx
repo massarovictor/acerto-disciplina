@@ -1,14 +1,14 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useClasses, useStudents, useGrades, useProfessionalSubjects } from '@/hooks/useData';
+import { useClasses, useStudents, useGrades, useProfessionalSubjects, useProfessionalSubjectTemplates } from '@/hooks/useData';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle2, XCircle, AlertTriangle, RefreshCw, Clock, Users, BookOpen } from 'lucide-react';
-import { calculateClassAcademicStatus, checkClassQuarterGrades, QuarterCheckResult } from '@/lib/approvalCalculator';
+import { calculateClassAcademicStatus, QuarterCheckResult } from '@/lib/approvalCalculator';
 import { getAcademicYear } from '@/lib/classYearCalculator';
 import { generateQuarterIncidents, checkLowPerformanceStudents } from '@/lib/autoIncidentGenerator';
 import { useIncidents } from '@/hooks/useData';
@@ -21,6 +21,7 @@ export const StudentApprovalManager = () => {
   const { students } = useStudents();
   const { grades } = useGrades();
   const { getProfessionalSubjects } = useProfessionalSubjects();
+  const { templates } = useProfessionalSubjectTemplates();
   const { incidents, addIncident } = useIncidents();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -36,12 +37,44 @@ export const StudentApprovalManager = () => {
 
   const classStudents = students.filter((s) => s.classId === selectedClass);
   const selectedClassData = classes.find((c) => c.id === selectedClass);
-  const professionalSubjects = selectedClass ? getProfessionalSubjects(selectedClass) : [];
-  const expectedSubjects = Array.from(
-    new Set([
-      ...SUBJECT_AREAS.flatMap((area) => area.subjects),
-      ...professionalSubjects,
-    ]),
+  const selectedSchoolYear = useMemo(() => {
+    const defaultYear = selectedClassData?.currentYear ?? 1;
+    return [1, 2, 3].includes(defaultYear as number)
+      ? (defaultYear as 1 | 2 | 3)
+      : 1;
+  }, [selectedClassData?.currentYear]);
+
+  const templateSubjects = useMemo(() => {
+    if (!selectedClassData?.templateId) return [];
+    const template = templates.find((t) => t.id === selectedClassData.templateId);
+    const yearData = template?.subjectsByYear.find((y) => y.year === selectedSchoolYear);
+    return yearData?.subjects ?? [];
+  }, [templates, selectedClassData?.templateId, selectedSchoolYear]);
+
+  const manualSubjects = useMemo(
+    () => (selectedClass ? getProfessionalSubjects(selectedClass) : []),
+    [selectedClass, getProfessionalSubjects],
+  );
+
+  const professionalSubjects = useMemo(() => {
+    const unique = new Set<string>();
+    [...templateSubjects, ...manualSubjects].forEach((subject) => {
+      if (subject?.trim()) {
+        unique.add(subject.trim());
+      }
+    });
+    return Array.from(unique);
+  }, [templateSubjects, manualSubjects]);
+
+  const expectedSubjects = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...SUBJECT_AREAS.flatMap((area) => area.subjects),
+          ...professionalSubjects,
+        ]),
+      ),
+    [professionalSubjects],
   );
 
   // === HANDLERS POR BIMESTRE ===
@@ -59,7 +92,8 @@ export const StudentApprovalManager = () => {
       grades,
       classStudents,
       selectedClass,
-      selectedQuarter
+      selectedQuarter,
+      selectedSchoolYear
     );
 
     setQuarterResults(results);
@@ -71,7 +105,8 @@ export const StudentApprovalManager = () => {
               (grade) =>
                 grade.studentId === student.id &&
                 grade.classId === selectedClass &&
-                grade.quarter === selectedQuarter
+                grade.quarter === selectedQuarter &&
+                (grade.schoolYear ?? 1) === selectedSchoolYear
             )
             .map((grade) => grade.subject)
         );
@@ -128,7 +163,8 @@ export const StudentApprovalManager = () => {
       selectedClassData,
       selectedQuarter,
       incidents,
-      user.id
+      user.id,
+      selectedSchoolYear
     );
 
     if (newIncidents.length === 0) {
@@ -167,7 +203,11 @@ export const StudentApprovalManager = () => {
       return;
     }
 
-    if (!selectedClassData.startYearDate || !selectedClassData.currentYear) {
+    const startYearDate =
+      selectedClassData.startYearDate ||
+      (selectedClassData.startCalendarYear ? `${selectedClassData.startCalendarYear}-02-01` : undefined);
+
+    if (!startYearDate || !selectedClassData.currentYear) {
       toast({
         title: 'Erro',
         description: 'Esta turma não possui dados de ano letivo configurados.',
@@ -177,7 +217,7 @@ export const StudentApprovalManager = () => {
     }
 
     const academicYear = getAcademicYear(
-      selectedClassData.startYearDate,
+      startYearDate,
       selectedClassData.currentYear
     );
 
@@ -186,7 +226,8 @@ export const StudentApprovalManager = () => {
       grades,
       studentIds,
       selectedClass,
-      academicYear
+      academicYear,
+      selectedSchoolYear
     );
 
     const statusesMap: Record<string, any> = {};
@@ -255,7 +296,7 @@ export const StudentApprovalManager = () => {
                   .filter((c) => !c.archived && c.active)
                   .map((cls) => (
                     <SelectItem key={cls.id} value={cls.id}>
-                      {cls.classNumber} - {cls.name}
+                      {cls.name}
                     </SelectItem>
                   ))}
               </SelectContent>

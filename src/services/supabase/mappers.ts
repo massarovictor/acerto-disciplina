@@ -26,12 +26,14 @@ export interface ClassRow {
   series: string;
   letter: string | null;
   course: string | null;
-  class_number: string;
   director_id: string | null;
+  director_email: string | null;
   active: boolean;
   start_year: number | null;
   current_year: number | null;
   start_year_date: string | null;
+  start_calendar_year: number | null;
+  end_calendar_year: number | null;
   archived: boolean;
   archived_at: string | null;
   archived_reason: string | null;
@@ -39,6 +41,7 @@ export interface ClassRow {
   created_at: string;
   updated_at: string;
 }
+
 
 export interface StudentRow {
   id: string;
@@ -64,6 +67,7 @@ export interface GradeRow {
   class_id: string;
   subject: string;
   quarter: string;
+  school_year: number | null;
   grade: number;
   observation: string | null;
   recorded_at: string;
@@ -167,7 +171,7 @@ export const mapClassFromDb = (row: ClassRow): Class => {
   // Se temos start_year_date e start_year, calcular o ano atual dinamicamente
   // Senão, usar o valor manual do banco (para compatibilidade com turmas antigas)
   let computedCurrentYear: Class['currentYear'];
-  
+
   if (row.start_year_date && row.start_year) {
     try {
       computedCurrentYear = calculateCurrentYear(
@@ -189,12 +193,14 @@ export const mapClassFromDb = (row: ClassRow): Class => {
     series: row.series,
     letter: row.letter ?? undefined,
     course: row.course ?? undefined,
-    classNumber: row.class_number,
     directorId: row.director_id ?? undefined,
+    directorEmail: row.director_email ?? undefined,
     active: row.active,
     startYear: row.start_year as Class['startYear'],
     currentYear: computedCurrentYear,
     startYearDate: row.start_year_date ?? undefined,
+    startCalendarYear: row.start_calendar_year ?? undefined,
+    endCalendarYear: row.end_calendar_year ?? undefined,
     archived: row.archived,
     archivedAt: row.archived_at ?? undefined,
     archivedReason: row.archived_reason ?? undefined,
@@ -212,17 +218,20 @@ export const mapClassToDb = (
   series: data.series,
   letter: data.letter ?? null,
   course: data.course ?? null,
-  class_number: data.classNumber,
   director_id: data.directorId ?? null,
+  director_email: data.directorEmail ?? null,
   active: data.active,
   start_year: data.startYear ?? null,
   current_year: data.currentYear ?? null,
   start_year_date: data.startYearDate ?? null,
+  start_calendar_year: data.startCalendarYear ?? null,
+  end_calendar_year: data.endCalendarYear ?? null,
   archived: data.archived ?? false,
   archived_at: data.archivedAt ?? null,
   archived_reason: data.archivedReason ?? null,
   template_id: data.templateId ?? null,
 });
+
 
 export const mapStudentFromDb = (row: StudentRow): Student => ({
   id: row.id,
@@ -263,6 +272,7 @@ export const mapGradeFromDb = (row: GradeRow): Grade => ({
   classId: row.class_id,
   subject: row.subject,
   quarter: row.quarter,
+  schoolYear: (row.school_year ?? 1) as Grade['schoolYear'],
   grade: row.grade,
   observation: row.observation ?? undefined,
   recordedAt: row.recorded_at,
@@ -277,6 +287,7 @@ export const mapGradeToDb = (
   class_id: data.classId,
   subject: data.subject,
   quarter: data.quarter,
+  school_year: data.schoolYear ?? 1,
   grade: data.grade,
   observation: data.observation ?? null,
   recorded_at: new Date().toISOString(),

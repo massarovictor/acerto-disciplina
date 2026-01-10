@@ -28,7 +28,6 @@ const ArchivedClasses = () => {
     const searchLower = searchTerm.toLowerCase();
     return (
       cls.name.toLowerCase().includes(searchLower) ||
-      cls.classNumber.toLowerCase().includes(searchLower) ||
       cls.course?.toLowerCase().includes(searchLower) ||
       cls.archivedReason?.toLowerCase().includes(searchLower)
     );
@@ -90,7 +89,7 @@ const ArchivedClasses = () => {
             <div className="relative w-[300px]">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por nome, número ou curso..."
+                placeholder="Buscar por nome, curso ou motivo..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -113,7 +112,6 @@ const ArchivedClasses = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Número</TableHead>
                   <TableHead>Nome</TableHead>
                   <TableHead>Curso</TableHead>
                   <TableHead>Alunos</TableHead>
@@ -125,7 +123,6 @@ const ArchivedClasses = () => {
               <TableBody>
                 {filteredClasses.map((cls) => (
                   <TableRow key={cls.id}>
-                    <TableCell className="font-medium">{cls.classNumber}</TableCell>
                     <TableCell>{cls.name}</TableCell>
                     <TableCell>{cls.course || '-'}</TableCell>
                     <TableCell>{getClassStudentsCount(cls.id)}</TableCell>
@@ -181,10 +178,6 @@ const ArchivedClasses = () => {
               return (
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Número</p>
-                      <p className="text-lg">{cls.classNumber}</p>
-                    </div>
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Nome</p>
                       <p className="text-lg">{cls.name}</p>

@@ -301,7 +301,7 @@ export const StudentsRegister = () => {
       console.log(`[IMPORTAÇÃO] Linha ${row.rowNumber}: Processando`, row.data);
       
       try {
-        // Usar o classId que foi validado pela planilha (baseado no número da turma)
+        // Usar o classId que foi validado pela planilha (baseado no nome da turma)
         if (!row.data.classId || row.data.classId === '') {
           const errorMsg = `Linha ${row.rowNumber}: ❌ classId VAZIO ou inválido`;
           console.error(errorMsg, row);
@@ -317,7 +317,7 @@ export const StudentsRegister = () => {
         if (!classExists) {
           const errorMsg = `Linha ${row.rowNumber}: ❌ Turma com ID "${row.data.classId}" não encontrada no sistema`;
           console.error(errorMsg, row);
-          console.error(`[IMPORTAÇÃO] Turmas disponíveis:`, classes.map(c => ({ id: c.id, name: c.name, classNumber: c.classNumber })));
+          console.error(`[IMPORTAÇÃO] Turmas disponíveis:`, classes.map(c => ({ id: c.id, name: c.name })));
           errorMessages.push(errorMsg);
           errors++;
           continue;
@@ -330,7 +330,7 @@ export const StudentsRegister = () => {
           continue;
         }
 
-        console.log(`[IMPORTAÇÃO] Linha ${row.rowNumber}: ✅ Turma encontrada:`, { id: classExists.id, name: classExists.name, classNumber: classExists.classNumber });
+        console.log(`[IMPORTAÇÃO] Linha ${row.rowNumber}: ✅ Turma encontrada:`, { id: classExists.id, name: classExists.name });
 
         // Verificar campos obrigatórios
         if (!row.data.name || !row.data.birthDate || !row.data.gender) {
@@ -345,7 +345,6 @@ export const StudentsRegister = () => {
           name: row.data.name,
           classId: row.data.classId,
           className: classExists.name,
-          classNumber: classExists.classNumber,
         });
 
         await addStudent({
@@ -469,7 +468,7 @@ export const StudentsRegister = () => {
                   <SelectContent>
                     {classes.filter(c => c.active && !c.archived).map(cls => (
                       <SelectItem key={cls.id} value={cls.id}>
-                        {cls.classNumber} - {cls.name}
+                        {cls.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -610,15 +609,15 @@ export const StudentsRegister = () => {
                 <SelectValue placeholder="Selecione a turma para importação" />
               </SelectTrigger>
               <SelectContent>
-                {classes.filter(c => c.active && !c.archived).map(cls => (
-                  <SelectItem key={cls.id} value={cls.id}>
-                    {cls.classNumber} - {cls.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                    {classes.filter(c => c.active && !c.archived).map(cls => (
+                      <SelectItem key={cls.id} value={cls.id}>
+                        {cls.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
             <p className="text-sm text-muted-foreground">
-              O número da turma selecionada será pré-preenchido no modelo de planilha e usado para todos os alunos importados.
+              O nome da turma selecionada será pré-preenchido no modelo de planilha e usado para todos os alunos importados.
             </p>
           </div>
 
@@ -723,7 +722,7 @@ export const StudentsRegister = () => {
                     <TableRow>
                       <TableHead className="w-16">Linha</TableHead>
                       <TableHead>Nome</TableHead>
-                      <TableHead>Número da Turma</TableHead>
+                      <TableHead>Turma</TableHead>
                       <TableHead>Data Nasc.</TableHead>
                       <TableHead>Sexo</TableHead>
                       <TableHead>Status</TableHead>
@@ -735,7 +734,7 @@ export const StudentsRegister = () => {
                         <TableCell className="font-medium">{row.rowNumber}</TableCell>
                         <TableCell>{row.data.name || '-'}</TableCell>
                         <TableCell>
-                          {classes.find(c => c.id === row.data.classId)?.classNumber || '-'}
+                          {classes.find(c => c.id === row.data.classId)?.name || '-'}
                         </TableCell>
                         <TableCell>
                           {row.data.birthDate

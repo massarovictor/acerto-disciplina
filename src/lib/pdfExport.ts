@@ -3,29 +3,70 @@ import html2canvas from 'html2canvas';
 
 export const exportSlideAsPDF = async (elementId: string, fileName: string) => {
   const element = document.getElementById(elementId);
-  if (!element) {
-    console.error('Element not found');
-    return;
-  }
+  if (!element) return;
 
   try {
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      logging: false,
-    });
-
-    const imgData = canvas.toDataURL('image/png');
+    const canvas = await html2canvas(element, { scale: 1, useCORS: true });
+    const imgData = canvas.toDataURL('image/jpeg', 0.8);
     const pdf = new jsPDF({
       orientation: 'landscape',
       unit: 'px',
       format: [canvas.width, canvas.height],
     });
-
-    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+    pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
     pdf.save(fileName);
   } catch (error) {
     console.error('Error exporting PDF:', error);
+  }
+};
+
+/**
+ * Sequential PDF Export to avoid browser freezing
+ */
+let currentPDF: jsPDF | null = null;
+
+export const startSequentialPDF = () => {
+  currentPDF = new jsPDF({
+    orientation: 'landscape',
+    unit: 'px',
+  });
+  return currentPDF;
+};
+
+export const addSlideToPDF = async (elementId: string, isFirst: boolean) => {
+  if (!currentPDF) return false;
+
+  const element = document.getElementById(elementId);
+  if (!element) return false;
+
+  try {
+    const canvas = await html2canvas(element, {
+      scale: 1,
+      useCORS: true,
+      logging: false,
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.6); // Slightly more compression
+
+    if (isFirst) {
+      (currentPDF as any).internal.pageSize.width = canvas.width;
+      (currentPDF as any).internal.pageSize.height = canvas.height;
+    } else {
+      currentPDF.addPage([canvas.width, canvas.height], 'landscape');
+    }
+
+    currentPDF.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height, undefined, 'FAST');
+    return true;
+  } catch (error) {
+    console.error('Error adding slide to PDF:', error);
+    return false;
+  }
+};
+
+export const finishSequentialPDF = (fileName: string) => {
+  if (currentPDF) {
+    currentPDF.save(fileName);
+    currentPDF = null;
   }
 };
 

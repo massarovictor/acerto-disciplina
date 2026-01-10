@@ -13,6 +13,13 @@ export const AppLayout = () => {
           <main className="flex-1 overflow-auto bg-background">
             <Outlet />
           </main>
+          <footer className="p-4 border-t bg-background text-center">
+            <p className="text-[10px] text-muted-foreground/60">
+              © {new Date().getFullYear()} Todos os direitos reservados —
+              Massaro Victor Pinheiro Alves —
+              victormassaro00@gmail.com
+            </p>
+          </footer>
         </div>
       </div>
     </SidebarProvider>

@@ -1,0 +1,424 @@
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from '@/components/ui/dialog';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/services/supabase';
+import { Search, Plus, Edit, Trash2, Shield, User, GraduationCap } from 'lucide-react';
+
+interface AuthorizedEmail {
+    email: string;
+    role: string;
+    created_at: string;
+}
+
+export const UsersManage = () => {
+    const { toast } = useToast();
+    const [users, setUsers] = useState<AuthorizedEmail[]>([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
+    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+    const [editingUser, setEditingUser] = useState<AuthorizedEmail | null>(null);
+    const [deletingUser, setDeletingUser] = useState<AuthorizedEmail | null>(null);
+    const [formData, setFormData] = useState({ email: '', role: 'professor' });
+
+    const fetchUsers = async () => {
+        setIsLoading(true);
+        const { data, error } = await supabase
+            .from('authorized_emails')
+            .select('*')
+            .order('email');
+
+        if (error) {
+            console.error('Error fetching users:', error);
+            toast({
+                title: 'Erro',
+                description: 'Não foi possível carregar os usuários.',
+                variant: 'destructive',
+            });
+        } else {
+            setUsers(data || []);
+        }
+        setIsLoading(false);
+    };
+
+    useEffect(() => {
+        fetchUsers();
+    }, []);
+
+    const filteredUsers = users.filter(
+        (user) =>
+            user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            user.role.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const handleAddUser = async () => {
+        if (!formData.email.trim()) {
+            toast({
+                title: 'Erro',
+                description: 'Digite o email do usuário.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        const { error } = await supabase.from('authorized_emails').insert({
+            email: formData.email.toLowerCase().trim(),
+            role: formData.role,
+        });
+
+        if (error) {
+            if (error.code === '23505') {
+                toast({
+                    title: 'Erro',
+                    description: 'Este email já está cadastrado.',
+                    variant: 'destructive',
+                });
+            } else {
+                toast({
+                    title: 'Erro',
+                    description: 'Não foi possível adicionar o usuário.',
+                    variant: 'destructive',
+                });
+            }
+            return;
+        }
+
+        toast({
+            title: 'Sucesso',
+            description: 'Usuário adicionado com sucesso.',
+        });
+        setIsAddDialogOpen(false);
+        setFormData({ email: '', role: 'professor' });
+        fetchUsers();
+    };
+
+    const handleUpdateUser = async () => {
+        if (!editingUser) return;
+
+        const { error } = await supabase
+            .from('authorized_emails')
+            .update({ role: formData.role })
+            .eq('email', editingUser.email);
+
+        if (error) {
+            toast({
+                title: 'Erro',
+                description: 'Não foi possível atualizar o usuário.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        // Also update the profile if exists
+        const { data: userData } = await supabase
+            .from('auth.users')
+            .select('id')
+            .eq('email', editingUser.email)
+            .single();
+
+        if (userData?.id) {
+            await supabase
+                .from('profiles')
+                .update({ role: formData.role })
+                .eq('id', userData.id);
+        }
+
+        toast({
+            title: 'Sucesso',
+            description: 'Usuário atualizado com sucesso.',
+        });
+        setEditingUser(null);
+        fetchUsers();
+    };
+
+    const handleDeleteUser = async () => {
+        if (!deletingUser) return;
+
+        const { error } = await supabase
+            .from('authorized_emails')
+            .delete()
+            .eq('email', deletingUser.email);
+
+        if (error) {
+            toast({
+                title: 'Erro',
+                description: 'Não foi possível remover o usuário.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        toast({
+            title: 'Sucesso',
+            description: 'Usuário removido da lista de autorizados.',
+        });
+        setDeletingUser(null);
+        fetchUsers();
+    };
+
+    const getRoleBadge = (role: string) => {
+        switch (role) {
+            case 'admin':
+                return (
+                    <Badge className="bg-purple-500/10 text-purple-700 border-purple-500/30">
+                        <Shield className="h-3 w-3 mr-1" />
+                        Admin
+                    </Badge>
+                );
+            case 'diretor':
+                return (
+                    <Badge className="bg-blue-500/10 text-blue-700 border-blue-500/30">
+                        <GraduationCap className="h-3 w-3 mr-1" />
+                        Diretor
+                    </Badge>
+                );
+            default:
+                return (
+                    <Badge variant="outline" className="bg-muted">
+                        <User className="h-3 w-3 mr-1" />
+                        Professor
+                    </Badge>
+                );
+        }
+    };
+
+    const adminCount = users.filter((u) => u.role === 'admin').length;
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h2 className="text-2xl font-bold">Gerenciar Usuários</h2>
+                    <p className="text-muted-foreground">
+                        Adicione, edite ou remova usuários autorizados no sistema.
+                    </p>
+                </div>
+                <Button onClick={() => setIsAddDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Adicionar Usuário
+                </Button>
+            </div>
+
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <CardTitle>Usuários Autorizados ({users.length})</CardTitle>
+                        <div className="relative w-64">
+                            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Buscar por email ou papel..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-10"
+                            />
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    {isLoading ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                            Carregando...
+                        </div>
+                    ) : filteredUsers.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                            Nenhum usuário encontrado.
+                        </div>
+                    ) : (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Email</TableHead>
+                                    <TableHead>Papel</TableHead>
+                                    <TableHead>Cadastrado em</TableHead>
+                                    <TableHead className="text-right">Ações</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredUsers.map((user) => (
+                                    <TableRow key={user.email}>
+                                        <TableCell className="font-medium">{user.email}</TableCell>
+                                        <TableCell>{getRoleBadge(user.role)}</TableCell>
+                                        <TableCell>
+                                            {new Date(user.created_at).toLocaleDateString('pt-BR')}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex gap-2 justify-end">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => {
+                                                        setEditingUser(user);
+                                                        setFormData({ email: user.email, role: user.role });
+                                                    }}
+                                                >
+                                                    <Edit className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => setDeletingUser(user)}
+                                                    disabled={user.role === 'admin' && adminCount <= 1}
+                                                    title={
+                                                        user.role === 'admin' && adminCount <= 1
+                                                            ? 'Não é possível remover o último admin'
+                                                            : 'Remover usuário'
+                                                    }
+                                                >
+                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Add User Dialog */}
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Adicionar Usuário</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="email">Email</Label>
+                            <Input
+                                id="email"
+                                type="email"
+                                placeholder="usuario@escola.com"
+                                value={formData.email}
+                                onChange={(e) =>
+                                    setFormData({ ...formData, email: e.target.value })
+                                }
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="role">Papel</Label>
+                            <Select
+                                value={formData.role}
+                                onValueChange={(value) =>
+                                    setFormData({ ...formData, role: value })
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="professor">Professor</SelectItem>
+                                    <SelectItem value="diretor">Diretor de Turma</SelectItem>
+                                    <SelectItem value="admin">Administrador</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleAddUser}>Adicionar</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit User Dialog */}
+            <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Editar Usuário</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label>Email</Label>
+                            <Input value={editingUser?.email || ''} disabled />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-role">Papel</Label>
+                            <Select
+                                value={formData.role}
+                                onValueChange={(value) =>
+                                    setFormData({ ...formData, role: value })
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="professor">Professor</SelectItem>
+                                    <SelectItem value="diretor">Diretor de Turma</SelectItem>
+                                    <SelectItem value="admin">Administrador</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditingUser(null)}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleUpdateUser}>Salvar</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Confirmation */}
+            <AlertDialog open={!!deletingUser} onOpenChange={(open) => !open && setDeletingUser(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Confirmar Remoção</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Tem certeza que deseja remover <strong>{deletingUser?.email}</strong> da lista de usuários autorizados?
+                            <br /><br />
+                            Este usuário não poderá mais acessar o sistema.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteUser}
+                            className="bg-destructive hover:bg-destructive/90"
+                        >
+                            Remover
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </div>
+    );
+};

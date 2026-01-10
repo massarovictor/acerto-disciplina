@@ -80,6 +80,32 @@ const validateAgeBySeries = (birthDate: string, series: string): { valid: boolea
   return { valid: true, age };
 };
 
+const normalizeClassLabel = (value: string): string =>
+  value.trim().replace(/\s+/g, ' ').toLowerCase();
+
+const buildLegacyClassNumber = (cls: Class): string | null => {
+  const letter = cls.letter?.trim().toUpperCase();
+  if (!letter) return null;
+
+  if (typeof cls.startCalendarYear === 'number' && typeof cls.endCalendarYear === 'number') {
+    return `${cls.startCalendarYear}-${cls.endCalendarYear}-${letter}`;
+  }
+
+  if (cls.startYearDate) {
+    const startDate = new Date(cls.startYearDate);
+    if (!Number.isNaN(startDate.getTime())) {
+      const startYearValue = startDate.getFullYear();
+      const startYearNumber = cls.startYear ?? 1;
+      if (startYearNumber >= 1 && startYearNumber <= 3) {
+        const endYearValue = startYearValue + (3 - startYearNumber);
+        return `${startYearValue}-${endYearValue}-${letter}`;
+      }
+    }
+  }
+
+  return null;
+};
+
 // Ler arquivo Excel/CSV
 export const readExcelFile = async (file: File): Promise<any[][]> => {
   return new Promise((resolve, reject) => {
@@ -128,7 +154,7 @@ export const validateImportData = (
   
   // Mapear índices das colunas
   const nameIndex = headers.findIndex(h => h.includes('nome'));
-  const classIndex = headers.findIndex(h => (h.includes('número') || h.includes('numero')) && h.includes('turma'));
+  const classIndex = headers.findIndex(h => h.includes('turma'));
   const birthDateIndex = headers.findIndex(h => h.includes('data') && h.includes('nascimento'));
   const genderIndex = headers.findIndex(h => h.includes('sexo'));
   const enrollmentIndex = headers.findIndex(h => h.includes('matrícula') || h.includes('matricula'));
@@ -139,7 +165,7 @@ export const validateImportData = (
   // Validar se colunas obrigatórias existem
   const missingColumns: string[] = [];
   if (nameIndex === -1) missingColumns.push('Nome Completo');
-  if (classIndex === -1) missingColumns.push('Número da Turma');
+  if (classIndex === -1) missingColumns.push('Nome da Turma');
   if (birthDateIndex === -1) missingColumns.push('Data de Nascimento');
   if (genderIndex === -1) missingColumns.push('Sexo');
 
@@ -171,7 +197,7 @@ export const validateImportData = (
     }
 
     const name = String(row[nameIndex] || '').trim();
-    const classNumberStr = String(row[classIndex] || '').trim();
+    const classNameStr = String(row[classIndex] || '').trim();
     const birthDateStr = String(row[birthDateIndex] || '').trim();
     const gender = String(row[genderIndex] || '').trim().toUpperCase();
     const enrollment = String(row[enrollmentIndex] || '').trim();
@@ -181,7 +207,7 @@ export const validateImportData = (
 
     // Validações obrigatórias
     if (!name) errors.push('Nome Completo é obrigatório');
-    if (!classNumberStr) errors.push('Número da Turma é obrigatório');
+    if (!classNameStr) errors.push('Nome da Turma é obrigatório');
     if (!birthDateStr) errors.push('Data de Nascimento é obrigatória');
     if (!gender) errors.push('Sexo é obrigatório');
 
@@ -197,40 +223,54 @@ export const validateImportData = (
       errors.push(`Sexo inválido. Use M, F, O ou N. Valor encontrado: ${gender}`);
     }
 
-    // Validar turma - usar número da turma da planilha
+    // Validar turma - usar nome da turma da planilha
     let classData: Class | undefined;
     
-    console.log(`[VALIDAÇÃO] Linha ${rowNumber}: Buscando turma pelo número "${classNumberStr}"`);
-    console.log(`[VALIDAÇÃO] Turmas disponíveis:`, classes.map(c => ({ id: c.id, classNumber: c.classNumber, name: c.name })));
-    
-    // Buscar turma pelo número da planilha
-    const normalizedClassNumber = classNumberStr.toUpperCase().trim();
-    classData = classes.find(c => {
-      const normalizedClassSystemNumber = c.classNumber.toUpperCase().trim();
-      console.log(`[VALIDAÇÃO] Comparando "${normalizedClassNumber}" com "${normalizedClassSystemNumber}" = ${normalizedClassSystemNumber === normalizedClassNumber}`);
-      return normalizedClassSystemNumber === normalizedClassNumber;
-    });
-    
-    if (classData) {
-      console.log(`[VALIDAÇÃO] ✅ Turma encontrada:`, { id: classData.id, classNumber: classData.classNumber, name: classData.name });
+    console.log(`[VALIDAÇÃO] Linha ${rowNumber}: Buscando turma pelo nome "${classNameStr}"`);
+    console.log(`[VALIDAÇÃO] Turmas disponíveis:`, classes.map(c => ({ id: c.id, name: c.name })));
+
+    const normalizedLookup = normalizeClassLabel(classNameStr);
+    classData = classes.find(c => normalizeClassLabel(c.name) === normalizedLookup);
+
+    if (!classData && classNameStr) {
+      const legacyLookup = classNameStr.toUpperCase().trim();
+      const legacyMatch = classes.find(c => {
+        const legacyNumber = buildLegacyClassNumber(c);
+        return legacyNumber ? legacyNumber.toUpperCase() === legacyLookup : false;
+      });
+      if (legacyMatch) {
+        classData = legacyMatch;
+        warnings.push(`Identificação no formato antigo. Use o nome "${legacyMatch.name}".`);
+      }
     }
-    
+
+    if (classData) {
+      console.log(`[VALIDAÇÃO] ✅ Turma encontrada:`, { id: classData.id, name: classData.name });
+    }
+
     // Se não encontrou e há turma pré-selecionada, verificar se corresponde
     if (!classData && selectedClassId) {
-      console.log(`[VALIDAÇÃO] Turma não encontrada pelo número, verificando turma pré-selecionada: ${selectedClassId}`);
+      console.log(`[VALIDAÇÃO] Turma não encontrada pelo nome, verificando turma pré-selecionada: ${selectedClassId}`);
       const selectedClass = classes.find(c => c.id === selectedClassId);
       if (selectedClass) {
-        const normalizedSelectedNumber = selectedClass.classNumber.toUpperCase().trim();
-        if (normalizedClassNumber === normalizedSelectedNumber) {
+        const normalizedSelectedName = normalizeClassLabel(selectedClass.name);
+        if (normalizedLookup === normalizedSelectedName) {
           classData = selectedClass;
-          console.log(`[VALIDAÇÃO] ✅ Usando turma pré-selecionada:`, { id: classData.id, classNumber: classData.classNumber, name: classData.name });
+          console.log(`[VALIDAÇÃO] ✅ Usando turma pré-selecionada:`, { id: classData.id, name: classData.name });
+        } else if (classNameStr) {
+          const legacyNumber = buildLegacyClassNumber(selectedClass);
+          if (legacyNumber && legacyNumber.toUpperCase() === classNameStr.toUpperCase().trim()) {
+            classData = selectedClass;
+            warnings.push(`Identificação no formato antigo. Use o nome "${selectedClass.name}".`);
+            console.log(`[VALIDAÇÃO] ⚠️ Formato antigo, usando turma pré-selecionada:`, { id: selectedClass.id, name: selectedClass.name });
+          }
         }
       }
     }
-    
+
     // Se ainda não encontrou, adicionar erro
-    if (!classData && classNumberStr) {
-      const errorMsg = `Turma com número "${classNumberStr}" não encontrada no sistema. Números disponíveis: ${classes.map(c => c.classNumber).join(', ')}`;
+    if (!classData && classNameStr) {
+      const errorMsg = `Turma com nome "${classNameStr}" não encontrada no sistema. Turmas disponíveis: ${classes.map(c => c.name).join(', ')}`;
       console.error(`[VALIDAÇÃO] ❌ ${errorMsg}`);
       errors.push(errorMsg);
     }
@@ -317,4 +357,3 @@ export const validateImportData = (
     duplicateRows,
   };
 };
-

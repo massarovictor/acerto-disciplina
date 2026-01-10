@@ -302,13 +302,17 @@ export async function generateIncidentPDF(
   incidentClass: Class | undefined,
   students: Student[]
 ) {
-  if (students.length > 1) {
-    for (const student of students) {
+  const scopedStudents = incident.studentIds && incident.studentIds.length > 0
+    ? students.filter((student) => incident.studentIds.includes(student.id))
+    : students;
+
+  if (scopedStudents.length > 1) {
+    for (const student of scopedStudents) {
       const generator = new IncidentPDF();
-      await generator.generate(incident, incidentClass, students, student);
+      await generator.generate(incident, incidentClass, scopedStudents, student);
     }
   } else {
     const generator = new IncidentPDF();
-    await generator.generate(incident, incidentClass, students);
+    await generator.generate(incident, incidentClass, scopedStudents);
   }
 }

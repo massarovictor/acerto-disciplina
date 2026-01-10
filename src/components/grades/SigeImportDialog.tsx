@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -26,7 +26,7 @@ import {
     X
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useClasses, useStudents, useGrades, useProfessionalSubjects } from '@/hooks/useData';
+import { useClasses, useStudents, useGrades, useProfessionalSubjects, useProfessionalSubjectTemplates } from '@/hooks/useData';
 import { QUARTERS, getAllSubjects } from '@/lib/subjects';
 import {
     processSigeFile,
@@ -74,6 +74,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
     const { students } = useStudents();
     const { addGrade, deleteGrade, grades: existingGrades } = useGrades();
     const { professionalSubjects } = useProfessionalSubjects();
+    const { templates } = useProfessionalSubjectTemplates();
     const { toast } = useToast();
 
     const [step, setStep] = useState<'configure' | 'upload' | 'match-students' | 'map-subjects' | 'review-subjects' | 'preview'>('configure');
@@ -84,12 +85,34 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
     const [parseResult, setParseResult] = useState<SigeParseResult | null>(null);
     const [selectedClass, setSelectedClass] = useState('');
     const [selectedQuarter, setSelectedQuarter] = useState('1º Bimestre');
+    const [selectedSchoolYear, setSelectedSchoolYear] = useState<1 | 2 | 3>(1);
     const [replaceExisting, setReplaceExisting] = useState(true); // Por padrão, substituir
     const [importableGrades, setImportableGrades] = useState<ImportableGrade[]>([]);
     const [studentMatches, setStudentMatches] = useState<StudentMatch[]>([]);
     const [subjectMappings, setSubjectMappings] = useState<SubjectMapping[]>([]);
 
     const activeClasses = classes.filter(c => !c.archived && c.active);
+    const schoolYearOptions: Array<{ value: 1 | 2 | 3; label: string }> = [
+        { value: 1, label: '1º ano' },
+        { value: 2, label: '2º ano' },
+        { value: 3, label: '3º ano' },
+    ];
+    const selectedClassData = useMemo(
+        () => classes.find((c) => c.id === selectedClass),
+        [classes, selectedClass],
+    );
+
+    useEffect(() => {
+        if (!selectedClass) {
+            setSelectedSchoolYear(1);
+            return;
+        }
+        const defaultYear = selectedClassData?.currentYear ?? 1;
+        const normalizedYear = [1, 2, 3].includes(defaultYear as number)
+            ? (defaultYear as 1 | 2 | 3)
+            : 1;
+        setSelectedSchoolYear(normalizedYear);
+    }, [selectedClass, selectedClassData?.currentYear]);
 
     // Função para obter disciplinas válidas de uma turma
     // Retorna tanto o nome original quanto o normalizado para comparação flexível
@@ -99,6 +122,14 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
             original: s,
             normalized: normalizeSubjectName(s).toLowerCase()
         }));
+
+        const templateSubjects = (() => {
+            const classData = classes.find((c) => c.id === classId);
+            if (!classData?.templateId) return [];
+            const template = templates.find((t) => t.id === classData.templateId);
+            const yearData = template?.subjectsByYear.find((y) => y.year === selectedSchoolYear);
+            return yearData?.subjects ?? [];
+        })();
 
         // Disciplinas Profissionais da turma (verificar se existe antes de filtrar)
         const classSubjects = (professionalSubjects || [])
@@ -112,7 +143,14 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
         const seenNormalized = new Set<string>();
         const allValidSubjects: { original: string; normalized: string }[] = [];
 
-        for (const subj of [...baseSubjects, ...classSubjects]) {
+        for (const subj of [
+            ...baseSubjects,
+            ...templateSubjects.map((subject) => ({
+                original: subject,
+                normalized: normalizeSubjectName(subject).toLowerCase(),
+            })),
+            ...classSubjects,
+        ]) {
             if (!seenNormalized.has(subj.normalized)) {
                 seenNormalized.add(subj.normalized);
                 allValidSubjects.push(subj);
@@ -376,6 +414,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                         classId: selectedClass,
                         subject: matchedSubject, // Usar o nome normalizado/oficial
                         quarter: selectedQuarter,
+                        schoolYear: selectedSchoolYear,
                         grade,
                         selected: true,
                     });
@@ -457,7 +496,10 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
             // ETAPA 1: Se replaceExisting, deletar TODAS as notas da turma + bimestre (EM LOTES PARALELOS)
             if (replaceExisting) {
                 const gradesToDelete = existingGrades.filter(
-                    g => g.classId === selectedClass && g.quarter === selectedQuarter
+                    g =>
+                        g.classId === selectedClass &&
+                        g.quarter === selectedQuarter &&
+                        (g.schoolYear ?? 1) === selectedSchoolYear
                 );
 
                 setImportPhase('deleting');
@@ -522,7 +564,8 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                             g => g.studentId === grade.studentId &&
                                 g.subject === grade.subject &&
                                 g.quarter === grade.quarter &&
-                                g.classId === grade.classId
+                                g.classId === grade.classId &&
+                                (g.schoolYear ?? 1) === selectedSchoolYear
                         ) : null;
 
                         await addGrade({
@@ -530,6 +573,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                             classId: grade.classId,
                             subject: grade.subject,
                             quarter: grade.quarter,
+                            schoolYear: grade.schoolYear ?? selectedSchoolYear,
                             grade: grade.grade,
                         });
 
@@ -607,7 +651,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                         Importar Notas do SIGE
                     </DialogTitle>
                     <DialogDescription>
-                        {step === 'configure' && 'Selecione a turma e o bimestre, depois faça o upload do arquivo Excel.'}
+                        {step === 'configure' && 'Selecione a turma, o ano e o bimestre, depois faça o upload do arquivo Excel.'}
                         {step === 'upload' && 'Aguarde enquanto processamos o arquivo...'}
                         {step === 'match-students' && 'Valide a associação entre os nomes do arquivo e do sistema.'}
                         {step === 'review-subjects' && 'Revise as disciplinas encontradas. Apenas disciplinas cadastradas serão importadas.'}
@@ -629,7 +673,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                                     <SelectContent>
                                         {activeClasses.map(cls => (
                                             <SelectItem key={cls.id} value={cls.id}>
-                                                {cls.classNumber} - {cls.name}
+                                                {cls.name}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -650,6 +694,25 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                                 </Select>
                             </div>
 
+                            <div className="space-y-2">
+                                <Label>Ano da turma *</Label>
+                                <Select
+                                    value={String(selectedSchoolYear)}
+                                    onValueChange={(value) => setSelectedSchoolYear(Number(value) as 1 | 2 | 3)}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Selecione o ano" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {schoolYearOptions.map((option) => (
+                                            <SelectItem key={option.value} value={String(option.value)}>
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
                             {/* Opção de substituir notas */}
                             <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
                                 <div className="space-y-1 flex-1 pr-4">
@@ -658,8 +721,8 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                                     </Label>
                                     <p className="text-sm text-muted-foreground">
                                         {replaceExisting
-                                            ? 'Todas as notas antigas deste bimestre serão deletadas e substituídas pelas novas'
-                                            : 'As notas do arquivo serão adicionadas/atualizadas sem deletar as existentes'
+                                            ? `Todas as notas antigas deste bimestre no ${selectedSchoolYear}º ano serão deletadas e substituídas pelas novas`
+                                            : `As notas do arquivo serão adicionadas/atualizadas sem deletar as existentes do ${selectedSchoolYear}º ano`
                                         }
                                     </p>
                                 </div>
@@ -1054,7 +1117,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                                         />
                                         {importPhase === 'deleting' && (
                                             <p className="text-xs text-muted-foreground">
-                                                Substituindo todas as notas do bimestre selecionado
+                                                Substituindo todas as notas do bimestre selecionado no {selectedSchoolYear}º ano
                                             </p>
                                         )}
                                     </div>

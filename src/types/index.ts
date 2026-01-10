@@ -1,6 +1,6 @@
 // Core types for the School Incidents System
 
-export type UserRole = 'professor' | 'diretor' | 'coordenador' | 'secretaria';
+export type UserRole = 'admin' | 'professor' | 'diretor' | 'coordenador' | 'secretaria';
 
 export interface User {
   id: string;
@@ -76,17 +76,20 @@ export interface Class {
   series: string;
   letter?: string;
   course?: string; // Opcional - pode ser digitado livremente
-  classNumber: string; // Número único da turma (ex: "2024-2026-RDC")
   directorId?: string;
+  directorEmail?: string;
   active: boolean;
-  startYear?: 1 | 2 | 3; // Ano de início da turma
+  startYear?: 1 | 2 | 3; // Ano de início da turma (série)
   currentYear?: 1 | 2 | 3; // Ano atual da turma (calculado automaticamente)
   startYearDate?: string; // Data de início do primeiro ano (para calcular anos seguintes)
+  startCalendarYear?: number; // Ano letivo de início (ex: 2024)
+  endCalendarYear?: number; // Ano letivo de fim (ex: 2026)
   archived?: boolean; // Se a turma foi arquivada
   archivedAt?: string | null; // Data de arquivamento
   archivedReason?: string | null; // Motivo do arquivamento
   templateId?: string | null; // ID do template usado para criar a turma
 }
+
 
 export type StudentStatus = 'active' | 'inactive' | 'transferred' | 'approved' | 'recovery' | 'failed';
 
@@ -112,6 +115,7 @@ export interface Grade {
   classId: string;
   subject: string;
   quarter: string;
+  schoolYear?: 1 | 2 | 3;
   grade: number;
   observation?: string;
   recordedAt: string;

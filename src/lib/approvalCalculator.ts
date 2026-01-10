@@ -1,6 +1,16 @@
 import { Grade, StudentAcademicStatus } from '@/types';
 import { QUARTERS } from '@/lib/subjects';
 
+const normalizeSchoolYear = (schoolYear?: number): 1 | 2 | 3 => {
+  if (schoolYear === 1 || schoolYear === 2 || schoolYear === 3) {
+    return schoolYear;
+  }
+  return 1;
+};
+
+const matchesSchoolYear = (grade: Grade, schoolYear?: number) =>
+  (grade.schoolYear ?? 1) === normalizeSchoolYear(schoolYear);
+
 /**
  * Calcula a média final de um aluno em uma disciplina específica
  * Média = soma das notas / número de notas lançadas
@@ -11,15 +21,17 @@ import { QUARTERS } from '@/lib/subjects';
  * @param grades Todas as notas do aluno
  * @param studentId ID do aluno
  * @param subject Disciplina
+ * @param schoolYear Ano/série da turma (1-3)
  * @returns Média final ou null se não houver notas
  */
 export function calculateFinalGrade(
   grades: Grade[],
   studentId: string,
-  subject: string
+  subject: string,
+  schoolYear?: number
 ): number | null {
   const studentGrades = grades.filter(
-    (g) => g.studentId === studentId && g.subject === subject
+    (g) => g.studentId === studentId && g.subject === subject && matchesSchoolYear(g, schoolYear)
   );
 
   if (studentGrades.length === 0) {
@@ -53,15 +65,17 @@ export function calculateFinalGrade(
  * @param grades Todas as notas
  * @param studentId ID do aluno
  * @param subject Disciplina
+ * @param schoolYear Ano/série da turma (1-3)
  * @returns Objeto com boolean completo e array de bimestres faltantes
  */
 export function checkQuartersComplete(
   grades: Grade[],
   studentId: string,
-  subject: string
+  subject: string,
+  schoolYear?: number
 ): { complete: boolean; missingQuarters: string[] } {
   const studentGrades = grades.filter(
-    (g) => g.studentId === studentId && g.subject === subject
+    (g) => g.studentId === studentId && g.subject === subject && matchesSchoolYear(g, schoolYear)
   );
 
   const presentQuarters = studentGrades.map((g) => g.quarter);
@@ -84,17 +98,20 @@ export function checkQuartersComplete(
  * @param studentId ID do aluno
  * @param classId ID da turma
  * @param academicYear Ano letivo (ex: "2024")
+ * @param schoolYear Ano/série da turma (1-3)
  * @returns Status acadêmico do aluno
  */
 export function calculateStudentStatus(
   grades: Grade[],
   studentId: string,
   classId: string,
-  academicYear: string
+  academicYear: string,
+  schoolYear?: number
 ): StudentAcademicStatus & { isPending?: boolean; pendingSubjects?: Record<string, string[]> } {
+  const targetSchoolYear = normalizeSchoolYear(schoolYear);
   // Filtrar apenas notas deste aluno e desta turma
   const studentGrades = grades.filter(
-    (g) => g.studentId === studentId && g.classId === classId
+    (g) => g.studentId === studentId && g.classId === classId && matchesSchoolYear(g, targetSchoolYear)
   );
 
   // Obter todas as disciplinas únicas deste aluno
@@ -108,14 +125,14 @@ export function calculateStudentStatus(
   // Calcular média final de cada disciplina
   subjects.forEach((subject) => {
     // Verificar se tem todas as 4 notas
-    const quarterCheck = checkQuartersComplete(grades, studentId, subject);
+    const quarterCheck = checkQuartersComplete(studentGrades, studentId, subject, targetSchoolYear);
 
     if (!quarterCheck.complete) {
       hasIncompleteSubject = true;
       pendingSubjects[subject] = quarterCheck.missingQuarters;
     }
 
-    const finalGrade = calculateFinalGrade(grades, studentId, subject);
+    const finalGrade = calculateFinalGrade(studentGrades, studentId, subject, targetSchoolYear);
     if (finalGrade !== null) {
       finalGrades[subject] = finalGrade;
       if (finalGrade < 6) {
@@ -163,16 +180,18 @@ export function calculateStudentStatus(
  * @param studentIds IDs dos alunos da turma
  * @param classId ID da turma
  * @param academicYear Ano letivo
+ * @param schoolYear Ano/série da turma (1-3)
  * @returns Array com status acadêmico de cada aluno
  */
 export function calculateClassAcademicStatus(
   grades: Grade[],
   studentIds: string[],
   classId: string,
-  academicYear: string
+  academicYear: string,
+  schoolYear?: number
 ): StudentAcademicStatus[] {
   return studentIds.map((studentId) =>
-    calculateStudentStatus(grades, studentId, classId, academicYear)
+    calculateStudentStatus(grades, studentId, classId, academicYear, schoolYear)
   );
 }
 
@@ -194,17 +213,23 @@ export interface QuarterCheckResult {
  * @param studentId ID do aluno
  * @param classId ID da turma
  * @param quarter Bimestre (B1, B2, B3, B4)
+ * @param schoolYear Ano/série da turma (1-3)
  * @returns Resultado da verificação com notas e disciplinas abaixo da média
  */
 export function checkQuarterGrades(
   grades: Grade[],
   studentId: string,
   classId: string,
-  quarter: string
+  quarter: string,
+  schoolYear?: number
 ): QuarterCheckResult {
   // Filtrar notas do aluno para o bimestre específico
   const quarterGrades = grades.filter(
-    (g) => g.studentId === studentId && g.classId === classId && g.quarter === quarter
+    (g) =>
+      g.studentId === studentId &&
+      g.classId === classId &&
+      g.quarter === quarter &&
+      matchesSchoolYear(g, schoolYear)
   );
 
   const subjectGrades: Record<string, number> = {};
@@ -233,15 +258,17 @@ export function checkQuarterGrades(
  * @param studentIds IDs dos alunos
  * @param classId ID da turma
  * @param quarter Bimestre
+ * @param schoolYear Ano/série da turma (1-3)
  * @returns Array com resultados de verificação por aluno
  */
 export function checkClassQuarterGrades(
   grades: Grade[],
   studentIds: string[],
   classId: string,
-  quarter: string
+  quarter: string,
+  schoolYear?: number
 ): QuarterCheckResult[] {
   return studentIds.map((studentId) =>
-    checkQuarterGrades(grades, studentId, classId, quarter)
+    checkQuarterGrades(grades, studentId, classId, quarter, schoolYear)
   );
 }

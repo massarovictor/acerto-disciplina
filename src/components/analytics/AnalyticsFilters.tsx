@@ -2,7 +2,7 @@
  * Barra de Filtros do Analytics
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Filter, X, GitCompare } from 'lucide-react';
 import { Class } from '@/types';
 import { AnalyticsFilters as FiltersType } from '@/hooks/useSchoolAnalytics';
@@ -32,6 +33,12 @@ interface AnalyticsFiltersProps {
 }
 
 const SERIES_OPTIONS = ['1º', '2º', '3º'];
+const SCHOOL_YEAR_OPTIONS: Array<{ value: FiltersType['schoolYear']; label: string }> = [
+  { value: 'all', label: 'Todos os anos' },
+  { value: 1, label: '1º ano' },
+  { value: 2, label: '2º ano' },
+  { value: 3, label: '3º ano' },
+];
 
 export function AnalyticsFilters({ 
   classes, 
@@ -41,7 +48,23 @@ export function AnalyticsFilters({
 }: AnalyticsFiltersProps) {
   const [selectedForComparison, setSelectedForComparison] = useState<string[]>([]);
   
-  const activeClasses = classes.filter(c => !c.archived);
+  const activeClasses = filters.includeArchived
+    ? classes
+    : classes.filter(c => !c.archived);
+
+  const calendarYears = useMemo(() => {
+    if (filters.schoolYear === 'all') return [];
+    const schoolYearValue = filters.schoolYear as 1 | 2 | 3;
+    const years = new Set<number>();
+    activeClasses.forEach((cls) => {
+      const startYear =
+        cls.startCalendarYear ||
+        (cls.startYearDate ? new Date(`${cls.startYearDate}T00:00:00`).getFullYear() : undefined);
+      if (!startYear) return;
+      years.add(startYear + (schoolYearValue - 1));
+    });
+    return Array.from(years).sort((a, b) => a - b);
+  }, [activeClasses, filters.schoolYear]);
   
   const handleSeriesToggle = (series: string) => {
     const newSeries = filters.series.includes(series)
@@ -78,12 +101,18 @@ export function AnalyticsFilters({
       series: [],
       classIds: [],
       quarter: 'all',
+      schoolYear: 'all',
+      calendarYear: 'all',
+      includeArchived: false,
     });
   };
   
   const hasActiveFilters = filters.series.length > 0 || 
     filters.classIds.length > 0 || 
-    filters.quarter !== 'all';
+    filters.quarter !== 'all' ||
+    filters.schoolYear !== 'all' ||
+    filters.calendarYear !== 'all' ||
+    filters.includeArchived;
 
   return (
     <div className="flex flex-wrap gap-3 items-center p-4 bg-card rounded-lg border">
@@ -103,6 +132,20 @@ export function AnalyticsFilters({
         <PopoverContent className="w-48" align="start">
           <div className="space-y-2">
             <Label className="text-sm font-medium">Filtrar por série</Label>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="series-all"
+                checked={filters.series.length === 0}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    onFilterChange({ series: [] });
+                  }
+                }}
+              />
+              <Label htmlFor="series-all" className="text-sm cursor-pointer">
+                Todas as séries
+              </Label>
+            </div>
             {SERIES_OPTIONS.map(series => (
               <div key={series} className="flex items-center space-x-2">
                 <Checkbox
@@ -169,6 +212,61 @@ export function AnalyticsFilters({
           ))}
         </SelectContent>
       </Select>
+
+      {/* Filtro por Ano */}
+      <Select
+        value={String(filters.schoolYear)}
+        onValueChange={(value) => {
+          if (value === 'all') {
+            onFilterChange({ schoolYear: 'all', calendarYear: 'all' });
+            return;
+          }
+          onFilterChange({ schoolYear: Number(value) as FiltersType['schoolYear'] });
+        }}
+      >
+        <SelectTrigger className="w-36">
+          <SelectValue placeholder="Ano" />
+        </SelectTrigger>
+        <SelectContent>
+          {SCHOOL_YEAR_OPTIONS.map(option => (
+            <SelectItem key={String(option.value)} value={String(option.value)}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Filtro por Ano Calendário */}
+      <Select
+        value={filters.calendarYear === 'all' ? 'all' : String(filters.calendarYear)}
+        disabled={filters.schoolYear === 'all' || calendarYears.length === 0}
+        onValueChange={(value) =>
+          onFilterChange({
+            calendarYear: value === 'all' ? 'all' : Number(value),
+          })
+        }
+      >
+        <SelectTrigger className="w-36">
+          <SelectValue placeholder="Ano" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todos</SelectItem>
+          {calendarYears.map((year) => (
+            <SelectItem key={year} value={String(year)}>
+              {year}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Incluir Arquivadas */}
+      <div className="flex items-center gap-2">
+        <Switch
+          checked={filters.includeArchived}
+          onCheckedChange={(checked) => onFilterChange({ includeArchived: checked })}
+        />
+        <span className="text-sm text-muted-foreground">Arquivadas</span>
+      </div>
       
       {/* Comparação de Turmas */}
       <Popover>
@@ -252,6 +350,19 @@ export function AnalyticsFilters({
           {filters.quarter !== 'all' && (
             <Badge variant="secondary" className="text-xs">
               {filters.quarter}
+            </Badge>
+          )}
+          <Badge variant="secondary" className="text-xs">
+            {filters.schoolYear === 'all' ? 'Todos os anos' : `${filters.schoolYear}º ano`}
+          </Badge>
+          {filters.calendarYear !== 'all' && (
+            <Badge variant="secondary" className="text-xs">
+              {filters.calendarYear}
+            </Badge>
+          )}
+          {filters.includeArchived && (
+            <Badge variant="secondary" className="text-xs">
+              Arquivadas
             </Badge>
           )}
         </div>

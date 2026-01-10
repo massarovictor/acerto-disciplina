@@ -136,6 +136,10 @@ class StudentReportPDFGenerator {
     const average = this.calculateAverage();
     const frequency = this.calculateFrequency();
     const incidentCount = this.incidents.length;
+
+    if (Object.keys(subjectAverages).length === 0) {
+      return 'Sem dados suficientes para análise acadêmica neste período. Aguardar lançamento de notas para avaliações mais precisas.';
+    }
     
     // Calcular tendência
     const quarterAverages = QUARTERS.map(quarter => {

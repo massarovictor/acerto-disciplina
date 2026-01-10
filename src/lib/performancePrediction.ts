@@ -257,20 +257,53 @@ export function calculateRecoveryPotential(
  */
 export function analyzeStudentPerformance(
   studentGrades: Grade[],
-  currentQuarter: string
+  currentQuarter: string,
+  options?: {
+    schoolYear?: number;
+    historicalGrades?: Grade[];
+    minQuartersForPrediction?: number;
+    includeHistoricalFallback?: boolean;
+  }
 ): {
   risk: number;
   trend: ReturnType<typeof identifyTrend>;
   intervention: ReturnType<typeof suggestInterventionPriority>;
   recovery: ReturnType<typeof calculateRecoveryPotential>;
-  prediction: ReturnType<typeof predictFinalGrade>;
+  prediction: ReturnType<typeof predictFinalGrade> & {
+    dataPoints: number;
+    historyAverage?: number;
+    currentAverage?: number;
+  };
 } {
+  const targetSchoolYear = options?.schoolYear;
+  const minQuarters = options?.minQuartersForPrediction ?? 1;
+  const includeHistory = options?.includeHistoricalFallback ?? true;
+
+  const maxQuarterIndex = QUARTERS.indexOf(currentQuarter);
+  const quarterCutoff = maxQuarterIndex >= 0 ? maxQuarterIndex : QUARTERS.length - 1;
+
+  const currentYearGrades = targetSchoolYear
+    ? studentGrades.filter((grade) => (grade.schoolYear ?? 1) === targetSchoolYear)
+    : studentGrades;
+
+  const currentGrades = currentYearGrades.filter((grade) => {
+    const index = QUARTERS.indexOf(grade.quarter);
+    if (index === -1) return true;
+    return index <= quarterCutoff;
+  });
+
+  const historicalGrades =
+    options?.historicalGrades ??
+    (targetSchoolYear
+      ? studentGrades.filter((grade) => (grade.schoolYear ?? 1) < targetSchoolYear)
+      : []);
+
   // Calcular risco
-  const risk = calculateFailureRisk(studentGrades, currentQuarter);
+  const risk = calculateFailureRisk(currentGrades, currentQuarter);
 
   // Agrupar por bimestre para análise de tendência
   const gradesByQuarter = new Map<string, number[]>();
-  studentGrades.forEach(grade => {
+  currentGrades.forEach(grade => {
     const grades = gradesByQuarter.get(grade.quarter) || [];
     grades.push(grade.grade);
     gradesByQuarter.set(grade.quarter, grades);
@@ -285,7 +318,7 @@ export function analyzeStudentPerformance(
   const trend = identifyTrend(quarterAverages);
 
   // Média atual
-  const currentAverage = calculateMean(studentGrades.map(g => g.grade));
+  const currentAverage = calculateMean(currentGrades.map(g => g.grade));
 
   // Prioridade de intervenção
   const intervention = suggestInterventionPriority(risk, trend.trend, currentAverage);
@@ -295,11 +328,81 @@ export function analyzeStudentPerformance(
   const recovery = calculateRecoveryPotential(quarterGrades, currentAverage);
 
   // Predição de nota final
-  const prediction = predictFinalGrade(quarterGrades);
+  const historyAverage = (() => {
+    if (historicalGrades.length === 0) return 0;
+    const historyByYear = new Map<number, number[]>();
+    historicalGrades.forEach((grade) => {
+      const year = grade.schoolYear ?? 1;
+      const list = historyByYear.get(year) || [];
+      list.push(grade.grade);
+      historyByYear.set(year, list);
+    });
+
+    const yearlyAverages = Array.from(historyByYear.values())
+      .map((grades) => calculateMean(grades))
+      .filter((value) => value > 0);
+
+    if (yearlyAverages.length === 0) return 0;
+    return calculateMean(yearlyAverages);
+  })();
+
+  const historyConfidence = (() => {
+    if (historicalGrades.length === 0) return 0;
+    const historyByYear = new Map<number, number[]>();
+    historicalGrades.forEach((grade) => {
+      const year = grade.schoolYear ?? 1;
+      const list = historyByYear.get(year) || [];
+      list.push(grade.grade);
+      historyByYear.set(year, list);
+    });
+    const yearlyAverages = Array.from(historyByYear.values())
+      .map((grades) => calculateMean(grades))
+      .filter((value) => value > 0);
+    if (yearlyAverages.length === 0) return 0;
+    if (yearlyAverages.length === 1) return 35;
+
+    const mean = calculateMean(yearlyAverages);
+    const variance =
+      yearlyAverages.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / yearlyAverages.length;
+    const stdDev = Math.sqrt(variance);
+    const rawConfidence = Math.round(100 - stdDev * 12);
+    return Math.min(80, Math.max(20, rawConfidence));
+  })();
+
+  let prediction = predictFinalGrade(quarterGrades);
+  let finalPrediction = prediction.predicted;
+  let finalConfidence = prediction.confidence;
+  let method = prediction.method;
+
+  if (quarterGrades.length < minQuarters && historyAverage === 0) {
+    finalPrediction = 0;
+    finalConfidence = 0;
+    method = 'insufficient_data';
+  } else if (includeHistory && historyAverage > 0) {
+    if (quarterGrades.length === 0) {
+      finalPrediction = historyAverage;
+      finalConfidence = historyConfidence || 20;
+      method = 'historical_baseline';
+    } else {
+      const historyWeight = quarterGrades.length >= 2 ? 0.3 : 0.4;
+      const currentWeight = 1 - historyWeight;
+      finalPrediction = currentWeight * prediction.predicted + historyWeight * historyAverage;
+      finalConfidence = Math.round(currentWeight * prediction.confidence + historyWeight * historyConfidence);
+      method = `${prediction.method}_history`;
+    }
+  }
+
+  prediction = {
+    predicted: Math.max(0, Math.min(10, finalPrediction)),
+    confidence: Math.max(0, Math.min(100, finalConfidence)),
+    method,
+    dataPoints: quarterGrades.length,
+    historyAverage: historyAverage || undefined,
+    currentAverage: currentAverage || undefined,
+  };
 
   return { risk, trend, intervention, recovery, prediction };
 }
-
 
 
 

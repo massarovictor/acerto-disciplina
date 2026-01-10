@@ -23,10 +23,22 @@ const Login = () => {
 
     setIsLoading(true);
     try {
+      // 1. Verificar se o email está na whitelist
+      const { data: authorized, error: checkError } = await supabase
+        .from('authorized_emails')
+        .select('email')
+        .eq('email', email.toLowerCase().trim())
+        .single();
+
+      if (checkError || !authorized) {
+        throw new Error('Este email não está autorizado a acessar o sistema. Entre em contato com a administração.');
+      }
+
+      // 2. Enviar código OTP (criar usuário se não existir)
       const { error } = await supabase.auth.signInWithOtp({
-        email,
+        email: email.toLowerCase().trim(),
         options: {
-          shouldCreateUser: true, // A trigger check_email_whitelist vai impedir se não permitido
+          shouldCreateUser: true, // Cria automaticamente se não existir
         },
       });
 
@@ -41,8 +53,8 @@ const Login = () => {
       console.error(error);
       toast({
         variant: 'destructive',
-        title: 'Erro ao entrar',
-        description: error instanceof Error ? error.message : 'Erro desconhecido. Verifique se seu email está autorizado.',
+        title: 'Acesso negado',
+        description: error instanceof Error ? error.message : 'Erro desconhecido.',
       });
     } finally {
       setIsLoading(false);

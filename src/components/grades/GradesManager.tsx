@@ -14,7 +14,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { useClasses, useStudents, useGrades, useProfessionalSubjects } from '@/hooks/useData';
+import { useClasses, useStudents, useGrades, useProfessionalSubjects, useProfessionalSubjectTemplates } from '@/hooks/useData';
 import { AlertTriangle, Save, CheckCircle2, FileUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -33,30 +33,64 @@ export const GradesManager = () => {
   const { students } = useStudents();
   const { grades, addGrade } = useGrades();
   const { toast } = useToast();
+  const { templates } = useProfessionalSubjectTemplates();
   const {
     getProfessionalSubjects
   } = useProfessionalSubjects();
 
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedQuarter, setSelectedQuarter] = useState('1º Bimestre');
+  const [selectedSchoolYear, setSelectedSchoolYear] = useState<1 | 2 | 3>(1);
   const [studentGrades, setStudentGrades] = useState<StudentGrades[]>([]);
   const [showSigeImport, setShowSigeImport] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
-  const [lastInitialized, setLastInitialized] = useState<{ class: string; quarter: string } | null>(null);
+  const [lastInitialized, setLastInitialized] = useState<{ class: string; quarter: string; year: number } | null>(null);
 
   const classStudents = useMemo(() => students.filter(s => s.classId === selectedClass), [students, selectedClass]);
   const selectedClassData = classes.find(c => c.id === selectedClass);
+
+  useEffect(() => {
+    if (!selectedClass) {
+      setSelectedSchoolYear(1);
+      return;
+    }
+    const defaultYear = selectedClassData?.currentYear ?? 1;
+    const normalizedYear = [1, 2, 3].includes(defaultYear as number)
+      ? (defaultYear as 1 | 2 | 3)
+      : 1;
+    setSelectedSchoolYear(normalizedYear);
+  }, [selectedClass, selectedClassData?.currentYear]);
 
   // Verificar se a turma está arquivada
   const isClassArchived = selectedClassData?.archived === true;
   const isClassInactive = selectedClassData?.active === false;
   const isClassLocked = isClassArchived || isClassInactive;
 
-  // Obter disciplinas profissionais da turma
-  const professionalSubjects = useMemo(() => selectedClass ? getProfessionalSubjects(selectedClass) : [], [selectedClass, getProfessionalSubjects]);
+  // Obter disciplinas profissionais da turma (template por ano + lista manual)
+  const templateSubjects = useMemo(() => {
+    if (!selectedClassData?.templateId) return [];
+    const template = templates.find((t) => t.id === selectedClassData.templateId);
+    const yearData = template?.subjectsByYear.find((y) => y.year === selectedSchoolYear);
+    return yearData?.subjects ?? [];
+  }, [templates, selectedClassData?.templateId, selectedSchoolYear]);
+
+  const manualSubjects = useMemo(
+    () => (selectedClass ? getProfessionalSubjects(selectedClass) : []),
+    [selectedClass, getProfessionalSubjects],
+  );
+
+  const professionalSubjects = useMemo(() => {
+    const unique = new Set<string>();
+    [...templateSubjects, ...manualSubjects].forEach((subject) => {
+      if (subject?.trim()) {
+        unique.add(subject.trim());
+      }
+    });
+    return Array.from(unique);
+  }, [templateSubjects, manualSubjects]);
 
   // Usar uma string para rastrear mudanças nas disciplinas profissionais
-  const professionalSubjectsStr = professionalSubjects.join(',');
+  const professionalSubjectsStr = `${selectedSchoolYear}:${professionalSubjects.join(',')}`;
 
   // Calcular allSubjects dentro do useEffect para evitar problemas de dependência
   const allSubjects = [
@@ -75,7 +109,8 @@ export const GradesManager = () => {
     // Só reinicializar se mudou a turma ou bimestre
     const needsReinit = !lastInitialized ||
       lastInitialized.class !== selectedClass ||
-      lastInitialized.quarter !== selectedQuarter;
+      lastInitialized.quarter !== selectedQuarter ||
+      lastInitialized.year !== selectedSchoolYear;
 
     if (needsReinit) {
       const currentAllSubjects = [
@@ -90,7 +125,8 @@ export const GradesManager = () => {
           const existingGrade = grades.find(
             g => g.studentId === student.id &&
               g.subject === subject &&
-              g.quarter === selectedQuarter
+              g.quarter === selectedQuarter &&
+              (g.schoolYear ?? 1) === selectedSchoolYear
           );
           studentGradeData[subject] = existingGrade ? String(existingGrade.grade) : '';
         });
@@ -102,7 +138,7 @@ export const GradesManager = () => {
       });
 
       setStudentGrades(initialGrades);
-      setLastInitialized({ class: selectedClass, quarter: selectedQuarter });
+      setLastInitialized({ class: selectedClass, quarter: selectedQuarter, year: selectedSchoolYear });
     } else {
       // Se apenas adicionou novas disciplinas profissionais, adicionar campos vazios sem resetar
       const currentAllSubjects = [
@@ -118,7 +154,8 @@ export const GradesManager = () => {
               const existingGrade = grades.find(
                 g => g.studentId === sg.studentId &&
                   g.subject === subject &&
-                  g.quarter === selectedQuarter
+                  g.quarter === selectedQuarter &&
+                  (g.schoolYear ?? 1) === selectedSchoolYear
               );
               updatedGrades[subject] = existingGrade ? String(existingGrade.grade) : '';
             }
@@ -127,7 +164,7 @@ export const GradesManager = () => {
         });
       });
     }
-  }, [selectedClass, selectedQuarter, professionalSubjectsStr, classStudents.length]);
+  }, [selectedClass, selectedQuarter, selectedSchoolYear, professionalSubjectsStr, classStudents.length, grades]);
 
   const handleGradeChange = (studentId: string, subject: string, value: string) => {
     setStudentGrades(prev =>
@@ -169,6 +206,7 @@ export const GradesManager = () => {
             classId: selectedClass,
             subject: subject,
             quarter: selectedQuarter,
+            schoolYear: selectedSchoolYear,
             grade: grade,
           }),
         );
@@ -252,12 +290,18 @@ export const GradesManager = () => {
     return SUBJECT_AREAS.find(area => area.subjects.includes(subject));
   };
 
+  const schoolYearOptions: Array<{ value: 1 | 2 | 3; label: string }> = [
+    { value: 1, label: '1º ano' },
+    { value: 2, label: '2º ano' },
+    { value: 3, label: '3º ano' },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Filters */}
       <Card className="bg-primary/5 border-primary/20">
         <CardContent className="pt-6">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label>Turma *</Label>
               <Select value={selectedClass} onValueChange={setSelectedClass}>
@@ -293,6 +337,25 @@ export const GradesManager = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <Label>Ano da turma *</Label>
+              <Select
+                value={String(selectedSchoolYear)}
+                onValueChange={(value) => setSelectedSchoolYear(Number(value) as 1 | 2 | 3)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o ano" />
+                </SelectTrigger>
+                <SelectContent>
+                  {schoolYearOptions.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {isClassLocked && (
@@ -309,8 +372,9 @@ export const GradesManager = () => {
           {selectedClass && selectedQuarter && !isClassLocked && (
             <Alert className="mt-4">
               <AlertDescription>
-                Lançando notas do <strong>{selectedQuarter}</strong> para a turma{' '}
-                <strong>{classes.find(c => c.id === selectedClass)?.name}</strong> ({classStudents.length} alunos)
+                Lançando notas do <strong>{selectedQuarter}</strong> para o <strong>{selectedSchoolYear}º ano</strong>{' '}
+                da turma <strong>{classes.find(c => c.id === selectedClass)?.name}</strong>{' '}
+                ({classStudents.length} alunos)
               </AlertDescription>
             </Alert>
           )}

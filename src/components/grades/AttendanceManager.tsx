@@ -41,7 +41,7 @@ const addYears = (date: Date, years: number) => {
 
 const getQuarterRange = (
   startYearDate: string | undefined,
-  currentYear: number | undefined,
+  schoolYear: number | undefined,
   quarter: string
 ) => {
   if (!startYearDate) return null;
@@ -51,7 +51,7 @@ const getQuarterRange = (
   const startDate = parseLocalDate(startYearDate);
   if (Number.isNaN(startDate.getTime())) return null;
 
-  const yearOffset = (currentYear ?? 1) - 1;
+  const yearOffset = (schoolYear ?? 1) - 1;
   const currentYearStart = addYears(startDate, yearOffset);
   const rangeStart = addMonths(currentYearStart, index * 2);
   const rangeEnd = addMonths(currentYearStart, index * 2 + 2);
@@ -77,6 +77,7 @@ export const AttendanceManager = () => {
 
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedQuarter, setSelectedQuarter] = useState('1º Bimestre');
+  const [selectedSchoolYear, setSelectedSchoolYear] = useState<1 | 2 | 3>(1);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [attendanceForm, setAttendanceForm] = useState<{
     date: string;
@@ -89,18 +90,40 @@ export const AttendanceManager = () => {
   const classStudents = useMemo(() => students.filter(s => s.classId === selectedClass), [students, selectedClass]);
   const selectedClassData = classes.find(c => c.id === selectedClass);
 
+  const schoolYearOptions: Array<{ value: 1 | 2 | 3; label: string }> = [
+    { value: 1, label: '1º ano' },
+    { value: 2, label: '2º ano' },
+    { value: 3, label: '3º ano' },
+  ];
+
+  useEffect(() => {
+    if (!selectedClass) {
+      setSelectedSchoolYear(1);
+      return;
+    }
+    const defaultYear = selectedClassData?.currentYear ?? 1;
+    const normalizedYear = [1, 2, 3].includes(defaultYear as number)
+      ? (defaultYear as 1 | 2 | 3)
+      : 1;
+    setSelectedSchoolYear(normalizedYear);
+  }, [selectedClass, selectedClassData?.currentYear]);
+
   const isClassArchived = selectedClassData?.archived === true;
   const isClassInactive = selectedClassData?.active === false;
   const isClassLocked = isClassArchived || isClassInactive;
 
+  const fallbackStartYearDate =
+    selectedClassData?.startCalendarYear ? `${selectedClassData.startCalendarYear}-02-01` : undefined;
+  const effectiveStartYearDate = selectedClassData?.startYearDate || fallbackStartYearDate;
+
   const quarterRange = useMemo(
     () =>
       getQuarterRange(
-        selectedClassData?.startYearDate,
-        selectedClassData?.currentYear,
+        effectiveStartYearDate,
+        selectedSchoolYear,
         selectedQuarter
       ),
-    [selectedClassData?.startYearDate, selectedClassData?.currentYear, selectedQuarter]
+    [effectiveStartYearDate, selectedSchoolYear, selectedQuarter]
   );
 
   const classAttendance = useMemo(() => {
@@ -202,7 +225,7 @@ export const AttendanceManager = () => {
       {/* Filters */}
       <Card className="bg-primary/5 border-primary/20">
         <CardContent className="pt-6">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label>Turma *</Label>
               <Select value={selectedClass} onValueChange={setSelectedClass}>
@@ -238,6 +261,25 @@ export const AttendanceManager = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <Label>Ano da turma *</Label>
+              <Select
+                value={String(selectedSchoolYear)}
+                onValueChange={(value) => setSelectedSchoolYear(Number(value) as 1 | 2 | 3)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o ano" />
+                </SelectTrigger>
+                <SelectContent>
+                  {schoolYearOptions.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {isClassLocked && (
@@ -255,7 +297,8 @@ export const AttendanceManager = () => {
             <Alert className="mt-4">
               <Calendar className="h-4 w-4" />
               <AlertDescription>
-                Registrando faltas do <strong>{selectedQuarter}</strong> para{' '}
+                Registrando faltas do <strong>{selectedQuarter}</strong> no{' '}
+                <strong>{selectedSchoolYear}º ano</strong> para{' '}
                 <strong>{classes.find(c => c.id === selectedClass)?.name}</strong>
               </AlertDescription>
             </Alert>
@@ -264,7 +307,9 @@ export const AttendanceManager = () => {
           {selectedClass && !selectedClassData?.startYearDate && (
             <Alert className="mt-4">
               <AlertDescription>
-                Defina a data de início da turma para organizar os registros por bimestre. Sem essa data, todos os registros serão exibidos.
+                {fallbackStartYearDate
+                  ? `Data de início não definida. Usando ${new Date(`${fallbackStartYearDate}T00:00:00`).toLocaleDateString('pt-BR')} como padrão.`
+                  : 'Defina a data de início da turma para organizar os registros por bimestre. Sem essa data, todos os registros serão exibidos.'}
               </AlertDescription>
             </Alert>
           )}
@@ -336,7 +381,8 @@ export const AttendanceManager = () => {
               <Alert>
                 <Calendar className="h-4 w-4" />
                 <AlertDescription>
-                  Registre a data e o status da frequência no <strong>{selectedQuarter}</strong>.
+                  Registre a data e o status da frequência no <strong>{selectedQuarter}</strong> do{' '}
+                  <strong>{selectedSchoolYear}º ano</strong>.
                 </AlertDescription>
               </Alert>
 
@@ -384,7 +430,7 @@ export const AttendanceManager = () => {
 
                 <div className="space-y-2 pt-4 border-t">
                   <Label className="text-sm text-muted-foreground">
-                    Registros do {selectedQuarter}
+                    Registros do {selectedQuarter} ({selectedSchoolYear}º ano)
                   </Label>
                   {selectedStudentRecords.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
