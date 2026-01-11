@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDataStore } from '@/stores/useDataStore';
 import {
   AttendanceRecord,
   Class,
@@ -400,16 +401,39 @@ export function useGrades() {
       return;
     }
 
-    const { data, error } = await supabase
-      .from('grades')
-      .select('*');
+    // Supabase has a server-side limit of 1000 rows per query.
+    // We use pagination to get all grades.
+    const PAGE_SIZE = 1000;
+    let allGrades: any[] = [];
+    let page = 0;
+    let hasMore = true;
 
-    if (error) {
-      logError('grades.select', error);
-      return;
+    while (hasMore) {
+      const from = page * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      const { data, error } = await supabase
+        .from('grades')
+        .select('*')
+        .order('recorded_at', { ascending: false })
+        .range(from, to);
+
+      if (error) {
+        logError('grades.select', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        allGrades = [...allGrades, ...data];
+        page++;
+        hasMore = data.length === PAGE_SIZE;
+      } else {
+        hasMore = false;
+      }
     }
 
-    setGrades((data || []).map(mapGradeFromDb));
+    console.log(`[GRADES FETCH] Supabase retornou ${allGrades.length} notas (${page} página(s))`);
+    setGrades(allGrades.map(mapGradeFromDb));
   }, [user?.id]);
 
   useEffect(() => {
@@ -418,6 +442,7 @@ export function useGrades() {
 
   useEffect(() => {
     if (!user?.id) return;
+
     const channel = supabase
       .channel('realtime:grades')
       .on(
@@ -585,7 +610,13 @@ export function useAttendance() {
 
 export function useIncidents() {
   const { user, profile } = useAuth();
-  const [incidents, setIncidents] = useState<Incident[]>([]);
+
+  // ✅ Usando store global para estado compartilhado entre componentes
+  const incidents = useDataStore((state) => state.incidents);
+  const setIncidents = useDataStore((state) => state.setIncidents);
+  const storeAddIncident = useDataStore((state) => state.addIncident);
+  const storeUpdateIncident = useDataStore((state) => state.updateIncident);
+  const storeDeleteIncident = useDataStore((state) => state.deleteIncident);
 
   const fetchIncidents = useCallback(async () => {
     if (!user?.id) {
@@ -658,7 +689,7 @@ export function useIncidents() {
     });
 
     setIncidents(mappedIncidents);
-  }, [user?.id]);
+  }, [user?.id, setIncidents]);
 
   useEffect(() => {
     fetchIncidents();
@@ -720,7 +751,7 @@ export function useIncidents() {
     }
 
     const newIncident = mapIncidentFromDb(data);
-    setIncidents((prev) => [newIncident, ...prev]);
+    storeAddIncident(newIncident); // ✅ Atualiza store global - todos os componentes veem
     return newIncident;
   };
 
@@ -760,9 +791,7 @@ export function useIncidents() {
       throw error;
     }
 
-    setIncidents((prev) =>
-      prev.map((incident) => (incident.id === id ? { ...incident, ...updates } : incident)),
-    );
+    storeUpdateIncident(id, updates); // ✅ Atualiza store global
   };
 
   const deleteIncident = async (id: string) => {
@@ -771,7 +800,7 @@ export function useIncidents() {
       logError('incidents.delete', error);
       throw error;
     }
-    setIncidents((prev) => prev.filter((incident) => incident.id !== id));
+    storeDeleteIncident(id); // ✅ Atualiza store global
   };
 
   const addFollowUp = async (

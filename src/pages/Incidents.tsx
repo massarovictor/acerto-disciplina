@@ -25,6 +25,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Incident } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useUIStore } from '@/stores/useUIStore';
 
 const Incidents = () => {
   const navigate = useNavigate();
@@ -33,13 +34,20 @@ const Incidents = () => {
   const { students } = useStudents();
   const { toast } = useToast();
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [classFilter, setClassFilter] = useState<string>('all');
+  // ✅ Usando Zustand store para persistir filtros entre navegações
+  const { incidentsUI, setIncidentsUI } = useUIStore();
+  const searchTerm = incidentsUI.searchTerm;
+  const classFilter = incidentsUI.classFilter;
+  const activeTab = incidentsUI.activeTab;
+
+  const setSearchTerm = (value: string) => setIncidentsUI({ searchTerm: value });
+  const setClassFilter = (value: string) => setIncidentsUI({ classFilter: value });
+  const setActiveTab = (value: 'aberta' | 'acompanhamento' | 'resolvida') => setIncidentsUI({ activeTab: value });
+
   const [viewingIncident, setViewingIncident] = useState<Incident | null>(null);
   const [managingIncident, setManagingIncident] = useState<Incident | null>(null);
   const [deletingIncident, setDeletingIncident] = useState<Incident | null>(null);
   const [showNewIncidentDialog, setShowNewIncidentDialog] = useState(false);
-  const [activeTab, setActiveTab] = useState<'aberta' | 'acompanhamento' | 'resolvida'>('aberta');
   const [initialTab, setInitialTab] = useState<'info' | 'followup' | 'comments'>('info');
 
   // Get active classes for filter

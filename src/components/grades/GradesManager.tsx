@@ -22,6 +22,17 @@ import {
   QUARTERS
 } from '@/lib/subjects';
 import { SigeImportDialog } from './SigeImportDialog';
+import { useUIStore } from '@/stores/useUIStore';
+
+// Normaliza nome de disciplina para comparação (case-insensitive, sem acentos)
+const normalizeForMatch = (subject: string): string => {
+  return subject
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+};
 
 interface StudentGrades {
   studentId: string;
@@ -31,16 +42,23 @@ interface StudentGrades {
 export const GradesManager = () => {
   const { classes } = useClasses();
   const { students } = useStudents();
-  const { grades, addGrade } = useGrades();
+  const { grades, addGrade, refreshGrades } = useGrades();
   const { toast } = useToast();
   const { templates } = useProfessionalSubjectTemplates();
   const {
     getProfessionalSubjects
   } = useProfessionalSubjects();
 
-  const [selectedClass, setSelectedClass] = useState('');
-  const [selectedQuarter, setSelectedQuarter] = useState('1º Bimestre');
-  const [selectedSchoolYear, setSelectedSchoolYear] = useState<1 | 2 | 3>(1);
+  // ✅ Usando Zustand store para persistir seleções entre navegações
+  const { gradesUI, setGradesUI } = useUIStore();
+  const selectedClass = gradesUI.selectedClassId;
+  const selectedQuarter = gradesUI.selectedQuarter;
+  const selectedSchoolYear = gradesUI.selectedSchoolYear as 1 | 2 | 3;
+
+  const setSelectedClass = (value: string) => setGradesUI({ selectedClassId: value });
+  const setSelectedQuarter = (value: string) => setGradesUI({ selectedQuarter: value });
+  const setSelectedSchoolYear = (value: 1 | 2 | 3) => setGradesUI({ selectedSchoolYear: value });
+
   const [studentGrades, setStudentGrades] = useState<StudentGrades[]>([]);
   const [showSigeImport, setShowSigeImport] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
@@ -67,35 +85,64 @@ export const GradesManager = () => {
   const isClassLocked = isClassArchived || isClassInactive;
 
   // Obter disciplinas profissionais da turma (template por ano + lista manual)
-  const templateSubjects = useMemo(() => {
+  // IMPORTANTE: Usamos disciplinas do ano selecionado para exibição
+  const templateSubjectsForYear = useMemo(() => {
     if (!selectedClassData?.templateId) return [];
     const template = templates.find((t) => t.id === selectedClassData.templateId);
     const yearData = template?.subjectsByYear.find((y) => y.year === selectedSchoolYear);
     return yearData?.subjects ?? [];
   }, [templates, selectedClassData?.templateId, selectedSchoolYear]);
 
+  // NOVA: Todas as disciplinas do template (todos os anos) - usado para buscar QUALQUER nota existente
+  const allTemplateSubjects = useMemo(() => {
+    if (!selectedClassData?.templateId) return [];
+    const template = templates.find((t) => t.id === selectedClassData.templateId);
+    if (!template) return [];
+
+    const allSubjects = new Set<string>();
+    for (const yearData of template.subjectsByYear) {
+      for (const subject of yearData.subjects) {
+        allSubjects.add(subject);
+      }
+    }
+    return Array.from(allSubjects);
+  }, [templates, selectedClassData?.templateId]);
+
   const manualSubjects = useMemo(
     () => (selectedClass ? getProfessionalSubjects(selectedClass) : []),
     [selectedClass, getProfessionalSubjects],
   );
 
+  // Disciplinas profissionais visíveis: do ano selecionado + manuais
   const professionalSubjects = useMemo(() => {
     const unique = new Set<string>();
-    [...templateSubjects, ...manualSubjects].forEach((subject) => {
+    [...templateSubjectsForYear, ...manualSubjects].forEach((subject) => {
       if (subject?.trim()) {
         unique.add(subject.trim());
       }
     });
     return Array.from(unique);
-  }, [templateSubjects, manualSubjects]);
+  }, [templateSubjectsForYear, manualSubjects]);
+
+  // TODAS as disciplinas profissionais (para buscar notas de cualquier año)
+  const allProfessionalSubjects = useMemo(() => {
+    const unique = new Set<string>();
+    [...allTemplateSubjects, ...manualSubjects].forEach((subject) => {
+      if (subject?.trim()) {
+        unique.add(subject.trim());
+      }
+    });
+    return Array.from(unique);
+  }, [allTemplateSubjects, manualSubjects]);
 
   // Usar uma string para rastrear mudanças nas disciplinas profissionais
-  const professionalSubjectsStr = `${selectedSchoolYear}:${professionalSubjects.join(',')}`;
+  const professionalSubjectsStr = `${selectedSchoolYear}:${allProfessionalSubjects.join(',')}`;
 
-  // Calcular allSubjects dentro do useEffect para evitar problemas de dependência
+  // Calcular allSubjects - agora inclui TODAS as disciplinas do template
+  // para encontrar notas importadas em qualquer disciplina
   const allSubjects = [
     ...SUBJECT_AREAS.flatMap(area => area.subjects),
-    ...professionalSubjects,
+    ...allProfessionalSubjects,
   ];
 
   // Initialize grades when class or quarter changes
@@ -115,16 +162,45 @@ export const GradesManager = () => {
     if (needsReinit) {
       const currentAllSubjects = [
         ...SUBJECT_AREAS.flatMap(area => area.subjects),
-        ...professionalSubjects,
+        ...allProfessionalSubjects,
       ];
+
+      console.log('=== DEBUG: CARREGAMENTO DE NOTAS ===');
+      console.log(`TOTAL DE NOTAS NO ESTADO (SEM FILTRO): ${grades.length}`); // CHECKPOINT CRÍTICO
+
+      const relevantGrades = grades.filter(
+        g => g.classId === selectedClass &&
+          g.quarter === selectedQuarter &&
+          (g.schoolYear ?? 1) === selectedSchoolYear
+      );
+
+      console.log(`Turma: "${selectedClass}"`);
+      console.log(`Bimestre: "${selectedQuarter}"`);
+      console.log(`Ano: ${selectedSchoolYear}`);
+      console.log(`Disciplinas esperadas (${currentAllSubjects.length}):`, currentAllSubjects);
+      console.log(`Notas no banco para esta turma/bimestre/ano: ${relevantGrades.length}`);
+
+      if (relevantGrades.length > 0) {
+        // Listar disciplinas únicas nas notas do banco
+        const subjectsInDb = [...new Set(relevantGrades.map(g => g.subject))];
+        console.log(`Disciplinas únicas nas notas do banco (${subjectsInDb.length}):`, subjectsInDb);
+
+        // Verificar quais disciplinas do banco NÃO estão na lista esperada
+        const notInExpected = subjectsInDb.filter(s => !currentAllSubjects.includes(s));
+        if (notInExpected.length > 0) {
+          console.warn('⚠️ PROBLEMA: Disciplinas no banco que NÃO estão na lista esperada:', notInExpected);
+        }
+      }
 
       const initialGrades = classStudents.map(student => {
         const studentGradeData: Record<string, string> = {};
 
         currentAllSubjects.forEach(subject => {
+          // Buscar nota usando comparação normalizada (case-insensitive)
+          const normalizedSubject = normalizeForMatch(subject);
           const existingGrade = grades.find(
             g => g.studentId === student.id &&
-              g.subject === subject &&
+              normalizeForMatch(g.subject) === normalizedSubject &&
               g.quarter === selectedQuarter &&
               (g.schoolYear ?? 1) === selectedSchoolYear
           );
@@ -143,7 +219,7 @@ export const GradesManager = () => {
       // Se apenas adicionou novas disciplinas profissionais, adicionar campos vazios sem resetar
       const currentAllSubjects = [
         ...SUBJECT_AREAS.flatMap(area => area.subjects),
-        ...professionalSubjects,
+        ...allProfessionalSubjects,
       ];
 
       setStudentGrades(prev => {
@@ -151,9 +227,11 @@ export const GradesManager = () => {
           const updatedGrades = { ...sg.grades };
           currentAllSubjects.forEach(subject => {
             if (!(subject in updatedGrades)) {
+              // Buscar nota usando comparação normalizada (case-insensitive)
+              const normalizedSubject = normalizeForMatch(subject);
               const existingGrade = grades.find(
                 g => g.studentId === sg.studentId &&
-                  g.subject === subject &&
+                  normalizeForMatch(g.subject) === normalizedSubject &&
                   g.quarter === selectedQuarter &&
                   (g.schoolYear ?? 1) === selectedSchoolYear
               );
@@ -273,17 +351,17 @@ export const GradesManager = () => {
     return { filled, total: area.subjects.length };
   };
 
-  // Calcular progresso da base profissional
+  // Calcular progresso da base profissional (usa TODAS as disciplinas)
   const getProfessionalProgress = (studentId: string) => {
     const studentGrade = studentGrades.find(sg => sg.studentId === studentId);
-    if (!studentGrade || professionalSubjects.length === 0) return { filled: 0, total: 0 };
+    if (!studentGrade || allProfessionalSubjects.length === 0) return { filled: 0, total: 0 };
 
-    const filled = professionalSubjects.filter(subject => {
+    const filled = allProfessionalSubjects.filter(subject => {
       const gradeValue = studentGrade.grades[subject];
       return gradeValue && gradeValue !== '';
     }).length;
 
-    return { filled, total: professionalSubjects.length };
+    return { filled, total: allProfessionalSubjects.length };
   };
 
   const getSubjectArea = (subject: string) => {
@@ -325,20 +403,6 @@ export const GradesManager = () => {
             </div>
 
             <div className="space-y-2">
-              <Label>Bimestre *</Label>
-              <Select value={selectedQuarter} onValueChange={setSelectedQuarter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o bimestre" />
-                </SelectTrigger>
-                <SelectContent>
-                  {QUARTERS.map(quarter => (
-                    <SelectItem key={quarter} value={quarter}>{quarter}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
               <Label>Ano da turma *</Label>
               <Select
                 value={String(selectedSchoolYear)}
@@ -352,6 +416,20 @@ export const GradesManager = () => {
                     <SelectItem key={option.value} value={String(option.value)}>
                       {option.label}
                     </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Bimestre *</Label>
+              <Select value={selectedQuarter} onValueChange={setSelectedQuarter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o bimestre" />
+                </SelectTrigger>
+                <SelectContent>
+                  {QUARTERS.map(quarter => (
+                    <SelectItem key={quarter} value={quarter}>{quarter}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -541,8 +619,8 @@ export const GradesManager = () => {
                   );
                 })}
 
-                {/* Professional Subjects */}
-                {professionalSubjects.length > 0 && (() => {
+                {/* Professional Subjects - mostra TODAS as disciplinas do template */}
+                {allProfessionalSubjects.length > 0 && (() => {
                   const professionalProgress = getProfessionalProgress(selectedStudent);
                   return (
                     <AccordionItem value="professional" className="border rounded-lg px-4 mb-2">
@@ -564,7 +642,7 @@ export const GradesManager = () => {
                       </AccordionTrigger>
                       <AccordionContent>
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 pt-2">
-                          {professionalSubjects.map(subject => {
+                          {allProfessionalSubjects.map(subject => {
                             const studentGrade = studentGrades.find(sg => sg.studentId === selectedStudent);
                             const gradeValue = studentGrade?.grades[subject] || '';
                             const grade = parseFloat(gradeValue);
@@ -637,6 +715,10 @@ export const GradesManager = () => {
       <SigeImportDialog
         open={showSigeImport}
         onOpenChange={setShowSigeImport}
+        defaultClassId={selectedClass}
+        defaultQuarter={selectedQuarter}
+        defaultSchoolYear={selectedSchoolYear}
+        onRefresh={refreshGrades}
       />
     </div>
   );

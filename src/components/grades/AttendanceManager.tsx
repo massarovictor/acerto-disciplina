@@ -249,20 +249,6 @@ export const AttendanceManager = () => {
             </div>
 
             <div className="space-y-2">
-              <Label>Bimestre *</Label>
-              <Select value={selectedQuarter} onValueChange={setSelectedQuarter}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {QUARTERS.map(quarter => (
-                    <SelectItem key={quarter} value={quarter}>{quarter}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
               <Label>Ano da turma *</Label>
               <Select
                 value={String(selectedSchoolYear)}
@@ -276,6 +262,20 @@ export const AttendanceManager = () => {
                     <SelectItem key={option.value} value={String(option.value)}>
                       {option.label}
                     </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Bimestre *</Label>
+              <Select value={selectedQuarter} onValueChange={setSelectedQuarter}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {QUARTERS.map(quarter => (
+                    <SelectItem key={quarter} value={quarter}>{quarter}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

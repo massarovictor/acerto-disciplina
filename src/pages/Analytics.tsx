@@ -38,6 +38,7 @@ import { ClassComparisonDialog } from '@/components/analytics/ClassComparisonDia
 import { BehaviorAnalyticsPanel } from '@/components/analytics/BehaviorAnalyticsPanel';
 import { CohortComparisonTable } from '@/components/analytics/CohortComparisonTable';
 import { PredictionDialog } from '@/components/analytics/PredictionDialog';
+import { useUIStore } from '@/stores/useUIStore';
 
 // Componente de Insights Inline
 const InlineInsights = ({
@@ -107,15 +108,13 @@ const Analytics = () => {
   const { attendance } = useAttendance();
   const { incidents } = useIncidents();
 
-  const [filters, setFilters] = useState<AnalyticsFilters>({
-    series: [],
-    classIds: [],
-    quarter: 'all',
-    schoolYear: 'all',
-    calendarYear: 'all',
-    includeArchived: false,
-    comparisonClassIds: [],
-  });
+  // ✅ Usando Zustand store para persistir filtros entre navegações
+  const { analyticsUI, setAnalyticsFilters } = useUIStore();
+  const filters = analyticsUI.filters as AnalyticsFilters;
+
+  const setFilters = (newFilters: Partial<AnalyticsFilters>) => {
+    setAnalyticsFilters(newFilters);
+  };
 
   const [showComparison, setShowComparison] = useState(false);
   const [showPredictions, setShowPredictions] = useState(false);
@@ -154,21 +153,20 @@ const Analytics = () => {
       const nextCalendarYear = calendarYear ?? 'all';
 
       if (filters.schoolYear !== nextSchoolYear || filters.calendarYear !== nextCalendarYear) {
-        setFilters((prev) => ({
-          ...prev,
+        setFilters({
           schoolYear: nextSchoolYear,
           calendarYear: nextCalendarYear,
-        }));
+        });
       }
     }
   }, [classes, filters.classIds, filters.comparisonClassIds, filters.schoolYear, filters.calendarYear]);
 
   const handleFilterChange = (newFilters: Partial<AnalyticsFilters>) => {
-    setFilters(prev => ({ ...prev, ...newFilters }));
+    setFilters(newFilters);
   };
 
   const handleCompare = (classIds: string[]) => {
-    setFilters(prev => ({ ...prev, comparisonClassIds: classIds }));
+    setFilters({ comparisonClassIds: classIds });
     setShowComparison(true);
   };
 

@@ -1,12 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSearchParams } from 'react-router-dom';
 import { StudentsRegister } from '@/components/students/StudentsRegister';
 import { StudentsManage } from '@/components/students/StudentsManage';
 import { StudentApprovalManager } from '@/components/students/StudentApprovalManager';
+import { useUIStore } from '@/stores/useUIStore';
 
 const Students = () => {
-  const [activeTab, setActiveTab] = useState('manage');
+  // ✅ Usando Zustand store para persistir tab entre navegações
+  const { studentsUI, setStudentsUI } = useUIStore();
+  const activeTab = studentsUI.activeTab;
+  const setActiveTab = (value: string) => setStudentsUI({ activeTab: value });
   const [searchParams, setSearchParams] = useSearchParams();
   const highlightId = searchParams.get('highlight');
 

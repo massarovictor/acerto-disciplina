@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/table';
 import { useStudents, useClasses } from '@/hooks/useData';
 import { useToast } from '@/hooks/use-toast';
+import { useFormStore } from '@/stores/useFormStore';
 import { ChevronDown, Upload, Download, UserPlus, Camera, X, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { generateStudentTemplate } from '@/lib/excelExport';
@@ -35,18 +36,12 @@ export const StudentsRegister = () => {
   const { students, addStudent } = useStudents();
   const { classes } = useClasses();
   const { toast } = useToast();
-  
-  const [formData, setFormData] = useState({
-    name: '',
-    classId: '',
-    birthDate: '',
-    gender: '',
-    enrollment: '',
-    censusId: '',
-    cpf: '',
-    rg: '',
-    photoUrl: '',
-  });
+
+  // ✅ Usando Zustand store para persistir formulário entre navegações
+  const { studentForm: formData, setStudentForm, resetStudentForm } = useFormStore();
+
+  // Helper para atualizar campos do formulário
+  const setFormData = (updates: Partial<typeof formData>) => setStudentForm(updates);
 
   const [photoPreview, setPhotoPreview] = useState<string>('');
   const [isOfficialDataOpen, setIsOfficialDataOpen] = useState(false);
@@ -106,7 +101,7 @@ export const StudentsRegister = () => {
 
     // Check for duplicates
     const cleanedCPF = formData.cpf ? formData.cpf.replace(/\D/g, '') : '';
-    const duplicate = cleanedCPF ? students.find(s => 
+    const duplicate = cleanedCPF ? students.find(s =>
       s.cpf && s.cpf.replace(/\D/g, '') === cleanedCPF
     ) : null;
     if (duplicate) {
@@ -137,17 +132,7 @@ export const StudentsRegister = () => {
         description: 'Aluno cadastrado com sucesso.',
       });
 
-      setFormData({
-        name: '',
-        classId: '',
-        birthDate: '',
-        gender: '',
-        enrollment: '',
-        censusId: '',
-        cpf: '',
-        rg: '',
-        photoUrl: '',
-      });
+      resetStudentForm();
       setPhotoPreview('');
     } catch (error) {
       toast({
@@ -279,7 +264,7 @@ export const StudentsRegister = () => {
 
   const handleImportConfirm = async () => {
     const validRows = importPreview.filter(r => r.isValid);
-    
+
     if (validRows.length === 0) {
       toast({
         title: 'Erro',
@@ -295,11 +280,11 @@ export const StudentsRegister = () => {
 
     // Processar alunos sequencialmente para evitar problemas de concorrência
     console.log(`[IMPORTAÇÃO] Iniciando importação de ${validRows.length} alunos válidos`);
-    
+
     for (let index = 0; index < validRows.length; index++) {
       const row = validRows[index];
       console.log(`[IMPORTAÇÃO] Linha ${row.rowNumber}: Processando`, row.data);
-      
+
       try {
         // Usar o classId que foi validado pela planilha (baseado no nome da turma)
         if (!row.data.classId || row.data.classId === '') {
@@ -372,7 +357,7 @@ export const StudentsRegister = () => {
       }
     }
 
-    const description = imported > 0 
+    const description = imported > 0
       ? `${imported} aluno(s) importado(s) com sucesso.${errors > 0 ? ` ${errors} erro(s): ${errorMessages.slice(0, 3).join('; ')}${errorMessages.length > 3 ? '...' : ''}` : ''}`
       : `Nenhum aluno foi importado. Erros: ${errorMessages.slice(0, 5).join('; ')}`;
 
@@ -567,17 +552,7 @@ export const StudentsRegister = () => {
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  setFormData({
-                    name: '',
-                    classId: '',
-                    birthDate: '',
-                    gender: '',
-                    enrollment: '',
-                    censusId: '',
-                    cpf: '',
-                    rg: '',
-                    photoUrl: '',
-                  });
+                  resetStudentForm();
                   setPhotoPreview('');
                 }}
               >
@@ -601,32 +576,31 @@ export const StudentsRegister = () => {
           {/* Seletor de Turma */}
           <div className="space-y-2">
             <Label htmlFor="import-class">Selecione a Turma *</Label>
-            <Select 
-              value={selectedClassForImport} 
+            <Select
+              value={selectedClassForImport}
               onValueChange={setSelectedClassForImport}
             >
               <SelectTrigger id="import-class">
                 <SelectValue placeholder="Selecione a turma para importação" />
               </SelectTrigger>
               <SelectContent>
-                    {classes.filter(c => c.active && !c.archived).map(cls => (
-                      <SelectItem key={cls.id} value={cls.id}>
-                        {cls.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {classes.filter(c => c.active && !c.archived).map(cls => (
+                  <SelectItem key={cls.id} value={cls.id}>
+                    {cls.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <p className="text-sm text-muted-foreground">
               O nome da turma selecionada será pré-preenchido no modelo de planilha e usado para todos os alunos importados.
             </p>
           </div>
 
           <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              isDragOver
-                ? 'border-primary bg-primary/5'
-                : 'border-border'
-            } ${!selectedClassForImport ? 'opacity-50 pointer-events-none' : ''}`}
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${isDragOver
+              ? 'border-primary bg-primary/5'
+              : 'border-border'
+              } ${!selectedClassForImport ? 'opacity-50 pointer-events-none' : ''}`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}

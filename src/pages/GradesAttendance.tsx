@@ -1,10 +1,13 @@
-import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GradesManager } from '@/components/grades/GradesManager';
 import { AttendanceManager } from '@/components/grades/AttendanceManager';
+import { useUIStore } from '@/stores/useUIStore';
 
 const GradesAttendance = () => {
-  const [activeTab, setActiveTab] = useState('grades');
+  // ✅ Usando Zustand store para persistir tab entre navegações
+  const { gradesAttendanceUI, setGradesAttendanceUI } = useUIStore();
+  const activeTab = gradesAttendanceUI.activeTab;
+  const setActiveTab = (value: string) => setGradesAttendanceUI({ activeTab: value });
 
   return (
     <div className="p-6 space-y-6">

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Archive } from 'lucide-react';
@@ -6,9 +6,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ClassesManage } from '@/components/classes/ClassesManage';
 import { ClassesCreate } from '@/components/classes/ClassesCreate';
 import { SubjectTemplatesManager } from '@/components/classes/SubjectTemplatesManager';
+import { useUIStore } from '@/stores/useUIStore';
 
 const Classes = () => {
-  const [activeTab, setActiveTab] = useState('manage');
+  // ✅ Usando Zustand store para persistir tab entre navegações
+  const { classesUI, setClassesUI } = useUIStore();
+  const activeTab = classesUI.activeTab;
+  const setActiveTab = (value: string) => setClassesUI({ activeTab: value });
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const highlightId = searchParams.get('highlight');

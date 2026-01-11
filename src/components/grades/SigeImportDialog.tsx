@@ -22,8 +22,7 @@ import {
     FileText,
     CheckCircle2,
     AlertTriangle,
-    Loader2,
-    X
+    Loader2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useClasses, useStudents, useGrades, useProfessionalSubjects, useProfessionalSubjectTemplates } from '@/hooks/useData';
@@ -36,20 +35,6 @@ import {
     normalizeSubjectName,
     normalizeNameForComparison
 } from '@/lib/sigeParser';
-import { ChevronsUpDown, Check } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-} from "@/components/ui/command"
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/components/ui/popover"
 
 interface StudentMatch {
     fileStudentName: string;
@@ -68,9 +53,20 @@ interface SubjectMapping {
 interface SigeImportDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    defaultClassId?: string;
+    defaultQuarter?: string;
+    defaultSchoolYear?: 1 | 2 | 3;
+    onRefresh: () => Promise<void>;
 }
 
-export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) => {
+export const SigeImportDialog = ({
+    open,
+    onOpenChange,
+    defaultClassId,
+    defaultQuarter,
+    defaultSchoolYear,
+    onRefresh,
+}: SigeImportDialogProps) => {
     const { classes } = useClasses();
     const { students } = useStudents();
     const { addGrade, deleteGrade, grades: existingGrades } = useGrades();
@@ -84,6 +80,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
     const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
     const [importPhase, setImportPhase] = useState<'deleting' | 'importing'>('importing');
     const [parseResult, setParseResult] = useState<SigeParseResult | null>(null);
+    const [fileQuarter, setFileQuarter] = useState<string | null>(null);
     const [selectedClass, setSelectedClass] = useState('');
     const [selectedQuarter, setSelectedQuarter] = useState('1º Bimestre');
     const [selectedSchoolYear, setSelectedSchoolYear] = useState<1 | 2 | 3>(1);
@@ -91,6 +88,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
     const [importableGrades, setImportableGrades] = useState<ImportableGrade[]>([]);
     const [studentMatches, setStudentMatches] = useState<StudentMatch[]>([]);
     const [subjectMappings, setSubjectMappings] = useState<SubjectMapping[]>([]);
+    const [lastSelectedClass, setLastSelectedClass] = useState<string | null>(null);
 
     const activeClasses = classes.filter(c => !c.archived && c.active);
     const schoolYearOptions: Array<{ value: 1 | 2 | 3; label: string }> = [
@@ -104,19 +102,82 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
     );
 
     useEffect(() => {
+        if (!open) return;
+        if (defaultClassId) setSelectedClass(defaultClassId);
+        if (defaultQuarter) setSelectedQuarter(defaultQuarter);
+        if (defaultSchoolYear) setSelectedSchoolYear(defaultSchoolYear);
+    }, [open, defaultClassId, defaultQuarter, defaultSchoolYear]);
+
+    useEffect(() => {
         if (!selectedClass) {
-            setSelectedSchoolYear(1);
+            setSelectedSchoolYear(defaultSchoolYear ?? 1);
+            setLastSelectedClass(null);
             return;
         }
-        const defaultYear = selectedClassData?.currentYear ?? 1;
-        const normalizedYear = [1, 2, 3].includes(defaultYear as number)
-            ? (defaultYear as 1 | 2 | 3)
+        if (selectedClass === lastSelectedClass) return;
+
+        const useDefaultForClass = defaultClassId && selectedClass === defaultClassId;
+        const baseYear = useDefaultForClass
+            ? (defaultSchoolYear ?? selectedClassData?.currentYear ?? 1)
+            : (selectedClassData?.currentYear ?? 1);
+        const parsedYear = Number(baseYear);
+        const normalizedYear = [1, 2, 3].includes(parsedYear)
+            ? (parsedYear as 1 | 2 | 3)
             : 1;
         setSelectedSchoolYear(normalizedYear);
-    }, [selectedClass, selectedClassData?.currentYear]);
+        setLastSelectedClass(selectedClass);
+    }, [
+        selectedClass,
+        selectedClassData?.currentYear,
+        defaultClassId,
+        defaultSchoolYear,
+        lastSelectedClass,
+    ]);
+
+    const normalizeTemplateYear = (value: unknown): 1 | 2 | 3 | null => {
+        const parsed = Number(value);
+        if (parsed === 1 || parsed === 2 || parsed === 3) {
+            return parsed as 1 | 2 | 3;
+        }
+        return null;
+    };
+
+    const getTemplateSubjectsForClass = (classId: string): string[] => {
+        const classData = classes.find((c) => c.id === classId);
+        if (!classData?.templateId) return [];
+        const template = templates.find((t) => t.id === classData.templateId);
+        if (!template) return [];
+        const yearData = template.subjectsByYear.find(
+            (y) => normalizeTemplateYear(y.year) === selectedSchoolYear,
+        );
+        return yearData?.subjects ?? [];
+    };
+
+    // NOVA: Retorna TODAS as disciplinas do template de todos os anos
+    // Usado para validação na importação - aceita disciplinas de qualquer ano
+    const getAllTemplateSubjectsForClass = (classId: string): string[] => {
+        const classData = classes.find((c) => c.id === classId);
+        if (!classData?.templateId) return [];
+        const template = templates.find((t) => t.id === classData.templateId);
+        if (!template) return [];
+
+        const allSubjects = new Set<string>();
+        for (const yearData of template.subjectsByYear) {
+            for (const subject of yearData.subjects) {
+                allSubjects.add(subject);
+            }
+        }
+        return Array.from(allSubjects);
+    };
+
+    const templateSubjectsForSelectedClass = useMemo(
+        () => (selectedClass ? getTemplateSubjectsForClass(selectedClass) : []),
+        [selectedClass, classes, templates, selectedSchoolYear],
+    );
 
     // Função para obter disciplinas válidas de uma turma
     // Retorna tanto o nome original quanto o normalizado para comparação flexível
+    // IMPORTANTE: Usa getAllTemplateSubjectsForClass para aceitar disciplinas de todos os anos!
     const getValidSubjectsForClass = (
         classId: string
     ): { original: string; normalized: string }[] => {
@@ -126,17 +187,11 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
             normalized: normalizeNameForComparison(normalizeSubjectName(s))
         }));
 
-        const templateSubjects = (() => {
-            const classData = classes.find((c) => c.id === classId);
-            if (!classData?.templateId) return [];
-            const template = templates.find((t) => t.id === classData.templateId);
-            const yearData = template?.subjectsByYear.find((y) => y.year === selectedSchoolYear);
-            const byYear = yearData?.subjects ?? [];
-            if (byYear.length > 0) return byYear;
-            return template?.subjectsByYear.flatMap((y) => y.subjects ?? []) ?? [];
-        })();
+        // IMPORTANTE: Usar TODAS as disciplinas do template (todos os anos)
+        // para que disciplinas de qualquer ano sejam aceitas na importação
+        const templateSubjects = getAllTemplateSubjectsForClass(classId);
 
-        // Disciplinas Profissionais da turma (verificar se existe antes de filtrar)
+        // Disciplinas Profissionais da turma (manuais)
         const classSubjects = (professionalSubjects || [])
             .filter(ps => ps.classId === classId)
             .map(ps => ({
@@ -165,45 +220,85 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
         return allValidSubjects;
     };
 
-    // Função para verificar se uma disciplina é válida (comparação flexível)
-    // Agora também considera os mapeamentos manuais
+    // Função para verificar se uma disciplina é válida (comparação normalizada)
+    // Usa matching baseado em palavras para disciplinas técnicas longas
     const isValidSubject = (
         subject: string,
         validSubjects: { original: string; normalized: string }[],
-        mappings: SubjectMapping[] = []
+        mappings: SubjectMapping[] = [],
+        debug = false
     ): string | null => {
-        // Primeiro: verificar se há mapeamento manual
+        // 1. PRIORIDADE: verificar se há mapeamento manual
         const manualMapping = mappings.find(m => m.excelSubject === subject);
         if (manualMapping) {
+            if (debug) console.log(`[SUBJECT MATCH] "${subject}" → Manual mapping: ${manualMapping.systemSubject ?? 'IGNORADO'}`);
             return manualMapping.systemSubject; // Pode ser null se foi ignorado
         }
 
-        const normalizedSubject = normalizeNameForComparison(normalizeSubjectName(subject));
+        const normalizedSubject = normalizeNameForComparison(subject);
+        // Palavras significativas (ignorar preposições curtas)
+        const subjectWords = normalizedSubject.split(/\s+/).filter(w => w.length > 2);
 
-        // Segundo: match exato pelo nome normalizado
+        if (debug) {
+            console.log(`[SUBJECT MATCH] "${subject}"`);
+            console.log(`  → Normalized: "${normalizedSubject}"`);
+            console.log(`  → Words: [${subjectWords.join(', ')}]`);
+        }
+
+        // 2. Match exato pelo nome normalizado
         const exactMatch = validSubjects.find(vs => vs.normalized === normalizedSubject);
-        if (exactMatch) return exactMatch.original;
+        if (exactMatch) {
+            if (debug) console.log(`  → EXACT MATCH: "${exactMatch.original}"`);
+            return exactMatch.original;
+        }
 
-        // Terceiro: match por inclusão flexível (palavras principais)
-        const subjectWords = normalizedSubject.split(' ').filter(w => w.length >= 3);
+        // 3. Word-based similarity (pelo menos 60% das palavras coincidem)
+        let bestWordMatch: { subject: string; ratio: number } | null = null;
 
         for (const vs of validSubjects) {
-            const vsWords = vs.normalized.split(' ').filter(w => w.length >= 3);
+            const targetWords = vs.normalized.split(/\s+/).filter(w => w.length > 2);
+            if (targetWords.length === 0 || subjectWords.length === 0) continue;
 
-            // Se todas as palavras principais do Excel estão no template (ou vice-versa)
-            const matchingWords = subjectWords.filter(sw =>
-                vsWords.some(vw => vw.includes(sw) || sw.includes(vw))
+            // Contar palavras que coincidem (incluindo parcialmente)
+            const matchingWords = subjectWords.filter(w =>
+                targetWords.some(tw => tw.includes(w) || w.includes(tw))
             );
 
-            // Se 70% ou mais das palavras principais casam
-            const matchRatio = matchingWords.length / Math.max(subjectWords.length, 1);
-            if (matchRatio >= 0.7 && matchingWords.length >= 1) {
-                return vs.original;
+            const matchRatio = matchingWords.length / Math.max(subjectWords.length, targetWords.length);
+
+            if (debug && matchRatio > 0.3) {
+                console.log(`  → Comparing with "${vs.original}": ${matchingWords.length}/${Math.max(subjectWords.length, targetWords.length)} words match (${(matchRatio * 100).toFixed(0)}%)`);
+            }
+
+            if (matchRatio >= 0.6 && (!bestWordMatch || matchRatio > bestWordMatch.ratio)) {
+                bestWordMatch = { subject: vs.original, ratio: matchRatio };
             }
         }
 
+        if (bestWordMatch) {
+            if (debug) console.log(`  → WORD MATCH: "${bestWordMatch.subject}" (${(bestWordMatch.ratio * 100).toFixed(0)}%)`);
+            return bestWordMatch.subject;
+        }
+
+        // 4. Substring match como fallback (uma contém a outra)
+        const substringMatch = validSubjects.find((vs) => {
+            const targetNormalized = vs.normalized;
+            if (Math.min(normalizedSubject.length, targetNormalized.length) < 3) return false;
+            if (normalizedSubject.includes(targetNormalized) || targetNormalized.includes(normalizedSubject)) {
+                return true;
+            }
+            return false;
+        });
+
+        if (substringMatch) {
+            if (debug) console.log(`  → SUBSTRING MATCH: "${substringMatch.original}"`);
+            return substringMatch.original;
+        }
+
+        if (debug) console.log(`  → NO MATCH FOUND`);
         return null; // Não encontrou match
     };
+
 
     // Função para preparar mapeamentos de disciplinas
     const prepareSubjectMappings = () => {
@@ -212,8 +307,23 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
         const validSubjects = getValidSubjectsForClass(selectedClass);
         const mappings: SubjectMapping[] = [];
 
+        // Debug: mostrar breakdown de disciplinas
+        const templateByYear = getTemplateSubjectsForClass(selectedClass);
+        const templateAll = getAllTemplateSubjectsForClass(selectedClass);
+        console.log('=== DEBUG: DISCIPLINAS VÁLIDAS ===');
+        console.log(`Turma selecionada: ${selectedClass}`);
+        console.log(`Ano selecionado: ${selectedSchoolYear}º ano`);
+        console.log(`Disciplinas do template para ${selectedSchoolYear}º ano: ${templateByYear.length}`, templateByYear);
+        console.log(`Disciplinas do template (todos os anos): ${templateAll.length}`, templateAll);
+        console.log(`Disciplinas manuais da turma: ${professionalSubjects.filter(ps => ps.classId === selectedClass).length}`);
+        console.log(`Total de disciplinas válidas (ENEM + template + manuais): ${validSubjects.length}`);
+        console.log('');
+        console.log('=== MAPEAMENTO DE DISCIPLINAS ===');
+        console.log(`Disciplinas no arquivo Excel: ${parseResult.subjects.length}`);
+        console.log(`Disciplinas válidas no sistema: ${validSubjects.length}`);
+
         for (const excelSubject of parseResult.subjects) {
-            const autoMatch = isValidSubject(excelSubject, validSubjects, []);
+            const autoMatch = isValidSubject(excelSubject, validSubjects, [], true);
             mappings.push({
                 excelSubject,
                 systemSubject: autoMatch,
@@ -221,9 +331,15 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
             });
         }
 
+        const matched = mappings.filter(m => m.autoMatched).length;
+        const unmatched = mappings.filter(m => !m.autoMatched).length;
+        console.log('');
+        console.log(`=== RESULTADO: ${matched} mapeadas automaticamente, ${unmatched} precisam mapeamento manual ===`);
+
         setSubjectMappings(mappings);
         setStep('map-subjects');
     };
+
 
     // Função para atualizar um mapeamento
     const updateSubjectMapping = (excelSubject: string, systemSubject: string | null) => {
@@ -252,6 +368,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
 
         setStep('upload');
         setParseResult(null);
+        setFileQuarter(null);
         setImportableGrades([]);
         setStudentMatches([]);
         setIsProcessing(true);
@@ -268,6 +385,14 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                     description: `${result.rows.length} alunos e ${result.subjects.length} disciplinas encontradas: ${subjectsSummary}`,
                 });
                 console.log('[INFO] Disciplinas encontradas no Excel:', result.subjects);
+
+                setFileQuarter(result.quarter ?? null);
+                if (result.quarter && result.quarter !== selectedQuarter) {
+                    toast({
+                        title: 'Bimestre detectado no arquivo',
+                        description: `Arquivo indica ${result.quarter}, mas está selecionado ${selectedQuarter}.`,
+                    });
+                }
 
                 // Preparar matches imediatamente com o resultado
                 if (selectedClass) {
@@ -303,6 +428,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                 }
 
                 setParseResult(result);
+
                 setStep('match-students');
             } else {
                 toast({
@@ -418,8 +544,8 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                         similarity: match.similarity,
                         classId: selectedClass,
                         subject: matchedSubject, // Usar o nome normalizado/oficial
-                        quarter: selectedQuarter,
-                        schoolYear: selectedSchoolYear,
+                        quarter: parseResult.quarter ?? selectedQuarter,
+                        schoolYear: parseResult.schoolYear ?? selectedSchoolYear,
                         grade,
                         selected: true,
                     });
@@ -479,6 +605,25 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
     };
 
     const handleImport = async () => {
+        // Validação crítica
+        if (!selectedSchoolYear) {
+            toast({
+                title: 'Erro de Configuração',
+                description: 'Ano letivo (1, 2 ou 3) não foi selecionado. A importação não pode continuar.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        if (!selectedQuarter) {
+            toast({
+                title: 'Erro de Configuração',
+                description: 'Bimestre não foi selecionado. A importação não pode continuar.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
         const toImport = importableGrades.filter(g => g.selected);
 
         if (toImport.length === 0) {
@@ -549,67 +694,70 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
             setImportPhase('importing');
             setImportProgress({ current: 0, total: toImport.length });
 
-            const BATCH_SIZE = 50; // Processar 50 notas por vez em paralelo
-            const batches = [];
+            // MODO DE DEBUG SEQUENCIAL (Lento, mas seguro e verbose)
+            console.log(`⚡ Iniciando modo de importação sequencial para ${toImport.length} notas...`);
 
-            for (let i = 0; i < toImport.length; i += BATCH_SIZE) {
-                batches.push(toImport.slice(i, i + BATCH_SIZE));
-            }
+            for (let i = 0; i < toImport.length; i++) {
+                const grade = toImport[i];
 
-            console.log(`⚡ Processando ${toImport.length} notas em ${batches.length} lotes de ${BATCH_SIZE}`);
+                try {
+                    // Cleanup de strings para evitar "espaços fantasma"
+                    const cleanSubject = grade.subject.trim();
+                    const cleanQuarter = selectedQuarter.trim();
 
-            for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-                const batch = batches[batchIndex];
+                    // Se não está substituindo, verificar se existe
+                    const existing = !replaceExisting ? existingGrades.find(
+                        g => g.studentId === grade.studentId &&
+                            g.subject === cleanSubject &&
+                            g.quarter === cleanQuarter &&
+                            g.classId === grade.classId &&
+                            (g.schoolYear ?? 1) === selectedSchoolYear
+                    ) : null;
 
-                // Processar TODAS as notas do lote em PARALELO
-                const batchPromises = batch.map(async (grade) => {
-                    try {
-                        // Se não está substituindo, verificar se existe
-                        const existing = !replaceExisting ? existingGrades.find(
-                            g => g.studentId === grade.studentId &&
-                                g.subject === grade.subject &&
-                                g.quarter === grade.quarter &&
-                                g.classId === grade.classId &&
-                                (g.schoolYear ?? 1) === selectedSchoolYear
-                        ) : null;
+                    // DEBUG DETALHADO POR NOTA
+                    console.log(`[SEQ IMPORT ${i + 1}/${toImport.length}] Tentando salvar:`, {
+                        student: grade.studentName,
+                        subject: cleanSubject,
+                        grade: grade.grade
+                    });
 
-                        await addGrade({
-                            studentId: grade.studentId,
-                            classId: grade.classId,
-                            subject: grade.subject,
-                            quarter: grade.quarter,
-                            schoolYear: grade.schoolYear ?? selectedSchoolYear,
-                            grade: grade.grade,
-                        });
+                    await addGrade({
+                        studentId: grade.studentId,
+                        classId: grade.classId,
+                        subject: cleanSubject,
+                        quarter: cleanQuarter, // FORÇAR O BIMESTRE SELECIONADO
+                        schoolYear: selectedSchoolYear, // FORÇAR O ANO SELECIONADO
+                        grade: grade.grade,
+                    });
 
-                        if (existing) {
-                            updated++;
-                        } else {
-                            imported++;
-                        }
-
-                        return { success: true };
-                    } catch (error) {
-                        console.error(`Erro ao importar nota:`, error);
-                        errors++;
-                        return { success: false, error };
+                    if (existing) {
+                        updated++;
+                    } else {
+                        imported++;
                     }
-                });
 
-                // Aguardar TODAS as notas do lote serem processadas
-                await Promise.all(batchPromises);
+                    // Atualizar progresso a cada nota (feedback real-time)
+                    setImportProgress({
+                        current: i + 1,
+                        total: toImport.length
+                    });
 
-                // Atualizar progresso após cada lote
-                const processedCount = Math.min((batchIndex + 1) * BATCH_SIZE, toImport.length);
-                setImportProgress({
-                    current: processedCount,
-                    total: toImport.length
-                });
+                } catch (error) {
+                    console.error(`❌ FALHA AO IMPORTAR NOTA [${i + 1}/${toImport.length}]:`);
+                    console.error(`Aluno: ${grade.studentName}`);
+                    console.error(`Disciplina: ${grade.subject}`);
+                    console.error(`Erro cru:`, error);
+                    errors++;
+                }
             }
 
-            console.log(`✅ Importação concluída: ${imported} importadas, ${updated} atualizadas, ${errors} erros`);
+            console.log(`✅ Importação SEQUENCIAL concluída: ${imported} importadas, ${updated} atualizadas, ${errors} erros`);
         } finally {
             setIsImporting(false);
+            // Chamar refresh do hook para atualizar estado
+            console.log('🔄 Chamando onRefresh para atualizar dados...');
+            await onRefresh();
+            console.log('✅ onRefresh concluído. Verifique o log de TOTAL DE NOTAS NO ESTADO.');
         }
 
         if (errors > 0) {
@@ -632,20 +780,25 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
         // Reset e fechar
         setStep('configure');
         setParseResult(null);
+        setFileQuarter(null);
         setImportableGrades([]);
         setStudentMatches([]);
+        setSubjectMappings([]);
         onOpenChange(false);
     };
 
     const handleClose = () => {
         setStep('configure');
         setParseResult(null);
+        setFileQuarter(null);
         setImportableGrades([]);
         setStudentMatches([]);
+        setSubjectMappings([]);
         onOpenChange(false);
     };
 
     const selectedGradesCount = importableGrades.filter(g => g.selected).length;
+    const quarterMismatch = !!fileQuarter && fileQuarter !== selectedQuarter;
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
@@ -686,20 +839,6 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Bimestre *</Label>
-                                <Select value={selectedQuarter} onValueChange={setSelectedQuarter}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Selecione o bimestre" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {QUARTERS.map(q => (
-                                            <SelectItem key={q} value={q}>{q}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="space-y-2">
                                 <Label>Ano da turma *</Label>
                                 <Select
                                     value={String(selectedSchoolYear)}
@@ -717,6 +856,30 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                                     </SelectContent>
                                 </Select>
                             </div>
+
+                            <div className="space-y-2">
+                                <Label>Bimestre *</Label>
+                                <Select value={selectedQuarter} onValueChange={setSelectedQuarter}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Selecione o bimestre" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {QUARTERS.map(q => (
+                                            <SelectItem key={q} value={q}>{q}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {selectedClass && selectedClassData?.templateId && templateSubjectsForSelectedClass.length === 0 && (
+                                <Alert>
+                                    <AlertTriangle className="h-4 w-4" />
+                                    <AlertDescription>
+                                        Nenhuma disciplina profissional cadastrada para o {selectedSchoolYear}º ano neste template.
+                                        Apenas disciplinas da base comum e disciplinas manuais da turma serão consideradas.
+                                    </AlertDescription>
+                                </Alert>
+                            )}
 
                             {/* Opção de substituir notas */}
                             <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
@@ -796,6 +959,26 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                                 Altere manualmente ou selecione "Ignorar" para não importar notas de um aluno.
                             </AlertDescription>
                         </Alert>
+
+                        {quarterMismatch && (
+                            <Alert>
+                                <AlertTriangle className="h-4 w-4" />
+                                <AlertDescription className="flex flex-wrap items-center gap-2">
+                                    <span>
+                                        O arquivo indica <strong>{fileQuarter}</strong>, mas está selecionado{' '}
+                                        <strong>{selectedQuarter}</strong>.
+                                    </span>
+                                    <Button
+                                        type="button"
+                                        variant="link"
+                                        className="p-0 h-auto"
+                                        onClick={() => fileQuarter && setSelectedQuarter(fileQuarter)}
+                                    >
+                                        Usar {fileQuarter}
+                                    </Button>
+                                </AlertDescription>
+                            </Alert>
+                        )}
 
                         <ScrollArea className="h-[400px] border rounded-lg">
                             <Table>
@@ -909,6 +1092,15 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
                                                                     {vs.original}
                                                                 </SelectItem>
                                                             ))}
+                                                            {/* Opção para usar o nome do Excel diretamente se não está na lista */}
+                                                            {!validSubjects.some(vs => vs.original === mapping.excelSubject) && (
+                                                                <SelectItem
+                                                                    value={mapping.excelSubject}
+                                                                    className="text-blue-600 font-medium"
+                                                                >
+                                                                    ➕ Usar "{mapping.excelSubject}" como está
+                                                                </SelectItem>
+                                                            )}
                                                         </SelectContent>
                                                     </Select>
                                                 </TableCell>

@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AlertCircle, Info, Calendar } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFormStore } from '@/stores/useFormStore';
 
 interface ClassesCreateProps {
   onSuccess?: () => void;
@@ -26,17 +27,11 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
 
   const currentCalendarYear = new Date().getFullYear();
 
-  const [formData, setFormData] = useState({
-    templateId: '',
-    letter: '',
-    course: '',
-    startCalendarYear: currentCalendarYear,
-    endCalendarYear: currentCalendarYear + 2,
-    currentSeries: 1 as 1 | 2 | 3,
-    startYearDate: `${currentCalendarYear}-02-01`,
-    directorEmail: '',
-    active: true,
-  });
+  // ✅ Usando Zustand store para persistir formulário entre navegações
+  const { classForm: formData, setClassForm, resetClassForm } = useFormStore();
+
+  // Helper para atualizar campos do formulário
+  const setFormData = (updates: Partial<typeof formData>) => setClassForm(updates);
 
   const [templateSubjects, setTemplateSubjects] = useState<string[]>([]);
   const [templateSubjectsByYear, setTemplateSubjectsByYear] = useState<
@@ -66,15 +61,15 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
 
       if (currentYear < formData.startCalendarYear) {
         // Turma ainda não começou
-        setFormData(prev => ({ ...prev, currentSeries: 1 }));
+        setFormData({ currentSeries: 1 });
       } else if (currentYear > formData.endCalendarYear) {
         // Turma já terminou
-        setFormData(prev => ({ ...prev, currentSeries: 3 }));
+        setFormData({ currentSeries: 3 });
       } else {
         // Turma em andamento - calcular série atual
         const yearsElapsed = currentYear - formData.startCalendarYear + 1;
         const series = Math.min(yearsElapsed, 3) as 1 | 2 | 3;
-        setFormData(prev => ({ ...prev, currentSeries: series }));
+        setFormData({ currentSeries: series });
       }
     }
   }, [formData.startCalendarYear, formData.endCalendarYear]);
@@ -85,10 +80,7 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
       const template = templates.find((t) => t.id === formData.templateId);
       if (template) {
         // Preencher curso automaticamente
-        setFormData(prev => ({
-          ...prev,
-          course: template.course,
-        }));
+        setFormData({ course: template.course });
 
         setTemplateSubjectsByYear(template.subjectsByYear);
 
@@ -99,10 +91,7 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
     } else {
       setTemplateSubjects([]);
       setTemplateSubjectsByYear([]);
-      setFormData(prev => ({
-        ...prev,
-        course: '',
-      }));
+      setFormData({ course: '' });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.templateId, formData.currentSeries, templates]);
@@ -207,17 +196,7 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
       });
 
       // Reset form
-      setFormData({
-        templateId: '',
-        letter: '',
-        course: '',
-        startCalendarYear: currentCalendarYear,
-        endCalendarYear: currentCalendarYear + 2,
-        currentSeries: 1,
-        startYearDate: `${currentCalendarYear}-02-01`,
-        directorEmail: '',
-        active: true,
-      });
+      resetClassForm();
       setTemplateSubjects([]);
 
       onSuccess?.();
@@ -321,21 +300,14 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
               <Label htmlFor="endCalendarYear">Ano de Término *</Label>
               <Select
                 value={formData.endCalendarYear?.toString() || ''}
-                onValueChange={(value) =>
-                  setFormData((prev) => {
-                    const nextEnd = parseInt(value);
-                    if (prev.startCalendarYear && nextEnd < prev.startCalendarYear) {
-                      return {
-                        ...prev,
-                        endCalendarYear: prev.startCalendarYear + 2,
-                      };
-                    }
-                    return {
-                      ...prev,
-                      endCalendarYear: nextEnd,
-                    };
-                  })
-                }
+                onValueChange={(value) => {
+                  const nextEnd = parseInt(value);
+                  if (formData.startCalendarYear && nextEnd < formData.startCalendarYear) {
+                    setFormData({ endCalendarYear: formData.startCalendarYear + 2 });
+                  } else {
+                    setFormData({ endCalendarYear: nextEnd });
+                  }
+                }}
               >
                 <SelectTrigger id="endCalendarYear">
                   <SelectValue placeholder="Selecione o ano" />

@@ -135,6 +135,40 @@ const GLOBAL_SUBJECT_MAPPING: Record<string, string> = {
     'REDES DE COMPUTADORES': 'Redes de Computadores',
     'PROGRAMAÇÃO': 'Programação',
     'PROGRAMACAO': 'Programação',
+    // Disciplinas técnicas adicionais
+    'ADMINISTRACAO DA PRODUCAO QUALIDADE E PROCESSOS': 'Administração da Produção, Qualidade e Processos',
+    'ADMINISTRAÇÃO DA PRODUÇÃO QUALIDADE E PROCESSOS': 'Administração da Produção, Qualidade e Processos',
+    'ADMINISTRACAO DA PRODUCAO, QUALIDADE E PROCESSOS': 'Administração da Produção, Qualidade e Processos',
+    'ADMINISTRAÇÃO DA PRODUÇÃO, QUALIDADE E PROCESSOS': 'Administração da Produção, Qualidade e Processos',
+    'PRODUCAO': 'Produção',
+    'PRODUÇÃO': 'Produção',
+    'QUALIDADE': 'Qualidade',
+    'PROCESSOS': 'Processos',
+    'EMPREENDEDORISMO': 'Empreendedorismo',
+    'GESTÃO': 'Gestão',
+    'GESTAO': 'Gestão',
+    'MARKETING': 'Marketing',
+    'RECURSOS HUMANOS': 'Recursos Humanos',
+    'FINANÇAS': 'Finanças',
+    'FINANCAS': 'Finanças',
+    'PROJETO INTEGRADOR': 'Projeto Integrador',
+    'PROJETO DE VIDA': 'Projeto de Vida',
+    'ELETIVA': 'Eletiva',
+    'ESTUDO ORIENTADO': 'Estudo Orientado',
+    'FORMAÇÃO PARA CIDADANIA': 'Formação para Cidadania',
+    'FORMACAO PARA CIDADANIA': 'Formação para Cidadania',
+    // Segurança e saúde
+    'SEGURANCA DO TRABALHO': 'Segurança do Trabalho',
+    'SEGURANÇA DO TRABALHO': 'Segurança do Trabalho',
+    'SAUDE E SEGURANCA': 'Saúde e Segurança',
+    'SAÚDE E SEGURANÇA': 'Saúde e Segurança',
+    // Tecnologia
+    'HARDWARE': 'Hardware',
+    'SOFTWARE': 'Software',
+    'ARQUITETURA DE COMPUTADORES': 'Arquitetura de Computadores',
+    'CABEAMENTO ESTRUTURADO': 'Cabeamento Estruturado',
+    'SEGURANCA DA INFORMACAO': 'Segurança da Informação',
+    'SEGURANÇA DA INFORMAÇÃO': 'Segurança da Informação',
 };
 
 const SUBJECT_MAPPING = new Map(
@@ -155,14 +189,6 @@ export function normalizeSubjectName(subject: string): string {
         return directMatch;
     }
 
-    // Tenta match parcial apenas para chaves com mais de uma palavra
-    for (const [key, value] of SUBJECT_MAPPING.entries()) {
-        if (key.split(' ').length < 2) continue;
-        if (normalized.includes(key)) {
-            return value;
-        }
-    }
-
     return subject.replace(/\s+/g, ' ').trim();
 }
 
@@ -173,6 +199,7 @@ export interface SigeParseResult {
     success: boolean;
     className?: string;
     quarter?: string;
+    schoolYear?: 1 | 2 | 3;
     subjects: string[];
     rows: SigeGradeRow[];
     errors: string[];
@@ -338,25 +365,25 @@ const isExcludedHeader = (normalized: string): boolean => {
 const isLikelySubjectHeader = (value: string): boolean => {
     const normalized = normalizeHeaderText(value);
     if (!normalized) return false;
-    
+
     // Deve ter pelo menos uma letra
     if (!/[A-Z]/.test(normalized)) return false;
-    
+
     // Não pode ser coluna de nome
     if (HEADER_NAME_KEYS.some((key) => normalized.includes(key))) return false;
-    
+
     // Não pode ser coluna excluída
     if (isExcludedHeader(normalized)) return false;
-    
+
     // Contar caracteres alfabéticos
     const alphaCount = (normalized.match(/[A-Z]/g) || []).length;
-    
+
     // Se tem pelo menos 3 caracteres alfabéticos, provavelmente é uma disciplina
     if (alphaCount >= 3) return true;
-    
+
     // Aceitar abreviações curtas (2-4 letras)
     if (alphaCount >= 2 && normalized.length <= 5) return true;
-    
+
     // Aceitar nomes compostos longos (ex: "SISTEMA OPERACIONAL I")
     // que são comuns em cursos técnicos
     const words = normalized.split(/\s+/);
@@ -365,7 +392,7 @@ const isLikelySubjectHeader = (value: string): boolean => {
         const significantWords = words.filter(w => w.length >= 3);
         if (significantWords.length >= 2) return true;
     }
-    
+
     return false;
 };
 
@@ -459,11 +486,28 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
     let allSubjects: string[] = [];
     let className: string | undefined;
     let quarter: string | undefined;
+    let schoolYear: 1 | 2 | 3 | undefined;
+    const allSubjectKeys = new Set<string>();
+    const subjectDisplayByKey = new Map<string, string>();
+
+    const getSubjectDisplay = (rawValue: string) => {
+        const cleaned = String(rawValue || '').replace(/\s+/g, ' ').trim();
+        const key = normalizeHeaderText(cleaned);
+        if (!key) {
+            return { key: '', display: cleaned };
+        }
+        const existing = subjectDisplayByKey.get(key);
+        if (existing) {
+            return { key, display: existing };
+        }
+        subjectDisplayByKey.set(key, cleaned);
+        return { key, display: cleaned };
+    };
 
     // Lista de disciplinas comuns da Base Nacional Comum (para priorização, não exclusão)
     const commonSubjects = [
         'ARTE', 'BIOLOGIA', 'EDUCAÇÃO FÍSICA', 'EDUCACAO FISICA', 'FILOSOFIA', 'FÍSICA', 'FISICA',
-        'GEOGRAFIA', 'HISTÓRIA', 'HISTORIA', 'INGLÊS', 'INGLES', 'LÍNGUA PORTUGUESA', 'LINGUA PORTUGUESA', 
+        'GEOGRAFIA', 'HISTÓRIA', 'HISTORIA', 'INGLÊS', 'INGLES', 'LÍNGUA PORTUGUESA', 'LINGUA PORTUGUESA',
         'MATEMÁTICA', 'MATEMATICA', 'QUÍMICA', 'QUIMICA', 'SOCIOLOGIA', 'ESPANHOL', 'REDAÇÃO', 'REDACAO',
         'LINGUA ESTRANGEIRA',
         // Abreviações comuns
@@ -478,7 +522,7 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
         'ELETIVA', 'ESTUDO', 'ORIENTADO', 'TÉCNICO', 'TECNICO', 'PROFISSIONAL'
     ];
     const commonSubjectsNormalized = commonSubjects.map(normalizeSubjectKey);
-    
+
     // Verifica se uma disciplina tem palavras-chave conhecidas (mais flexível)
     const hasCommonKeywords = (normalized: string): boolean => {
         return commonSubjectsNormalized.some((known) => {
@@ -547,28 +591,29 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
 
                     const normalized = normalizeHeaderText(rawValue);
                     if (!normalized) continue;
-                    
+
                     // Pular apenas colunas antes da coluna de nome (não igual)
                     if (nameHeaderIndex >= 0 && j < nameHeaderIndex) continue;
-                    
+
                     // Se é a coluna de nome, pular
                     if (HEADER_NAME_KEYS.some((key) => normalized.includes(key))) continue;
                     if (isExcludedHeader(normalized)) continue;
 
                     const hasKeywords = hasCommonKeywords(normalized);
-                    
+
                     // NOVA LÓGICA: Mais flexível - aceita qualquer texto que pareça disciplina
                     // Não exige que seja "conhecida", apenas que tenha características de disciplina
                     if (hasKeywords || isLikelySubjectHeader(rawValue)) {
                         if (hasKeywords) {
                             commonSubjectCount += 1;
                         }
-                        
-                        const subjectName = normalizeSubjectName(rawValue);
-                        subjectColumnsMap.set(j, subjectName);
-                        
+
+                        const { key, display } = getSubjectDisplay(rawValue);
+                        if (!key) continue;
+                        subjectColumnsMap.set(j, display);
+
                         // Log de debug - REMOVER DEPOIS
-                        console.log(`[DEBUG] (${sheetName}) Linha ${i}, Coluna ${j}: "${rawValue}" -> "${subjectName}" (comum: ${hasKeywords})`);
+                        console.log(`[DEBUG] (${sheetName}) Linha ${i}, Coluna ${j}: "${rawValue}" -> "${display}" (comum: ${hasKeywords})`);
                     }
                 }
 
@@ -578,7 +623,7 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
                 }));
 
                 const hasNameHeader = nameHeaderIndex >= 0;
-                
+
                 // LÓGICA MAIS FLEXÍVEL: aceitar blocos com disciplinas mesmo que não sejam "conhecidas"
                 // Aceitar se:
                 // 1. Tem cabeçalho de nome "Alunos / Disciplinas" E pelo menos 1 disciplina
@@ -586,7 +631,7 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
                 // 3. Tem pelo menos 2 disciplinas que parecem ser nomes de matérias
                 const minSubjects = hasNameHeader ? 1 : 2;
                 if (subjectColumns.length < minSubjects) continue;
-                
+
                 // Se não tem cabeçalho de nome, exigir pelo menos alguma palavra-chave conhecida ou várias colunas
                 if (!hasNameHeader) {
                     // Precisa ter pelo menos 1 disciplina com palavra-chave conhecida OU 3+ colunas
@@ -600,22 +645,24 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
                     subjectColumns,
                     nameColumnIndex,
                 });
-                
+
                 processedHeaderRows.add(i);
 
                 // Adicionar disciplinas à lista única
                 for (const subj of subjectColumns) {
-                    if (!allSubjects.includes(subj.name)) {
+                    const subjKey = normalizeHeaderText(subj.name);
+                    if (subjKey && !allSubjectKeys.has(subjKey)) {
+                        allSubjectKeys.add(subjKey);
                         allSubjects.push(subj.name);
                     }
                 }
-                
+
                 // Log de debug - REMOVER DEPOIS
                 console.log(`[DEBUG] (${sheetName}) Bloco ${blocks.length} encontrado na linha ${i} com ${subjectColumns.length} disciplinas:`, subjectColumns.map(s => s.name).join(', '));
             }
 
             console.log(`[DEBUG] (${sheetName}) Total de blocos identificados: ${blocks.length}`);
-            
+
             if (blocks.length === 0) {
                 continue;
             }
@@ -645,7 +692,7 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
                     if (!isLikelyStudentName(studentName)) continue;
 
                     studentsInBlock++;
-                    
+
                     // Normalizar nome para matching
                     const normalizedName = normalizeNameForComparison(studentName);
 
@@ -665,18 +712,18 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
                                 });
                             }
                             const studentData = studentGradesMap.get(normalizedName)!;
-                            
+
                             // Sobrescrever nota se já existir (o último bloco prevalece)
                             studentData.grades[subjectCol.name] = grade;
                             gradesAddedForStudent++;
                         }
                     }
-                    
+
                     if (gradesAddedForStudent > 0) {
                         console.log(`[DEBUG] (${sheetName}) Aluno "${studentName}" - ${gradesAddedForStudent} notas capturadas neste bloco`);
                     }
                 }
-                
+
                 console.log(`[DEBUG] (${sheetName}) Bloco ${b + 1}: ${studentsInBlock} alunos processados`);
             }
         }
@@ -716,6 +763,7 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
         success: errors.length === 0 && studentGradesMap.size > 0,
         className,
         quarter,
+        schoolYear,
         subjects: allSubjects,
         rows: Array.from(studentGradesMap.values()).map(s => ({
             studentName: s.originalName,
