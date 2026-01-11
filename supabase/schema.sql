@@ -327,40 +327,40 @@ create policy "profiles_update_own" on public.profiles
 for update using (id = auth.uid()) with check (id = auth.uid());
 
 drop policy if exists "classes_owner_access" on public.classes;
-create policy "classes_owner_access" on public.classes
-for all using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "classes_authenticated_access" on public.classes
+for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 drop policy if exists "students_owner_access" on public.students;
-create policy "students_owner_access" on public.students
-for all using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "students_authenticated_access" on public.students
+for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 drop policy if exists "grades_owner_access" on public.grades;
-create policy "grades_owner_access" on public.grades
-for all using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "grades_authenticated_access" on public.grades
+for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 drop policy if exists "attendance_owner_access" on public.attendance;
-create policy "attendance_owner_access" on public.attendance
-for all using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "attendance_authenticated_access" on public.attendance
+for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 drop policy if exists "incidents_owner_access" on public.incidents;
-create policy "incidents_owner_access" on public.incidents
-for all using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "incidents_authenticated_access" on public.incidents
+for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 drop policy if exists "follow_ups_owner_access" on public.follow_ups;
-create policy "follow_ups_owner_access" on public.follow_ups
-for all using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "follow_ups_authenticated_access" on public.follow_ups
+for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 drop policy if exists "comments_owner_access" on public.comments;
-create policy "comments_owner_access" on public.comments
-for all using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "comments_authenticated_access" on public.comments
+for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 drop policy if exists "professional_subject_templates_owner_access" on public.professional_subject_templates;
-create policy "professional_subject_templates_owner_access" on public.professional_subject_templates
-for all using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "professional_subject_templates_authenticated_access" on public.professional_subject_templates
+for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 drop policy if exists "professional_subjects_owner_access" on public.professional_subjects;
-create policy "professional_subjects_owner_access" on public.professional_subjects
-for all using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "professional_subjects_authenticated_access" on public.professional_subjects
+for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 -- Política: Qualquer usuário autenticado pode ler e modificar a configuração da escola
 -- No futuro, isso será ajustado para incluir permissões baseadas em roles

@@ -126,7 +126,6 @@ export function useClasses() {
     const { data, error } = await supabase
       .from('classes')
       .select('*')
-      .eq('owner_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -144,10 +143,10 @@ export function useClasses() {
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
-      .channel(`realtime:classes:${user.id}`)
+      .channel('realtime:classes')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'classes', filter: `owner_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'classes' },
         () => {
           fetchClasses();
         },
@@ -294,7 +293,6 @@ export function useStudents() {
     const { data, error } = await supabase
       .from('students')
       .select('*')
-      .eq('owner_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -312,10 +310,10 @@ export function useStudents() {
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
-      .channel(`realtime:students:${user.id}`)
+      .channel('realtime:students')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'students', filter: `owner_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'students' },
         () => {
           fetchStudents();
         },
@@ -404,8 +402,7 @@ export function useGrades() {
 
     const { data, error } = await supabase
       .from('grades')
-      .select('*')
-      .eq('owner_id', user.id);
+      .select('*');
 
     if (error) {
       logError('grades.select', error);
@@ -422,10 +419,10 @@ export function useGrades() {
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
-      .channel(`realtime:grades:${user.id}`)
+      .channel('realtime:grades')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'grades', filter: `owner_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'grades' },
         () => {
           fetchGrades();
         },
@@ -521,8 +518,7 @@ export function useAttendance() {
 
     const { data, error } = await supabase
       .from('attendance')
-      .select('*')
-      .eq('owner_id', user.id);
+      .select('*');
 
     if (error) {
       logError('attendance.select', error);
@@ -539,10 +535,10 @@ export function useAttendance() {
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
-      .channel(`realtime:attendance:${user.id}`)
+      .channel('realtime:attendance')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'attendance', filter: `owner_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'attendance' },
         () => {
           fetchAttendance();
         },
@@ -600,7 +596,6 @@ export function useIncidents() {
     const { data: incidentRows, error } = await supabase
       .from('incidents')
       .select('*')
-      .eq('owner_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -619,13 +614,11 @@ export function useIncidents() {
         supabase
           .from('follow_ups')
           .select('*')
-          .eq('owner_id', user.id)
           .in('incident_id', ids)
           .order('date', { ascending: true }),
         supabase
           .from('comments')
           .select('*')
-          .eq('owner_id', user.id)
           .in('incident_id', ids)
           .order('created_at', { ascending: true }),
       ]);
@@ -674,24 +667,24 @@ export function useIncidents() {
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
-      .channel(`realtime:incidents:${user.id}`)
+      .channel('realtime:incidents')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'incidents', filter: `owner_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'incidents' },
         () => {
           fetchIncidents();
         },
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'follow_ups', filter: `owner_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'follow_ups' },
         () => {
           fetchIncidents();
         },
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'comments', filter: `owner_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'comments' },
         () => {
           fetchIncidents();
         },
@@ -871,8 +864,7 @@ export function useProfessionalSubjects() {
 
     const { data, error } = await supabase
       .from('professional_subjects')
-      .select('*')
-      .eq('owner_id', user.id);
+      .select('*');
 
     if (error) {
       logError('professional_subjects.select', error);
@@ -889,14 +881,13 @@ export function useProfessionalSubjects() {
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
-      .channel(`realtime:professional_subjects:${user.id}`)
+      .channel('realtime:professional_subjects')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'professional_subjects',
-          filter: `owner_id=eq.${user.id}`,
         },
         () => {
           fetchSubjects();
@@ -993,7 +984,6 @@ export function useProfessionalSubjectTemplates() {
     const { data, error } = await supabase
       .from('professional_subject_templates')
       .select('*')
-      .eq('owner_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -1011,14 +1001,13 @@ export function useProfessionalSubjectTemplates() {
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
-      .channel(`realtime:professional_subject_templates:${user.id}`)
+      .channel('realtime:professional_subject_templates')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'professional_subject_templates',
-          filter: `owner_id=eq.${user.id}`,
         },
         () => {
           fetchTemplates();
