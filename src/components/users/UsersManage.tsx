@@ -16,6 +16,7 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
+    DialogDescription,
     DialogFooter,
 } from '@/components/ui/dialog';
 import {
@@ -96,32 +97,35 @@ export const UsersManage = () => {
             return;
         }
 
-        const { error } = await supabase.from('authorized_emails').insert({
-            email: formData.email.toLowerCase().trim(),
-            role: formData.role,
+        const normalizedEmail = formData.email.toLowerCase().trim();
+
+        const { data, error } = await supabase.functions.invoke('create-user', {
+            body: {
+                email: normalizedEmail,
+                role: formData.role,
+            },
         });
 
         if (error) {
-            if (error.code === '23505') {
-                toast({
-                    title: 'Erro',
-                    description: 'Este email já está cadastrado.',
-                    variant: 'destructive',
-                });
-            } else {
-                toast({
-                    title: 'Erro',
-                    description: 'Não foi possível adicionar o usuário.',
-                    variant: 'destructive',
-                });
-            }
+            toast({
+                title: 'Erro',
+                description: error.message || 'Não foi possível adicionar o usuário.',
+                variant: 'destructive',
+            });
             return;
         }
 
-        toast({
-            title: 'Sucesso',
-            description: 'Usuário adicionado com sucesso.',
-        });
+        if (data?.warning) {
+            toast({
+                title: 'Aviso',
+                description: data.warning,
+            });
+        } else {
+            toast({
+                title: 'Sucesso',
+                description: 'Usuário adicionado e criado no sistema.',
+            });
+        }
         setIsAddDialogOpen(false);
         setFormData({ email: '', role: 'professor' });
         fetchUsers();
@@ -316,6 +320,9 @@ export const UsersManage = () => {
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Adicionar Usuário</DialogTitle>
+                        <DialogDescription>
+                            Informe o email e o papel do usuário autorizado.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <div className="space-y-2">
@@ -363,6 +370,9 @@ export const UsersManage = () => {
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Editar Usuário</DialogTitle>
+                        <DialogDescription>
+                            Atualize o papel do usuário selecionado.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <div className="space-y-2">

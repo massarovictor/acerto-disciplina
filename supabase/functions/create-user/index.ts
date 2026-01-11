@@ -1,0 +1,154 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const jsonResponse = (body: Record<string, unknown>, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      ...corsHeaders,
+      'Content-Type': 'application/json',
+    },
+  });
+
+const findUserByEmail = async (client: ReturnType<typeof createClient>, email: string) => {
+  const perPage = 200;
+  const maxPages = 10;
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const { data, error } = await client.auth.admin.listUsers({ page, perPage });
+    if (error) return null;
+
+    const match = data.users.find((user) => user.email?.toLowerCase() === email);
+    if (match) return match;
+
+    if (data.users.length < perPage) break;
+  }
+
+  return null;
+};
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  if (req.method !== 'POST') {
+    return jsonResponse({ error: 'Metodo nao permitido.' }, 405);
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+  if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
+    return jsonResponse({ error: 'Ambiente Supabase nao configurado.' }, 500);
+  }
+
+  const authHeader = req.headers.get('Authorization') ?? '';
+
+  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false },
+  });
+
+  const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: { persistSession: false },
+  });
+
+  const { data: userData, error: authError } = await userClient.auth.getUser();
+  if (authError || !userData.user) {
+    return jsonResponse({ error: 'Nao autenticado.' }, 401);
+  }
+
+  const { data: profile, error: profileError } = await adminClient
+    .from('profiles')
+    .select('role')
+    .eq('id', userData.user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    return jsonResponse({ error: 'Falha ao validar permissao.' }, 500);
+  }
+
+  if (profile?.role !== 'admin') {
+    return jsonResponse({ error: 'Nao autorizado.' }, 403);
+  }
+
+  let payload: { email?: string; role?: string; name?: string };
+  try {
+    payload = await req.json();
+  } catch {
+    return jsonResponse({ error: 'JSON invalido.' }, 400);
+  }
+
+  const email = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : '';
+  const role = typeof payload.role === 'string' ? payload.role : 'professor';
+  const name = typeof payload.name === 'string' ? payload.name.trim() : '';
+
+  if (!email || !emailRegex.test(email)) {
+    return jsonResponse({ error: 'Email invalido.' }, 400);
+  }
+
+  const allowedRoles = new Set(['admin', 'diretor', 'professor', 'coordenador', 'secretaria']);
+  const normalizedRole = allowedRoles.has(role) ? role : 'professor';
+  const displayName = name || email.split('@')[0];
+
+  let userId: string | null = null;
+  const { data: created, error: createError } = await adminClient.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    user_metadata: {
+      name: displayName,
+      role: normalizedRole,
+    },
+  });
+
+  if (createError) {
+    const message = createError.message?.toLowerCase() ?? '';
+    if (!message.includes('already') && !message.includes('exists')) {
+      return jsonResponse({ error: createError.message }, 400);
+    }
+  } else {
+    userId = created?.user?.id ?? null;
+  }
+
+  const { error: upsertError } = await adminClient
+    .from('authorized_emails')
+    .upsert({ email, role: normalizedRole }, { onConflict: 'email' });
+
+  if (upsertError) {
+    return jsonResponse({ error: 'Falha ao salvar usuario autorizado.' }, 500);
+  }
+
+  if (!userId) {
+    const existingUser = await findUserByEmail(adminClient, email);
+    userId = existingUser?.id ?? null;
+  }
+
+  if (userId) {
+    const { error: profileUpsertError } = await adminClient
+      .from('profiles')
+      .upsert(
+        {
+          id: userId,
+          name: displayName,
+          role: normalizedRole,
+        },
+        { onConflict: 'id' }
+      );
+
+    if (profileUpsertError) {
+      return jsonResponse({
+        warning: 'Usuario criado, mas nao foi possivel atualizar o perfil.',
+      });
+    }
+  }
+
+  return jsonResponse({ ok: true, userId, created: Boolean(created?.user?.id) });
+});

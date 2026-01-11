@@ -38,7 +38,7 @@ const Login = () => {
       const { error } = await supabase.auth.signInWithOtp({
         email: email.toLowerCase().trim(),
         options: {
-          shouldCreateUser: true, // Cria automaticamente se não existir
+          shouldCreateUser: false,
         },
       });
 
@@ -51,10 +51,16 @@ const Login = () => {
       });
     } catch (error) {
       console.error(error);
+      const message = error instanceof Error ? error.message : 'Erro desconhecido.';
+      const friendlyMessage = message.toLowerCase().includes('signups not allowed')
+        ? 'Seu acesso precisa ser liberado pela administração antes do primeiro login.'
+        : message.toLowerCase().includes('user not found')
+          ? 'Usuário não encontrado. Peça à administração para criar seu acesso.'
+          : message;
       toast({
         variant: 'destructive',
         title: 'Acesso negado',
-        description: error instanceof Error ? error.message : 'Erro desconhecido.',
+        description: friendlyMessage,
       });
     } finally {
       setIsLoading(false);

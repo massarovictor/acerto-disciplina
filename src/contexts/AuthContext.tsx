@@ -42,12 +42,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    const fetchProfile = async (userId: string) => {
+    const fetchProfile = async (userId: string, authUser: SupabaseUser | null) => {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Failed to load profile:', error);
@@ -56,7 +56,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (!data) {
-        setProfile(null);
+        const fallbackName =
+          typeof authUser?.user_metadata?.name === 'string'
+            ? authUser.user_metadata.name
+            : authUser?.email?.split('@')[0] ?? 'Usuario';
+        const fallbackRole =
+          typeof authUser?.user_metadata?.role === 'string'
+            ? authUser.user_metadata.role
+            : 'diretor';
+        setProfile({
+          id: userId,
+          name: fallbackName,
+          email: authUser?.email ?? '',
+          role: fallbackRole,
+        });
         return;
       }
 
@@ -69,7 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     if (session?.user?.id) {
-      fetchProfile(session.user.id);
+      fetchProfile(session.user.id, session.user);
     } else {
       setProfile(null);
     }
