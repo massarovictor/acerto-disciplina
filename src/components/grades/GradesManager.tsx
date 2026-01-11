@@ -89,7 +89,8 @@ export const GradesManager = () => {
   const templateSubjectsForYear = useMemo(() => {
     if (!selectedClassData?.templateId) return [];
     const template = templates.find((t) => t.id === selectedClassData.templateId);
-    const yearData = template?.subjectsByYear.find((y) => y.year === selectedSchoolYear);
+    if (!template) return [];
+    const yearData = template.subjectsByYear.find((y) => y.year === selectedSchoolYear);
     return yearData?.subjects ?? [];
   }, [templates, selectedClassData?.templateId, selectedSchoolYear]);
 
@@ -113,16 +114,25 @@ export const GradesManager = () => {
     [selectedClass, getProfessionalSubjects],
   );
 
-  // Disciplinas profissionais visíveis: do ano selecionado + manuais
+  // Disciplinas profissionais visíveis: do ano selecionado
+  // IMPORTANTE: Se turma tem template, usa APENAS disciplinas do template por ano
+  // Se turma NÃO tem template, usa disciplinas manuais
   const professionalSubjects = useMemo(() => {
     const unique = new Set<string>();
-    [...templateSubjectsForYear, ...manualSubjects].forEach((subject) => {
+
+    // Se a turma tem template, usar apenas disciplinas do ano selecionado do template
+    // Isso ignora manualSubjects que foi criado erroneamente ao criar turma
+    const subjectsToUse = selectedClassData?.templateId
+      ? templateSubjectsForYear  // Apenas do template por ano
+      : manualSubjects;          // Fallback para manuais se não tem template
+
+    subjectsToUse.forEach((subject) => {
       if (subject?.trim()) {
         unique.add(subject.trim());
       }
     });
     return Array.from(unique);
-  }, [templateSubjectsForYear, manualSubjects]);
+  }, [templateSubjectsForYear, manualSubjects, selectedClassData?.templateId]);
 
   // TODAS as disciplinas profissionais (para buscar notas de cualquier año)
   const allProfessionalSubjects = useMemo(() => {
@@ -138,11 +148,10 @@ export const GradesManager = () => {
   // Usar uma string para rastrear mudanças nas disciplinas profissionais
   const professionalSubjectsStr = `${selectedSchoolYear}:${allProfessionalSubjects.join(',')}`;
 
-  // Calcular allSubjects - agora inclui TODAS as disciplinas do template
-  // para encontrar notas importadas em qualquer disciplina
+  // Calcular allSubjects - disciplinas base + profissionais do ANO SELECIONADO
   const allSubjects = [
     ...SUBJECT_AREAS.flatMap(area => area.subjects),
-    ...allProfessionalSubjects,
+    ...professionalSubjects,  // Agora usa apenas disciplinas do ano selecionado
   ];
 
   // Initialize grades when class or quarter changes
@@ -351,23 +360,24 @@ export const GradesManager = () => {
     return { filled, total: area.subjects.length };
   };
 
-  // Calcular progresso da base profissional (usa TODAS as disciplinas)
+  // Calcular progresso da base profissional (usa disciplinas do ANO SELECIONADO)
   const getProfessionalProgress = (studentId: string) => {
     const studentGrade = studentGrades.find(sg => sg.studentId === studentId);
-    if (!studentGrade || allProfessionalSubjects.length === 0) return { filled: 0, total: 0 };
+    if (!studentGrade || professionalSubjects.length === 0) return { filled: 0, total: 0 };
 
-    const filled = allProfessionalSubjects.filter(subject => {
+    const filled = professionalSubjects.filter(subject => {
       const gradeValue = studentGrade.grades[subject];
       return gradeValue && gradeValue !== '';
     }).length;
 
-    return { filled, total: allProfessionalSubjects.length };
+    return { filled, total: professionalSubjects.length };
   };
 
   const getSubjectArea = (subject: string) => {
     return SUBJECT_AREAS.find(area => area.subjects.includes(subject));
   };
 
+  // Opções de ano (simplificado)
   const schoolYearOptions: Array<{ value: 1 | 2 | 3; label: string }> = [
     { value: 1, label: '1º ano' },
     { value: 2, label: '2º ano' },
@@ -619,8 +629,8 @@ export const GradesManager = () => {
                   );
                 })}
 
-                {/* Professional Subjects - mostra TODAS as disciplinas do template */}
-                {allProfessionalSubjects.length > 0 && (() => {
+                {/* Professional Subjects - mostra apenas disciplinas do ano selecionado */}
+                {professionalSubjects.length > 0 && (() => {
                   const professionalProgress = getProfessionalProgress(selectedStudent);
                   return (
                     <AccordionItem value="professional" className="border rounded-lg px-4 mb-2">
@@ -628,8 +638,11 @@ export const GradesManager = () => {
                         <div className="flex items-center justify-between w-full pr-4">
                           <div className="flex items-center gap-3">
                             <Badge variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/30">
-                              Base Profissional
-                              {selectedClassData?.course && ` - ${selectedClassData.course}`}
+                              Base Profissional - {selectedSchoolYear}º ano
+                              {selectedClassData?.course && ` (${selectedClassData.course})`}
+                              <span className="ml-1 font-normal opacity-75">
+                                • {professionalSubjects.length} disciplinas
+                              </span>
                             </Badge>
                             {professionalProgress.filled === professionalProgress.total && professionalProgress.total > 0 && (
                               <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -642,7 +655,7 @@ export const GradesManager = () => {
                       </AccordionTrigger>
                       <AccordionContent>
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 pt-2">
-                          {allProfessionalSubjects.map(subject => {
+                          {professionalSubjects.map(subject => {
                             const studentGrade = studentGrades.find(sg => sg.studentId === selectedStudent);
                             const gradeValue = studentGrade?.grades[subject] || '';
                             const grade = parseFloat(gradeValue);
