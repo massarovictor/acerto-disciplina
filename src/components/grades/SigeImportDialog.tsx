@@ -33,7 +33,8 @@ import {
     ImportableGrade,
     SigeParseResult,
     calculateNameSimilarity,
-    normalizeSubjectName
+    normalizeSubjectName,
+    normalizeNameForComparison
 } from '@/lib/sigeParser';
 import { ChevronsUpDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -116,11 +117,13 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
 
     // Função para obter disciplinas válidas de uma turma
     // Retorna tanto o nome original quanto o normalizado para comparação flexível
-    const getValidSubjectsForClass = (classId: string): { original: string; normalized: string }[] => {
+    const getValidSubjectsForClass = (
+        classId: string
+    ): { original: string; normalized: string }[] => {
         // Disciplinas da Base Nacional Comum (ENEM)
         const baseSubjects = getAllSubjects().map(s => ({
             original: s,
-            normalized: normalizeSubjectName(s).toLowerCase()
+            normalized: normalizeNameForComparison(normalizeSubjectName(s))
         }));
 
         const templateSubjects = (() => {
@@ -128,7 +131,9 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
             if (!classData?.templateId) return [];
             const template = templates.find((t) => t.id === classData.templateId);
             const yearData = template?.subjectsByYear.find((y) => y.year === selectedSchoolYear);
-            return yearData?.subjects ?? [];
+            const byYear = yearData?.subjects ?? [];
+            if (byYear.length > 0) return byYear;
+            return template?.subjectsByYear.flatMap((y) => y.subjects ?? []) ?? [];
         })();
 
         // Disciplinas Profissionais da turma (verificar se existe antes de filtrar)
@@ -136,7 +141,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
             .filter(ps => ps.classId === classId)
             .map(ps => ({
                 original: ps.subject,
-                normalized: normalizeSubjectName(ps.subject).toLowerCase()
+                normalized: normalizeNameForComparison(normalizeSubjectName(ps.subject))
             }));
 
         // Combinar ambas (sem duplicatas por nome normalizado)
@@ -147,7 +152,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
             ...baseSubjects,
             ...templateSubjects.map((subject) => ({
                 original: subject,
-                normalized: normalizeSubjectName(subject).toLowerCase(),
+                normalized: normalizeNameForComparison(normalizeSubjectName(subject)),
             })),
             ...classSubjects,
         ]) {
@@ -173,7 +178,7 @@ export const SigeImportDialog = ({ open, onOpenChange }: SigeImportDialogProps) 
             return manualMapping.systemSubject; // Pode ser null se foi ignorado
         }
 
-        const normalizedSubject = normalizeSubjectName(subject).toLowerCase();
+        const normalizedSubject = normalizeNameForComparison(normalizeSubjectName(subject));
 
         // Segundo: match exato pelo nome normalizado
         const exactMatch = validSubjects.find(vs => vs.normalized === normalizedSubject);

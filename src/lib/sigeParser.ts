@@ -496,186 +496,189 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
         const arrayBuffer = await file.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
 
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
-
-        if (data.length < 5) {
-            errors.push('Planilha vazia ou sem dados suficientes');
+        if (workbook.SheetNames.length === 0) {
+            errors.push('Nenhuma planilha encontrada no arquivo.');
             return { success: false, subjects: [], rows: [], errors };
         }
 
-        // Extrair informações da escola e período (primeiras 10 linhas)
-        for (let i = 0; i < 10 && i < data.length; i++) {
-            const rowText = data[i].join(' ');
-            if (rowText.includes('ESCOLA:') || rowText.includes('Escola:')) {
-                const match = rowText.match(/(\d+\.\d+\.\d+)/);
-                if (match) className = match[1];
+        for (const sheetName of workbook.SheetNames) {
+            const worksheet = workbook.Sheets[sheetName];
+            const data: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+            if (data.length < 5) {
+                continue;
             }
-            if (rowText.includes('Período') || rowText.includes('período')) {
-                const bimMatch = rowText.match(/(\d)[ºª]?\s*Per/i);
-                if (bimMatch) quarter = `${bimMatch[1]}º Bimestre`;
-            }
-        }
 
-        // ENCONTRAR TODOS OS BLOCOS DE DISCIPLINAS
-        interface Block {
-            headerRow: number;
-            subjectColumns: { index: number; name: string }[];
-            nameColumnIndex: number;
-        }
-
-        const blocks: Block[] = [];
-        const processedHeaderRows = new Set<number>();
-
-        for (let i = 0; i < data.length; i++) {
-            const row = data[i];
-            if (!row || processedHeaderRows.has(i)) continue;
-
-            // Verificar se esta linha tem disciplinas
-            const subjectColumnsMap = new Map<number, string>();
-            const nameHeaderIndex = row.findIndex((cell: any) => isNameHeaderCell(String(cell || '')));
-            let commonSubjectCount = 0;
-
-            for (let j = 0; j < row.length; j++) {
-                const rawValue = String(row[j] || '').trim();
-                if (!rawValue) continue;
-
-                const normalized = normalizeHeaderText(rawValue);
-                if (!normalized) continue;
-                
-                // Pular apenas colunas antes da coluna de nome (não igual)
-                if (nameHeaderIndex >= 0 && j < nameHeaderIndex) continue;
-                
-                // Se é a coluna de nome, pular
-                if (HEADER_NAME_KEYS.some((key) => normalized.includes(key))) continue;
-                if (isExcludedHeader(normalized)) continue;
-
-                const hasKeywords = hasCommonKeywords(normalized);
-                
-                // NOVA LÓGICA: Mais flexível - aceita qualquer texto que pareça disciplina
-                // Não exige que seja "conhecida", apenas que tenha características de disciplina
-                if (hasKeywords || isLikelySubjectHeader(rawValue)) {
-                    if (hasKeywords) {
-                        commonSubjectCount += 1;
-                    }
-                    
-                    const subjectName = normalizeSubjectName(rawValue);
-                    subjectColumnsMap.set(j, subjectName);
-                    
-                    // Log de debug - REMOVER DEPOIS
-                    console.log(`[DEBUG] Linha ${i}, Coluna ${j}: "${rawValue}" -> "${subjectName}" (comum: ${hasKeywords})`);
+            // Extrair informações da escola e período (primeiras 10 linhas)
+            for (let i = 0; i < 10 && i < data.length; i++) {
+                const rowText = data[i].join(' ');
+                if (!className && (rowText.includes('ESCOLA:') || rowText.includes('Escola:'))) {
+                    const match = rowText.match(/(\d+\.\d+\.\d+)/);
+                    if (match) className = match[1];
+                }
+                if (!quarter && (rowText.includes('Período') || rowText.includes('período'))) {
+                    const bimMatch = rowText.match(/(\d)[ºª]?\s*Per/i);
+                    if (bimMatch) quarter = `${bimMatch[1]}º Bimestre`;
                 }
             }
 
-            const subjectColumns = Array.from(subjectColumnsMap.entries()).map(([index, name]) => ({
-                index,
-                name,
-            }));
-
-            const hasNameHeader = nameHeaderIndex >= 0;
-            
-            // LÓGICA MAIS FLEXÍVEL: aceitar blocos com disciplinas mesmo que não sejam "conhecidas"
-            // Aceitar se:
-            // 1. Tem cabeçalho de nome "Alunos / Disciplinas" E pelo menos 1 disciplina
-            // 2. Tem pelo menos 1 disciplina comum (conhecida)
-            // 3. Tem pelo menos 2 disciplinas que parecem ser nomes de matérias
-            const minSubjects = hasNameHeader ? 1 : 2;
-            if (subjectColumns.length < minSubjects) continue;
-            
-            // Se não tem cabeçalho de nome, exigir pelo menos alguma palavra-chave conhecida ou várias colunas
-            if (!hasNameHeader) {
-                // Precisa ter pelo menos 1 disciplina com palavra-chave conhecida OU 3+ colunas
-                if (commonSubjectCount === 0 && subjectColumns.length < 3) continue;
+            // ENCONTRAR TODOS OS BLOCOS DE DISCIPLINAS
+            interface Block {
+                headerRow: number;
+                subjectColumns: { index: number; name: string }[];
+                nameColumnIndex: number;
             }
 
-            const nameColumnIndex = hasNameHeader ? nameHeaderIndex : 2;
+            const blocks: Block[] = [];
+            const processedHeaderRows = new Set<number>();
 
-            blocks.push({
-                headerRow: i,
-                subjectColumns,
-                nameColumnIndex,
-            });
-            
-            processedHeaderRows.add(i);
-
-            // Adicionar disciplinas à lista única
-            for (const subj of subjectColumns) {
-                if (!allSubjects.includes(subj.name)) {
-                    allSubjects.push(subj.name);
-                }
-            }
-            
-            // Log de debug - REMOVER DEPOIS
-            console.log(`[DEBUG] Bloco ${blocks.length} encontrado na linha ${i} com ${subjectColumns.length} disciplinas:`, subjectColumns.map(s => s.name).join(', '));
-        }
-
-        console.log(`[DEBUG] Total de blocos identificados: ${blocks.length}`);
-        
-        if (blocks.length === 0) {
-            errors.push('Não foi possível identificar blocos de disciplinas. Verifique se o arquivo é do SIGE.');
-            console.error('[DEBUG] Nenhum bloco encontrado! Verifique o formato do arquivo.');
-            return { success: false, subjects: [], rows: [], errors };
-        }
-
-        // PROCESSAR CADA BLOCO
-        for (let b = 0; b < blocks.length; b++) {
-            const block = blocks[b];
-            const nextBlockStart = b < blocks.length - 1 ? blocks[b + 1].headerRow : data.length;
-            const nameColumnIndex = findNameColumnIndex(
-                data,
-                block.headerRow,
-                nextBlockStart,
-                block.nameColumnIndex,
-            );
-
-            console.log(`[DEBUG] Processando bloco ${b + 1}/${blocks.length}, linhas ${block.headerRow + 1} até ${nextBlockStart - 1}, coluna de nome: ${nameColumnIndex}`);
-
-            // Processar linhas de dados deste bloco
-            let studentsInBlock = 0;
-            for (let i = block.headerRow + 1; i < nextBlockStart; i++) {
+            for (let i = 0; i < data.length; i++) {
                 const row = data[i];
-                if (!row) continue;
+                if (!row || processedHeaderRows.has(i)) continue;
 
-                const studentName = String(row[nameColumnIndex] || '').trim();
+                // Verificar se esta linha tem disciplinas
+                const subjectColumnsMap = new Map<number, string>();
+                const nameHeaderIndex = row.findIndex((cell: any) => isNameHeaderCell(String(cell || '')));
+                let commonSubjectCount = 0;
 
-                // Validar nome
-                if (!isLikelyStudentName(studentName)) continue;
+                for (let j = 0; j < row.length; j++) {
+                    const rawValue = String(row[j] || '').trim();
+                    if (!rawValue) continue;
 
-                studentsInBlock++;
-                
-                // Normalizar nome para matching
-                const normalizedName = normalizeNameForComparison(studentName);
+                    const normalized = normalizeHeaderText(rawValue);
+                    if (!normalized) continue;
+                    
+                    // Pular apenas colunas antes da coluna de nome (não igual)
+                    if (nameHeaderIndex >= 0 && j < nameHeaderIndex) continue;
+                    
+                    // Se é a coluna de nome, pular
+                    if (HEADER_NAME_KEYS.some((key) => normalized.includes(key))) continue;
+                    if (isExcludedHeader(normalized)) continue;
 
-                // Extrair notas deste bloco
-                let gradesAddedForStudent = 0;
-                for (const subjectCol of block.subjectColumns) {
-                    const cellValue = row[subjectCol.index];
-                    const grade = parseGradeValue(cellValue);
-
-                    // Validar nota (permitir 0 como nota válida)
-                    if (grade !== null && grade >= 0 && grade <= 10) {
-                        // Adicionar ao mapa do aluno
-                        if (!studentGradesMap.has(normalizedName)) {
-                            studentGradesMap.set(normalizedName, {
-                                originalName: studentName,
-                                grades: {},
-                            });
+                    const hasKeywords = hasCommonKeywords(normalized);
+                    
+                    // NOVA LÓGICA: Mais flexível - aceita qualquer texto que pareça disciplina
+                    // Não exige que seja "conhecida", apenas que tenha características de disciplina
+                    if (hasKeywords || isLikelySubjectHeader(rawValue)) {
+                        if (hasKeywords) {
+                            commonSubjectCount += 1;
                         }
-                        const studentData = studentGradesMap.get(normalizedName)!;
                         
-                        // Sobrescrever nota se já existir (o último bloco prevalece)
-                        studentData.grades[subjectCol.name] = grade;
-                        gradesAddedForStudent++;
+                        const subjectName = normalizeSubjectName(rawValue);
+                        subjectColumnsMap.set(j, subjectName);
+                        
+                        // Log de debug - REMOVER DEPOIS
+                        console.log(`[DEBUG] (${sheetName}) Linha ${i}, Coluna ${j}: "${rawValue}" -> "${subjectName}" (comum: ${hasKeywords})`);
+                    }
+                }
+
+                const subjectColumns = Array.from(subjectColumnsMap.entries()).map(([index, name]) => ({
+                    index,
+                    name,
+                }));
+
+                const hasNameHeader = nameHeaderIndex >= 0;
+                
+                // LÓGICA MAIS FLEXÍVEL: aceitar blocos com disciplinas mesmo que não sejam "conhecidas"
+                // Aceitar se:
+                // 1. Tem cabeçalho de nome "Alunos / Disciplinas" E pelo menos 1 disciplina
+                // 2. Tem pelo menos 1 disciplina comum (conhecida)
+                // 3. Tem pelo menos 2 disciplinas que parecem ser nomes de matérias
+                const minSubjects = hasNameHeader ? 1 : 2;
+                if (subjectColumns.length < minSubjects) continue;
+                
+                // Se não tem cabeçalho de nome, exigir pelo menos alguma palavra-chave conhecida ou várias colunas
+                if (!hasNameHeader) {
+                    // Precisa ter pelo menos 1 disciplina com palavra-chave conhecida OU 3+ colunas
+                    if (commonSubjectCount === 0 && subjectColumns.length < 3) continue;
+                }
+
+                const nameColumnIndex = hasNameHeader ? nameHeaderIndex : 2;
+
+                blocks.push({
+                    headerRow: i,
+                    subjectColumns,
+                    nameColumnIndex,
+                });
+                
+                processedHeaderRows.add(i);
+
+                // Adicionar disciplinas à lista única
+                for (const subj of subjectColumns) {
+                    if (!allSubjects.includes(subj.name)) {
+                        allSubjects.push(subj.name);
                     }
                 }
                 
-                if (gradesAddedForStudent > 0) {
-                    console.log(`[DEBUG] Aluno "${studentName}" - ${gradesAddedForStudent} notas capturadas neste bloco`);
-                }
+                // Log de debug - REMOVER DEPOIS
+                console.log(`[DEBUG] (${sheetName}) Bloco ${blocks.length} encontrado na linha ${i} com ${subjectColumns.length} disciplinas:`, subjectColumns.map(s => s.name).join(', '));
             }
+
+            console.log(`[DEBUG] (${sheetName}) Total de blocos identificados: ${blocks.length}`);
             
-            console.log(`[DEBUG] Bloco ${b + 1}: ${studentsInBlock} alunos processados`);
+            if (blocks.length === 0) {
+                continue;
+            }
+
+            // PROCESSAR CADA BLOCO
+            for (let b = 0; b < blocks.length; b++) {
+                const block = blocks[b];
+                const nextBlockStart = b < blocks.length - 1 ? blocks[b + 1].headerRow : data.length;
+                const nameColumnIndex = findNameColumnIndex(
+                    data,
+                    block.headerRow,
+                    nextBlockStart,
+                    block.nameColumnIndex,
+                );
+
+                console.log(`[DEBUG] (${sheetName}) Processando bloco ${b + 1}/${blocks.length}, linhas ${block.headerRow + 1} até ${nextBlockStart - 1}, coluna de nome: ${nameColumnIndex}`);
+
+                // Processar linhas de dados deste bloco
+                let studentsInBlock = 0;
+                for (let i = block.headerRow + 1; i < nextBlockStart; i++) {
+                    const row = data[i];
+                    if (!row) continue;
+
+                    const studentName = String(row[nameColumnIndex] || '').trim();
+
+                    // Validar nome
+                    if (!isLikelyStudentName(studentName)) continue;
+
+                    studentsInBlock++;
+                    
+                    // Normalizar nome para matching
+                    const normalizedName = normalizeNameForComparison(studentName);
+
+                    // Extrair notas deste bloco
+                    let gradesAddedForStudent = 0;
+                    for (const subjectCol of block.subjectColumns) {
+                        const cellValue = row[subjectCol.index];
+                        const grade = parseGradeValue(cellValue);
+
+                        // Validar nota (permitir 0 como nota válida)
+                        if (grade !== null && grade >= 0 && grade <= 10) {
+                            // Adicionar ao mapa do aluno
+                            if (!studentGradesMap.has(normalizedName)) {
+                                studentGradesMap.set(normalizedName, {
+                                    originalName: studentName,
+                                    grades: {},
+                                });
+                            }
+                            const studentData = studentGradesMap.get(normalizedName)!;
+                            
+                            // Sobrescrever nota se já existir (o último bloco prevalece)
+                            studentData.grades[subjectCol.name] = grade;
+                            gradesAddedForStudent++;
+                        }
+                    }
+                    
+                    if (gradesAddedForStudent > 0) {
+                        console.log(`[DEBUG] (${sheetName}) Aluno "${studentName}" - ${gradesAddedForStudent} notas capturadas neste bloco`);
+                    }
+                }
+                
+                console.log(`[DEBUG] (${sheetName}) Bloco ${b + 1}: ${studentsInBlock} alunos processados`);
+            }
         }
 
         // Converter mapa para array de rows
@@ -692,7 +695,6 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
 
         // Log de resumo - REMOVER DEPOIS
         console.log(`[DEBUG] === RESUMO DA IMPORTAÇÃO ===`);
-        console.log(`[DEBUG] Total de blocos encontrados: ${blocks.length}`);
         console.log(`[DEBUG] Total de disciplinas únicas: ${allSubjects.length}`);
         console.log(`[DEBUG] Disciplinas: ${allSubjects.join(', ')}`);
         console.log(`[DEBUG] Total de alunos: ${rows.length}`);

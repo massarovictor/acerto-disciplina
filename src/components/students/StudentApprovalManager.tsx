@@ -29,6 +29,7 @@ export const StudentApprovalManager = () => {
   const [activeTab, setActiveTab] = useState('quarter');
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedQuarter, setSelectedQuarter] = useState('1º Bimestre');
+  const [selectedSchoolYear, setSelectedSchoolYear] = useState<1 | 2 | 3>(1);
   const [academicStatuses, setAcademicStatuses] = useState<Record<string, any>>({});
   const [quarterResults, setQuarterResults] = useState<(QuarterCheckResult & { studentName: string })[]>([]);
   const [pendingQuarterResults, setPendingQuarterResults] = useState<
@@ -37,12 +38,18 @@ export const StudentApprovalManager = () => {
 
   const classStudents = students.filter((s) => s.classId === selectedClass);
   const selectedClassData = classes.find((c) => c.id === selectedClass);
-  const selectedSchoolYear = useMemo(() => {
-    const defaultYear = selectedClassData?.currentYear ?? 1;
-    return [1, 2, 3].includes(defaultYear as number)
+  const handleSelectClass = (value: string) => {
+    setSelectedClass(value);
+    const nextClass = classes.find((cls) => cls.id === value);
+    const defaultYear = nextClass?.currentYear ?? 1;
+    const nextYear = [1, 2, 3].includes(defaultYear as number)
       ? (defaultYear as 1 | 2 | 3)
       : 1;
-  }, [selectedClassData?.currentYear]);
+    setSelectedSchoolYear(nextYear);
+    setQuarterResults([]);
+    setPendingQuarterResults([]);
+    setAcademicStatuses({});
+  };
 
   const templateSubjects = useMemo(() => {
     if (!selectedClassData?.templateId) return [];
@@ -218,7 +225,7 @@ export const StudentApprovalManager = () => {
 
     const academicYear = getAcademicYear(
       startYearDate,
-      selectedClassData.currentYear
+      selectedSchoolYear
     );
 
     const studentIds = classStudents.map((s) => s.id);
@@ -287,7 +294,7 @@ export const StudentApprovalManager = () => {
         <CardContent className="space-y-4">
           {/* Seletor de Turma */}
           <div className="flex gap-4">
-            <Select value={selectedClass} onValueChange={setSelectedClass}>
+            <Select value={selectedClass} onValueChange={handleSelectClass}>
               <SelectTrigger className="w-[300px]">
                 <SelectValue placeholder="Selecione uma turma" />
               </SelectTrigger>
@@ -301,6 +308,25 @@ export const StudentApprovalManager = () => {
                   ))}
               </SelectContent>
             </Select>
+            <Select
+              value={selectedSchoolYear.toString()}
+              onValueChange={(value) => {
+                setSelectedSchoolYear(Number(value) as 1 | 2 | 3);
+                setQuarterResults([]);
+                setPendingQuarterResults([]);
+                setAcademicStatuses({});
+              }}
+              disabled={!selectedClass}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Ano da turma" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">1º Ano</SelectItem>
+                <SelectItem value="2">2º Ano</SelectItem>
+                <SelectItem value="3">3º Ano</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {selectedClassData && (
@@ -308,7 +334,8 @@ export const StudentApprovalManager = () => {
               <AlertDescription>
                 <strong>Turma:</strong> {selectedClassData.name} |{' '}
                 <strong>Ano Atual:</strong> {selectedClassData.currentYear || 'Não definido'} |{' '}
-                <strong>Alunos:</strong> {classStudents.length}
+                <strong>Alunos:</strong> {classStudents.length} |{' '}
+                <strong>Ano selecionado:</strong> {selectedSchoolYear}º
               </AlertDescription>
             </Alert>
           )}
