@@ -218,8 +218,7 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
     return years;
   }, [currentCalendarYear]);
 
-  const directors = authorizedEmails?.filter(e => e.role === 'diretor') || [];
-
+  const directors = authorizedEmails?.filter(director => director.role === 'professor' || director.role === 'diretor') || [];
   return (
     <Card>
       <CardHeader>

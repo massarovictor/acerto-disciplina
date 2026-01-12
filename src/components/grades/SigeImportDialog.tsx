@@ -638,7 +638,6 @@ export const SigeImportDialog = ({
                 setImportPhase('deleting');
                 setImportProgress({ current: 0, total: gradesToDelete.length });
 
-                console.log(`🗑️ Deletando ${gradesToDelete.length} notas antigas...`);
 
                 const DELETE_BATCH_SIZE = 50; // Deletar 50 por vez em paralelo
                 const deleteBatches = [];
