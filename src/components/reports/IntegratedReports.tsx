@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Users, FileDown, UserCheck, Calendar } from 'lucide-react';
 import { Class, Student, Incident } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { useProfessionalSubjects, useProfessionalSubjectTemplates, useGrades, useAttendance } from '@/hooks/useData';
+import { useProfessionalSubjects, useProfessionalSubjectTemplates, useGrades } from '@/hooks/useData';
 import {
   Dialog,
   DialogContent,
@@ -37,7 +37,8 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
   const { grades } = useGrades();
-  const { attendance } = useAttendance();
+  // DISABLED: Attendance feature temporarily removed
+  // const { attendance } = useAttendance();
   const { getProfessionalSubjects } = useProfessionalSubjects();
   const { templates } = useProfessionalSubjectTemplates();
 
@@ -120,8 +121,8 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
     () =>
       selectedClass
         ? grades.filter(
-            g => g.classId === selectedClass && (g.schoolYear ?? 1) === selectedSchoolYear
-          )
+          g => g.classId === selectedClass && (g.schoolYear ?? 1) === selectedSchoolYear
+        )
         : [],
     [grades, selectedClass, selectedSchoolYear]
   );
@@ -130,25 +131,27 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
     () =>
       selectedClass
         ? incidents.filter(
-            i =>
-              i.classId === selectedClass &&
-              isDateInRange(i.date, schoolYearRange)
-          )
+          i =>
+            i.classId === selectedClass &&
+            isDateInRange(i.date, schoolYearRange)
+        )
         : [],
     [incidents, selectedClass, schoolYearRange]
   );
 
-  const classAttendance = useMemo(
-    () =>
-      selectedClass
-        ? attendance.filter(
-            a =>
-              a.classId === selectedClass &&
-              isDateInRange(a.date, schoolYearRange)
-          )
-        : [],
-    [attendance, selectedClass, schoolYearRange]
-  );
+  // DISABLED: Attendance feature temporarily removed
+  // const classAttendance = useMemo(
+  //   () =>
+  //     selectedClass
+  //       ? attendance.filter(
+  //         a =>
+  //           a.classId === selectedClass &&
+  //           isDateInRange(a.date, schoolYearRange)
+  //       )
+  //       : [],
+  //   [attendance, selectedClass, schoolYearRange]
+  // );
+  const classAttendance: any[] = []; // Empty array - attendance disabled
 
   const templateSubjects = useMemo(() => {
     if (!selectedClassData?.templateId) return [];
@@ -271,7 +274,7 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
         description: `O relatório qualitativo da turma ${selectedClassData.name} foi baixado.`,
       });
     } catch (error) {
-      console.error('Erro ao gerar relatório de turma:', error);
+      console.error('Erro ao gerar relatório de turma (PDF generation failed)');
       toast({
         variant: 'destructive',
         title: 'Erro ao gerar relatório',
@@ -307,7 +310,7 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
         description: `O relatório de ${selectedStudentData.name} foi baixado.`,
       });
     } catch (error) {
-      console.error('Erro ao gerar relatório individual:', error);
+      console.error('Erro ao gerar relatório individual (PDF generation failed)');
       toast({
         variant: 'destructive',
         title: 'Erro na geração',

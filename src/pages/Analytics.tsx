@@ -105,7 +105,8 @@ const Analytics = () => {
   const { classes } = useClasses();
   const { students } = useStudents();
   const { grades } = useGrades();
-  const { attendance } = useAttendance();
+  // DISABLED: Attendance feature temporarily removed
+  // const { attendance } = useAttendance();
   const { incidents } = useIncidents();
 
   // ✅ Usando Zustand store para persistir filtros entre navegações
@@ -123,7 +124,7 @@ const Analytics = () => {
     students,
     classes,
     grades,
-    attendance,
+    [], // DISABLED: Attendance temporarily removed
     incidents,
     filters
   );

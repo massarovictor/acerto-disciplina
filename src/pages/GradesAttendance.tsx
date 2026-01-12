@@ -1,23 +1,24 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+// import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GradesManager } from '@/components/grades/GradesManager';
-import { AttendanceManager } from '@/components/grades/AttendanceManager';
-import { useUIStore } from '@/stores/useUIStore';
+// import { AttendanceManager } from '@/components/grades/AttendanceManager'; // DISABLED: Attendance feature temporarily removed
+// import { useUIStore } from '@/stores/useUIStore';
 
 const GradesAttendance = () => {
-  // ✅ Usando Zustand store para persistir tab entre navegações
-  const { gradesAttendanceUI, setGradesAttendanceUI } = useUIStore();
-  const activeTab = gradesAttendanceUI.activeTab;
-  const setActiveTab = (value: string) => setGradesAttendanceUI({ activeTab: value });
+  // DISABLED: Tab navigation removed - only grades for now
+  // const { gradesAttendanceUI, setGradesAttendanceUI } = useUIStore();
+  // const activeTab = gradesAttendanceUI.activeTab;
+  // const setActiveTab = (value: string) => setGradesAttendanceUI({ activeTab: value });
 
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Notas & Frequência</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Notas</h1>
         <p className="text-muted-foreground mt-1">
-          Lance notas e registre frequência dos alunos
+          Lance notas dos alunos por turma e bimestre
         </p>
       </div>
 
+      {/* DISABLED: Tabs removed - only GradesManager for now
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="grades">Lançamento de Notas</TabsTrigger>
@@ -32,8 +33,12 @@ const GradesAttendance = () => {
           <AttendanceManager />
         </TabsContent>
       </Tabs>
+      */}
+
+      <GradesManager />
     </div>
   );
 };
 
 export default GradesAttendance;
+

@@ -279,11 +279,11 @@ export const StudentsRegister = () => {
     const errorMessages: string[] = [];
 
     // Processar alunos sequencialmente para evitar problemas de concorrência
-    console.log(`[IMPORTAÇÃO] Iniciando importação de ${validRows.length} alunos válidos`);
+    // Processar alunos sequencialmente para evitar problemas de concorrência
 
     for (let index = 0; index < validRows.length; index++) {
       const row = validRows[index];
-      console.log(`[IMPORTAÇÃO] Linha ${row.rowNumber}: Processando`, row.data);
+
 
       try {
         // Usar o classId que foi validado pela planilha (baseado no nome da turma)
@@ -295,7 +295,7 @@ export const StudentsRegister = () => {
           continue;
         }
 
-        console.log(`[IMPORTAÇÃO] Linha ${row.rowNumber}: classId = "${row.data.classId}"`);
+
 
         // Verificar se a turma existe
         const classExists = classes.find(c => c.id === row.data.classId);
@@ -315,7 +315,7 @@ export const StudentsRegister = () => {
           continue;
         }
 
-        console.log(`[IMPORTAÇÃO] Linha ${row.rowNumber}: ✅ Turma encontrada:`, { id: classExists.id, name: classExists.name });
+
 
         // Verificar campos obrigatórios
         if (!row.data.name || !row.data.birthDate || !row.data.gender) {
@@ -326,11 +326,7 @@ export const StudentsRegister = () => {
           continue;
         }
 
-        console.log(`[IMPORTAÇÃO] Linha ${row.rowNumber}: Adicionando aluno ${index + 1}/${validRows.length}:`, {
-          name: row.data.name,
-          classId: row.data.classId,
-          className: classExists.name,
-        });
+
 
         await addStudent({
           name: row.data.name || '',
@@ -344,14 +340,13 @@ export const StudentsRegister = () => {
           photoUrl: row.data.photoUrl,
           status: 'active',
         });
-        console.log(`[IMPORTAÇÃO] Linha ${row.rowNumber}: ✅ Aluno adicionado com sucesso`);
         imported++;
 
         // Pequeno delay para garantir IDs únicos e atualização do estado
         await new Promise(resolve => setTimeout(resolve, 10));
       } catch (error) {
         const errorMsg = `Linha ${row.rowNumber}: ${error instanceof Error ? error.message : 'Erro desconhecido'}`;
-        console.error(`[IMPORTAÇÃO] ❌ Erro ao importar aluno:`, error, row);
+        console.error(`[IMPORTAÇÃO] ❌ Erro ao importar aluno linha ${row.rowNumber}`);
         errorMessages.push(errorMsg);
         errors++;
       }
@@ -375,7 +370,7 @@ export const StudentsRegister = () => {
     }
 
     // Forçar atualização da lista de alunos
-    console.log('Importação finalizada. Total de alunos no sistema:', students.length + imported);
+    // Forçar atualização da lista de alunos
   };
 
   return (

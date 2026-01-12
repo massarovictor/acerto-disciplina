@@ -13,11 +13,11 @@ import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interface
 import { Student, Class, Grade, Incident, AttendanceRecord } from '@/types';
 import { getSchoolConfig, getDefaultConfig, SchoolConfig } from './schoolConfig';
 import { PDF_COLORS, PDF_STYLES } from './pdfGenerator';
-import { 
-  classifyStudent, 
+import {
+  classifyStudent,
   SubjectGradeInfo,
   CLASSIFICATION_LABELS,
-  CLASSIFICATION_COLORS 
+  CLASSIFICATION_COLORS
 } from './advancedAnalytics';
 import { QUARTERS } from './subjects';
 import { analyzeTrend } from './mlAnalytics';
@@ -27,21 +27,21 @@ let pdfMakeInstance: any = null;
 
 async function getPdfMake() {
   if (pdfMakeInstance) return pdfMakeInstance;
-  
+
   const pdfMakeModule = await import('pdfmake/build/pdfmake');
   const pdfFontsModule = await import('pdfmake/build/vfs_fonts');
-  
+
   pdfMakeInstance = pdfMakeModule.default || pdfMakeModule;
-  
-  const vfs = (pdfFontsModule as any).pdfMake?.vfs 
-    || (pdfFontsModule as any).default?.pdfMake?.vfs 
+
+  const vfs = (pdfFontsModule as any).pdfMake?.vfs
+    || (pdfFontsModule as any).default?.pdfMake?.vfs
     || (pdfFontsModule as any).vfs
     || (pdfFontsModule as any).default?.vfs;
-  
+
   if (vfs) {
     pdfMakeInstance.vfs = vfs;
   }
-  
+
   return pdfMakeInstance;
 }
 
@@ -57,7 +57,7 @@ class StudentReportPDFGenerator {
   private incidents: Incident[] = [];
   private attendance: AttendanceRecord[] = [];
 
-    constructor() {
+  constructor() {
     this.config = getDefaultConfig();
   }
 
@@ -66,7 +66,7 @@ class StudentReportPDFGenerator {
     studentClass: Class | undefined,
     grades: Grade[],
     incidents: Incident[],
-    attendance: AttendanceRecord[],
+    attendance: AttendanceRecord[], // DISABLED: Kept for API compatibility, not used
     subjects?: string[]
   ): Promise<void> {
     try {
@@ -75,21 +75,22 @@ class StudentReportPDFGenerator {
       this.studentClass = studentClass;
       this.grades = grades.filter(g => g.studentId === student.id);
       this.incidents = incidents.filter(i => i.studentIds.includes(student.id));
-      this.attendance = attendance.filter(a => a.studentId === student.id);
-      
+      // DISABLED: Attendance feature temporarily removed
+      this.attendance = []; // Empty array instead of filtering attendance
+
       // Construir documento
       const content = this.buildDocumentContent(subjects);
       const docDefinition = this.createDocDefinition(content);
-      
+
       // Download
       const safeName = (student.name || 'Aluno').replace(/[^a-z0-9]/gi, '_').toLowerCase();
       const filename = `Relatorio_${safeName}.pdf`;
-      
+
       const pdfMake = await getPdfMake();
       pdfMake.createPdf(docDefinition).download(filename);
-      
+
     } catch (error) {
-      console.error('Erro ao gerar relatório individual:', error);
+      console.error('Erro ao gerar relatório individual (PDF generation failed)');
       throw error;
     }
   }
@@ -115,12 +116,12 @@ class StudentReportPDFGenerator {
       if (!subjectGrades[g.subject]) subjectGrades[g.subject] = [];
       subjectGrades[g.subject].push(g.grade);
     });
-    
+
     const averages: Record<string, number> = {};
     Object.entries(subjectGrades).forEach(([subject, gradeList]) => {
       averages[subject] = gradeList.reduce((a, b) => a + b, 0) / gradeList.length;
     });
-    
+
     return averages;
   }
 
@@ -130,7 +131,7 @@ class StudentReportPDFGenerator {
 
   private generateNarrative(): string {
     if (!this.student) return '';
-    
+
     const classification = classifyStudent(this.grades, this.attendance);
     const subjectAverages = this.getSubjectAverages();
     const average = this.calculateAverage();
@@ -140,22 +141,22 @@ class StudentReportPDFGenerator {
     if (Object.keys(subjectAverages).length === 0) {
       return 'Sem dados suficientes para análise acadêmica neste período. Aguardar lançamento de notas para avaliações mais precisas.';
     }
-    
+
     // Calcular tendência
     const quarterAverages = QUARTERS.map(quarter => {
       const qGrades = this.grades.filter(g => g.quarter === quarter);
       return qGrades.length > 0 ? qGrades.reduce((s, g) => s + g.grade, 0) / qGrades.length : 0;
     }).filter(v => v > 0);
-    
+
     const trend = analyzeTrend(quarterAverages);
-    
+
     // Identificar pontos fortes e fracos
     const sortedSubjects = Object.entries(subjectAverages).sort((a, b) => b[1] - a[1]);
     const strengths = sortedSubjects.filter(([_, avg]) => avg >= 7).slice(0, 5).map(([s]) => s);
     const weaknesses = sortedSubjects.filter(([_, avg]) => avg < 6).map(([s]) => s);
-    
+
     const parts: string[] = [];
-    
+
     // 1. SITUAÇÃO ATUAL
     const classLabel = CLASSIFICATION_LABELS[classification.classification];
     if (classification.classification === 'critico') {
@@ -167,7 +168,7 @@ class StudentReportPDFGenerator {
     } else {
       parts.push(`Situação regular: aprovado em todas as disciplinas.`);
     }
-    
+
     // 2. DISCIPLINAS EM DIFICULDADE
     if (classification.subjectsBelow6.length > 0) {
       const disciplinasFormatadas = classification.subjectsBelow6
@@ -175,7 +176,7 @@ class StudentReportPDFGenerator {
         .join(', ');
       parts.push(`Disciplinas abaixo de 6,0: ${disciplinasFormatadas}.`);
     }
-    
+
     // 3. PONTOS FORTES
     if (strengths.length > 0) {
       const fortesFormatados = strengths
@@ -183,7 +184,7 @@ class StudentReportPDFGenerator {
         .join(', ');
       parts.push(`Pontos fortes: ${fortesFormatados}.`);
     }
-    
+
     // 4. TENDÊNCIA
     if (trend.direction === 'crescente' && trend.confidence > 30) {
       parts.push(`Tendência: melhora progressiva ao longo dos bimestres (confiança ${trend.confidence.toFixed(0)}%).`);
@@ -192,13 +193,13 @@ class StudentReportPDFGenerator {
     } else if (trend.direction === 'estavel') {
       parts.push(`Tendência: desempenho estável ao longo dos bimestres.`);
     }
-    
+
     // 5. COMPORTAMENTO
     if (incidentCount > 0) {
-      const graveCount = this.incidents.filter(i => 
+      const graveCount = this.incidents.filter(i =>
         i.finalSeverity === 'grave' || i.finalSeverity === 'gravissima'
       ).length;
-      
+
       if (graveCount > 0) {
         parts.push(`Comportamento: ${incidentCount} ocorrência(s) registrada(s), sendo ${graveCount} grave(s) ou gravíssima(s), o que pode estar impactando o desempenho acadêmico.`);
       } else {
@@ -207,13 +208,13 @@ class StudentReportPDFGenerator {
     } else {
       parts.push(`Comportamento: sem ocorrências disciplinares registradas.`);
     }
-    
+
     // 6. PREDIÇÃO
     if (trend.prediction > 0 && trend.confidence > 20) {
       const prediction = Math.max(0, Math.min(10, trend.prediction));
       parts.push(`Projeção: média final estimada de ${prediction.toFixed(1)} com base nos dados acumulados dos bimestres anteriores.`);
     }
-    
+
     // 7. RECOMENDAÇÃO
     let recommendation: string;
     if (classification.classification === 'critico') {
@@ -226,7 +227,7 @@ class StudentReportPDFGenerator {
       recommendation = `Manter acompanhamento regular para consolidar desempenho.`;
     }
     parts.push(`Ação: ${recommendation}`);
-    
+
     return parts.join(' ');
   }
 
@@ -271,7 +272,7 @@ class StudentReportPDFGenerator {
         ],
       };
     }
-    
+
     return {
       margin: [40, 20, 40, 10],
       columns: [
@@ -301,25 +302,25 @@ class StudentReportPDFGenerator {
 
   private buildDocumentContent(subjects?: string[]): Content[] {
     const content: Content[] = [];
-    
+
     // 1. Título
     content.push(this.buildTitleSection());
-    
+
     // 2. Informações do Estudante + Métricas
     content.push(this.buildStudentInfoSection());
-    
+
     // 3. Quadro de Aproveitamento
     content.push(this.buildGradesTableSection(subjects));
-    
+
     // 4. Resumo Textual
     content.push(this.buildNarrativeSection());
-    
+
     // 5. Seção Comportamental
     content.push(this.buildBehaviorSection());
-    
+
     // 6. Assinaturas
     content.push(this.buildSignaturesSection());
-    
+
     return content;
   }
 
@@ -344,14 +345,14 @@ class StudentReportPDFGenerator {
 
   private buildStudentInfoSection(): Content {
     if (!this.student) return '';
-    
+
     const average = this.calculateAverage();
     const frequency = this.calculateFrequency();
     const incidentCount = this.incidents.length;
     const classification = classifyStudent(this.grades, this.attendance);
     const color = CLASSIFICATION_COLORS[classification.classification];
     const label = CLASSIFICATION_LABELS[classification.classification];
-    
+
     return {
       stack: [
         // Informações do estudante
@@ -385,11 +386,11 @@ class StudentReportPDFGenerator {
           },
           margin: [0, 0, 0, 10],
         },
-        
-        // Métricas: Média, Frequência, Ocorrências
+
+        // Métricas: Média, Ocorrências (Frequência removida)
         {
           table: {
-            widths: ['*', '*', '*'],
+            widths: ['*', '*'],
             body: [[
               {
                 stack: [
@@ -399,14 +400,15 @@ class StudentReportPDFGenerator {
                 fillColor: '#F8FAFC',
                 margin: [10, 8, 10, 8],
               },
-              {
-                stack: [
-                  { text: 'Frequência', fontSize: 9, color: PDF_COLORS.secondary, alignment: 'center' },
-                  { text: `${frequency.toFixed(0)}%`, fontSize: 20, bold: true, alignment: 'center' },
-                ],
-                fillColor: '#F8FAFC',
-                margin: [10, 8, 10, 8],
-              },
+              // DISABLED: Frequência removida temporariamente
+              // {
+              //   stack: [
+              //     { text: 'Frequência', fontSize: 9, color: PDF_COLORS.secondary, alignment: 'center' },
+              //     { text: `${frequency.toFixed(0)}%`, fontSize: 20, bold: true, alignment: 'center' },
+              //   ],
+              //   fillColor: '#F8FAFC',
+              //   margin: [10, 8, 10, 8],
+              // },
               {
                 stack: [
                   { text: 'Total de Ocorrências', fontSize: 9, color: PDF_COLORS.secondary, alignment: 'center' },
@@ -425,7 +427,7 @@ class StudentReportPDFGenerator {
           },
           margin: [0, 0, 0, 10],
         },
-        
+
         // Classificação
         {
           table: {
@@ -466,9 +468,9 @@ class StudentReportPDFGenerator {
     const subjectList = subjects && subjects.length > 0
       ? [...subjects].sort()
       : [...new Set(this.grades.map(g => g.subject))].sort();
-    
+
     const subjectAverages = this.getSubjectAverages();
-    
+
     // Construir tabela
     const tableBody: TableCell[][] = [
       [
@@ -480,13 +482,13 @@ class StudentReportPDFGenerator {
         { text: 'Média', style: 'tableHeader' },
       ],
     ];
-    
+
     subjectList.forEach(subject => {
       const subGrades = this.grades.filter(g => g.subject === subject);
       const row: TableCell[] = [
         { text: subject, style: 'tableCellLeft', fontSize: 9 },
       ];
-      
+
       QUARTERS.forEach(quarter => {
         const grade = subGrades.find(g => g.quarter === quarter);
         if (grade) {
@@ -501,7 +503,7 @@ class StudentReportPDFGenerator {
           row.push({ text: '-', style: 'tableCell', fontSize: 9, color: PDF_COLORS.tertiary });
         }
       });
-      
+
       // Média final
       const avg = subjectAverages[subject] || 0;
       row.push({
@@ -511,10 +513,10 @@ class StudentReportPDFGenerator {
         bold: true,
         color: avg < 6 ? PDF_COLORS.status.critico : PDF_COLORS.primary,
       });
-      
+
       tableBody.push(row);
     });
-    
+
     return {
       stack: [
         { text: '', margin: [0, 0, 0, 0] }, // Quebra de linha
@@ -544,7 +546,7 @@ class StudentReportPDFGenerator {
 
   private buildNarrativeSection(): Content {
     const narrative = this.generateNarrative();
-    
+
     return {
       stack: [
         { text: '', margin: [0, 0, 0, 0] }, // Quebra de linha
@@ -577,26 +579,26 @@ class StudentReportPDFGenerator {
         ],
       };
     }
-    
-    const sortedIncidents = [...this.incidents].sort((a, b) => 
+
+    const sortedIncidents = [...this.incidents].sort((a, b) =>
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
-    
+
     const SEVERITY_LABELS: Record<string, string> = {
       leve: 'Leve',
       intermediaria: 'Intermediária',
       grave: 'Grave',
       gravissima: 'Gravíssima',
     };
-    
+
     const incidentCards: Content[] = sortedIncidents.map(incident => {
       const severityLabel = SEVERITY_LABELS[incident.finalSeverity] || incident.finalSeverity;
       const severityColor = incident.finalSeverity === 'grave' || incident.finalSeverity === 'gravissima'
         ? PDF_COLORS.status.critico
         : incident.finalSeverity === 'intermediaria'
-        ? PDF_COLORS.status.atencao
-        : PDF_COLORS.tertiary;
-      
+          ? PDF_COLORS.status.atencao
+          : PDF_COLORS.tertiary;
+
       return {
         table: {
           widths: [3, '*'],
@@ -626,7 +628,7 @@ class StudentReportPDFGenerator {
         unbreakable: true,
       };
     });
-    
+
     return {
       stack: [
         { text: '', margin: [0, 0, 0, 0] }, // Quebra de linha
@@ -691,12 +693,12 @@ class StudentReportPDFGenerator {
 // ============================================
 
 export async function generateStudentReportPDF(
-    student: Student,
-    studentClass: Class | undefined,
-    grades: Grade[],
-    incidents: Incident[],
-    attendance: AttendanceRecord[],
-    subjects?: string[]
+  student: Student,
+  studentClass: Class | undefined,
+  grades: Grade[],
+  incidents: Incident[],
+  attendance: AttendanceRecord[],
+  subjects?: string[]
 ): Promise<void> {
   const generator = new StudentReportPDFGenerator();
   await generator.generate(student, studentClass, grades, incidents, attendance, subjects);

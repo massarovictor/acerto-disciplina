@@ -28,14 +28,15 @@ export function SchoolOverviewCards({ overview }: SchoolOverviewCardsProps) {
       color: overview.overallAverage >= 6 ? 'text-emerald-600' : 'text-red-600',
       bgColor: overview.overallAverage >= 6 ? 'bg-emerald-100' : 'bg-red-100',
     },
-    {
-      title: 'Frequência',
-      value: `${overview.overallFrequency.toFixed(0)}%`,
-      icon: Clock,
-      description: overview.overallFrequency >= 75 ? 'Adequada' : 'Atenção necessária',
-      color: overview.overallFrequency >= 75 ? 'text-emerald-600' : 'text-amber-600',
-      bgColor: overview.overallFrequency >= 75 ? 'bg-emerald-100' : 'bg-amber-100',
-    },
+    // DISABLED: Frequência removida temporariamente
+    // {
+    //   title: 'Frequência',
+    //   value: `${overview.overallFrequency.toFixed(0)}%`,
+    //   icon: Clock,
+    //   description: overview.overallFrequency >= 75 ? 'Adequada' : 'Atenção necessária',
+    //   color: overview.overallFrequency >= 75 ? 'text-emerald-600' : 'text-amber-600',
+    //   bgColor: overview.overallFrequency >= 75 ? 'bg-emerald-100' : 'bg-amber-100',
+    // },
     {
       title: 'Ocorrências',
       value: overview.totalIncidents.toString(),
@@ -47,7 +48,7 @@ export function SchoolOverviewCards({ overview }: SchoolOverviewCardsProps) {
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {cards.map((card) => (
         <Card key={card.title}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -66,24 +67,24 @@ export function SchoolOverviewCards({ overview }: SchoolOverviewCardsProps) {
           </CardContent>
         </Card>
       ))}
-      
+
       {/* Classification Summary */}
       <Card className="md:col-span-2 lg:col-span-4">
         <CardContent className="pt-6">
           <div className="flex flex-wrap gap-4 justify-center">
             {(Object.keys(overview.classifications) as Array<keyof typeof overview.classifications>).map((key) => {
               const count = overview.classifications[key];
-              const percent = overview.totalStudents > 0 
-                ? ((count / overview.totalStudents) * 100).toFixed(0) 
+              const percent = overview.totalStudents > 0
+                ? ((count / overview.totalStudents) * 100).toFixed(0)
                 : '0';
-              
+
               return (
-                <div 
+                <div
                   key={key}
                   className="flex items-center gap-3 px-4 py-2 rounded-lg border"
                   style={{ borderColor: CLASSIFICATION_COLORS[key] }}
                 >
-                  <div 
+                  <div
                     className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: CLASSIFICATION_COLORS[key] }}
                   />

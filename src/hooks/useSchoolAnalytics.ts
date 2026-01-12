@@ -320,10 +320,18 @@ export function useSchoolAnalytics(
       );
     }
 
-    if (!useAllYears && filters.calendarYear !== 'all') {
+    // Filtrar por ano calendário - funciona independente de schoolYear
+    // Quando calendarYear é definido, filtra turmas que estavam ativas naquele ano
+    if (filters.calendarYear !== 'all') {
+      const targetCalendarYear = filters.calendarYear as number;
       filteredClasses = filteredClasses.filter((cls) => {
-        const calendarYear = classCalendarYearMap.get(cls.id);
-        return calendarYear === filters.calendarYear;
+        const startYear = getStartCalendarYear(cls);
+        const endYear = cls.endCalendarYear ?? (startYear ? startYear + 2 : undefined);
+
+        if (!startYear) return false;
+
+        // Turma estava ativa naquele ano calendário
+        return startYear <= targetCalendarYear && targetCalendarYear <= (endYear || startYear + 2);
       });
     }
 
@@ -358,9 +366,23 @@ export function useSchoolAnalytics(
     let filteredAttendance = attendance.filter(a => filteredClassIds.has(a.classId));
     let filteredIncidents = incidents.filter(i => filteredClassIds.has(i.classId));
 
+    // Filtrar por range de datas quando schoolYear específico
     if (!useAllYears && targetSchoolYear !== null) {
       const classRanges = new Map<string, { start: Date; end: Date } | null>();
       filteredClasses.forEach(cls => {
+        // Se temos um ano calendário específico, verificamos se o schoolYear da turma cai nesse ano
+        if (filters.calendarYear !== 'all') {
+          const startYear = getStartCalendarYear(cls);
+          if (startYear) {
+            // Ano calendário em que a turma cursou este schoolYear
+            const specificYear = startYear + (targetSchoolYear - 1);
+            if (specificYear !== filters.calendarYear) {
+              classRanges.set(cls.id, null); // Fora do ano selecionado
+              return;
+            }
+          }
+        }
+
         const startYearDate = resolveStartYearDate(cls);
         const range = filters.quarter !== 'all'
           ? getQuarterRange(startYearDate, targetSchoolYear, filters.quarter)
@@ -370,14 +392,52 @@ export function useSchoolAnalytics(
 
       filteredAttendance = attendance.filter(a => {
         if (!filteredClassIds.has(a.classId)) return false;
-        const range = classRanges.get(a.classId) ?? null;
-        return isDateInRange(a.date, range);
+        const range = classRanges.get(a.classId);
+        return range ? isDateInRange(a.date, range) : false;
       });
 
       filteredIncidents = incidents.filter(i => {
         if (!filteredClassIds.has(i.classId)) return false;
-        const range = classRanges.get(i.classId) ?? null;
-        return isDateInRange(i.date, range);
+        const range = classRanges.get(i.classId);
+        return range ? isDateInRange(i.date, range) : false;
+      });
+
+      // Também precisamos filtrar as notas se o range for nulo (fora do ano)
+      filteredGrades = filteredGrades.filter(g => {
+        const range = classRanges.get(g.classId);
+        return range !== null && range !== undefined; // Se range é null/undefined, a turma não cursou a série neste ano
+      });
+    }
+    // Filtrar por ano calendário quando schoolYear é 'all' mas calendarYear é específico
+    else if (useAllYears && filters.calendarYear !== 'all') {
+      const targetCalYear = filters.calendarYear as number;
+
+      // Filtrar notas pelo ano calendário
+      filteredGrades = filteredGrades.filter(g => {
+        // Usar a data se disponível, ou calcular a partir do schoolYear da nota
+        const cls = filteredClasses.find(c => c.id === g.classId);
+        if (!cls) return false;
+
+        const startYear = getStartCalendarYear(cls);
+        if (!startYear) return true; // Se não conseguir determinar, mantém
+
+        // Nota do schoolYear X corresponde ao ano calendário startYear + X - 1
+        const gradeCalendarYear = startYear + ((g.schoolYear ?? 1) - 1);
+        return gradeCalendarYear === targetCalYear;
+      });
+
+      // Filtrar frequência pelo ano calendário
+      filteredAttendance = filteredAttendance.filter(a => {
+        const date = parseLocalDate(a.date);
+        if (Number.isNaN(date.getTime())) return false;
+        return date.getFullYear() === targetCalYear;
+      });
+
+      // Filtrar ocorrências pelo ano calendário  
+      filteredIncidents = filteredIncidents.filter(i => {
+        const date = parseLocalDate(i.date);
+        if (Number.isNaN(date.getTime())) return false;
+        return date.getFullYear() === targetCalYear;
       });
     }
 
@@ -415,10 +475,6 @@ export function useSchoolAnalytics(
         trend,
       };
     });
-
-    // ============================================
-    // CALCULAR ANALYTICS POR TURMA
-    // ============================================
 
     // ============================================
     // CALCULAR ANALYTICS POR TURMA
@@ -557,25 +613,25 @@ export function useSchoolAnalytics(
     const cohortAnalytics = useAllYears
       ? []
       : Array.from(cohortMap.entries())
-          .map(([calendarYear, entry]) => {
-            const growthAverage =
-              entry.growthValues.length > 0
-                ? entry.growthValues.reduce((sum, value) => sum + value, 0) / entry.growthValues.length
-                : null;
-            return {
-              calendarYear,
-              classCount: entry.classIds.size,
-              studentCount: entry.studentIds.size,
-              average: entry.gradeCount > 0 ? entry.gradeSum / entry.gradeCount : 0,
-              frequency:
-                entry.attendanceTotal > 0
-                  ? (entry.attendancePresent / entry.attendanceTotal) * 100
-                  : 100,
-              incidentCount: entry.incidentCount,
-              growthAverage,
-            };
-          })
-          .sort((a, b) => a.calendarYear - b.calendarYear);
+        .map(([calendarYear, entry]) => {
+          const growthAverage =
+            entry.growthValues.length > 0
+              ? entry.growthValues.reduce((sum, value) => sum + value, 0) / entry.growthValues.length
+              : null;
+          return {
+            calendarYear,
+            classCount: entry.classIds.size,
+            studentCount: entry.studentIds.size,
+            average: entry.gradeCount > 0 ? entry.gradeSum / entry.gradeCount : 0,
+            frequency:
+              entry.attendanceTotal > 0
+                ? (entry.attendancePresent / entry.attendanceTotal) * 100
+                : 100,
+            incidentCount: entry.incidentCount,
+            growthAverage,
+          };
+        })
+        .sort((a, b) => a.calendarYear - b.calendarYear);
 
     // ============================================
     // CALCULAR ANALYTICS POR DISCIPLINA

@@ -69,7 +69,8 @@ export function CohortComparisonTable({ cohorts, schoolYear }: CohortComparisonT
                 <TableHead className="text-center">Turmas</TableHead>
                 <TableHead className="text-center">Alunos</TableHead>
                 <TableHead className="text-center">Média</TableHead>
-                <TableHead className="text-center">Frequência</TableHead>
+                {/* DISABLED: Frequência removida temporariamente */}
+                {/* <TableHead className="text-center">Frequência</TableHead> */}
                 <TableHead className="text-center">Ocorrências</TableHead>
                 <TableHead className="text-center">Crescimento</TableHead>
               </TableRow>
@@ -77,7 +78,7 @@ export function CohortComparisonTable({ cohorts, schoolYear }: CohortComparisonT
             <TableBody>
               {cohorts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     Nenhum dado suficiente para comparação por ano calendário.
                   </TableCell>
                 </TableRow>
@@ -92,11 +93,12 @@ export function CohortComparisonTable({ cohorts, schoolYear }: CohortComparisonT
                         {cohort.average.toFixed(1)}
                       </span>
                     </TableCell>
-                    <TableCell className="text-center">
+                    {/* DISABLED: Frequência removida temporariamente */}
+                    {/* <TableCell className="text-center">
                       <span className={cohort.frequency >= 75 ? 'text-emerald-600' : 'text-amber-600'}>
                         {cohort.frequency.toFixed(0)}%
                       </span>
-                    </TableCell>
+                    </TableCell> */}
                     <TableCell className="text-center">{cohort.incidentCount}</TableCell>
                     <TableCell className="text-center">
                       <GrowthIndicator value={cohort.growthAverage} />

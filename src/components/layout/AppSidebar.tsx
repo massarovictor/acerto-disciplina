@@ -20,7 +20,7 @@ const menuItems = [
   { icon: AlertTriangle, label: 'Ocorrências', path: '/ocorrencias' },
   { icon: School, label: 'Turmas', path: '/turmas' },
   { icon: Users, label: 'Alunos', path: '/alunos' },
-  { icon: BookOpen, label: 'Notas & Frequência', path: '/notas-frequencia' },
+  { icon: BookOpen, label: 'Notas', path: '/notas-frequencia' },
   { icon: BarChart3, label: 'Relatórios', path: '/relatorios' },
 ];
 

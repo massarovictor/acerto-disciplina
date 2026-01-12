@@ -174,32 +174,7 @@ export const GradesManager = () => {
         ...allProfessionalSubjects,
       ];
 
-      console.log('=== DEBUG: CARREGAMENTO DE NOTAS ===');
-      console.log(`TOTAL DE NOTAS NO ESTADO (SEM FILTRO): ${grades.length}`); // CHECKPOINT CRÍTICO
 
-      const relevantGrades = grades.filter(
-        g => g.classId === selectedClass &&
-          g.quarter === selectedQuarter &&
-          (g.schoolYear ?? 1) === selectedSchoolYear
-      );
-
-      console.log(`Turma: "${selectedClass}"`);
-      console.log(`Bimestre: "${selectedQuarter}"`);
-      console.log(`Ano: ${selectedSchoolYear}`);
-      console.log(`Disciplinas esperadas (${currentAllSubjects.length}):`, currentAllSubjects);
-      console.log(`Notas no banco para esta turma/bimestre/ano: ${relevantGrades.length}`);
-
-      if (relevantGrades.length > 0) {
-        // Listar disciplinas únicas nas notas do banco
-        const subjectsInDb = [...new Set(relevantGrades.map(g => g.subject))];
-        console.log(`Disciplinas únicas nas notas do banco (${subjectsInDb.length}):`, subjectsInDb);
-
-        // Verificar quais disciplinas do banco NÃO estão na lista esperada
-        const notInExpected = subjectsInDb.filter(s => !currentAllSubjects.includes(s));
-        if (notInExpected.length > 0) {
-          console.warn('⚠️ PROBLEMA: Disciplinas no banco que NÃO estão na lista esperada:', notInExpected);
-        }
-      }
 
       const initialGrades = classStudents.map(student => {
         const studentGradeData: Record<string, string> = {};

@@ -20,10 +20,11 @@ interface ClassSlidesProps {
   students: Student[];
   incidents: Incident[];
   grades: Grade[];
-  attendance: AttendanceRecord[];
+  // DISABLED: Attendance feature temporarily removed
+  // attendance: AttendanceRecord[];
 }
 
-export const ClassSlides = ({ classes, students, incidents, grades, attendance }: ClassSlidesProps) => {
+export const ClassSlides = ({ classes, students, incidents, grades }: ClassSlidesProps) => {
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedStudent, setSelectedStudent] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('all');
@@ -120,17 +121,17 @@ export const ClassSlides = ({ classes, students, incidents, grades, attendance }
   );
   const classIncidents = selectedClass
     ? incidents.filter(
-        i =>
-          i.classId === selectedClass &&
-          isDateInRange(i.date, schoolYearRange),
-      )
+      i =>
+        i.classId === selectedClass &&
+        isDateInRange(i.date, schoolYearRange),
+    )
     : [];
   const classGrades = selectedClass
     ? grades.filter(
-        g =>
-          g.classId === selectedClass &&
-          (g.schoolYear ?? 1) === selectedSchoolYear,
-      )
+      g =>
+        g.classId === selectedClass &&
+        (g.schoolYear ?? 1) === selectedSchoolYear,
+    )
     : [];
   const studentData = students.find(s => s.id === selectedStudent);
 

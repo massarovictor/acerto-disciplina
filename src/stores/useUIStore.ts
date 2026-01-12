@@ -121,13 +121,16 @@ const initialIncidentsUI: IncidentsUIState = {
     searchTerm: '',
 };
 
+// Ano atual para filtro padrão
+const currentCalendarYear = new Date().getFullYear();
+
 const initialAnalyticsUI: AnalyticsUIState = {
     filters: {
         series: [],
         classIds: [],
         quarter: 'all',
         schoolYear: 'all',
-        calendarYear: 'all',
+        calendarYear: currentCalendarYear,  // ✅ Ano atual por padrão
         includeArchived: false,
         comparisonClassIds: [],
     },

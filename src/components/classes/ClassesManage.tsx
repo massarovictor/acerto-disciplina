@@ -40,7 +40,7 @@ import {
   useClasses,
   useStudents,
   useGrades,
-  useAttendance,
+  // useAttendance, // DISABLED: Attendance feature temporarily removed
   useProfessionalSubjects,
   useIncidents,
   useProfessionalSubjectTemplates,
@@ -71,7 +71,10 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
   const { classes, updateClass, deleteClass, archiveClass } = useClasses();
   const { students, updateStudent } = useStudents();
   const { grades, deleteGrade } = useGrades();
-  const { attendance, deleteAttendance } = useAttendance();
+  // DISABLED: Attendance feature temporarily removed
+  // const { attendance, deleteAttendance } = useAttendance();
+  const attendance: any[] = []; // Empty array placeholder
+  const deleteAttendance = async (id: string) => { }; // No-op placeholder
   const { setProfessionalSubjectsForClass } = useProfessionalSubjects();
   const { incidents } = useIncidents();
   const { templates, getTemplate } = useProfessionalSubjectTemplates();
@@ -397,7 +400,8 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
 
       toast({
         title: "Turma excluída",
-        description: `Turma excluída com sucesso. ${studentCount} aluno(s) transferido(s), ${gradeCount} nota(s) e ${attendanceCount} registro(s) de frequência removidos.`,
+        // DISABLED: Frequência removida temporariamente
+        description: `Turma excluída com sucesso. ${studentCount} aluno(s) transferido(s) e ${gradeCount} nota(s) removidas.`,
       });
 
       setDeleteConfirmData(null);
@@ -763,7 +767,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
           open={!!editingClass}
           onOpenChange={(open) => !open && setEditingClass(null)}
         >
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Editar Turma</DialogTitle>
             </DialogHeader>
@@ -937,34 +941,34 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                     {templateSubjectsByYear.map((yearData) => {
                       const isCurrent = yearData.year === editFormData.currentSeries;
                       return (
-                      <div key={yearData.year} className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-muted-foreground">
-                            {yearData.year}º Ano
-                          </p>
-                          {isCurrent && (
-                            <Badge variant="secondary" className="text-xs">
-                              Atual
-                            </Badge>
-                          )}
+                        <div key={yearData.year} className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-muted-foreground">
+                              {yearData.year}º Ano
+                            </p>
+                            {isCurrent && (
+                              <Badge variant="secondary" className="text-xs">
+                                Atual
+                              </Badge>
+                            )}
+                          </div>
+                          <div
+                            className={`flex flex-wrap gap-2 p-3 border rounded-md ${isCurrent ? "bg-amber-50/50 border-amber-200" : "bg-muted/50"
+                              }`}
+                          >
+                            {yearData.subjects.map((subject, index) => (
+                              <Badge
+                                key={`${yearData.year}-${index}`}
+                                variant="outline"
+                                className="bg-amber-500/10 text-amber-700 border-amber-500/30"
+                              >
+                                {subject}
+                              </Badge>
+                            ))}
+                          </div>
                         </div>
-                        <div
-                          className={`flex flex-wrap gap-2 p-3 border rounded-md ${
-                            isCurrent ? "bg-amber-50/50 border-amber-200" : "bg-muted/50"
-                          }`}
-                        >
-                          {yearData.subjects.map((subject, index) => (
-                            <Badge
-                              key={`${yearData.year}-${index}`}
-                              variant="outline"
-                              className="bg-amber-500/10 text-amber-700 border-amber-500/30"
-                            >
-                              {subject}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )})}
+                      )
+                    })}
                   </div>
                 )}
 
@@ -1058,8 +1062,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
 
               {deleteConfirmData &&
                 (deleteConfirmData.studentCount > 0 ||
-                  deleteConfirmData.gradeCount > 0 ||
-                  deleteConfirmData.attendanceCount > 0) && (
+                  deleteConfirmData.gradeCount > 0) && (
                   <div className="bg-severity-critical-bg p-4 rounded-md space-y-2">
                     <p className="font-semibold text-severity-critical">
                       Esta turma possui dados vinculados:
@@ -1077,12 +1080,14 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                           permanentemente excluídas
                         </li>
                       )}
+                      {/* DISABLED: Frequência removida temporariamente
                       {deleteConfirmData.attendanceCount > 0 && (
                         <li>
                           {deleteConfirmData.attendanceCount} registro(s) de
                           frequência - serão permanentemente excluídos
                         </li>
                       )}
+                      */}
                     </ul>
                   </div>
                 )}

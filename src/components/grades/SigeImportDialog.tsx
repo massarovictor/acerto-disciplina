@@ -267,7 +267,7 @@ export const SigeImportDialog = ({
             const matchRatio = matchingWords.length / Math.max(subjectWords.length, targetWords.length);
 
             if (debug && matchRatio > 0.3) {
-                console.log(`  → Comparing with "${vs.original}": ${matchingWords.length}/${Math.max(subjectWords.length, targetWords.length)} words match (${(matchRatio * 100).toFixed(0)}%)`);
+
             }
 
             if (matchRatio >= 0.6 && (!bestWordMatch || matchRatio > bestWordMatch.ratio)) {
@@ -276,7 +276,7 @@ export const SigeImportDialog = ({
         }
 
         if (bestWordMatch) {
-            if (debug) console.log(`  → WORD MATCH: "${bestWordMatch.subject}" (${(bestWordMatch.ratio * 100).toFixed(0)}%)`);
+
             return bestWordMatch.subject;
         }
 
@@ -310,17 +310,7 @@ export const SigeImportDialog = ({
         // Debug: mostrar breakdown de disciplinas
         const templateByYear = getTemplateSubjectsForClass(selectedClass);
         const templateAll = getAllTemplateSubjectsForClass(selectedClass);
-        console.log('=== DEBUG: DISCIPLINAS VÁLIDAS ===');
-        console.log(`Turma selecionada: ${selectedClass}`);
-        console.log(`Ano selecionado: ${selectedSchoolYear}º ano`);
-        console.log(`Disciplinas do template para ${selectedSchoolYear}º ano: ${templateByYear.length}`, templateByYear);
-        console.log(`Disciplinas do template (todos os anos): ${templateAll.length}`, templateAll);
-        console.log(`Disciplinas manuais da turma: ${professionalSubjects.filter(ps => ps.classId === selectedClass).length}`);
-        console.log(`Total de disciplinas válidas (ENEM + template + manuais): ${validSubjects.length}`);
-        console.log('');
-        console.log('=== MAPEAMENTO DE DISCIPLINAS ===');
-        console.log(`Disciplinas no arquivo Excel: ${parseResult.subjects.length}`);
-        console.log(`Disciplinas válidas no sistema: ${validSubjects.length}`);
+
 
         for (const excelSubject of parseResult.subjects) {
             const autoMatch = isValidSubject(excelSubject, validSubjects, [], true);
@@ -333,8 +323,7 @@ export const SigeImportDialog = ({
 
         const matched = mappings.filter(m => m.autoMatched).length;
         const unmatched = mappings.filter(m => !m.autoMatched).length;
-        console.log('');
-        console.log(`=== RESULTADO: ${matched} mapeadas automaticamente, ${unmatched} precisam mapeamento manual ===`);
+
 
         setSubjectMappings(mappings);
         setStep('map-subjects');
@@ -384,7 +373,7 @@ export const SigeImportDialog = ({
                     title: 'Excel processado com sucesso',
                     description: `${result.rows.length} alunos e ${result.subjects.length} disciplinas encontradas: ${subjectsSummary}`,
                 });
-                console.log('[INFO] Disciplinas encontradas no Excel:', result.subjects);
+
 
                 setFileQuarter(result.quarter ?? null);
                 if (result.quarter && result.quarter !== selectedQuarter) {
@@ -554,13 +543,7 @@ export const SigeImportDialog = ({
         }
 
         // 📊 LOG DETALHADO
-        console.log('=== ESTATÍSTICAS DE IMPORTAÇÃO ===');
-        console.log(`📝 Total de notas no arquivo: ${totalNotasNoArquivo}`);
-        console.log(`✅ Notas válidas: ${notasValidas}`);
-        console.log(`❌ Descartadas por aluno não identificado: ${notasDescartadasPorAluno}`);
-        console.log(`❌ Descartadas por disciplina não cadastrada: ${notasDescartadasPorDisciplina}`);
-        console.log(`❌ Descartadas por valor inválido (nulo/fora de 0-10): ${notasDescartadasPorValorInvalido}`);
-        console.log(`📊 Taxa de aproveitamento: ${((notasValidas / totalNotasNoArquivo) * 100).toFixed(1)}%`);
+
 
         if (grades.length === 0) {
             toast({
@@ -674,7 +657,7 @@ export const SigeImportDialog = ({
                             deleted++;
                             return { success: true };
                         } catch (error) {
-                            console.error(`Erro ao deletar nota:`, error);
+                            console.error(`Erro ao deletar nota de ID ${grade.id}`);
                             errors++;
                             return { success: false, error };
                         }
@@ -687,7 +670,7 @@ export const SigeImportDialog = ({
                     setImportProgress({ current: deletedCount, total: gradesToDelete.length });
                 }
 
-                console.log(`✅ ${deleted} notas antigas deletadas`);
+
             }
 
             // ETAPA 2: Importar as novas notas (EM LOTES PARALELOS para velocidade)
@@ -695,7 +678,7 @@ export const SigeImportDialog = ({
             setImportProgress({ current: 0, total: toImport.length });
 
             // MODO DE DEBUG SEQUENCIAL (Lento, mas seguro e verbose)
-            console.log(`⚡ Iniciando modo de importação sequencial para ${toImport.length} notas...`);
+            // MODO DE DEBUG SEQUENCIAL (Lento, mas seguro e verbose)
 
             for (let i = 0; i < toImport.length; i++) {
                 const grade = toImport[i];
@@ -715,11 +698,7 @@ export const SigeImportDialog = ({
                     ) : null;
 
                     // DEBUG DETALHADO POR NOTA
-                    console.log(`[SEQ IMPORT ${i + 1}/${toImport.length}] Tentando salvar:`, {
-                        student: grade.studentName,
-                        subject: cleanSubject,
-                        grade: grade.grade
-                    });
+
 
                     await addGrade({
                         studentId: grade.studentId,
@@ -743,21 +722,16 @@ export const SigeImportDialog = ({
                     });
 
                 } catch (error) {
-                    console.error(`❌ FALHA AO IMPORTAR NOTA [${i + 1}/${toImport.length}]:`);
-                    console.error(`Aluno: ${grade.studentName}`);
-                    console.error(`Disciplina: ${grade.subject}`);
-                    console.error(`Erro cru:`, error);
+                    console.error(`❌ FALHA AO IMPORTAR NOTA [${i + 1}/${toImport.length}]: Erro ao importar disciplina ${grade.subject}`);
                     errors++;
                 }
             }
 
-            console.log(`✅ Importação SEQUENCIAL concluída: ${imported} importadas, ${updated} atualizadas, ${errors} erros`);
+
         } finally {
             setIsImporting(false);
             // Chamar refresh do hook para atualizar estado
-            console.log('🔄 Chamando onRefresh para atualizar dados...');
             await onRefresh();
-            console.log('✅ onRefresh concluído. Verifique o log de TOTAL DE NOTAS NO ESTADO.');
         }
 
         if (errors > 0) {

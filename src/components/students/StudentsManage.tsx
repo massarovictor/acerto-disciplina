@@ -35,7 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useStudents, useClasses, useIncidents, useGrades, useAttendance } from '@/hooks/useData';
+import { useStudents, useClasses, useIncidents, useGrades } from '@/hooks/useData';
 import { useToast } from '@/hooks/use-toast';
 import { exportStudentsList } from '@/lib/excelExport';
 import { Search, Edit, Download, Eye, Trash2, Camera, X, CheckCircle2, XCircle, AlertTriangle, ArrowRightLeft, Clock } from 'lucide-react';
@@ -64,7 +64,9 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
   const { classes } = useClasses();
   const { incidents } = useIncidents();
   const { grades } = useGrades();
-  const { attendance } = useAttendance();
+  // DISABLED: Attendance feature temporarily removed
+  // const { attendance } = useAttendance();
+  const attendance: any[] = []; // Empty array placeholder
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [classFilter, setClassFilter] = useState<string>('all');
@@ -327,11 +329,12 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
 
     const links = checkStudentLinks(deletingStudent.id);
 
-    if (links.hasIncidents || links.hasGrades || links.hasAttendance) {
+    if (links.hasIncidents || links.hasGrades) {
       const messages = [];
       if (links.hasIncidents) messages.push(`${links.incidentsCount} ocorrência(s)`);
       if (links.hasGrades) messages.push(`${links.gradesCount} nota(s)`);
-      if (links.hasAttendance) messages.push(`${links.attendanceCount} registro(s) de frequência`);
+      // DISABLED: Frequência removida temporariamente
+      // if (links.hasAttendance) messages.push(`${links.attendanceCount} registro(s) de frequência`);
 
       toast({
         title: 'Erro',
@@ -693,7 +696,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                       return (
                         <div className="border-t pt-4">
                           <h4 className="font-medium mb-3">Estatísticas</h4>
-                          <div className="grid grid-cols-3 gap-4">
+                          <div className="grid grid-cols-2 gap-4">
                             <div>
                               <p className="text-sm text-muted-foreground">Ocorrências</p>
                               <p className="text-2xl font-bold">{links.incidentsCount}</p>
@@ -702,10 +705,12 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                               <p className="text-sm text-muted-foreground">Notas</p>
                               <p className="text-2xl font-bold">{links.gradesCount}</p>
                             </div>
+                            {/* DISABLED: Frequência removida temporariamente
                             <div>
                               <p className="text-sm text-muted-foreground">Frequência</p>
                               <p className="text-2xl font-bold">{links.attendanceCount}</p>
                             </div>
+                            */}
                           </div>
                         </div>
                       );

@@ -1,5 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useClasses, useStudents, useIncidents, useGrades, useAttendance } from '@/hooks/useData';
+import { useClasses, useStudents, useIncidents, useGrades } from '@/hooks/useData';
 import { IntegratedReports } from '@/components/reports/IntegratedReports';
 import { ClassSlides } from '@/components/reports/ClassSlides';
 import { useUIStore } from '@/stores/useUIStore';
@@ -13,7 +13,8 @@ const Reports = () => {
   const { students } = useStudents();
   const { incidents } = useIncidents();
   const { grades } = useGrades();
-  const { attendance } = useAttendance();
+  // DISABLED: Attendance feature temporarily removed
+  // const { attendance } = useAttendance();
 
   return (
     <div className="p-6 space-y-6">
@@ -44,7 +45,6 @@ const Reports = () => {
             students={students}
             incidents={incidents}
             grades={grades}
-            attendance={attendance}
           />
         </TabsContent>
       </Tabs>
@@ -53,3 +53,4 @@ const Reports = () => {
 };
 
 export default Reports;
+
