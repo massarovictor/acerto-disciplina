@@ -51,6 +51,24 @@ export function calculateCurrentYear(
 }
 
 /**
+ * Calcula o ano atual da turma baseado apenas no ano calendário de início.
+ * Fórmula simples: anoAtual - anoInício + 1
+ * 
+ * @param startCalendarYear Ano calendário de início (ex: 2024)
+ * @returns Ano atual (1, 2 ou 3)
+ */
+export function calculateCurrentYearFromCalendar(startCalendarYear: number): 1 | 2 | 3 {
+  const currentCalendarYear = new Date().getFullYear();
+  const calculatedYear = currentCalendarYear - startCalendarYear + 1;
+
+  // Limitar entre 1 e 3
+  if (calculatedYear < 1) return 1;
+  if (calculatedYear > 3) return 3;
+
+  return calculatedYear as 1 | 2 | 3;
+}
+
+/**
  * Calcula as datas de início de cada ano letivo
  * @param startYearDate Data de início do primeiro ano
  * @param startYear Ano de início (1, 2 ou 3)

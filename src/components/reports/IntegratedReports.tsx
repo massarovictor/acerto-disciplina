@@ -21,6 +21,7 @@ import {
 import { generateStudentReportPDF } from '@/lib/studentReportPdfExport';
 import { generateProfessionalClassReportPDF } from '@/lib/classReportPdfExport';
 import { SUBJECT_AREAS, QUARTERS } from '@/lib/subjects';
+import { calculateCurrentYearFromCalendar } from '@/lib/classYearCalculator';
 
 interface IntegratedReportsProps {
   classes: Class[];
@@ -58,12 +59,24 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
       setSelectedSchoolYear(1);
       return;
     }
-    const defaultYear = selectedClassData?.currentYear ?? 1;
-    const normalizedYear = [1, 2, 3].includes(defaultYear as number)
-      ? (defaultYear as 1 | 2 | 3)
-      : 1;
-    setSelectedSchoolYear(normalizedYear);
-  }, [selectedClass, selectedClassData?.currentYear]);
+    // Calcular dinamicamente o ano atual da turma baseado no ano calendário de início
+    const classInfo = classes.find(cls => cls.id === selectedClass);
+    if (!classInfo) {
+      setSelectedSchoolYear(1);
+      return;
+    }
+
+    // Usar startCalendarYear para cálculo simples: anoAtual - anoInício + 1
+    if (classInfo.startCalendarYear) {
+      const calculatedYear = calculateCurrentYearFromCalendar(classInfo.startCalendarYear);
+      setSelectedSchoolYear(calculatedYear);
+    } else {
+      // Fallback para currentYear armazenado
+      const defaultYear = classInfo.currentYear ?? 1;
+      const normalizedYear = [1, 2, 3].includes(defaultYear as number) ? (defaultYear as 1 | 2 | 3) : 1;
+      setSelectedSchoolYear(normalizedYear);
+    }
+  }, [selectedClass, classes]);
 
   const parseLocalDate = (value: string) => new Date(`${value}T00:00:00`);
   const addMonths = (date: Date, months: number) => {

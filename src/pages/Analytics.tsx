@@ -39,6 +39,7 @@ import { BehaviorAnalyticsPanel } from '@/components/analytics/BehaviorAnalytics
 import { CohortComparisonTable } from '@/components/analytics/CohortComparisonTable';
 import { PredictionDialog } from '@/components/analytics/PredictionDialog';
 import { useUIStore } from '@/stores/useUIStore';
+import { calculateCurrentYearFromCalendar } from '@/lib/classYearCalculator';
 
 // Componente de Insights Inline
 const InlineInsights = ({
@@ -144,20 +145,37 @@ const Analytics = () => {
     if (filters.schoolYear === 'all') return;
 
     const classData = classes.find((c) => c.id === primaryClassId);
-    const defaultYear = classData?.currentYear;
-    if (defaultYear && [1, 2, 3].includes(defaultYear)) {
-      const startYear =
-        classData?.startCalendarYear ||
-        (classData?.startYearDate ? new Date(`${classData.startYearDate}T00:00:00`).getFullYear() : undefined);
-      const calendarYear = startYear ? startYear + (defaultYear - 1) : undefined;
-      const nextSchoolYear = defaultYear as 1 | 2 | 3;
-      const nextCalendarYear = calendarYear ?? 'all';
+
+    // Usar startCalendarYear para cálculo simples: anoAtual - anoInício + 1
+    if (classData?.startCalendarYear) {
+      const calculatedYear = calculateCurrentYearFromCalendar(classData.startCalendarYear);
+      const currentCalendarYear = new Date().getFullYear();
+      const nextSchoolYear = calculatedYear;
+      const nextCalendarYear = currentCalendarYear;
 
       if (filters.schoolYear !== nextSchoolYear || filters.calendarYear !== nextCalendarYear) {
         setFilters({
           schoolYear: nextSchoolYear,
           calendarYear: nextCalendarYear,
         });
+      }
+    } else {
+      // Fallback para currentYear armazenado
+      const defaultYear = classData?.currentYear;
+      if (defaultYear && [1, 2, 3].includes(defaultYear)) {
+        const startYear =
+          classData?.startCalendarYear ||
+          (classData?.startYearDate ? new Date(`${classData.startYearDate}T00:00:00`).getFullYear() : undefined);
+        const calendarYear = startYear ? startYear + (defaultYear - 1) : undefined;
+        const nextSchoolYear = defaultYear as 1 | 2 | 3;
+        const nextCalendarYear = calendarYear ?? 'all';
+
+        if (filters.schoolYear !== nextSchoolYear || filters.calendarYear !== nextCalendarYear) {
+          setFilters({
+            schoolYear: nextSchoolYear,
+            calendarYear: nextCalendarYear,
+          });
+        }
       }
     }
   }, [classes, filters.classIds, filters.comparisonClassIds, filters.schoolYear, filters.calendarYear]);

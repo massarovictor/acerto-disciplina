@@ -14,6 +14,7 @@ import { StudentGradesTableSlide } from './slides/StudentGradesTableSlide';
 import { useToast } from '@/hooks/use-toast';
 import { useProfessionalSubjects, useProfessionalSubjectTemplates } from '@/hooks/useData';
 import { QUARTERS, SUBJECT_AREAS } from '@/lib/subjects';
+import { calculateCurrentYearFromCalendar } from '@/lib/classYearCalculator';
 
 interface ClassSlidesProps {
   classes: Class[];
@@ -55,12 +56,24 @@ export const ClassSlides = ({ classes, students, incidents, grades }: ClassSlide
       setSelectedSchoolYear(1);
       return;
     }
-    const defaultYear = classData?.currentYear ?? 1;
-    const normalizedYear = [1, 2, 3].includes(defaultYear as number)
-      ? (defaultYear as 1 | 2 | 3)
-      : 1;
-    setSelectedSchoolYear(normalizedYear);
-  }, [selectedClass, classData?.currentYear]);
+    // Calcular dinamicamente o ano atual da turma baseado no ano calendário de início
+    const classInfo = classes.find(c => c.id === selectedClass);
+    if (!classInfo) {
+      setSelectedSchoolYear(1);
+      return;
+    }
+
+    // Usar startCalendarYear para cálculo simples: anoAtual - anoInício + 1
+    if (classInfo.startCalendarYear) {
+      const calculatedYear = calculateCurrentYearFromCalendar(classInfo.startCalendarYear);
+      setSelectedSchoolYear(calculatedYear);
+    } else {
+      // Fallback para currentYear armazenado
+      const defaultYear = classInfo.currentYear ?? 1;
+      const normalizedYear = [1, 2, 3].includes(defaultYear as number) ? (defaultYear as 1 | 2 | 3) : 1;
+      setSelectedSchoolYear(normalizedYear);
+    }
+  }, [selectedClass, classes]);
 
   const parseLocalDate = (value: string) => new Date(`${value}T00:00:00`);
   const addMonths = (date: Date, months: number) => {

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useClasses, useStudents } from '@/hooks/useData';
 import { School, Users, AlertCircle, CheckCircle, Calendar, Archive } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { calculateCurrentYearFromCalendar } from '@/lib/classYearCalculator';
 
 export const ClassesOverview = () => {
   const { classes } = useClasses();
@@ -15,18 +16,22 @@ export const ClassesOverview = () => {
 
   const classesWithDirector = activeClasses.filter(c => c.directorId);
   const classesWithoutDirector = activeClasses.filter(c => !c.directorId);
-  
+
   // Distribuição por ano atual
   const yearDistribution = activeClasses.reduce((acc, cls) => {
-    if (cls.currentYear) {
-      const yearLabel = `${cls.currentYear}º ano`;
-      acc[yearLabel] = (acc[yearLabel] || 0) + 1;
-    } else {
-      acc['Sem ano definido'] = (acc['Sem ano definido'] || 0) + 1;
+    let yearLabel = 'Sem ano definido';
+
+    if (cls.startCalendarYear) {
+      const calculatedYear = calculateCurrentYearFromCalendar(cls.startCalendarYear);
+      yearLabel = `${calculatedYear}º ano`;
+    } else if (cls.currentYear) {
+      yearLabel = `${cls.currentYear}º ano`;
     }
+
+    acc[yearLabel] = (acc[yearLabel] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
-  
+
   const directors = profile ? [profile] : [];
   const directorLoad = directors.map((director) => ({
     name: director.name,
@@ -124,7 +129,7 @@ export const ClassesOverview = () => {
                       <span className="text-sm text-muted-foreground">{count} turma(s)</span>
                     </div>
                     <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="bg-primary h-full rounded-full"
                         style={{ width: `${(count / Math.max(...Object.values(yearDistribution), 1)) * 100}%` }}
                       />
@@ -178,7 +183,7 @@ export const ClassesOverview = () => {
                     <span className="text-sm text-muted-foreground">{count} turmas</span>
                   </div>
                   <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
-                    <div 
+                    <div
                       className="bg-primary h-full rounded-full"
                       style={{ width: `${(count / classes.length) * 100}%` }}
                     />
@@ -202,7 +207,7 @@ export const ClassesOverview = () => {
                     <span className="text-sm text-muted-foreground">{count} turmas</span>
                   </div>
                   <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
-                    <div 
+                    <div
                       className="bg-status-analysis h-full rounded-full"
                       style={{ width: `${(count / classes.length) * 100}%` }}
                     />
@@ -235,7 +240,7 @@ export const ClassesOverview = () => {
                   </div>
                 </div>
                 <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className={`h-full rounded-full ${director.classes > 5 ? 'bg-severity-intermediate' : 'bg-severity-light'}`}
                     style={{ width: `${Math.min((director.classes / 8) * 100, 100)}%` }}
                   />

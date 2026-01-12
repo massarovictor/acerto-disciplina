@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle2, XCircle, AlertTriangle, RefreshCw, Clock, Users, BookOpen } from 'lucide-react';
 import { calculateClassAcademicStatus, QuarterCheckResult } from '@/lib/approvalCalculator';
-import { getAcademicYear } from '@/lib/classYearCalculator';
+import { getAcademicYear, calculateCurrentYearFromCalendar } from '@/lib/classYearCalculator';
 import { generateQuarterIncidents, checkLowPerformanceStudents } from '@/lib/autoIncidentGenerator';
 import { useIncidents } from '@/hooks/useData';
 import { useAuth } from '@/contexts/AuthContext';
@@ -41,11 +41,19 @@ export const StudentApprovalManager = () => {
   const handleSelectClass = (value: string) => {
     setSelectedClass(value);
     const nextClass = classes.find((cls) => cls.id === value);
-    const defaultYear = nextClass?.currentYear ?? 1;
-    const nextYear = [1, 2, 3].includes(defaultYear as number)
-      ? (defaultYear as 1 | 2 | 3)
-      : 1;
-    setSelectedSchoolYear(nextYear);
+
+    // Usar startCalendarYear para cálculo simples: anoAtual - anoInício + 1
+    if (nextClass?.startCalendarYear) {
+      const calculatedYear = calculateCurrentYearFromCalendar(nextClass.startCalendarYear);
+      setSelectedSchoolYear(calculatedYear);
+    } else {
+      // Fallback para currentYear armazenado
+      const defaultYear = nextClass?.currentYear ?? 1;
+      const nextYear = [1, 2, 3].includes(defaultYear as number)
+        ? (defaultYear as 1 | 2 | 3)
+        : 1;
+      setSelectedSchoolYear(nextYear);
+    }
     setQuarterResults([]);
     setPendingQuarterResults([]);
     setAcademicStatuses({});

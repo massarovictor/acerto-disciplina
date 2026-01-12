@@ -23,6 +23,7 @@ import {
 } from '@/lib/subjects';
 import { SigeImportDialog } from './SigeImportDialog';
 import { useUIStore } from '@/stores/useUIStore';
+import { calculateCurrentYearFromCalendar } from '@/lib/classYearCalculator';
 
 // Normaliza nome de disciplina para comparação (case-insensitive, sem acentos)
 const normalizeForMatch = (subject: string): string => {
@@ -72,12 +73,24 @@ export const GradesManager = () => {
       setSelectedSchoolYear(1);
       return;
     }
-    const defaultYear = selectedClassData?.currentYear ?? 1;
-    const normalizedYear = [1, 2, 3].includes(defaultYear as number)
-      ? (defaultYear as 1 | 2 | 3)
-      : 1;
-    setSelectedSchoolYear(normalizedYear);
-  }, [selectedClass, selectedClassData?.currentYear]);
+    // Calcular dinamicamente o ano atual da turma baseado no ano calendário de início
+    const classInfo = classes.find(c => c.id === selectedClass);
+    if (!classInfo) {
+      setSelectedSchoolYear(1);
+      return;
+    }
+
+    // Usar startCalendarYear para cálculo simples: anoAtual - anoInício + 1
+    if (classInfo.startCalendarYear) {
+      const calculatedYear = calculateCurrentYearFromCalendar(classInfo.startCalendarYear);
+      setSelectedSchoolYear(calculatedYear);
+    } else {
+      // Fallback para currentYear armazenado
+      const defaultYear = classInfo.currentYear ?? 1;
+      const normalizedYear = [1, 2, 3].includes(defaultYear as number) ? (defaultYear as 1 | 2 | 3) : 1;
+      setSelectedSchoolYear(normalizedYear);
+    }
+  }, [selectedClass, classes]);
 
   // Verificar se a turma está arquivada
   const isClassArchived = selectedClassData?.archived === true;
