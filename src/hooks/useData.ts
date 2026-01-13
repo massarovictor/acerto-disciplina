@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/services/supabase';
-import { useAuth } from '@/contexts/AuthContext';
-import { useDataStore } from '@/stores/useDataStore';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { supabase } from "@/services/supabase";
+import { useAuth } from "@/contexts/AuthContext";
+import { useDataStore } from "@/stores/useDataStore";
 import {
   AttendanceRecord,
   Class,
@@ -12,7 +12,7 @@ import {
   ProfessionalSubjectTemplate,
   Student,
   User,
-} from '@/types';
+} from "@/types";
 import {
   mapAttendanceFromDb,
   mapAttendanceToDb,
@@ -33,7 +33,7 @@ import {
   mapStudentToDb,
   mapTemplateFromDb,
   mapTemplateToDb,
-} from '@/services/supabase/mappers';
+} from "@/services/supabase/mappers";
 
 const logError = (scope: string, error: unknown) => {
   console.error(`[Supabase:${scope}]`, error);
@@ -50,12 +50,12 @@ export function useProfiles() {
     }
 
     const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id);
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id);
 
     if (error) {
-      logError('profiles.select', error);
+      logError("profiles.select", error);
       return;
     }
 
@@ -71,8 +71,13 @@ export function useProfiles() {
     const channel = supabase
       .channel(`realtime:profiles:${user.id}`)
       .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "profiles",
+          filter: `id=eq.${user.id}`,
+        },
         () => {
           fetchProfiles();
         },
@@ -89,18 +94,20 @@ export function useProfiles() {
 
 export function useAuthorizedEmails() {
   const { user } = useAuth();
-  const [authorizedEmails, setAuthorizedEmails] = useState<{ email: string; role: string }[]>([]);
+  const [authorizedEmails, setAuthorizedEmails] = useState<
+    { email: string; role: string }[]
+  >([]);
 
   const fetchAuthorizedEmails = useCallback(async () => {
     if (!user?.id) return;
 
     const { data, error } = await supabase
-      .from('authorized_emails')
-      .select('email, role')
-      .order('email');
+      .from("authorized_emails")
+      .select("email, role")
+      .order("email");
 
     if (error) {
-      logError('authorized_emails.select', error);
+      logError("authorized_emails.select", error);
       return;
     }
 
@@ -125,12 +132,12 @@ export function useClasses() {
     }
 
     const { data, error } = await supabase
-      .from('classes')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .from("classes")
+      .select("*")
+      .order("created_at", { ascending: false });
 
     if (error) {
-      logError('classes.select', error);
+      logError("classes.select", error);
       return;
     }
 
@@ -144,10 +151,10 @@ export function useClasses() {
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
-      .channel('realtime:classes')
+      .channel("realtime:classes")
       .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'classes' },
+        "postgres_changes",
+        { event: "*", schema: "public", table: "classes" },
         () => {
           fetchClasses();
         },
@@ -159,19 +166,19 @@ export function useClasses() {
     };
   }, [user?.id, fetchClasses]);
 
-  const addClass = async (classData: Omit<Class, 'id'>) => {
+  const addClass = async (classData: Omit<Class, "id">) => {
     if (!user?.id) return null;
 
     const payload = mapClassToDb(classData, user.id);
 
     const { data, error } = await supabase
-      .from('classes')
+      .from("classes")
       .insert(payload)
-      .select('*')
+      .select("*")
       .single();
 
     if (error) {
-      logError('classes.insert', error);
+      logError("classes.insert", error);
       throw error;
     }
 
@@ -185,18 +192,30 @@ export function useClasses() {
     const base = classes.find((c) => c.id === id);
     if (!base) return;
 
-    const hasArchivedAt = Object.prototype.hasOwnProperty.call(updates, 'archivedAt');
-    const hasArchivedReason = Object.prototype.hasOwnProperty.call(updates, 'archivedReason');
-    const hasTemplateId = Object.prototype.hasOwnProperty.call(updates, 'templateId');
-    const hasName = Object.prototype.hasOwnProperty.call(updates, 'name');
+    const hasArchivedAt = Object.prototype.hasOwnProperty.call(
+      updates,
+      "archivedAt",
+    );
+    const hasArchivedReason = Object.prototype.hasOwnProperty.call(
+      updates,
+      "archivedReason",
+    );
+    const hasTemplateId = Object.prototype.hasOwnProperty.call(
+      updates,
+      "templateId",
+    );
+    const hasName = Object.prototype.hasOwnProperty.call(updates, "name");
 
     const nextCourse = updates.course ?? base.course;
     const nextStartYear = updates.startYear ?? base.startYear;
     const nextStartYearDate = updates.startYearDate ?? base.startYearDate;
-    const nextStartCalendarYear = updates.startCalendarYear ?? base.startCalendarYear;
+    const nextStartCalendarYear =
+      updates.startCalendarYear ?? base.startCalendarYear;
     const nextEndCalendarYear = updates.endCalendarYear ?? base.endCalendarYear;
     const nextLetter = updates.letter ?? base.letter;
-    const nextTemplateId = hasTemplateId ? updates.templateId ?? null : base.templateId;
+    const nextTemplateId = hasTemplateId
+      ? (updates.templateId ?? null)
+      : base.templateId;
 
     const payload = mapClassToDb(
       {
@@ -213,10 +232,12 @@ export function useClasses() {
         startCalendarYear: nextStartCalendarYear,
         endCalendarYear: nextEndCalendarYear,
         archived: updates.archived ?? base.archived,
-        archivedAt: hasArchivedAt ? updates.archivedAt ?? null : base.archivedAt ?? null,
+        archivedAt: hasArchivedAt
+          ? (updates.archivedAt ?? null)
+          : (base.archivedAt ?? null),
         archivedReason: hasArchivedReason
-          ? updates.archivedReason ?? null
-          : base.archivedReason ?? null,
+          ? (updates.archivedReason ?? null)
+          : (base.archivedReason ?? null),
         templateId: nextTemplateId,
       },
       user.id,
@@ -224,14 +245,14 @@ export function useClasses() {
     );
 
     const { data, error } = await supabase
-      .from('classes')
+      .from("classes")
       .update(payload)
-      .eq('id', id)
-      .select('*')
+      .eq("id", id)
+      .select("*")
       .single();
 
     if (error) {
-      logError('classes.update', error);
+      logError("classes.update", error);
       throw error;
     }
 
@@ -244,9 +265,9 @@ export function useClasses() {
   };
 
   const deleteClass = async (id: string) => {
-    const { error } = await supabase.from('classes').delete().eq('id', id);
+    const { error } = await supabase.from("classes").delete().eq("id", id);
     if (error) {
-      logError('classes.delete', error);
+      logError("classes.delete", error);
       throw error;
     }
     setClasses((prev) => prev.filter((cls) => cls.id !== id));
@@ -256,7 +277,7 @@ export function useClasses() {
     await updateClass(id, {
       archived: true,
       archivedAt: new Date().toISOString(),
-      archivedReason: reason || 'Arquivamento manual',
+      archivedReason: reason || "Arquivamento manual",
       active: false,
     });
   };
@@ -292,12 +313,12 @@ export function useStudents() {
     }
 
     const { data, error } = await supabase
-      .from('students')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .from("students")
+      .select("*")
+      .order("created_at", { ascending: false });
 
     if (error) {
-      logError('students.select', error);
+      logError("students.select", error);
       return;
     }
 
@@ -311,10 +332,10 @@ export function useStudents() {
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
-      .channel('realtime:students')
+      .channel("realtime:students")
       .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'students' },
+        "postgres_changes",
+        { event: "*", schema: "public", table: "students" },
         () => {
           fetchStudents();
         },
@@ -326,16 +347,16 @@ export function useStudents() {
     };
   }, [user?.id, fetchStudents]);
 
-  const addStudent = async (student: Omit<Student, 'id'>) => {
+  const addStudent = async (student: Omit<Student, "id">) => {
     if (!user?.id) return null;
     const payload = mapStudentToDb(student, user.id);
     const { data, error } = await supabase
-      .from('students')
+      .from("students")
       .insert(payload)
-      .select('*')
+      .select("*")
       .single();
     if (error) {
-      logError('students.insert', error);
+      logError("students.insert", error);
       throw error;
     }
 
@@ -366,29 +387,37 @@ export function useStudents() {
     );
 
     const { error } = await supabase
-      .from('students')
+      .from("students")
       .update(payload)
-      .eq('id', id);
+      .eq("id", id);
     if (error) {
-      logError('students.update', error);
+      logError("students.update", error);
       throw error;
     }
 
     setStudents((prev) =>
-      prev.map((student) => (student.id === id ? { ...student, ...updates } : student)),
+      prev.map((student) =>
+        student.id === id ? { ...student, ...updates } : student,
+      ),
     );
   };
 
   const deleteStudent = async (id: string) => {
-    const { error } = await supabase.from('students').delete().eq('id', id);
+    const { error } = await supabase.from("students").delete().eq("id", id);
     if (error) {
-      logError('students.delete', error);
+      logError("students.delete", error);
       throw error;
     }
     setStudents((prev) => prev.filter((student) => student.id !== id));
   };
 
-  return { students, refreshStudents: fetchStudents, addStudent, updateStudent, deleteStudent };
+  return {
+    students,
+    refreshStudents: fetchStudents,
+    addStudent,
+    updateStudent,
+    deleteStudent,
+  };
 }
 
 export function useGrades() {
@@ -413,13 +442,13 @@ export function useGrades() {
       const to = from + PAGE_SIZE - 1;
 
       const { data, error } = await supabase
-        .from('grades')
-        .select('*')
-        .order('recorded_at', { ascending: false })
+        .from("grades")
+        .select("*")
+        .order("recorded_at", { ascending: false })
         .range(from, to);
 
       if (error) {
-        logError('grades.select', error);
+        logError("grades.select", error);
         return;
       }
 
@@ -432,7 +461,9 @@ export function useGrades() {
       }
     }
 
-    console.log(`[GRADES FETCH] Supabase retornou ${allGrades.length} notas (${page} página(s))`);
+    console.log(
+      `[GRADES FETCH] Supabase retornou ${allGrades.length} notas (${page} página(s))`,
+    );
     setGrades(allGrades.map(mapGradeFromDb));
   }, [user?.id]);
 
@@ -444,10 +475,10 @@ export function useGrades() {
     if (!user?.id) return;
 
     const channel = supabase
-      .channel('realtime:grades')
+      .channel("realtime:grades")
       .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'grades' },
+        "postgres_changes",
+        { event: "*", schema: "public", table: "grades" },
         () => {
           fetchGrades();
         },
@@ -459,20 +490,20 @@ export function useGrades() {
     };
   }, [user?.id, fetchGrades]);
 
-  const addGrade = async (grade: Omit<Grade, 'id' | 'recordedAt'>) => {
+  const addGrade = async (grade: Omit<Grade, "id" | "recordedAt">) => {
     if (!user?.id) return;
 
     const payload = mapGradeToDb(grade, user.id);
     const { data, error } = await supabase
-      .from('grades')
+      .from("grades")
       .upsert(payload, {
-        onConflict: 'student_id,class_id,subject,quarter,school_year',
+        onConflict: "student_id,class_id,subject,quarter,school_year",
       })
-      .select('*')
+      .select("*")
       .single();
 
     if (error) {
-      logError('grades.upsert', error);
+      logError("grades.upsert", error);
       throw error;
     }
 
@@ -506,29 +537,40 @@ export function useGrades() {
       user.id,
     );
 
-    const { error } = await supabase.from('grades').update(payload).eq('id', id);
+    const { error } = await supabase
+      .from("grades")
+      .update(payload)
+      .eq("id", id);
     if (error) {
-      logError('grades.update', error);
+      logError("grades.update", error);
       throw error;
     }
 
     setGrades((prev) =>
       prev.map((grade) =>
-        grade.id === id ? { ...grade, ...updates, recordedAt: new Date().toISOString() } : grade,
+        grade.id === id
+          ? { ...grade, ...updates, recordedAt: new Date().toISOString() }
+          : grade,
       ),
     );
   };
 
   const deleteGrade = async (id: string) => {
-    const { error } = await supabase.from('grades').delete().eq('id', id);
+    const { error } = await supabase.from("grades").delete().eq("id", id);
     if (error) {
-      logError('grades.delete', error);
+      logError("grades.delete", error);
       throw error;
     }
     setGrades((prev) => prev.filter((grade) => grade.id !== id));
   };
 
-  return { grades, refreshGrades: fetchGrades, addGrade, updateGrade, deleteGrade };
+  return {
+    grades,
+    refreshGrades: fetchGrades,
+    addGrade,
+    updateGrade,
+    deleteGrade,
+  };
 }
 
 export function useAttendance() {
@@ -541,12 +583,10 @@ export function useAttendance() {
       return;
     }
 
-    const { data, error } = await supabase
-      .from('attendance')
-      .select('*');
+    const { data, error } = await supabase.from("attendance").select("*");
 
     if (error) {
-      logError('attendance.select', error);
+      logError("attendance.select", error);
       return;
     }
 
@@ -560,10 +600,10 @@ export function useAttendance() {
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
-      .channel('realtime:attendance')
+      .channel("realtime:attendance")
       .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'attendance' },
+        "postgres_changes",
+        { event: "*", schema: "public", table: "attendance" },
         () => {
           fetchAttendance();
         },
@@ -576,18 +616,18 @@ export function useAttendance() {
   }, [user?.id, fetchAttendance]);
 
   const addAttendance = async (
-    record: Omit<AttendanceRecord, 'id' | 'recordedAt'>,
+    record: Omit<AttendanceRecord, "id" | "recordedAt">,
   ) => {
     if (!user?.id) return null;
     const payload = mapAttendanceToDb(record, user.id, user.id);
     const { data, error } = await supabase
-      .from('attendance')
+      .from("attendance")
       .insert(payload)
-      .select('*')
+      .select("*")
       .single();
 
     if (error) {
-      logError('attendance.insert', error);
+      logError("attendance.insert", error);
       throw error;
     }
 
@@ -597,15 +637,20 @@ export function useAttendance() {
   };
 
   const deleteAttendance = async (id: string) => {
-    const { error } = await supabase.from('attendance').delete().eq('id', id);
+    const { error } = await supabase.from("attendance").delete().eq("id", id);
     if (error) {
-      logError('attendance.delete', error);
+      logError("attendance.delete", error);
       throw error;
     }
     setAttendance((prev) => prev.filter((record) => record.id !== id));
   };
 
-  return { attendance, refreshAttendance: fetchAttendance, addAttendance, deleteAttendance };
+  return {
+    attendance,
+    refreshAttendance: fetchAttendance,
+    addAttendance,
+    deleteAttendance,
+  };
 }
 
 export function useIncidents() {
@@ -625,12 +670,13 @@ export function useIncidents() {
     }
 
     const { data: incidentRows, error } = await supabase
-      .from('incidents')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .from("incidents")
+      .select("*")
+      .order("created_at", { ascending: false });
+    console.log(incidentRows);
 
     if (error) {
-      logError('incidents.select', error);
+      logError("incidents.select", error);
       return;
     }
 
@@ -640,46 +686,46 @@ export function useIncidents() {
       return;
     }
 
-    const [{ data: followUpRows, error: followUpError }, { data: commentRows, error: commentError }] =
-      await Promise.all([
-        supabase
-          .from('follow_ups')
-          .select('*')
-          .in('incident_id', ids)
-          .order('date', { ascending: true }),
-        supabase
-          .from('comments')
-          .select('*')
-          .in('incident_id', ids)
-          .order('created_at', { ascending: true }),
-      ]);
+    const [
+      { data: followUpRows, error: followUpError },
+      { data: commentRows, error: commentError },
+    ] = await Promise.all([
+      supabase
+        .from("follow_ups")
+        .select("*")
+        .in("incident_id", ids)
+        .order("date", { ascending: true }),
+      supabase
+        .from("comments")
+        .select("*")
+        .in("incident_id", ids)
+        .order("created_at", { ascending: true }),
+    ]);
 
     if (followUpError) {
-      logError('follow_ups.select', followUpError);
+      logError("follow_ups.select", followUpError);
     }
     if (commentError) {
-      logError('comments.select', commentError);
+      logError("comments.select", commentError);
     }
 
-    const followUpsByIncident = (followUpRows || []).reduce<Record<string, FollowUpRecord[]>>(
-      (acc, row) => {
-        const mapped = mapFollowUpFromDb(row);
-        acc[row.incident_id] = acc[row.incident_id] || [];
-        acc[row.incident_id].push(mapped);
-        return acc;
-      },
-      {},
-    );
+    const followUpsByIncident = (followUpRows || []).reduce<
+      Record<string, FollowUpRecord[]>
+    >((acc, row) => {
+      const mapped = mapFollowUpFromDb(row);
+      acc[row.incident_id] = acc[row.incident_id] || [];
+      acc[row.incident_id].push(mapped);
+      return acc;
+    }, {});
 
-    const commentsByIncident = (commentRows || []).reduce<Record<string, Comment[]>>(
-      (acc, row) => {
-        const mapped = mapCommentFromDb(row);
-        acc[row.incident_id] = acc[row.incident_id] || [];
-        acc[row.incident_id].push(mapped);
-        return acc;
-      },
-      {},
-    );
+    const commentsByIncident = (commentRows || []).reduce<
+      Record<string, Comment[]>
+    >((acc, row) => {
+      const mapped = mapCommentFromDb(row);
+      acc[row.incident_id] = acc[row.incident_id] || [];
+      acc[row.incident_id].push(mapped);
+      return acc;
+    }, {});
 
     const mappedIncidents = (incidentRows || []).map((row) => {
       const mapped = mapIncidentFromDb(row);
@@ -698,24 +744,24 @@ export function useIncidents() {
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
-      .channel('realtime:incidents')
+      .channel("realtime:incidents")
       .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'incidents' },
+        "postgres_changes",
+        { event: "*", schema: "public", table: "incidents" },
         () => {
           fetchIncidents();
         },
       )
       .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'follow_ups' },
+        "postgres_changes",
+        { event: "*", schema: "public", table: "follow_ups" },
         () => {
           fetchIncidents();
         },
       )
       .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'comments' },
+        "postgres_changes",
+        { event: "*", schema: "public", table: "comments" },
         () => {
           fetchIncidents();
         },
@@ -728,25 +774,21 @@ export function useIncidents() {
   }, [user?.id, fetchIncidents]);
 
   const addIncident = async (
-    incident: Omit<Incident, 'id' | 'createdAt' | 'updatedAt'>,
+    incident: Omit<Incident, "id" | "createdAt" | "updatedAt">,
   ) => {
     if (!user?.id) return null;
 
     const { followUps, comments, ...incidentData } = incident;
-    const payload = mapIncidentToDb(
-      incidentData,
-      user.id,
-      user.id,
-    );
+    const payload = mapIncidentToDb(incidentData, user.id, user.id);
 
     const { data, error } = await supabase
-      .from('incidents')
+      .from("incidents")
       .insert(payload)
-      .select('*')
+      .select("*")
       .single();
 
     if (error) {
-      logError('incidents.insert', error);
+      logError("incidents.insert", error);
       throw error;
     }
 
@@ -766,9 +808,11 @@ export function useIncidents() {
         date: updates.date ?? base.date,
         studentIds: updates.studentIds ?? base.studentIds,
         episodes: updates.episodes ?? base.episodes,
-        calculatedSeverity: updates.calculatedSeverity ?? base.calculatedSeverity,
+        calculatedSeverity:
+          updates.calculatedSeverity ?? base.calculatedSeverity,
         finalSeverity: updates.finalSeverity ?? base.finalSeverity,
-        severityOverrideReason: updates.severityOverrideReason ?? base.severityOverrideReason,
+        severityOverrideReason:
+          updates.severityOverrideReason ?? base.severityOverrideReason,
         description: updates.description ?? base.description,
         actions: updates.actions ?? base.actions,
         suggestedAction: updates.suggestedAction ?? base.suggestedAction,
@@ -782,12 +826,12 @@ export function useIncidents() {
     );
 
     const { error } = await supabase
-      .from('incidents')
+      .from("incidents")
       .update(payload)
-      .eq('id', id);
+      .eq("id", id);
 
     if (error) {
-      logError('incidents.update', error);
+      logError("incidents.update", error);
       throw error;
     }
 
@@ -795,9 +839,9 @@ export function useIncidents() {
   };
 
   const deleteIncident = async (id: string) => {
-    const { error } = await supabase.from('incidents').delete().eq('id', id);
+    const { error } = await supabase.from("incidents").delete().eq("id", id);
     if (error) {
-      logError('incidents.delete', error);
+      logError("incidents.delete", error);
       throw error;
     }
     storeDeleteIncident(id); // ✅ Atualiza store global
@@ -805,15 +849,15 @@ export function useIncidents() {
 
   const addFollowUp = async (
     incidentId: string,
-    followUp: Omit<FollowUpRecord, 'id' | 'incidentId' | 'createdAt'>,
+    followUp: Omit<FollowUpRecord, "id" | "incidentId" | "createdAt">,
   ) => {
     if (!user?.id) return;
 
     const payload = mapFollowUpToDb(followUp, incidentId, user.id, user.id);
-    const { error } = await supabase.from('follow_ups').insert(payload);
+    const { error } = await supabase.from("follow_ups").insert(payload);
 
     if (error) {
-      logError('follow_ups.insert', error);
+      logError("follow_ups.insert", error);
       throw error;
     }
 
@@ -822,7 +866,7 @@ export function useIncidents() {
 
   const saveFollowUp = async (
     incidentId: string,
-    followUp: Omit<FollowUpRecord, 'id' | 'incidentId' | 'createdAt'>,
+    followUp: Omit<FollowUpRecord, "id" | "incidentId" | "createdAt">,
     followUpId?: string,
   ) => {
     if (!user?.id) return;
@@ -830,17 +874,17 @@ export function useIncidents() {
 
     if (followUpId) {
       const { error } = await supabase
-        .from('follow_ups')
+        .from("follow_ups")
         .update(payload)
-        .eq('id', followUpId);
+        .eq("id", followUpId);
       if (error) {
-        logError('follow_ups.update', error);
+        logError("follow_ups.update", error);
         throw error;
       }
     } else {
-      const { error } = await supabase.from('follow_ups').insert(payload);
+      const { error } = await supabase.from("follow_ups").insert(payload);
       if (error) {
-        logError('follow_ups.insert', error);
+        logError("follow_ups.insert", error);
         throw error;
       }
     }
@@ -853,16 +897,16 @@ export function useIncidents() {
     const payload = mapCommentToDb(
       {
         userId: user.id,
-        userName: profile?.name ?? user.email ?? 'Usuário',
+        userName: profile?.name ?? user.email ?? "Usuário",
         text,
       },
       incidentId,
       user.id,
     );
 
-    const { error } = await supabase.from('comments').insert(payload);
+    const { error } = await supabase.from("comments").insert(payload);
     if (error) {
-      logError('comments.insert', error);
+      logError("comments.insert", error);
       throw error;
     }
 
@@ -883,7 +927,9 @@ export function useIncidents() {
 
 export function useProfessionalSubjects() {
   const { user } = useAuth();
-  const [items, setItems] = useState<{ id: string; classId: string; subject: string }[]>([]);
+  const [items, setItems] = useState<
+    { id: string; classId: string; subject: string }[]
+  >([]);
 
   const fetchSubjects = useCallback(async () => {
     if (!user?.id) {
@@ -892,11 +938,11 @@ export function useProfessionalSubjects() {
     }
 
     const { data, error } = await supabase
-      .from('professional_subjects')
-      .select('*');
+      .from("professional_subjects")
+      .select("*");
 
     if (error) {
-      logError('professional_subjects.select', error);
+      logError("professional_subjects.select", error);
       return;
     }
 
@@ -910,13 +956,13 @@ export function useProfessionalSubjects() {
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
-      .channel('realtime:professional_subjects')
+      .channel("realtime:professional_subjects")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'professional_subjects',
+          event: "*",
+          schema: "public",
+          table: "professional_subjects",
         },
         () => {
           fetchSubjects();
@@ -944,22 +990,27 @@ export function useProfessionalSubjects() {
   const addProfessionalSubject = async (classId: string, subject: string) => {
     if (!user?.id) return;
     const payload = mapProfessionalSubjectToDb(classId, subject, user.id);
-    const { error } = await supabase.from('professional_subjects').insert(payload);
+    const { error } = await supabase
+      .from("professional_subjects")
+      .insert(payload);
     if (error) {
-      logError('professional_subjects.insert', error);
+      logError("professional_subjects.insert", error);
       throw error;
     }
     await fetchSubjects();
   };
 
-  const removeProfessionalSubject = async (classId: string, subject: string) => {
+  const removeProfessionalSubject = async (
+    classId: string,
+    subject: string,
+  ) => {
     const { error } = await supabase
-      .from('professional_subjects')
+      .from("professional_subjects")
       .delete()
-      .eq('class_id', classId)
-      .eq('subject', subject);
+      .eq("class_id", classId)
+      .eq("subject", subject);
     if (error) {
-      logError('professional_subjects.delete', error);
+      logError("professional_subjects.delete", error);
       throw error;
     }
     await fetchSubjects();
@@ -970,7 +1021,10 @@ export function useProfessionalSubjects() {
     subjects: string[],
   ) => {
     if (!user?.id) return;
-    await supabase.from('professional_subjects').delete().eq('class_id', classId);
+    await supabase
+      .from("professional_subjects")
+      .delete()
+      .eq("class_id", classId);
 
     if (subjects.length === 0) {
       await fetchSubjects();
@@ -982,10 +1036,10 @@ export function useProfessionalSubjects() {
     );
 
     const { error } = await supabase
-      .from('professional_subjects')
+      .from("professional_subjects")
       .insert(payload);
     if (error) {
-      logError('professional_subjects.bulk_insert', error);
+      logError("professional_subjects.bulk_insert", error);
       throw error;
     }
     await fetchSubjects();
@@ -1011,12 +1065,12 @@ export function useProfessionalSubjectTemplates() {
     }
 
     const { data, error } = await supabase
-      .from('professional_subject_templates')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .from("professional_subject_templates")
+      .select("*")
+      .order("created_at", { ascending: false });
 
     if (error) {
-      logError('templates.select', error);
+      logError("templates.select", error);
       return;
     }
 
@@ -1030,13 +1084,13 @@ export function useProfessionalSubjectTemplates() {
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
-      .channel('realtime:professional_subject_templates')
+      .channel("realtime:professional_subject_templates")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'professional_subject_templates',
+          event: "*",
+          schema: "public",
+          table: "professional_subject_templates",
         },
         () => {
           fetchTemplates();
@@ -1050,18 +1104,21 @@ export function useProfessionalSubjectTemplates() {
   }, [user?.id, fetchTemplates]);
 
   const addTemplate = async (
-    template: Omit<ProfessionalSubjectTemplate, 'id' | 'createdAt' | 'updatedAt'>,
+    template: Omit<
+      ProfessionalSubjectTemplate,
+      "id" | "createdAt" | "updatedAt"
+    >,
   ) => {
     if (!user?.id) return null;
     const payload = mapTemplateToDb(template, user.id);
     const { data, error } = await supabase
-      .from('professional_subject_templates')
+      .from("professional_subject_templates")
       .insert(payload)
-      .select('*')
+      .select("*")
       .single();
 
     if (error) {
-      logError('templates.insert', error);
+      logError("templates.insert", error);
       throw error;
     }
 
@@ -1088,27 +1145,29 @@ export function useProfessionalSubjectTemplates() {
     );
 
     const { error } = await supabase
-      .from('professional_subject_templates')
+      .from("professional_subject_templates")
       .update(payload)
-      .eq('id', id);
+      .eq("id", id);
 
     if (error) {
-      logError('templates.update', error);
+      logError("templates.update", error);
       throw error;
     }
 
     setTemplates((prev) =>
-      prev.map((template) => (template.id === id ? { ...template, ...updates } : template)),
+      prev.map((template) =>
+        template.id === id ? { ...template, ...updates } : template,
+      ),
     );
   };
 
   const deleteTemplate = async (id: string) => {
     const { error } = await supabase
-      .from('professional_subject_templates')
+      .from("professional_subject_templates")
       .delete()
-      .eq('id', id);
+      .eq("id", id);
     if (error) {
-      logError('templates.delete', error);
+      logError("templates.delete", error);
       throw error;
     }
     setTemplates((prev) => prev.filter((template) => template.id !== id));
@@ -1118,7 +1177,9 @@ export function useProfessionalSubjectTemplates() {
     return templates.find((t) => t.id === id);
   };
 
-  const getTemplatesByCourse = (course: string): ProfessionalSubjectTemplate[] => {
+  const getTemplatesByCourse = (
+    course: string,
+  ): ProfessionalSubjectTemplate[] => {
     return templates.filter(
       (t) =>
         t.course.toLowerCase().includes(course.toLowerCase()) ||

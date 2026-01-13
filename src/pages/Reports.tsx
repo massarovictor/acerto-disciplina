@@ -1,8 +1,13 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useClasses, useStudents, useIncidents, useGrades } from '@/hooks/useData';
-import { IntegratedReports } from '@/components/reports/IntegratedReports';
-import { ClassSlides } from '@/components/reports/ClassSlides';
-import { useUIStore } from '@/stores/useUIStore';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  useClasses,
+  useStudents,
+  useIncidents,
+  useGrades,
+} from "@/hooks/useData";
+import { IntegratedReports } from "@/components/reports/IntegratedReports";
+import { ClassSlides } from "@/components/reports/ClassSlides";
+import { useUIStore } from "@/stores/useUIStore";
 
 const Reports = () => {
   // ✅ Usando Zustand store para persistir tab entre navegações
@@ -53,4 +58,3 @@ const Reports = () => {
 };
 
 export default Reports;
-

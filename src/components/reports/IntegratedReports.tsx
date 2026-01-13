@@ -1,15 +1,31 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Users, FileDown, UserCheck, Calendar } from 'lucide-react';
-import { Class, Student, Incident } from '@/types';
-import { useToast } from '@/hooks/use-toast';
-import { useProfessionalSubjects, useProfessionalSubjectTemplates, useGrades } from '@/hooks/useData';
+import { useEffect, useMemo, useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Users, FileDown, UserCheck, Calendar } from "lucide-react";
+import { Class, Student, Incident } from "@/types";
+import { useToast } from "@/hooks/use-toast";
+import {
+  useProfessionalSubjects,
+  useProfessionalSubjectTemplates,
+  useGrades,
+} from "@/hooks/useData";
 import {
   Dialog,
   DialogContent,
@@ -17,11 +33,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { generateStudentReportPDF } from '@/lib/studentReportPdfExport';
-import { generateProfessionalClassReportPDF } from '@/lib/classReportPdfExport';
-import { SUBJECT_AREAS, QUARTERS } from '@/lib/subjects';
-import { calculateCurrentYearFromCalendar } from '@/lib/classYearCalculator';
+} from "@/components/ui/dialog";
+import { generateStudentReportPDF } from "@/lib/studentReportPdfExport";
+import { generateProfessionalClassReportPDF } from "@/lib/classReportPdfExport";
+import { SUBJECT_AREAS, QUARTERS } from "@/lib/subjects";
+import { calculateCurrentYearFromCalendar } from "@/lib/classYearCalculator";
 
 interface IntegratedReportsProps {
   classes: Class[];
@@ -29,11 +45,15 @@ interface IntegratedReportsProps {
   incidents: Incident[];
 }
 
-export const IntegratedReports = ({ classes, students, incidents }: IntegratedReportsProps) => {
-  const [selectedClass, setSelectedClass] = useState('');
-  const [selectedStudent, setSelectedStudent] = useState('');
+export const IntegratedReports = ({
+  classes,
+  students,
+  incidents,
+}: IntegratedReportsProps) => {
+  const [selectedClass, setSelectedClass] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState("");
   const [showPeriodDialog, setShowPeriodDialog] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('anual');
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("anual");
   const [selectedSchoolYear, setSelectedSchoolYear] = useState<1 | 2 | 3>(1);
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
@@ -44,14 +64,14 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
   const { templates } = useProfessionalSubjectTemplates();
 
   const schoolYearOptions: Array<{ value: 1 | 2 | 3; label: string }> = [
-    { value: 1, label: '1º ano' },
-    { value: 2, label: '2º ano' },
-    { value: 3, label: '3º ano' },
+    { value: 1, label: "1º ano" },
+    { value: 2, label: "2º ano" },
+    { value: 3, label: "3º ano" },
   ];
 
   const selectedClassData = useMemo(
-    () => classes.find(cls => cls.id === selectedClass) || null,
-    [classes, selectedClass]
+    () => classes.find((cls) => cls.id === selectedClass) || null,
+    [classes, selectedClass],
   );
 
   useEffect(() => {
@@ -60,7 +80,7 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
       return;
     }
     // Calcular dinamicamente o ano atual da turma baseado no ano calendário de início
-    const classInfo = classes.find(cls => cls.id === selectedClass);
+    const classInfo = classes.find((cls) => cls.id === selectedClass);
     if (!classInfo) {
       setSelectedSchoolYear(1);
       return;
@@ -68,12 +88,16 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
 
     // Usar startCalendarYear para cálculo simples: anoAtual - anoInício + 1
     if (classInfo.startCalendarYear) {
-      const calculatedYear = calculateCurrentYearFromCalendar(classInfo.startCalendarYear);
+      const calculatedYear = calculateCurrentYearFromCalendar(
+        classInfo.startCalendarYear,
+      );
       setSelectedSchoolYear(calculatedYear);
     } else {
       // Fallback para currentYear armazenado
       const defaultYear = classInfo.currentYear ?? 1;
-      const normalizedYear = [1, 2, 3].includes(defaultYear as number) ? (defaultYear as 1 | 2 | 3) : 1;
+      const normalizedYear = [1, 2, 3].includes(defaultYear as number)
+        ? (defaultYear as 1 | 2 | 3)
+        : 1;
       setSelectedSchoolYear(normalizedYear);
     }
   }, [selectedClass, classes]);
@@ -89,7 +113,11 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
     next.setFullYear(next.getFullYear() + years);
     return next;
   };
-  const getQuarterRange = (startYearDate: string | undefined, schoolYear: number, quarter: string) => {
+  const getQuarterRange = (
+    startYearDate: string | undefined,
+    schoolYear: number,
+    quarter: string,
+  ) => {
     if (!startYearDate) return null;
     const index = QUARTERS.indexOf(quarter);
     if (index < 0) return null;
@@ -101,7 +129,10 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
     const rangeEnd = addMonths(currentYearStart, index * 2 + 2);
     return { start: rangeStart, end: rangeEnd };
   };
-  const getSchoolYearRange = (startYearDate: string | undefined, schoolYear: number) => {
+  const getSchoolYearRange = (
+    startYearDate: string | undefined,
+    schoolYear: number,
+  ) => {
     if (!startYearDate) return null;
     const startDate = parseLocalDate(startYearDate);
     if (Number.isNaN(startDate.getTime())) return null;
@@ -110,7 +141,10 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
     const yearEnd = addMonths(yearStart, 8);
     return { start: yearStart, end: yearEnd };
   };
-  const isDateInRange = (value: string, range: { start: Date; end: Date } | null) => {
+  const isDateInRange = (
+    value: string,
+    range: { start: Date; end: Date } | null,
+  ) => {
     if (!range) return true;
     const date = parseLocalDate(value);
     if (Number.isNaN(date.getTime())) return false;
@@ -118,13 +152,16 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
   };
 
   const classStudents = useMemo(
-    () => (selectedClass ? students.filter(s => s.classId === selectedClass) : []),
-    [selectedClass, students]
+    () =>
+      selectedClass ? students.filter((s) => s.classId === selectedClass) : [],
+    [selectedClass, students],
   );
 
-  const fallbackStartYearDate =
-    selectedClassData?.startCalendarYear ? `${selectedClassData.startCalendarYear}-02-01` : undefined;
-  const effectiveStartYearDate = selectedClassData?.startYearDate || fallbackStartYearDate;
+  const fallbackStartYearDate = selectedClassData?.startCalendarYear
+    ? `${selectedClassData.startCalendarYear}-02-01`
+    : undefined;
+  const effectiveStartYearDate =
+    selectedClassData?.startYearDate || fallbackStartYearDate;
   const schoolYearRange = useMemo(
     () => getSchoolYearRange(effectiveStartYearDate, selectedSchoolYear),
     [effectiveStartYearDate, selectedSchoolYear],
@@ -134,22 +171,24 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
     () =>
       selectedClass
         ? grades.filter(
-          g => g.classId === selectedClass && (g.schoolYear ?? 1) === selectedSchoolYear
-        )
+            (g) =>
+              g.classId === selectedClass &&
+              (g.schoolYear ?? 1) === selectedSchoolYear,
+          )
         : [],
-    [grades, selectedClass, selectedSchoolYear]
+    [grades, selectedClass, selectedSchoolYear],
   );
 
   const classIncidents = useMemo(
     () =>
       selectedClass
         ? incidents.filter(
-          i =>
-            i.classId === selectedClass &&
-            isDateInRange(i.date, schoolYearRange)
-        )
+            (i) =>
+              i.classId === selectedClass &&
+              isDateInRange(i.date, schoolYearRange),
+          )
         : [],
-    [incidents, selectedClass, schoolYearRange]
+    [incidents, selectedClass, schoolYearRange],
   );
 
   // DISABLED: Attendance feature temporarily removed
@@ -168,8 +207,12 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
 
   const templateSubjects = useMemo(() => {
     if (!selectedClassData?.templateId) return [];
-    const template = templates.find((t) => t.id === selectedClassData.templateId);
-    const yearData = template?.subjectsByYear.find((y) => y.year === selectedSchoolYear);
+    const template = templates.find(
+      (t) => t.id === selectedClassData.templateId,
+    );
+    const yearData = template?.subjectsByYear.find(
+      (y) => y.year === selectedSchoolYear,
+    );
     return yearData?.subjects ?? [];
   }, [templates, selectedClassData?.templateId, selectedSchoolYear]);
 
@@ -189,7 +232,9 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
   }, [templateSubjects, manualSubjects]);
   const reportSubjects = useMemo(() => {
     if (!selectedClassData) return [];
-    const gradeSubjects = [...new Set(classGrades.map((grade) => grade.subject))];
+    const gradeSubjects = [
+      ...new Set(classGrades.map((grade) => grade.subject)),
+    ];
     if (gradeSubjects.length > 0) {
       return gradeSubjects.sort();
     }
@@ -197,41 +242,59 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
     return [...new Set([...baseSubjects, ...professionalSubjects])].sort();
   }, [selectedClassData, classGrades, professionalSubjects]);
 
-  const classAverage = classGrades.length > 0
-    ? classGrades.reduce((sum, grade) => sum + grade.grade, 0) / classGrades.length
-    : 0;
+  const classAverage =
+    classGrades.length > 0
+      ? classGrades.reduce((sum, grade) => sum + grade.grade, 0) /
+        classGrades.length
+      : 0;
 
   const selectedStudentData = selectedStudent
-    ? classStudents.find(student => student.id === selectedStudent) || null
+    ? classStudents.find((student) => student.id === selectedStudent) || null
     : null;
 
   const selectedStudentMetrics = useMemo(() => {
     if (!selectedStudentData) return null;
 
-    const studentGrades = classGrades.filter(g => g.studentId === selectedStudentData.id);
-    const subjects = [...new Set(studentGrades.map(g => g.subject))];
-    const subjectAverages = subjects.map(subject => {
-      const gradesBySubject = studentGrades.filter(g => g.subject === subject);
-      const average = gradesBySubject.length > 0
-        ? gradesBySubject.reduce((sum, g) => sum + g.grade, 0) / gradesBySubject.length
-        : 0;
+    const studentGrades = classGrades.filter(
+      (g) => g.studentId === selectedStudentData.id,
+    );
+    const subjects = [...new Set(studentGrades.map((g) => g.subject))];
+    const subjectAverages = subjects.map((subject) => {
+      const gradesBySubject = studentGrades.filter(
+        (g) => g.subject === subject,
+      );
+      const average =
+        gradesBySubject.length > 0
+          ? gradesBySubject.reduce((sum, g) => sum + g.grade, 0) /
+            gradesBySubject.length
+          : 0;
       return { subject, average };
     });
 
-    const overallAverage = subjectAverages.length > 0
-      ? subjectAverages.reduce((sum, s) => sum + s.average, 0) / subjectAverages.length
-      : 0;
+    const overallAverage =
+      subjectAverages.length > 0
+        ? subjectAverages.reduce((sum, s) => sum + s.average, 0) /
+          subjectAverages.length
+        : 0;
 
     const subjectsBelowAverage = subjectAverages
-      .filter(s => s.average < 6)
-      .map(s => s.subject);
+      .filter((s) => s.average < 6)
+      .map((s) => s.subject);
 
-    const studentIncidents = classIncidents.filter(i => i.studentIds.includes(selectedStudentData.id));
-    const studentAttendance = classAttendance.filter(a => a.studentId === selectedStudentData.id);
-    const absences = studentAttendance.filter(a => a.status !== 'presente').length;
-    const presenceRate = studentAttendance.length > 0
-      ? ((studentAttendance.length - absences) / studentAttendance.length) * 100
-      : 100;
+    const studentIncidents = classIncidents.filter((i) =>
+      i.studentIds.includes(selectedStudentData.id),
+    );
+    const studentAttendance = classAttendance.filter(
+      (a) => a.studentId === selectedStudentData.id,
+    );
+    const absences = studentAttendance.filter(
+      (a) => a.status !== "presente",
+    ).length;
+    const presenceRate =
+      studentAttendance.length > 0
+        ? ((studentAttendance.length - absences) / studentAttendance.length) *
+          100
+        : 100;
 
     return {
       average: overallAverage,
@@ -245,13 +308,13 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
   const handleOpenPeriodDialog = () => {
     if (!selectedClassData) {
       toast({
-        variant: 'destructive',
-        title: 'Selecione uma turma',
-        description: 'Escolha a turma para gerar o relatório.',
+        variant: "destructive",
+        title: "Selecione uma turma",
+        description: "Escolha a turma para gerar o relatório.",
       });
       return;
     }
-    setSelectedPeriod('anual');
+    setSelectedPeriod("anual");
     setShowPeriodDialog(true);
   };
 
@@ -261,8 +324,12 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
     setIsGenerating(true);
     try {
       const periodRange =
-        selectedPeriod !== 'anual'
-          ? getQuarterRange(effectiveStartYearDate, selectedSchoolYear, selectedPeriod)
+        selectedPeriod !== "anual"
+          ? getQuarterRange(
+              effectiveStartYearDate,
+              selectedSchoolYear,
+              selectedPeriod,
+            )
           : schoolYearRange;
       const reportAttendance = classAttendance.filter((record) =>
         isDateInRange(record.date, periodRange),
@@ -278,20 +345,20 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
         reportIncidents,
         reportAttendance,
         professionalSubjects,
-        selectedPeriod
+        selectedPeriod,
       );
 
       setShowPeriodDialog(false);
       toast({
-        title: 'Relatório Gerado',
+        title: "Relatório Gerado",
         description: `O relatório qualitativo da turma ${selectedClassData.name} foi baixado.`,
       });
     } catch (error) {
-      console.error('Erro ao gerar relatório de turma (PDF generation failed)');
+      console.error("Erro ao gerar relatório de turma (PDF generation failed)");
       toast({
-        variant: 'destructive',
-        title: 'Erro ao gerar relatório',
-        description: 'Não foi possível gerar o PDF. Tente novamente.',
+        variant: "destructive",
+        title: "Erro ao gerar relatório",
+        description: "Não foi possível gerar o PDF. Tente novamente.",
       });
     } finally {
       setIsGenerating(false);
@@ -301,9 +368,9 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
   const handleIndividualReport = async () => {
     if (!selectedClassData || !selectedStudentData) {
       toast({
-        variant: 'destructive',
-        title: 'Selecione a turma e o aluno',
-        description: 'Escolha o aluno que receberá o relatório individual.',
+        variant: "destructive",
+        title: "Selecione a turma e o aluno",
+        description: "Escolha o aluno que receberá o relatório individual.",
       });
       return;
     }
@@ -315,19 +382,21 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
         classGrades,
         classIncidents,
         classAttendance,
-        reportSubjects
+        reportSubjects,
       );
 
       toast({
-        title: 'Relatório Gerado',
+        title: "Relatório Gerado",
         description: `O relatório de ${selectedStudentData.name} foi baixado.`,
       });
     } catch (error) {
-      console.error('Erro ao gerar relatório individual (PDF generation failed)');
+      console.error(
+        "Erro ao gerar relatório individual (PDF generation failed)",
+      );
       toast({
-        variant: 'destructive',
-        title: 'Erro na geração',
-        description: 'Não foi possível criar o PDF. Tente novamente.',
+        variant: "destructive",
+        title: "Erro na geração",
+        description: "Não foi possível criar o PDF. Tente novamente.",
       });
     }
   };
@@ -355,10 +424,13 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label>Selecione a turma</Label>
-              <Select value={selectedClass} onValueChange={(value) => {
-                setSelectedClass(value);
-                setSelectedStudent('');
-              }}>
+              <Select
+                value={selectedClass}
+                onValueChange={(value) => {
+                  setSelectedClass(value);
+                  setSelectedStudent("");
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Escolha a turma" />
                 </SelectTrigger>
@@ -369,8 +441,8 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
                     </div>
                   ) : (
                     classes
-                      .filter(cls => !cls.archived)
-                      .map(cls => (
+                      .filter((cls) => !cls.archived)
+                      .map((cls) => (
                         <SelectItem key={cls.id} value={cls.id}>
                           {cls.name}
                         </SelectItem>
@@ -384,7 +456,9 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
               <Label>Ano da turma</Label>
               <Select
                 value={String(selectedSchoolYear)}
-                onValueChange={(value) => setSelectedSchoolYear(Number(value) as 1 | 2 | 3)}
+                onValueChange={(value) =>
+                  setSelectedSchoolYear(Number(value) as 1 | 2 | 3)
+                }
                 disabled={!selectedClass}
               >
                 <SelectTrigger>
@@ -404,24 +478,35 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
               <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground space-y-2">
                 <div className="flex items-center justify-between">
                   <span>Total de alunos</span>
-                  <span className="font-semibold text-foreground">{classStudents.length}</span>
+                  <span className="font-semibold text-foreground">
+                    {classStudents.length}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Média geral</span>
-                  <span className="font-semibold text-foreground">{classAverage.toFixed(1)}</span>
+                  <span className="font-semibold text-foreground">
+                    {classAverage.toFixed(1)}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Ocorrências registradas</span>
-                  <span className="font-semibold text-foreground">{classIncidents.length}</span>
+                  <span className="font-semibold text-foreground">
+                    {classIncidents.length}
+                  </span>
                 </div>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Escolha uma turma para visualizar o resumo e habilitar o download do PDF.
+                Escolha uma turma para visualizar o resumo e habilitar o
+                download do PDF.
               </p>
             )}
 
-            <Button className="w-full" onClick={handleOpenPeriodDialog} disabled={!selectedClass}>
+            <Button
+              className="w-full"
+              onClick={handleOpenPeriodDialog}
+              disabled={!selectedClass}
+            >
               <FileDown className="mr-2 h-4 w-4" />
               Gerar Relatório Qualitativo
             </Button>
@@ -437,7 +522,8 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
                   Relatório Individual
                 </CardTitle>
                 <CardDescription>
-                  Gera um boletim individual com resumo de atenção, ocorrências e notas do ano.
+                  Gera um boletim individual com resumo de atenção, ocorrências
+                  e notas do ano.
                 </CardDescription>
               </div>
             </div>
@@ -445,10 +531,13 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label>Turma</Label>
-              <Select value={selectedClass} onValueChange={(value) => {
-                setSelectedClass(value);
-                setSelectedStudent('');
-              }}>
+              <Select
+                value={selectedClass}
+                onValueChange={(value) => {
+                  setSelectedClass(value);
+                  setSelectedStudent("");
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Escolha a turma" />
                 </SelectTrigger>
@@ -459,8 +548,8 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
                     </div>
                   ) : (
                     classes
-                      .filter(cls => !cls.archived)
-                      .map(cls => (
+                      .filter((cls) => !cls.archived)
+                      .map((cls) => (
                         <SelectItem key={cls.id} value={cls.id}>
                           {cls.name}
                         </SelectItem>
@@ -474,7 +563,9 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
               <Label>Ano da turma</Label>
               <Select
                 value={String(selectedSchoolYear)}
-                onValueChange={(value) => setSelectedSchoolYear(Number(value) as 1 | 2 | 3)}
+                onValueChange={(value) =>
+                  setSelectedSchoolYear(Number(value) as 1 | 2 | 3)
+                }
                 disabled={!selectedClass}
               >
                 <SelectTrigger>
@@ -498,7 +589,13 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
                 disabled={!selectedClass}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={selectedClass ? 'Escolha o aluno' : 'Selecione a turma primeiro'} />
+                  <SelectValue
+                    placeholder={
+                      selectedClass
+                        ? "Escolha o aluno"
+                        : "Selecione a turma primeiro"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {classStudents.length === 0 ? (
@@ -506,7 +603,7 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
                       Nenhum aluno encontrado
                     </div>
                   ) : (
-                    classStudents.map(student => (
+                    classStudents.map((student) => (
                       <SelectItem key={student.id} value={student.id}>
                         {student.name}
                       </SelectItem>
@@ -519,8 +616,12 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
             {selectedStudentData && selectedStudentMetrics && (
               <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground space-y-3">
                 <div className="space-y-1">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Resumo</p>
-                  <p className="font-semibold text-foreground">{selectedStudentData.name}</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Resumo
+                  </p>
+                  <p className="font-semibold text-foreground">
+                    {selectedStudentData.name}
+                  </p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -536,7 +637,9 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Disciplinas &lt; 6</p>
+                    <p className="text-xs text-muted-foreground">
+                      Disciplinas &lt; 6
+                    </p>
                     <p className="text-lg font-semibold text-foreground">
                       {selectedStudentMetrics.subjectsBelowAverage.length}
                     </p>
@@ -555,7 +658,7 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
                       Disciplinas em atenção
                     </p>
                     <p className="text-sm text-foreground">
-                      {selectedStudentMetrics.subjectsBelowAverage.join(', ')}
+                      {selectedStudentMetrics.subjectsBelowAverage.join(", ")}
                     </p>
                   </>
                 )}
@@ -572,7 +675,8 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
               Gerar Relatório Individual
             </Button>
             <p className="text-xs text-muted-foreground text-center">
-              O modelo individual segue o boletim com resumo, ocorrências e tabela anual de notas.
+              O modelo individual segue o boletim com resumo, ocorrências e
+              tabela anual de notas.
             </p>
           </CardContent>
         </Card>
@@ -586,24 +690,36 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
               Gerar Relatório Qualitativo
             </DialogTitle>
             <DialogDescription>
-              Selecione o período para análise. O relatório inclui análise por área do conhecimento,
-              correlação comportamento x desempenho, predições de risco e recomendações.
+              Selecione o período para análise. O relatório inclui análise por
+              área do conhecimento, correlação comportamento x desempenho,
+              predições de risco e recomendações.
             </DialogDescription>
           </DialogHeader>
 
           <div className="py-4">
-            <Label className="text-sm font-medium mb-3 block">Período de análise</Label>
-            <RadioGroup value={selectedPeriod} onValueChange={setSelectedPeriod} className="space-y-2">
+            <Label className="text-sm font-medium mb-3 block">
+              Período de análise
+            </Label>
+            <RadioGroup
+              value={selectedPeriod}
+              onValueChange={setSelectedPeriod}
+              className="space-y-2"
+            >
               <div className="flex items-center space-x-2 rounded-lg border p-3 hover:bg-muted/50 cursor-pointer">
                 <RadioGroupItem value="anual" id="anual" />
                 <Label htmlFor="anual" className="flex-1 cursor-pointer">
                   <span className="font-medium">Ano Completo</span>
-                  <p className="text-xs text-muted-foreground">Análise consolidada de todos os bimestres</p>
+                  <p className="text-xs text-muted-foreground">
+                    Análise consolidada de todos os bimestres
+                  </p>
                 </Label>
               </div>
 
               {QUARTERS.map((quarter) => (
-                <div key={quarter} className="flex items-center space-x-2 rounded-lg border p-3 hover:bg-muted/50 cursor-pointer">
+                <div
+                  key={quarter}
+                  className="flex items-center space-x-2 rounded-lg border p-3 hover:bg-muted/50 cursor-pointer"
+                >
                   <RadioGroupItem value={quarter} id={quarter} />
                   <Label htmlFor={quarter} className="flex-1 cursor-pointer">
                     <span className="font-medium">{quarter}</span>
@@ -614,16 +730,19 @@ export const IntegratedReports = ({ classes, students, incidents }: IntegratedRe
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setShowPeriodDialog(false)} disabled={isGenerating}>
+            <Button
+              variant="outline"
+              onClick={() => setShowPeriodDialog(false)}
+              disabled={isGenerating}
+            >
               Cancelar
             </Button>
             <Button onClick={handleGenerateClassReport} disabled={isGenerating}>
-              {isGenerating ? 'Gerando...' : 'Gerar PDF'}
+              {isGenerating ? "Gerando..." : "Gerar PDF"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
     </>
   );
 };
