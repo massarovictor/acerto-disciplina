@@ -63,7 +63,7 @@ export const GradesManager = () => {
   const [studentGrades, setStudentGrades] = useState<StudentGrades[]>([]);
   const [showSigeImport, setShowSigeImport] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
-  const [lastInitialized, setLastInitialized] = useState<{ class: string; quarter: string; year: number } | null>(null);
+  const [lastInitialized, setLastInitialized] = useState<{ class: string; quarter: string; year: number; gradesKey: string } | null>(null);
 
   const classStudents = useMemo(() => students.filter(s => s.classId === selectedClass), [students, selectedClass]);
   const selectedClassData = classes.find(c => c.id === selectedClass);
@@ -167,6 +167,26 @@ export const GradesManager = () => {
     ...professionalSubjects,  // Agora usa apenas disciplinas do ano selecionado
   ];
 
+  const gradesKey = useMemo(() => {
+    if (!selectedClass || !selectedQuarter) return '';
+    let count = 0;
+    let latestRecordedAt = '';
+    for (const grade of grades) {
+      if (
+        grade.classId === selectedClass &&
+        grade.quarter === selectedQuarter &&
+        (grade.schoolYear ?? 1) === selectedSchoolYear
+      ) {
+        count++;
+        const recordedAt = grade.recordedAt ?? '';
+        if (recordedAt > latestRecordedAt) {
+          latestRecordedAt = recordedAt;
+        }
+      }
+    }
+    return `${count}:${latestRecordedAt}`;
+  }, [grades, selectedClass, selectedQuarter, selectedSchoolYear]);
+
   // Initialize grades when class or quarter changes
   useEffect(() => {
     if (!selectedClass || !selectedQuarter) {
@@ -179,7 +199,8 @@ export const GradesManager = () => {
     const needsReinit = !lastInitialized ||
       lastInitialized.class !== selectedClass ||
       lastInitialized.quarter !== selectedQuarter ||
-      lastInitialized.year !== selectedSchoolYear;
+      lastInitialized.year !== selectedSchoolYear ||
+      lastInitialized.gradesKey !== gradesKey;
 
     if (needsReinit) {
       const currentAllSubjects = [
@@ -211,7 +232,12 @@ export const GradesManager = () => {
       });
 
       setStudentGrades(initialGrades);
-      setLastInitialized({ class: selectedClass, quarter: selectedQuarter, year: selectedSchoolYear });
+      setLastInitialized({
+        class: selectedClass,
+        quarter: selectedQuarter,
+        year: selectedSchoolYear,
+        gradesKey,
+      });
     } else {
       // Se apenas adicionou novas disciplinas profissionais, adicionar campos vazios sem resetar
       const currentAllSubjects = [

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -89,6 +89,7 @@ export const SigeImportDialog = ({
     const [studentMatches, setStudentMatches] = useState<StudentMatch[]>([]);
     const [subjectMappings, setSubjectMappings] = useState<SubjectMapping[]>([]);
     const [lastSelectedClass, setLastSelectedClass] = useState<string | null>(null);
+    const mappingKeyRef = useRef<string | null>(null);
 
     const activeClasses = classes.filter(c => !c.archived && c.active);
     const schoolYearOptions: Array<{ value: 1 | 2 | 3; label: string }> = [
@@ -100,6 +101,7 @@ export const SigeImportDialog = ({
         () => classes.find((c) => c.id === selectedClass),
         [classes, selectedClass],
     );
+    const allowUnlistedSubjects = !selectedClassData?.templateId;
 
     useEffect(() => {
         if (!open) return;
@@ -135,20 +137,26 @@ export const SigeImportDialog = ({
     ]);
 
     const normalizeTemplateYear = (value: unknown): 1 | 2 | 3 | null => {
-        const parsed = Number(value);
-        if (parsed === 1 || parsed === 2 || parsed === 3) {
-            return parsed as 1 | 2 | 3;
+        if (value === null || value === undefined) return null;
+        const str = String(value).trim();
+        // extrai primeiro dígito 1, 2 ou 3 de strings como "3", "3º", "3 ano", "Ano 3"
+        const digitMatch = str.match(/[1-3]/);
+        if (digitMatch) {
+            const parsed = Number(digitMatch[0]);
+            if (parsed === 1 || parsed === 2 || parsed === 3) {
+                return parsed as 1 | 2 | 3;
+            }
         }
         return null;
     };
 
-    const getTemplateSubjectsForClass = (classId: string): string[] => {
+    const getTemplateSubjectsForClass = (classId: string, schoolYear: 1 | 2 | 3 = selectedSchoolYear): string[] => {
         const classData = classes.find((c) => c.id === classId);
         if (!classData?.templateId) return [];
         const template = templates.find((t) => t.id === classData.templateId);
         if (!template) return [];
         const yearData = template.subjectsByYear.find(
-            (y) => normalizeTemplateYear(y.year) === selectedSchoolYear,
+            (y) => normalizeTemplateYear(y.year) === schoolYear,
         );
         return yearData?.subjects ?? [];
     };
@@ -171,33 +179,41 @@ export const SigeImportDialog = ({
     };
 
     const templateSubjectsForSelectedClass = useMemo(
-        () => (selectedClass ? getTemplateSubjectsForClass(selectedClass) : []),
+        () => (selectedClass ? getTemplateSubjectsForClass(selectedClass, selectedSchoolYear) : []),
         [selectedClass, classes, templates, selectedSchoolYear],
     );
 
     // Função para obter disciplinas válidas de uma turma
     // Retorna tanto o nome original quanto o normalizado para comparação flexível
-    // IMPORTANTE: Usa getAllTemplateSubjectsForClass para aceitar disciplinas de todos os anos!
+    // IMPORTANTE: Se há template, usa apenas disciplinas do ano selecionado.
     const getValidSubjectsForClass = (
-        classId: string
+        classId: string,
+        schoolYear: 1 | 2 | 3 = selectedSchoolYear,
+        templateSubjectsOverride?: string[]
     ): { original: string; normalized: string }[] => {
+        const classData = classes.find((c) => c.id === classId);
+        const hasTemplate = !!classData?.templateId;
+
         // Disciplinas da Base Nacional Comum (ENEM)
         const baseSubjects = getAllSubjects().map(s => ({
             original: s,
             normalized: normalizeNameForComparison(normalizeSubjectName(s))
         }));
 
-        // IMPORTANTE: Usar TODAS as disciplinas do template (todos os anos)
-        // para que disciplinas de qualquer ano sejam aceitas na importação
-        const templateSubjects = getAllTemplateSubjectsForClass(classId);
+        // Apenas disciplinas do template para o ano selecionado.
+        const templateSubjects = hasTemplate
+            ? (templateSubjectsOverride ?? getTemplateSubjectsForClass(classId, schoolYear))
+            : [];
 
         // Disciplinas Profissionais da turma (manuais)
-        const classSubjects = (professionalSubjects || [])
-            .filter(ps => ps.classId === classId)
-            .map(ps => ({
-                original: ps.subject,
-                normalized: normalizeNameForComparison(normalizeSubjectName(ps.subject))
-            }));
+        const classSubjects = hasTemplate
+            ? []
+            : (professionalSubjects || [])
+                .filter(ps => ps.classId === classId)
+                .map(ps => ({
+                    original: ps.subject,
+                    normalized: normalizeNameForComparison(normalizeSubjectName(ps.subject))
+                }));
 
         // Combinar ambas (sem duplicatas por nome normalizado)
         const seenNormalized = new Set<string>();
@@ -220,22 +236,34 @@ export const SigeImportDialog = ({
         return allValidSubjects;
     };
 
+    const normalizeSubjectForMatch = (value: string): string => {
+        return normalizeNameForComparison(normalizeSubjectName(value));
+    };
+
     // Função para verificar se uma disciplina é válida (comparação normalizada)
     // Usa matching baseado em palavras para disciplinas técnicas longas
     const isValidSubject = (
         subject: string,
         validSubjects: { original: string; normalized: string }[],
         mappings: SubjectMapping[] = [],
+        allowUnlisted = false,
         debug = false
     ): string | null => {
+        const normalizedSubject = normalizeSubjectForMatch(subject);
+
         // 1. PRIORIDADE: verificar se há mapeamento manual
-        const manualMapping = mappings.find(m => m.excelSubject === subject);
+        const manualMapping = mappings.find(
+            m => normalizeSubjectForMatch(m.excelSubject) === normalizedSubject
+        );
         if (manualMapping) {
             if (debug) console.log(`[SUBJECT MATCH] "${subject}" → Manual mapping: ${manualMapping.systemSubject ?? 'IGNORADO'}`);
-            return manualMapping.systemSubject; // Pode ser null se foi ignorado
-        }
+            if (manualMapping.systemSubject === null) return null;
+            if (allowUnlisted) return manualMapping.systemSubject;
 
-        const normalizedSubject = normalizeNameForComparison(subject);
+            const normalizedManual = normalizeSubjectForMatch(manualMapping.systemSubject);
+            const allowed = validSubjects.some(vs => vs.normalized === normalizedManual);
+            return allowed ? manualMapping.systemSubject : null;
+        }
         // Palavras significativas (ignorar preposições curtas)
         const subjectWords = normalizedSubject.split(/\s+/).filter(w => w.length > 2);
 
@@ -304,16 +332,37 @@ export const SigeImportDialog = ({
     const prepareSubjectMappings = () => {
         if (!parseResult || !selectedClass) return;
 
-        const validSubjects = getValidSubjectsForClass(selectedClass);
+        const validSubjects = getValidSubjectsForClass(selectedClass, selectedSchoolYear, templateSubjectsForSelectedClass);
         const mappings: SubjectMapping[] = [];
 
         // Debug: mostrar breakdown de disciplinas
-        const templateByYear = getTemplateSubjectsForClass(selectedClass);
+        const templateByYear = getTemplateSubjectsForClass(selectedClass, selectedSchoolYear);
         const templateAll = getAllTemplateSubjectsForClass(selectedClass);
 
+        // Usar apenas disciplinas presentes nas notas dos alunos mapeados
+        const matchedNames = new Set(
+            studentMatches
+                .filter(m => m.systemStudentId)
+                .map(m => normalizeNameForComparison(m.fileStudentName))
+        );
+        const sourceRows = matchedNames.size > 0
+            ? parseResult.rows.filter(r => matchedNames.has(normalizeNameForComparison(r.studentName)))
+            : parseResult.rows;
+        const subjectMap = new Map<string, string>();
+        for (const row of sourceRows) {
+            for (const subject of Object.keys(row.grades)) {
+                const normalized = normalizeSubjectForMatch(subject);
+                if (!subjectMap.has(normalized)) {
+                    subjectMap.set(normalized, subject);
+                }
+            }
+        }
+        const excelSubjects = subjectMap.size > 0
+            ? Array.from(subjectMap.values())
+            : parseResult.subjects;
 
-        for (const excelSubject of parseResult.subjects) {
-            const autoMatch = isValidSubject(excelSubject, validSubjects, [], true);
+        for (const excelSubject of excelSubjects) {
+            const autoMatch = isValidSubject(excelSubject, validSubjects, [], allowUnlistedSubjects, true);
             mappings.push({
                 excelSubject,
                 systemSubject: autoMatch,
@@ -328,6 +377,32 @@ export const SigeImportDialog = ({
         setSubjectMappings(mappings);
         setStep('map-subjects');
     };
+
+    useEffect(() => {
+        if (!parseResult || !selectedClass) return;
+        if (step !== 'map-subjects' && step !== 'review-subjects' && step !== 'preview') return;
+
+        const templateKey = templateSubjectsForSelectedClass.join('|');
+        const parseKey = parseResult.subjects.join('|');
+        const mappingKey = `${selectedClass}|${selectedSchoolYear}|${selectedClassData?.templateId ?? ''}|${templateKey}|${parseKey}`;
+
+        if (mappingKeyRef.current === mappingKey) return;
+        mappingKeyRef.current = mappingKey;
+        prepareSubjectMappings();
+    }, [
+        parseResult,
+        selectedClass,
+        selectedSchoolYear,
+        selectedClassData?.templateId,
+        step,
+        templateSubjectsForSelectedClass,
+    ]);
+
+    // Reset mapeamento quando turma ou ano mudarem (evita cache de ano anterior)
+    useEffect(() => {
+        mappingKeyRef.current = null;
+        setSubjectMappings([]);
+    }, [selectedClass, selectedSchoolYear]);
 
 
     // Função para atualizar um mapeamento
@@ -360,6 +435,7 @@ export const SigeImportDialog = ({
         setFileQuarter(null);
         setImportableGrades([]);
         setStudentMatches([]);
+        mappingKeyRef.current = null;
         setIsProcessing(true);
         try {
             const result = await processSigeFile(file);
@@ -478,6 +554,7 @@ export const SigeImportDialog = ({
 
     const handleConfirmMatches = () => {
         // Ir para o passo de mapeamento de disciplinas
+        mappingKeyRef.current = null; // força recalcular mapeamento com ano atual
         prepareSubjectMappings();
     };
 
@@ -485,7 +562,7 @@ export const SigeImportDialog = ({
         if (!parseResult) return;
 
         const classStudents = students.filter(s => s.classId === selectedClass);
-        const validSubjects = getValidSubjectsForClass(selectedClass);
+        const validSubjects = getValidSubjectsForClass(selectedClass, selectedSchoolYear, templateSubjectsForSelectedClass);
         const grades: ImportableGrade[] = [];
 
         // 📊 ESTATÍSTICAS DE DEBUG
@@ -518,7 +595,7 @@ export const SigeImportDialog = ({
                     }
 
                     // Verificar se a disciplina é válida (usando mapeamentos manuais)
-                    const matchedSubject = isValidSubject(subject, validSubjects, subjectMappings);
+                    const matchedSubject = isValidSubject(subject, validSubjects, subjectMappings, allowUnlistedSubjects);
                     if (!matchedSubject) {
                         notasDescartadasPorDisciplina++;
                         continue;
@@ -767,6 +844,7 @@ export const SigeImportDialog = ({
         setImportableGrades([]);
         setStudentMatches([]);
         setSubjectMappings([]);
+        mappingKeyRef.current = null;
         onOpenChange(false);
     };
 
@@ -775,7 +853,7 @@ export const SigeImportDialog = ({
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
-            <DialogContent className="max-w-4xl max-h-[90vh]">
+            <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <FileText className="h-5 w-5 text-blue-600" />
@@ -790,6 +868,7 @@ export const SigeImportDialog = ({
                     </DialogDescription>
                 </DialogHeader>
 
+                <div className="flex-1 min-h-0 overflow-y-auto pr-1">
                 {/* Step 1: Configure - AGORA É O PRIMEIRO PASSO */}
                 {step === 'configure' && (
                     <div className="space-y-6">
@@ -849,7 +928,7 @@ export const SigeImportDialog = ({
                                     <AlertTriangle className="h-4 w-4" />
                                     <AlertDescription>
                                         Nenhuma disciplina profissional cadastrada para o {selectedSchoolYear}º ano neste template.
-                                        Apenas disciplinas da base comum e disciplinas manuais da turma serão consideradas.
+                                        Apenas disciplinas da base comum serão consideradas.
                                     </AlertDescription>
                                 </Alert>
                             )}
@@ -1036,7 +1115,7 @@ export const SigeImportDialog = ({
                                 </TableHeader>
                                 <TableBody>
                                     {subjectMappings.map((mapping) => {
-                                        const validSubjects = getValidSubjectsForClass(selectedClass);
+                                        const validSubjects = getValidSubjectsForClass(selectedClass, selectedSchoolYear, templateSubjectsForSelectedClass);
                                         return (
                                             <TableRow
                                                 key={mapping.excelSubject}
@@ -1066,7 +1145,7 @@ export const SigeImportDialog = ({
                                                                 </SelectItem>
                                                             ))}
                                                             {/* Opção para usar o nome do Excel diretamente se não está na lista */}
-                                                            {!validSubjects.some(vs => vs.original === mapping.excelSubject) && (
+                                                            {allowUnlistedSubjects && !validSubjects.some(vs => vs.original === mapping.excelSubject) && (
                                                                 <SelectItem
                                                                     value={mapping.excelSubject}
                                                                     className="text-blue-600 font-medium"
@@ -1126,8 +1205,20 @@ export const SigeImportDialog = ({
                         </Alert>
 
                         {(() => {
+                            const validSubjects = selectedClass
+                                ? getValidSubjectsForClass(selectedClass, selectedSchoolYear, templateSubjectsForSelectedClass)
+                                : [];
                             const mappedSubjects = subjectMappings.filter(m => m.systemSubject !== null);
                             const unmappedSubjects = subjectMappings.filter(m => m.systemSubject === null);
+                            const mappedNormalized = new Set(
+                                mappedSubjects
+                                    .map(m => m.systemSubject)
+                                    .filter((subject): subject is string => !!subject)
+                                    .map(normalizeSubjectForMatch)
+                            );
+                            const missingSystemSubjects = validSubjects
+                                .filter(vs => !mappedNormalized.has(vs.normalized))
+                                .map(vs => vs.original);
 
                             return (
                                 <div className="space-y-4">
@@ -1190,6 +1281,32 @@ export const SigeImportDialog = ({
                                         </div>
                                     )}
 
+                                    {/* Disciplinas do Sistema Nao Preenchidas */}
+                                    {missingSystemSubjects.length > 0 && (
+                                        <div className="border rounded-lg p-4 bg-blue-50 dark:bg-blue-950/20">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <FileText className="h-5 w-5 text-blue-600" />
+                                                <h3 className="font-semibold text-blue-900 dark:text-blue-100">
+                                                    Disciplinas do sistema nao preenchidas ({missingSystemSubjects.length})
+                                                </h3>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {missingSystemSubjects.map(subject => (
+                                                    <Badge
+                                                        key={subject}
+                                                        variant="outline"
+                                                        className="bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30"
+                                                    >
+                                                        {subject}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                            <p className="text-sm text-muted-foreground mt-2">
+                                                Essas disciplinas pertencem ao ano selecionado e nao tem notas no arquivo.
+                                            </p>
+                                        </div>
+                                    )}
+
                                     {/* Resumo */}
                                     <div className="border rounded-lg p-4 bg-muted/50">
                                         <h4 className="font-semibold mb-2">Resumo da Importação</h4>
@@ -1201,6 +1318,11 @@ export const SigeImportDialog = ({
                                             {unmappedSubjects.length > 0 && (
                                                 <p className="text-amber-700 dark:text-amber-400">
                                                     ⚠ Ignoradas: {unmappedSubjects.length}
+                                                </p>
+                                            )}
+                                            {missingSystemSubjects.length > 0 && (
+                                                <p className="text-blue-700 dark:text-blue-400">
+                                                    Disciplinas do sistema nao preenchidas: {missingSystemSubjects.length}
                                                 </p>
                                             )}
                                         </div>
@@ -1368,7 +1490,8 @@ export const SigeImportDialog = ({
                     </div>
                 )}
 
-                <DialogFooter>
+                </div>
+                <DialogFooter className="flex-wrap gap-2 sm:space-x-0">
                     {step === 'configure' && (
                         <Button variant="outline" onClick={handleClose}>
                             Cancelar
