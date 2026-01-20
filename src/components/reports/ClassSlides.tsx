@@ -177,10 +177,10 @@ export const ClassSlides = ({
 
   const classGrades = selectedClass
     ? grades.filter(
-        (g) =>
-          g.classId === selectedClass &&
-          (g.schoolYear ?? 1) === selectedSchoolYear,
-      )
+      (g) =>
+        g.classId === selectedClass &&
+        (g.schoolYear ?? 1) === selectedSchoolYear,
+    )
     : [];
   const studentData = students.find((s) => s.id === selectedStudent);
 
@@ -200,7 +200,7 @@ export const ClassSlides = ({
         const average =
           filteredGrades.length > 0
             ? filteredGrades.reduce((sum, g) => sum + g.grade, 0) /
-              filteredGrades.length
+            filteredGrades.length
             : 0;
 
         return { student, average };
@@ -412,18 +412,28 @@ export const ClassSlides = ({
     if (!container) return;
 
     const updateScale = () => {
-      const rect = container.getBoundingClientRect();
-      const scale =
-        Math.min(rect.width / SLIDE_WIDTH, rect.height / SLIDE_HEIGHT) || 1;
+      // In fullscreen mode, use window dimensions for accurate scaling
+      const width = isFullscreen ? window.innerWidth : container.getBoundingClientRect().width;
+      const height = isFullscreen ? window.innerHeight : container.getBoundingClientRect().height;
+
+      // Calculate scale with a small margin to prevent edge clipping
+      const marginFactor = isFullscreen ? 0.95 : 1;
+      const scale = Math.min(width / SLIDE_WIDTH, height / SLIDE_HEIGHT) * marginFactor || 1;
       setSlideScale(scale);
     };
 
     updateScale();
+
+    // Also update on window resize for fullscreen changes
+    window.addEventListener('resize', updateScale);
     const observer = new ResizeObserver(updateScale);
     observer.observe(container);
 
-    return () => observer.disconnect();
-  }, [SLIDE_HEIGHT, SLIDE_WIDTH]);
+    return () => {
+      window.removeEventListener('resize', updateScale);
+      observer.disconnect();
+    };
+  }, [SLIDE_HEIGHT, SLIDE_WIDTH, isFullscreen]);
 
   // Mouse wheel zoom
   useEffect(() => {

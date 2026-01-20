@@ -58,12 +58,12 @@ export const StudentGradesTableSlide = ({ student, grades, period }: StudentGrad
     const color = getGradeColor(value);
     return (
       <span style={{
-        padding: '4px 12px',
-        borderRadius: 6,
+        padding: '8px 16px',
+        borderRadius: 10,
         background: `${color}15`,
         color: color,
-        fontWeight: 600,
-        fontSize: 13,
+        fontWeight: 700,
+        fontSize: 22,
       }}>
         {value.toFixed(1)}
       </span>
@@ -74,12 +74,12 @@ export const StudentGradesTableSlide = ({ student, grades, period }: StudentGrad
     const colors = approved ? STATUS_COLORS.approved : STATUS_COLORS.critical;
     return (
       <span style={{
-        padding: '4px 12px',
-        borderRadius: 6,
+        padding: '8px 18px',
+        borderRadius: 10,
         background: colors.bg,
         color: colors.text,
-        fontWeight: 600,
-        fontSize: 12,
+        fontWeight: 700,
+        fontSize: 18,
       }}>
         {approved ? 'Aprovado' : 'Recuperação'}
       </span>
@@ -94,23 +94,23 @@ export const StudentGradesTableSlide = ({ student, grades, period }: StudentGrad
     >
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         {/* Header with Avatar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 28 }}>
           {student.photoUrl ? (
             <img
               src={student.photoUrl}
               alt={student.name}
-              style={{ width: 48, height: 48, borderRadius: 24, objectFit: 'cover' }}
+              style={{ width: 72, height: 72, borderRadius: 36, objectFit: 'cover' }}
             />
           ) : (
             <div style={{
-              width: 48,
-              height: 48,
-              borderRadius: 24,
+              width: 72,
+              height: 72,
+              borderRadius: 36,
               background: `${REPORT_COLORS.primary}15`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 18,
+              fontSize: 28,
               fontWeight: 700,
               color: REPORT_COLORS.primary,
             }}>
@@ -118,7 +118,7 @@ export const StudentGradesTableSlide = ({ student, grades, period }: StudentGrad
             </div>
           )}
           <div>
-            <p style={{ margin: 0, fontSize: 14, color: REPORT_COLORS.text.secondary }}>
+            <p style={{ margin: 0, fontSize: 22, fontWeight: 500, color: REPORT_COLORS.text.secondary }}>
               Matrícula: {student.enrollment || 'Não informada'}
             </p>
           </div>
@@ -136,15 +136,15 @@ export const StudentGradesTableSlide = ({ student, grades, period }: StudentGrad
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: REPORT_COLORS.background.surface }}>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: REPORT_COLORS.text.secondary, width: 50 }}>#</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: REPORT_COLORS.text.secondary }}>Disciplina</th>
+                <th style={{ padding: '16px 20px', textAlign: 'left', fontSize: 18, fontWeight: 700, color: REPORT_COLORS.text.secondary, width: 60 }}>#</th>
+                <th style={{ padding: '16px 20px', textAlign: 'left', fontSize: 18, fontWeight: 700, color: REPORT_COLORS.text.secondary }}>Disciplina</th>
                 {period === 'all' && quarters.map(q => (
-                  <th key={q} style={{ padding: '12px 8px', textAlign: 'center', fontSize: 12, fontWeight: 600, color: REPORT_COLORS.text.secondary, width: 80 }}>
+                  <th key={q} style={{ padding: '16px 12px', textAlign: 'center', fontSize: 16, fontWeight: 700, color: REPORT_COLORS.text.secondary, width: 100 }}>
                     {q.replace(' Bimestre', '')}
                   </th>
                 ))}
-                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: 13, fontWeight: 600, color: REPORT_COLORS.text.secondary, width: 90 }}>Média</th>
-                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: 13, fontWeight: 600, color: REPORT_COLORS.text.secondary, width: 110 }}>Status</th>
+                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: 18, fontWeight: 700, color: REPORT_COLORS.text.secondary, width: 120 }}>Média</th>
+                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: 18, fontWeight: 700, color: REPORT_COLORS.text.secondary, width: 160 }}>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -156,8 +156,8 @@ export const StudentGradesTableSlide = ({ student, grades, period }: StudentGrad
                     background: index % 2 === 0 ? 'transparent' : REPORT_COLORS.background.surface,
                   }}
                 >
-                  <td style={{ padding: '10px 16px', fontSize: 13, color: REPORT_COLORS.text.tertiary }}>{index + 1}</td>
-                  <td style={{ padding: '10px 16px', fontSize: 13, fontWeight: 500, color: REPORT_COLORS.text.primary }}>{item.subject}</td>
+                  <td style={{ padding: '14px 20px', fontSize: 20, color: REPORT_COLORS.text.tertiary }}>{index + 1}</td>
+                  <td style={{ padding: '14px 20px', fontSize: 20, fontWeight: 600, color: REPORT_COLORS.text.primary }}>{item.subject}</td>
                   {period === 'all' && quarters.map(quarter => {
                     const quarterGrade = item.grades.find(g => g.quarter === quarter);
                     return (
@@ -193,20 +193,20 @@ export const StudentGradesTableSlide = ({ student, grades, period }: StudentGrad
           borderRadius: 12,
         }}>
           <div style={{ textAlign: 'center' }}>
-            <p style={{ margin: 0, fontSize: 12, color: REPORT_COLORS.text.secondary }}>Total Disciplinas</p>
-            <p style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 700, color: REPORT_COLORS.text.primary }}>{sortedSubjects.length}</p>
+            <p style={{ margin: 0, fontSize: 18, color: REPORT_COLORS.text.secondary }}>Total Disciplinas</p>
+            <p style={{ margin: '8px 0 0', fontSize: 40, fontWeight: 700, color: REPORT_COLORS.text.primary }}>{sortedSubjects.length}</p>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <p style={{ margin: 0, fontSize: 12, color: REPORT_COLORS.text.secondary }}>Aprovado</p>
-            <p style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 700, color: STATUS_COLORS.approved.solid }}>{approvedCount}</p>
+            <p style={{ margin: 0, fontSize: 18, color: REPORT_COLORS.text.secondary }}>Aprovado</p>
+            <p style={{ margin: '8px 0 0', fontSize: 40, fontWeight: 700, color: STATUS_COLORS.approved.solid }}>{approvedCount}</p>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <p style={{ margin: 0, fontSize: 12, color: REPORT_COLORS.text.secondary }}>Recuperação</p>
-            <p style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 700, color: STATUS_COLORS.critical.solid }}>{recoveryCount}</p>
+            <p style={{ margin: 0, fontSize: 18, color: REPORT_COLORS.text.secondary }}>Recuperação</p>
+            <p style={{ margin: '8px 0 0', fontSize: 40, fontWeight: 700, color: STATUS_COLORS.critical.solid }}>{recoveryCount}</p>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <p style={{ margin: 0, fontSize: 12, color: REPORT_COLORS.text.secondary }}>Média Geral</p>
-            <p style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 700, color: REPORT_COLORS.text.primary }}>{overallAverage.toFixed(1)}</p>
+            <p style={{ margin: 0, fontSize: 18, color: REPORT_COLORS.text.secondary }}>Média Geral</p>
+            <p style={{ margin: '8px 0 0', fontSize: 40, fontWeight: 700, color: REPORT_COLORS.text.primary }}>{overallAverage.toFixed(1)}</p>
           </div>
         </div>
       </div>
