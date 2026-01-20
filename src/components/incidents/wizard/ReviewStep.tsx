@@ -55,7 +55,7 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Registrado por:</span>
-              <span className="font-medium">{profile?.name || user?.email}</span>
+              <span className="font-medium">{user?.email}</span>
             </div>
           </CardContent>
         </Card>

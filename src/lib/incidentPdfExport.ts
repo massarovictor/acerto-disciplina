@@ -31,7 +31,7 @@ class IncidentPDF extends BasePDFGenerator {
   }
 
   private async getResponsibleName(incident: Incident): Promise<string> {
-    // Tenta buscar o nome do último acompanhamento primeiro
+    // Tenta buscar o email do último acompanhamento primeiro
     if (incident.followUps && incident.followUps.length > 0) {
       const lastFollowUp = incident.followUps[incident.followUps.length - 1];
       if (lastFollowUp.responsavel) {
@@ -39,20 +39,20 @@ class IncidentPDF extends BasePDFGenerator {
       }
     }
 
-    // Se não tiver, busca o nome do usuário que criou o incidente
+    // Se não tiver, busca o email do usuário que criou o incidente
     if (incident.createdBy) {
       try {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('name')
+          .select('email')
           .eq('id', incident.createdBy)
           .single();
 
-        if (profile?.name) {
-          return profile.name;
+        if (profile?.email) {
+          return profile.email;
         }
       } catch (e) {
-        console.error('Erro ao buscar nome do responsável:', e);
+        console.error('Erro ao buscar email do responsável:', e);
       }
     }
 
@@ -70,7 +70,7 @@ class IncidentPDF extends BasePDFGenerator {
       await this.loadConfig();
       this.responsibleName = await this.getResponsibleName(incident);
       this.renderHeader();
-      
+
       // Título do Documento - formato profissional
       this.setFont('md', 'bold', '#000000');
       this.drawText('Registro de Ocorrência Disciplinar', this.margin, this.y);
@@ -127,11 +127,11 @@ class IncidentPDF extends BasePDFGenerator {
       }
 
       // Assinaturas - buscar nome do responsável legal do último acompanhamento se houver
-      const lastFollowUp = incident.followUps && incident.followUps.length > 0 
-        ? incident.followUps[incident.followUps.length - 1] 
+      const lastFollowUp = incident.followUps && incident.followUps.length > 0
+        ? incident.followUps[incident.followUps.length - 1]
         : null;
-      const legalGuardianName = lastFollowUp?.nome_responsavel_pai || undefined;
-      
+      const legalGuardianName = lastFollowUp?.nomeResponsavelPai || undefined;
+
       this.renderSignatures(singleStudent || (students.length === 1 ? students[0] : undefined), legalGuardianName);
 
       const name = (singleStudent || students[0])?.name || 'Aluno';
@@ -145,14 +145,14 @@ class IncidentPDF extends BasePDFGenerator {
   private renderIdentification(incident: Incident, incidentClass: Class | undefined, students: Student[], singleStudent?: Student) {
     // Caixa de identificação - preto e branco
     this.drawRect(this.margin, this.y, this.contentWidth, 20, { fill: '#F5F5F5', stroke: '#000000' });
-    
+
     const startY = this.y + 5;
     const col1 = this.colX(1) + 4;
     const col2 = this.colX(7) + 4;
 
     this.renderField('Estudante(s)', singleStudent ? singleStudent.name : students.map(s => s.name).join(', '), col1, startY, this.colWidth(6) - 8);
     this.renderField('Turma', incidentClass?.name || 'Não informado', col2, startY, this.colWidth(6) - 8);
-    
+
     this.renderField('Matrícula(s)', singleStudent ? (singleStudent.enrollment || 'N/A') : students.map(s => s.enrollment || 'N/A').join(', '), col1, startY + 9, this.colWidth(6) - 8);
     this.renderField('Data do Fato', new Date(incident.date).toLocaleDateString('pt-BR'), col2, startY + 9, this.colWidth(6) - 8);
 
@@ -163,7 +163,7 @@ class IncidentPDF extends BasePDFGenerator {
     // Gravidade e Status - preto e branco, formato profissional
     this.setFont('xs', 'normal', '#000000');
     this.drawText('Gravidade:', this.margin, this.y + 4);
-    
+
     // Caixa com borda preta (sem cor de fundo)
     this.drawRect(this.margin + 20, this.y, 35, 6, { stroke: '#000000', radius: 1 });
     this.setFont('xs', 'bold', '#000000');
@@ -199,12 +199,12 @@ class IncidentPDF extends BasePDFGenerator {
 
   private renderFollowUps(followUps: FollowUpRecord[]) {
     this.renderSectionTitle('Histórico de Acompanhamento');
-    
+
     const sorted = [...followUps].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     sorted.forEach((fu, index) => {
       this.checkPageBreak(25);
-      
+
       this.setFont('xs', 'bold', '#000000');
       this.drawText(`${index + 1}. ${new Date(fu.date).toLocaleDateString('pt-BR')} - ${this.getFollowUpType(fu.type)}`, this.margin, this.y + 4);
       this.y += 6;
@@ -213,7 +213,7 @@ class IncidentPDF extends BasePDFGenerator {
       if (fu.responsavel) fields.push(`Registrado por: ${fu.responsavel}`);
       if (fu.motivo) fields.push(`Motivo: ${fu.motivo}`);
       if (fu.providencias) fields.push(`Providências: ${fu.providencias}`);
-      
+
       this.setFont('xs', 'normal', '#000000');
       fields.forEach(f => {
         const lines = this.pdf.splitTextToSize(f, this.contentWidth - 10);
@@ -243,7 +243,7 @@ class IncidentPDF extends BasePDFGenerator {
       this.setFont('xs', 'bold', '#000000');
       this.drawText(`${c.userName} em ${new Date(c.createdAt).toLocaleDateString('pt-BR')}`, this.margin, this.y + 3);
       this.y += 4;
-      
+
       this.setFont('xs', 'normal', '#000000');
       const lines = this.pdf.splitTextToSize(c.text, this.contentWidth - 5);
       this.drawText(lines, this.margin + 2, this.y + 3);
@@ -254,7 +254,7 @@ class IncidentPDF extends BasePDFGenerator {
   private renderSignatures(student?: Student, legalGuardianName?: string) {
     this.checkPageBreak(50);
     this.y += 15;
-    
+
     const sigY = this.y + 15;
     const colW = this.contentWidth / 3;
 
@@ -264,35 +264,35 @@ class IncidentPDF extends BasePDFGenerator {
     // Responsável pela Escola (quem registrou/acompanhou)
     this.pdf.line(this.margin, sigY, this.margin + colW - 5, sigY);
     this.setFont('xs', 'normal', '#000000');
-    this.drawText('Responsável pela Escola', this.margin + (colW-5)/2, sigY + 4, { align: 'center' });
+    this.drawText('Responsável pela Escola', this.margin + (colW - 5) / 2, sigY + 4, { align: 'center' });
     if (this.responsibleName) {
       this.setFont('xs', 'bold', '#000000');
-      this.drawText(this.responsibleName, this.margin + (colW-5)/2, sigY + 8, { align: 'center' });
+      this.drawText(this.responsibleName, this.margin + (colW - 5) / 2, sigY + 8, { align: 'center' });
     }
 
     // Estudante
     this.pdf.line(this.margin + colW, sigY, this.margin + (colW * 2) - 5, sigY);
     this.setFont('xs', 'normal', '#000000');
-    this.drawText('Estudante', this.margin + colW + (colW-5)/2, sigY + 4, { align: 'center' });
+    this.drawText('Estudante', this.margin + colW + (colW - 5) / 2, sigY + 4, { align: 'center' });
     if (student) {
       this.setFont('xs', 'bold', '#000000');
-      this.drawText(student.name, this.margin + colW + (colW-5)/2, sigY + 8, { align: 'center' });
+      this.drawText(student.name, this.margin + colW + (colW - 5) / 2, sigY + 8, { align: 'center' });
     }
 
     // Responsável Legal
     this.pdf.line(this.margin + (colW * 2), sigY, this.pageWidth - this.margin, sigY);
     this.setFont('xs', 'normal', '#000000');
-    this.drawText('Responsável Legal', this.margin + (colW * 2) + (colW-5)/2, sigY + 4, { align: 'center' });
+    this.drawText('Responsável Legal', this.margin + (colW * 2) + (colW - 5) / 2, sigY + 4, { align: 'center' });
     if (legalGuardianName) {
       this.setFont('xs', 'bold', '#000000');
-      this.drawText(legalGuardianName, this.margin + (colW * 2) + (colW-5)/2, sigY + 8, { align: 'center' });
+      this.drawText(legalGuardianName, this.margin + (colW * 2) + (colW - 5) / 2, sigY + 8, { align: 'center' });
     }
 
     // Assinatura Digitalizada se houver (posicionada no responsável pela escola)
     if (this.config.signatureBase64) {
       try {
         this.pdf.addImage(this.config.signatureBase64, 'PNG', this.margin + 5, sigY - 12, 25, 10);
-      } catch (e) {}
+      } catch (e) { }
     }
   }
 }

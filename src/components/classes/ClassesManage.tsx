@@ -136,9 +136,9 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
 
   const getDirectorName = (cls: Class) => {
     if (cls.directorId) {
-      if (cls.directorId === profile?.id) return profile?.name || profile?.email || "Diretor (Eu)";
+      if (cls.directorId === profile?.id) return profile?.email || "Diretor (Eu)";
       const foundProfile = profiles.find(p => p.id === cls.directorId);
-      if (foundProfile) return foundProfile.name || foundProfile.email;
+      if (foundProfile) return foundProfile.email || foundProfile.name;
     }
     if (cls.directorEmail) return cls.directorEmail;
     return null;

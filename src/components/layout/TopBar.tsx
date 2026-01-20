@@ -52,11 +52,11 @@ export const TopBar = () => {
           <Button variant="ghost" className="gap-2 p-1">
             <Avatar className="h-8 w-8">
               <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                {profile ? getInitials(profile.name) : user?.email?.[0]?.toUpperCase() || 'U'}
+                {user?.email?.[0]?.toUpperCase() || 'U'}
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col items-start text-sm pr-2">
-              <span className="font-medium leading-none">{profile?.name || user?.email}</span>
+              <span className="font-medium leading-none">{user?.email}</span>
             </div>
           </Button>
         </DropdownMenuTrigger>

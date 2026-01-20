@@ -228,7 +228,7 @@ export const IncidentManagementDialog = ({
     const followUp: any = {
       type: followUpType,
       date: followUpDate,
-      responsavel: followUpResponsavel || profile?.name || user.email,
+      responsavel: followUpResponsavel || user.email,
       createdBy: user.id,
     };
 

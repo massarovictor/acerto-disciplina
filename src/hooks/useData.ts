@@ -897,7 +897,7 @@ export function useIncidents() {
     const payload = mapCommentToDb(
       {
         userId: user.id,
-        userName: profile?.name ?? user.email ?? "Usuário",
+        userName: user.email ?? "Usuário",
         text,
       },
       incidentId,
