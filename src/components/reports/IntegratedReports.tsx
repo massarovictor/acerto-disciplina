@@ -153,7 +153,11 @@ export const IntegratedReports = ({
 
   const classStudents = useMemo(
     () =>
-      selectedClass ? students.filter((s) => s.classId === selectedClass) : [],
+      selectedClass
+        ? students
+          .filter((s) => s.classId === selectedClass)
+          .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+        : [],
     [selectedClass, students],
   );
 
@@ -171,10 +175,10 @@ export const IntegratedReports = ({
     () =>
       selectedClass
         ? grades.filter(
-            (g) =>
-              g.classId === selectedClass &&
-              (g.schoolYear ?? 1) === selectedSchoolYear,
-          )
+          (g) =>
+            g.classId === selectedClass &&
+            (g.schoolYear ?? 1) === selectedSchoolYear,
+        )
         : [],
     [grades, selectedClass, selectedSchoolYear],
   );
@@ -183,10 +187,10 @@ export const IntegratedReports = ({
     () =>
       selectedClass
         ? incidents.filter(
-            (i) =>
-              i.classId === selectedClass &&
-              isDateInRange(i.date, schoolYearRange),
-          )
+          (i) =>
+            i.classId === selectedClass &&
+            isDateInRange(i.date, schoolYearRange),
+        )
         : [],
     [incidents, selectedClass, schoolYearRange],
   );
@@ -245,7 +249,7 @@ export const IntegratedReports = ({
   const classAverage =
     classGrades.length > 0
       ? classGrades.reduce((sum, grade) => sum + grade.grade, 0) /
-        classGrades.length
+      classGrades.length
       : 0;
 
   const selectedStudentData = selectedStudent
@@ -266,7 +270,7 @@ export const IntegratedReports = ({
       const average =
         gradesBySubject.length > 0
           ? gradesBySubject.reduce((sum, g) => sum + g.grade, 0) /
-            gradesBySubject.length
+          gradesBySubject.length
           : 0;
       return { subject, average };
     });
@@ -274,7 +278,7 @@ export const IntegratedReports = ({
     const overallAverage =
       subjectAverages.length > 0
         ? subjectAverages.reduce((sum, s) => sum + s.average, 0) /
-          subjectAverages.length
+        subjectAverages.length
         : 0;
 
     const subjectsBelowAverage = subjectAverages
@@ -293,7 +297,7 @@ export const IntegratedReports = ({
     const presenceRate =
       studentAttendance.length > 0
         ? ((studentAttendance.length - absences) / studentAttendance.length) *
-          100
+        100
         : 100;
 
     return {
@@ -326,10 +330,10 @@ export const IntegratedReports = ({
       const periodRange =
         selectedPeriod !== "anual"
           ? getQuarterRange(
-              effectiveStartYearDate,
-              selectedSchoolYear,
-              selectedPeriod,
-            )
+            effectiveStartYearDate,
+            selectedSchoolYear,
+            selectedPeriod,
+          )
           : schoolYearRange;
       const reportAttendance = classAttendance.filter((record) =>
         isDateInRange(record.date, periodRange),

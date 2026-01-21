@@ -87,7 +87,12 @@ export const AttendanceManager = () => {
     status: 'falta',
   });
 
-  const classStudents = useMemo(() => students.filter(s => s.classId === selectedClass), [students, selectedClass]);
+  const classStudents = useMemo(() =>
+    students
+      .filter(s => s.classId === selectedClass)
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
+    [students, selectedClass]
+  );
   const selectedClassData = classes.find(c => c.id === selectedClass);
 
   const schoolYearOptions: Array<{ value: 1 | 2 | 3; label: string }> = [

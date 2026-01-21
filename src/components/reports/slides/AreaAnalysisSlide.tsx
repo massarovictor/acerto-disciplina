@@ -68,14 +68,25 @@ export const AreaAnalysisSlide = ({
                 const subjectGrades = filteredGrades.filter((g) => g.subject === subject);
                 if (subjectGrades.length === 0) return null;
 
-                const values = subjectGrades.map(g => g.grade);
-                const stats = calculateSummaryStatistics(values);
+                // Calculate average per student for this subject
+                const studentIds = [...new Set(subjectGrades.map(g => g.studentId))];
+                const studentAverages = studentIds.map(studentId => {
+                    const studentSubjectGrades = subjectGrades.filter(g => g.studentId === studentId);
+                    return studentSubjectGrades.reduce((sum, g) => sum + g.grade, 0) / studentSubjectGrades.length;
+                });
+
+                // Count unique students approved/failed based on their average for this subject
+                const approvedCount = studentAverages.filter(avg => avg >= 6).length;
+                const failedCount = studentAverages.filter(avg => avg < 6).length;
+
+                // Overall subject average (average of all student averages)
+                const subjectAvg = studentAverages.reduce((sum, avg) => sum + avg, 0) / studentAverages.length;
 
                 return {
                     name: subject,
-                    value: parseFloat(stats.mean.toFixed(1)),
-                    approved: subjectGrades.filter(g => g.grade >= 6).length,
-                    failed: subjectGrades.filter(g => g.grade < 6).length
+                    value: parseFloat(subjectAvg.toFixed(1)),
+                    approved: approvedCount,
+                    failed: failedCount
                 };
             })
             .filter(Boolean)
@@ -97,14 +108,23 @@ export const AreaAnalysisSlide = ({
                 const subGrades = quarterGrades.filter(g => g.subject === subject);
                 if (subGrades.length === 0) return null;
 
-                const values = subGrades.map(g => g.grade);
-                const stats = calculateSummaryStatistics(values);
+                // Calculate average per student for this subject in this quarter
+                const studentIds = [...new Set(subGrades.map(g => g.studentId))];
+                const studentAverages = studentIds.map(studentId => {
+                    const studentSubjectGrades = subGrades.filter(g => g.studentId === studentId);
+                    return studentSubjectGrades.reduce((sum, g) => sum + g.grade, 0) / studentSubjectGrades.length;
+                });
+
+                // Count unique students approved/failed
+                const approvedCount = studentAverages.filter(avg => avg >= 6).length;
+                const failedCount = studentAverages.filter(avg => avg < 6).length;
+                const subjectAvg = studentAverages.reduce((sum, avg) => sum + avg, 0) / studentAverages.length;
 
                 return {
                     subject,
-                    avg: parseFloat(stats.mean.toFixed(1)),
-                    approved: subGrades.filter(v => v.grade >= 6).length,
-                    failed: subGrades.filter(v => v.grade < 6).length
+                    avg: parseFloat(subjectAvg.toFixed(1)),
+                    approved: approvedCount,
+                    failed: failedCount
                 };
             }).filter(Boolean) as { subject: string; avg: number; approved: number; failed: number }[];
 

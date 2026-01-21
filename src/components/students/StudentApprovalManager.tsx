@@ -36,7 +36,9 @@ export const StudentApprovalManager = () => {
     { studentId: string; studentName: string; missingSubjects: string[] }[]
   >([]);
 
-  const classStudents = students.filter((s) => s.classId === selectedClass);
+  const classStudents = students
+    .filter((s) => s.classId === selectedClass)
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   const selectedClassData = classes.find((c) => c.id === selectedClass);
   const handleSelectClass = (value: string) => {
     setSelectedClass(value);

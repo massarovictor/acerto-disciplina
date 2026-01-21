@@ -267,7 +267,7 @@ class IncidentPDF extends BasePDFGenerator {
     this.drawText('Responsável pela Escola', this.margin + (colW - 5) / 2, sigY + 4, { align: 'center' });
     if (this.responsibleName) {
       this.setFont('xs', 'bold', '#000000');
-      this.drawText(this.responsibleName, this.margin + (colW - 5) / 2, sigY + 8, { align: 'center' });
+      this.drawText(this.responsibleName, this.margin + (colW - 5) / 2, sigY + 8, { align: 'center', maxWidth: colW - 5 });
     }
 
     // Estudante
@@ -276,7 +276,7 @@ class IncidentPDF extends BasePDFGenerator {
     this.drawText('Estudante', this.margin + colW + (colW - 5) / 2, sigY + 4, { align: 'center' });
     if (student) {
       this.setFont('xs', 'bold', '#000000');
-      this.drawText(student.name, this.margin + colW + (colW - 5) / 2, sigY + 8, { align: 'center' });
+      this.drawText(student.name, this.margin + colW + (colW - 5) / 2, sigY + 8, { align: 'center', maxWidth: colW - 5 });
     }
 
     // Responsável Legal
@@ -285,7 +285,7 @@ class IncidentPDF extends BasePDFGenerator {
     this.drawText('Responsável Legal', this.margin + (colW * 2) + (colW - 5) / 2, sigY + 4, { align: 'center' });
     if (legalGuardianName) {
       this.setFont('xs', 'bold', '#000000');
-      this.drawText(legalGuardianName, this.margin + (colW * 2) + (colW - 5) / 2, sigY + 8, { align: 'center' });
+      this.drawText(legalGuardianName, this.margin + (colW * 2) + (colW - 5) / 2, sigY + 8, { align: 'center', maxWidth: colW - 5 });
     }
 
     // Assinatura Digitalizada se houver (posicionada no responsável pela escola)

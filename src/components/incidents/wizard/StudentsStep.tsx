@@ -15,7 +15,9 @@ export const StudentsStep = ({ formData, updateFormData }: StudentsStepProps) =>
   const { students } = useStudents();
   const [searchTerm, setSearchTerm] = useState('');
 
-  const classStudents = students.filter((s) => s.classId === formData.classId);
+  const classStudents = students
+    .filter((s) => s.classId === formData.classId)
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   const filteredStudents = classStudents.filter((s) =>
     s.name.toLowerCase().includes(searchTerm.toLowerCase())
   );

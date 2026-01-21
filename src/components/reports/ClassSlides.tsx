@@ -26,6 +26,12 @@ import { ClassOverviewSlide } from "./slides/ClassOverviewSlide";
 import { AreaAnalysisSlide } from "./slides/AreaAnalysisSlide";
 import { StudentMetricsSlide } from "./slides/StudentMetricsSlide";
 import { StudentGradesTableSlide } from "./slides/StudentGradesTableSlide";
+import { SchoolCoverSlide } from "./slides/SchoolCoverSlide";
+import { SchoolOverviewSlide } from "./slides/SchoolOverviewSlide";
+import { SchoolAreasSlide } from "./slides/SchoolAreasSlide";
+import { SchoolSituationSlide } from "./slides/SchoolSituationSlide";
+import { SchoolClassRankingSlide } from "./slides/SchoolClassRankingSlide";
+import { SchoolIncidentsSlide } from "./slides/SchoolIncidentsSlide";
 import { useToast } from "@/hooks/use-toast";
 import {
   useProfessionalSubjects,
@@ -34,6 +40,7 @@ import {
 import { QUARTERS, SUBJECT_AREAS } from "@/lib/subjects";
 import { calculateCurrentYearFromCalendar } from "@/lib/classYearCalculator";
 import { calculateFinalGrade } from "@/lib/approvalCalculator";
+import { getSchoolConfig, getDefaultConfig } from "@/lib/schoolConfig";
 
 // Tipos para classificação por situação
 type SituationType = "critico" | "atencao" | "aprovado" | "excelencia";
@@ -58,7 +65,7 @@ export const ClassSlides = ({
   const [selectedPeriod, setSelectedPeriod] = useState("all");
   const [selectedSchoolYear, setSelectedSchoolYear] = useState<1 | 2 | 3>(1);
   const [currentSlide, setCurrentSlide] = useState(1);
-  const [viewMode, setViewMode] = useState<"class" | "individual" | "situation">("class");
+  const [viewMode, setViewMode] = useState<"class" | "individual" | "situation" | "school">("class");
   const [selectedSituation, setSelectedSituation] = useState<SituationType | "">("");
   const { getProfessionalSubjects } = useProfessionalSubjects();
   const { templates } = useProfessionalSubjectTemplates();
@@ -68,6 +75,8 @@ export const ClassSlides = ({
   const [slideScale, setSlideScale] = useState(1);
   const [previewZoom, setPreviewZoom] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
+  const [schoolName, setSchoolName] = useState("Instituição de Ensino");
+  const [schoolPeriod, setSchoolPeriod] = useState("all");
   const [exportingIndex, setExportingIndex] = useState<number | null>(null);
   const SLIDE_WIDTH = 1920;
   const SLIDE_HEIGHT = 1080;
@@ -113,6 +122,19 @@ export const ClassSlides = ({
       setSelectedSchoolYear(normalizedYear);
     }
   }, [selectedClass, classes]);
+
+  // Load school name from config
+  useEffect(() => {
+    const loadSchoolName = async () => {
+      try {
+        const config = await getSchoolConfig();
+        setSchoolName(config.schoolName || "Instituição de Ensino");
+      } catch (e) {
+        console.error("Erro ao carregar nome da escola:", e);
+      }
+    };
+    loadSchoolName();
+  }, []);
 
   const parseLocalDate = (value: string) => new Date(`${value}T00:00:00`);
   const addMonths = (date: Date, months: number) => {
@@ -171,7 +193,9 @@ export const ClassSlides = ({
     return Array.from(unique);
   }, [templateSubjects, manualSubjects]);
   const classStudents = selectedClass
-    ? students.filter((s) => s.classId === selectedClass)
+    ? students
+      .filter((s) => s.classId === selectedClass)
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
     : [];
   const fallbackStartYearDate = classData?.startCalendarYear
     ? `${classData.startCalendarYear}-02-01`
@@ -487,11 +511,121 @@ export const ClassSlides = ({
     situationOptions,
   ]);
 
+  // All professional subjects across all classes for school view
+  const allProfessionalSubjects = useMemo(() => {
+    const unique = new Set<string>();
+    classes.forEach(cls => {
+      const template = templates.find(t => t.id === cls.templateId);
+      template?.subjectsByYear.forEach(y => {
+        y.subjects.forEach(s => s?.trim() && unique.add(s.trim()));
+      });
+    });
+    return Array.from(unique);
+  }, [classes, templates]);
+
+  // School-wide slides
+  const schoolSlides = useMemo(() => {
+    if (viewMode !== "school") return [];
+
+    const period = schoolPeriod;
+    const filteredGrades = period === 'all' ? grades : grades.filter(g => g.quarter === period);
+
+    if (students.length === 0 && classes.length === 0) return [];
+
+    // Determine which areas have data
+    const schoolAreasList: string[] = [];
+    if (filteredGrades.some(g => SUBJECT_AREAS[0].subjects.includes(g.subject))) {
+      schoolAreasList.push("Linguagens");
+    }
+    if (filteredGrades.some(g => SUBJECT_AREAS[1].subjects.includes(g.subject))) {
+      schoolAreasList.push("Ciências Humanas");
+    }
+    if (filteredGrades.some(g => SUBJECT_AREAS[2].subjects.includes(g.subject))) {
+      schoolAreasList.push("Ciências da Natureza");
+    }
+    if (filteredGrades.some(g => SUBJECT_AREAS[3].subjects.includes(g.subject))) {
+      schoolAreasList.push("Matemática");
+    }
+    if (allProfessionalSubjects.length > 0 && filteredGrades.some(g => allProfessionalSubjects.includes(g.subject))) {
+      schoolAreasList.push("Formação Técnica");
+    }
+
+    const slides: React.ReactNode[] = [
+      // 1. Cover
+      <SchoolCoverSlide
+        key="school-cover"
+        schoolName={schoolName}
+        period={period}
+        totalClasses={classes.length}
+        totalStudents={students.length}
+      />,
+      // 2. Overview with KPIs
+      <SchoolOverviewSlide
+        key="school-overview"
+        schoolName={schoolName}
+        classes={classes}
+        students={students}
+        grades={filteredGrades}
+        incidents={incidents}
+        period={period}
+      />,
+      // 3. Class Ranking
+      <SchoolClassRankingSlide
+        key="school-class-ranking"
+        schoolName={schoolName}
+        classes={classes}
+        students={students}
+        grades={filteredGrades}
+        period={period}
+      />,
+    ];
+
+    // 4-8. Individual Area Slides (like class view)
+    schoolAreasList.forEach((area) => {
+      slides.push(
+        <AreaAnalysisSlide
+          key={`school-area-${area}`}
+          areaName={area}
+          grades={filteredGrades}
+          period={period}
+          professionalSubjects={allProfessionalSubjects}
+        />
+      );
+    });
+
+    // 9. Incidents Slide
+    slides.push(
+      <SchoolIncidentsSlide
+        key="school-incidents"
+        schoolName={schoolName}
+        classes={classes}
+        incidents={incidents}
+        period={period}
+      />
+    );
+
+    // 10. Situation Distribution
+    slides.push(
+      <SchoolSituationSlide
+        key="school-situation"
+        schoolName={schoolName}
+        classes={classes}
+        students={students}
+        grades={filteredGrades}
+        period={period}
+      />
+    );
+
+    return slides;
+  }, [viewMode, schoolPeriod, schoolName, classes, students, grades, incidents, allProfessionalSubjects]);
+
   const activeSlides = viewMode === "class"
     ? classSlides
     : viewMode === "individual"
       ? individualSlides
-      : situationSlides;
+      : viewMode === "situation"
+        ? situationSlides
+        : schoolSlides;
   const maxSlides = Math.max(1, activeSlides.length);
   const effectiveScale = slideScale * previewZoom;
 
@@ -659,16 +793,20 @@ export const ClassSlides = ({
   };
 
   const renderSlide = () => {
+    if (viewMode === "school") {
+      return activeSlides[currentSlide - 1] ?? null;
+    }
     if (!selectedClass) return null;
     return activeSlides[currentSlide - 1] ?? null;
   };
 
   const shouldShowSlides =
-    selectedClass &&
-    activeSlides.length > 0 &&
-    (viewMode === "class" ||
-      (viewMode === "individual" && selectedStudent) ||
-      (viewMode === "situation" && selectedSituation));
+    (viewMode === "school" && activeSlides.length > 0) ||
+    (selectedClass &&
+      activeSlides.length > 0 &&
+      (viewMode === "class" ||
+        (viewMode === "individual" && selectedStudent) ||
+        (viewMode === "situation" && selectedSituation)));
 
   return (
     <div className="space-y-6">
@@ -680,17 +818,18 @@ export const ClassSlides = ({
           <Tabs
             value={viewMode}
             onValueChange={(v) => {
-              setViewMode(v as "class" | "individual" | "situation");
+              setViewMode(v as "class" | "individual" | "situation" | "school");
               setCurrentSlide(1);
               if (v === "situation") {
                 setSelectedSituation("");
               }
             }}
           >
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="class">Turma</TabsTrigger>
               <TabsTrigger value="individual">Individuais</TabsTrigger>
               <TabsTrigger value="situation">Situação</TabsTrigger>
+              <TabsTrigger value="school">Escola</TabsTrigger>
             </TabsList>
 
             <TabsContent value="class" className="space-y-4">
@@ -981,6 +1120,40 @@ export const ClassSlides = ({
                   })}
                 </div>
               )}
+            </TabsContent>
+
+            <TabsContent value="school" className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Período</Label>
+                  <Select
+                    value={schoolPeriod}
+                    onValueChange={(v) => {
+                      setSchoolPeriod(v);
+                      setCurrentSlide(1);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Ano Letivo Completo</SelectItem>
+                      {QUARTERS.map((quarter) => (
+                        <SelectItem key={quarter} value={quarter}>
+                          {quarter}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-end">
+                  <div className="p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground w-full">
+                    <p className="font-medium text-foreground">{schoolName}</p>
+                    <p>{classes.length} turmas • {students.length} alunos matriculados</p>
+                  </div>
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
 

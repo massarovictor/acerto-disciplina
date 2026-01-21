@@ -65,7 +65,12 @@ export const GradesManager = () => {
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [lastInitialized, setLastInitialized] = useState<{ class: string; quarter: string; year: number; gradesKey: string } | null>(null);
 
-  const classStudents = useMemo(() => students.filter(s => s.classId === selectedClass), [students, selectedClass]);
+  const classStudents = useMemo(() =>
+    students
+      .filter(s => s.classId === selectedClass)
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
+    [students, selectedClass]
+  );
   const selectedClassData = classes.find(c => c.id === selectedClass);
 
   useEffect(() => {
