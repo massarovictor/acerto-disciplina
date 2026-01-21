@@ -1,4 +1,4 @@
-import { Home, School, Users, BookOpen, BarChart3, GraduationCap, AlertTriangle, LineChart, Shield } from 'lucide-react';
+import { Home, School, Users, BookOpen, BarChart3, GraduationCap, AlertTriangle, LineChart, Shield, History } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Sidebar,
@@ -21,6 +21,7 @@ const menuItems = [
   { icon: School, label: 'Turmas', path: '/turmas' },
   { icon: Users, label: 'Alunos', path: '/alunos' },
   { icon: BookOpen, label: 'Notas', path: '/notas-frequencia' },
+  { icon: History, label: 'Trajetória', path: '/trajetoria' },
   { icon: BarChart3, label: 'Relatórios', path: '/relatorios' },
 ];
 

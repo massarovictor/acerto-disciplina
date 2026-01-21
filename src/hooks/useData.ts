@@ -12,6 +12,8 @@ import {
   ProfessionalSubjectTemplate,
   Student,
   User,
+  HistoricalGrade,
+  ExternalAssessment,
 } from "@/types";
 import {
   mapAttendanceFromDb,
@@ -1202,4 +1204,220 @@ export function useArchivedClasses() {
   const { classes } = useClasses();
   const archivedClasses = classes.filter((c) => c.archived === true);
   return { archivedClasses };
+}
+
+// ========================
+// Historical Grades Hook (6º-9º ano Fundamental)
+// ========================
+
+const mapHistoricalGradeFromDb = (row: any): HistoricalGrade => ({
+  id: row.id,
+  studentId: row.student_id,
+  schoolLevel: row.school_level,
+  gradeYear: row.grade_year,
+  subject: row.subject,
+  quarter: row.quarter,
+  grade: row.grade,
+  schoolName: row.school_name,
+  calendarYear: row.calendar_year,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+const mapHistoricalGradeToDb = (grade: Omit<HistoricalGrade, 'id' | 'createdAt' | 'updatedAt'>) => ({
+  student_id: grade.studentId,
+  school_level: grade.schoolLevel,
+  grade_year: grade.gradeYear,
+  subject: grade.subject,
+  quarter: grade.quarter,
+  grade: grade.grade,
+  school_name: grade.schoolName,
+  calendar_year: grade.calendarYear,
+});
+
+export function useHistoricalGrades() {
+  const { historicalGrades, setHistoricalGrades, addHistoricalGrade: addHistoricalGradeToStore, deleteHistoricalGrade: deleteHistoricalGradeFromStore } = useDataStore();
+  const [loading, setLoading] = useState(true);
+
+  const fetchHistoricalGrades = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("historical_grades")
+      .select("*")
+      .order("calendar_year", { ascending: false });
+
+    if (error) {
+      if (!error.message.includes("does not exist")) {
+        logError("historical_grades.select", error);
+      }
+      setHistoricalGrades([]);
+    } else {
+      setHistoricalGrades((data || []).map(mapHistoricalGradeFromDb));
+    }
+    setLoading(false);
+  }, [setHistoricalGrades]);
+
+  useEffect(() => {
+    fetchHistoricalGrades();
+  }, [fetchHistoricalGrades]);
+
+  const addHistoricalGrade = async (
+    grade: Omit<HistoricalGrade, 'id' | 'createdAt' | 'updatedAt'>
+  ) => {
+    const { data, error } = await supabase
+      .from("historical_grades")
+      .upsert(mapHistoricalGradeToDb(grade), {
+        onConflict: "student_id,school_level,grade_year,subject,quarter,calendar_year",
+      })
+      .select()
+      .single();
+
+    if (error) {
+      logError("historical_grades.upsert", error);
+      throw error;
+    }
+
+    const newGrade = mapHistoricalGradeFromDb(data);
+    addHistoricalGradeToStore(newGrade);
+    return newGrade;
+  };
+
+  const deleteHistoricalGrade = async (id: string) => {
+    const { error } = await supabase
+      .from("historical_grades")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      logError("historical_grades.delete", error);
+      throw error;
+    }
+
+    deleteHistoricalGradeFromStore(id);
+  };
+
+  const getStudentHistoricalGrades = useCallback(
+    (studentId: string) => historicalGrades.filter((g) => g.studentId === studentId),
+    [historicalGrades]
+  );
+
+  return {
+    historicalGrades,
+    loading,
+    refreshHistoricalGrades: fetchHistoricalGrades,
+    addHistoricalGrade,
+    deleteHistoricalGrade,
+    getStudentHistoricalGrades,
+  };
+}
+
+// ========================
+// External Assessments Hook (SAEB, SIGE, Diagnósticas)
+// ========================
+
+const mapExternalAssessmentFromDb = (row: any): ExternalAssessment => ({
+  id: row.id,
+  studentId: row.student_id,
+  assessmentType: row.assessment_type,
+  assessmentName: row.assessment_name,
+  subject: row.subject,
+  score: row.score,
+  maxScore: row.max_score,
+  proficiencyLevel: row.proficiency_level,
+  appliedDate: row.applied_date,
+  schoolLevel: row.school_level,
+  gradeYear: row.grade_year,
+  quarter: row.quarter,
+  notes: row.notes,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+const mapExternalAssessmentToDb = (assessment: Omit<ExternalAssessment, 'id' | 'createdAt' | 'updatedAt'>) => ({
+  student_id: assessment.studentId,
+  assessment_type: assessment.assessmentType,
+  assessment_name: assessment.assessmentName,
+  subject: assessment.subject,
+  score: assessment.score,
+  max_score: assessment.maxScore,
+  proficiency_level: assessment.proficiencyLevel,
+  applied_date: assessment.appliedDate,
+  school_level: assessment.schoolLevel,
+  grade_year: assessment.gradeYear,
+  quarter: assessment.quarter,
+  notes: assessment.notes,
+});
+
+export function useExternalAssessments() {
+  const { externalAssessments, setExternalAssessments, addExternalAssessment: addExternalAssessmentToStore, deleteExternalAssessment: deleteExternalAssessmentFromStore } = useDataStore();
+  const [loading, setLoading] = useState(true);
+
+  const fetchExternalAssessments = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("external_assessments")
+      .select("*")
+      .order("applied_date", { ascending: false });
+
+    if (error) {
+      if (!error.message.includes("does not exist")) {
+        logError("external_assessments.select", error);
+      }
+      setExternalAssessments([]);
+    } else {
+      setExternalAssessments((data || []).map(mapExternalAssessmentFromDb));
+    }
+    setLoading(false);
+  }, [setExternalAssessments]);
+
+  useEffect(() => {
+    fetchExternalAssessments();
+  }, [fetchExternalAssessments]);
+
+  const addExternalAssessment = async (
+    assessment: Omit<ExternalAssessment, 'id' | 'createdAt' | 'updatedAt'>
+  ) => {
+    const { data, error } = await supabase
+      .from("external_assessments")
+      .insert(mapExternalAssessmentToDb(assessment))
+      .select()
+      .single();
+
+    if (error) {
+      logError("external_assessments.insert", error);
+      throw error;
+    }
+
+    const newAssessment = mapExternalAssessmentFromDb(data);
+    addExternalAssessmentToStore(newAssessment);
+    return newAssessment;
+  };
+
+  const deleteExternalAssessment = async (id: string) => {
+    const { error } = await supabase
+      .from("external_assessments")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      logError("external_assessments.delete", error);
+      throw error;
+    }
+
+    deleteExternalAssessmentFromStore(id);
+  };
+
+  const getStudentExternalAssessments = useCallback(
+    (studentId: string) => externalAssessments.filter((a) => a.studentId === studentId),
+    [externalAssessments]
+  );
+
+  return {
+    externalAssessments,
+    loading,
+    refreshExternalAssessments: fetchExternalAssessments,
+    addExternalAssessment,
+    deleteExternalAssessment,
+    getStudentExternalAssessments,
+  };
 }

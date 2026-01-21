@@ -98,6 +98,14 @@ const Dashboard = () => {
       iconBg: 'bg-orange-500/10',
       iconColor: 'text-orange-500',
     },
+    {
+      title: 'Trajetória Acadêmica',
+      description: 'Acompanhamento longitudinal do aluno',
+      icon: GraduationCap,
+      path: '/trajetoria',
+      iconBg: 'bg-cyan-500/10',
+      iconColor: 'text-cyan-500',
+    },
   ];
 
   return (

@@ -152,3 +152,52 @@ export interface ProfessionalSubjectTemplate {
   createdAt: string;
   updatedAt: string;
 }
+
+// Tipos para Trajetória Acadêmica (Avaliação Longitudinal)
+
+export type SchoolLevel = 'fundamental' | 'medio';
+
+export interface HistoricalGrade {
+  id: string;
+  studentId: string;
+  schoolLevel: SchoolLevel;
+  gradeYear: number; // 6, 7, 8, 9 para fundamental; 1, 2, 3 para médio
+  subject: string;
+  quarter: string;
+  grade: number;
+  schoolName?: string; // Escola onde cursou (se transferido)
+  calendarYear: number; // Ano calendário (ex: 2022)
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type ExternalAssessmentType = 'SAEB' | 'SIGE' | 'Diagnóstica' | 'Simulado' | 'Outro';
+
+// Posição temporal na timeline
+export interface TemporalPosition {
+  level: SchoolLevel;
+  year?: number; // 6-9 para fundamental, 1-3 para médio
+  afterQuarter?: string; // Para posicionar após um bimestre específico
+  afterYear?: number; // Para posicionar após um ano do fundamental
+}
+
+export interface ExternalAssessment {
+  id: string;
+  studentId: string;
+  assessmentType: ExternalAssessmentType;
+  assessmentName: string; // Nome específico da avaliação
+  subject?: string; // Disciplina (opcional, algumas são gerais)
+  score: number;
+  maxScore: number;
+  proficiencyLevel?: string; // Nível de proficiência (ex: Básico, Proficiente)
+  appliedDate: string;
+
+  // Posicionamento temporal explícito
+  schoolLevel: SchoolLevel;
+  gradeYear: number;
+  quarter?: string;
+
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}

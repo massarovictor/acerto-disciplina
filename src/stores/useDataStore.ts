@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Incident, Student, Class, Grade, AttendanceRecord } from '@/types';
+import { Incident, Student, Class, Grade, AttendanceRecord, HistoricalGrade, ExternalAssessment } from '@/types';
 
 /**
  * Data Store - Estado global de dados compartilhado entre todos os componentes
@@ -15,6 +15,8 @@ interface DataState {
     classes: Class[];
     grades: Grade[];
     attendance: AttendanceRecord[];
+    historicalGrades: HistoricalGrade[];
+    externalAssessments: ExternalAssessment[];
 
     // Actions - Incidents
     setIncidents: (incidents: Incident[]) => void;
@@ -44,6 +46,16 @@ interface DataState {
     setAttendance: (attendance: AttendanceRecord[]) => void;
     addAttendance: (record: AttendanceRecord) => void;
     deleteAttendance: (id: string) => void;
+
+    // Actions - Historical Grades
+    setHistoricalGrades: (grades: HistoricalGrade[]) => void;
+    addHistoricalGrade: (grade: HistoricalGrade) => void;
+    deleteHistoricalGrade: (id: string) => void;
+
+    // Actions - External Assessments
+    setExternalAssessments: (assessments: ExternalAssessment[]) => void;
+    addExternalAssessment: (assessment: ExternalAssessment) => void;
+    deleteExternalAssessment: (id: string) => void;
 }
 
 export const useDataStore = create<DataState>()((set) => ({
@@ -53,6 +65,8 @@ export const useDataStore = create<DataState>()((set) => ({
     classes: [],
     grades: [],
     attendance: [],
+    historicalGrades: [],
+    externalAssessments: [],
 
     // Actions - Incidents
     setIncidents: (incidents) => set({ incidents }),
@@ -129,5 +143,39 @@ export const useDataStore = create<DataState>()((set) => ({
     deleteAttendance: (id) =>
         set((state) => ({
             attendance: state.attendance.filter((a) => a.id !== id),
+        })),
+
+    // Actions - Historical Grades
+    setHistoricalGrades: (historicalGrades) => set({ historicalGrades }),
+    addHistoricalGrade: (grade) =>
+        set((state) => {
+            const existing = state.historicalGrades.findIndex((g) => g.id === grade.id);
+            if (existing >= 0) {
+                const updated = [...state.historicalGrades];
+                updated[existing] = grade;
+                return { historicalGrades: updated };
+            }
+            return { historicalGrades: [grade, ...state.historicalGrades] };
+        }),
+    deleteHistoricalGrade: (id) =>
+        set((state) => ({
+            historicalGrades: state.historicalGrades.filter((g) => g.id !== id),
+        })),
+
+    // Actions - External Assessments
+    setExternalAssessments: (externalAssessments) => set({ externalAssessments }),
+    addExternalAssessment: (assessment) =>
+        set((state) => {
+            const existing = state.externalAssessments.findIndex((a) => a.id === assessment.id);
+            if (existing >= 0) {
+                const updated = [...state.externalAssessments];
+                updated[existing] = assessment;
+                return { externalAssessments: updated };
+            }
+            return { externalAssessments: [assessment, ...state.externalAssessments] };
+        }),
+    deleteExternalAssessment: (id) =>
+        set((state) => ({
+            externalAssessments: state.externalAssessments.filter((a) => a.id !== id),
         })),
 }));
