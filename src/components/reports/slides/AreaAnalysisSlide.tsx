@@ -9,7 +9,8 @@ import { SlideLayout } from './SlideLayout';
 import { ReportBarChart } from '@/lib/reportCharts';
 import { REPORT_COLORS } from '@/lib/reportDesignSystem';
 import { BookOpen, Brain, FlaskConical, Calculator, Briefcase } from 'lucide-react';
-import { SUBJECT_AREAS } from '@/lib/subjects';
+import { SUBJECT_AREAS, QUARTERS } from '@/lib/subjects';
+import { calculateSummaryStatistics } from '@/lib/advancedCalculations';
 
 // Configuração das áreas com ícones e cores
 const AREA_CONFIG: Record<string, { icon: any; color: string; subjects: string[] }> = {
@@ -67,25 +68,61 @@ export const AreaAnalysisSlide = ({
                 const subjectGrades = filteredGrades.filter((g) => g.subject === subject);
                 if (subjectGrades.length === 0) return null;
 
-                const approvedCount = subjectGrades.filter(g => g.grade >= 6).length;
-                const failedCount = subjectGrades.filter(g => g.grade < 6).length;
-                const avg = subjectGrades.reduce((sum, g) => sum + g.grade, 0) / subjectGrades.length;
+                const values = subjectGrades.map(g => g.grade);
+                const stats = calculateSummaryStatistics(values);
 
                 return {
                     name: subject,
-                    value: parseFloat(avg.toFixed(1)),
-                    approved: approvedCount,
-                    failed: failedCount
+                    value: parseFloat(stats.mean.toFixed(1)),
+                    approved: subjectGrades.filter(g => g.grade >= 6).length,
+                    failed: subjectGrades.filter(g => g.grade < 6).length
                 };
             })
             .filter(Boolean)
             .sort((a, b) => (a?.value || 0) - (b?.value || 0)) as { name: string; value: number; approved: number; failed: number }[];
     }, [grades, period, subjects]);
 
+    // Group stats by quarter for the "All Year" view list
+    const quarterlyStats = useMemo(() => {
+        if (period !== 'all') return null;
+
+        // Use the same subject order as the chart for consistency
+        const sortedSubjectNames = chartData.map(d => d.name);
+
+        return QUARTERS.map(q => {
+            const quarterGrades = grades.filter(g => g.quarter === q && subjects.includes(g.subject));
+            if (quarterGrades.length === 0) return null;
+
+            const stats = sortedSubjectNames.map(subject => {
+                const subGrades = quarterGrades.filter(g => g.subject === subject);
+                if (subGrades.length === 0) return null;
+
+                const values = subGrades.map(g => g.grade);
+                const stats = calculateSummaryStatistics(values);
+
+                return {
+                    subject,
+                    avg: parseFloat(stats.mean.toFixed(1)),
+                    approved: subGrades.filter(v => v.grade >= 6).length,
+                    failed: subGrades.filter(v => v.grade < 6).length
+                };
+            }).filter(Boolean) as { subject: string; avg: number; approved: number; failed: number }[];
+
+            return { quarter: q, stats };
+        }).filter(Boolean);
+    }, [grades, period, subjects, chartData]);
+
     const areaAverage = useMemo(() => {
-        if (chartData.length === 0) return null;
-        return chartData.reduce((sum, d) => sum + d.value, 0) / chartData.length;
-    }, [chartData]);
+        const filteredGrades = period === 'all' ? grades : grades.filter((g) => g.quarter === period);
+        const areaRawGrades = filteredGrades
+            .filter(g => subjects.includes(g.subject))
+            .map(g => g.grade);
+
+        if (areaRawGrades.length === 0) return null;
+
+        const stats = calculateSummaryStatistics(areaRawGrades);
+        return stats.mean;
+    }, [grades, period, subjects]);
 
     const hasData = chartData.length > 0;
 
@@ -99,7 +136,7 @@ export const AreaAnalysisSlide = ({
                 {/* Left: Chart */}
                 <div
                     style={{
-                        flex: 1.5,
+                        flex: 1,
                         background: REPORT_COLORS.background.card,
                         borderRadius: 12,
                         padding: 32,
@@ -152,7 +189,7 @@ export const AreaAnalysisSlide = ({
                 </div>
 
                 {/* Right: Detailed Table/List */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
                     {/* Area Summary Card */}
                     <div
                         style={{
@@ -164,8 +201,8 @@ export const AreaAnalysisSlide = ({
                             boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                         }}
                     >
-                        <p style={{ margin: 0, fontSize: 14, fontWeight: 600, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '1px' }}>Média Geral da Área</p>
-                        <p style={{ margin: '4px 0 0', fontSize: 64, fontWeight: 900 }}>
+                        <p style={{ margin: 0, fontSize: 12, fontWeight: 600, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '1px' }}>Média Geral da Área</p>
+                        <p style={{ margin: '2px 0 0', fontSize: 48, fontWeight: 900 }}>
                             {areaAverage === null ? '--' : areaAverage.toFixed(1)}
                         </p>
                     </div>
@@ -178,7 +215,8 @@ export const AreaAnalysisSlide = ({
                         border: `1px solid ${REPORT_COLORS.border}`,
                         overflow: 'hidden',
                         display: 'flex',
-                        flexDirection: 'column'
+                        flexDirection: 'column',
+                        minHeight: 0
                     }}>
                         <div style={{
                             padding: '16px 20px',
@@ -197,29 +235,71 @@ export const AreaAnalysisSlide = ({
                             <span style={{ textAlign: 'right' }}>Média</span>
                         </div>
 
-                        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
-                            {chartData.map((item, idx) => (
-                                <div key={idx} style={{
-                                    padding: '16px 20px',
-                                    display: 'grid',
-                                    gridTemplateColumns: '1.5fr 1fr 1fr 0.8fr',
-                                    gap: 12,
-                                    alignItems: 'center',
-                                    borderBottom: idx === chartData.length - 1 ? 'none' : `1px solid ${REPORT_COLORS.border}50`,
-                                    background: idx % 2 === 0 ? 'transparent' : `${REPORT_COLORS.background.surface}50`
-                                }}>
-                                    <span style={{ fontSize: 18, fontWeight: 700, color: REPORT_COLORS.text.primary }}>{item.name}</span>
-                                    <span style={{ textAlign: 'center', fontSize: 20, fontWeight: 600, color: REPORT_COLORS.success }}>
-                                        {item.approved}
-                                    </span>
-                                    <span style={{ textAlign: 'center', fontSize: 20, fontWeight: 600, color: item.failed > 0 ? REPORT_COLORS.danger : REPORT_COLORS.text.tertiary }}>
-                                        {item.failed}
-                                    </span>
-                                    <span style={{ textAlign: 'right', fontSize: 22, fontWeight: 800, color: item.value >= 6 ? REPORT_COLORS.success : REPORT_COLORS.danger }}>
-                                        {item.value.toFixed(1)}
-                                    </span>
-                                </div>
-                            ))}
+                        <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+                            {period === 'all' && quarterlyStats ? (
+                                quarterlyStats.map((qGroup, qIdx) => (
+                                    <div key={qIdx}>
+                                        <div style={{
+                                            padding: '8px 20px',
+                                            background: `${config.color}10`,
+                                            fontSize: 12,
+                                            fontWeight: 800,
+                                            color: config.color,
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '0.5px',
+                                            borderTop: qIdx > 0 ? `1px solid ${REPORT_COLORS.border}50` : 'none',
+                                            borderBottom: `1px solid ${REPORT_COLORS.border}30`,
+                                        }}>
+                                            {qGroup.quarter}
+                                        </div>
+                                        {qGroup.stats.map((item, idx) => (
+                                            <div key={idx} style={{
+                                                padding: '12px 20px',
+                                                display: 'grid',
+                                                gridTemplateColumns: '1.5fr 1fr 1fr 0.8fr',
+                                                gap: 12,
+                                                alignItems: 'center',
+                                                borderBottom: idx === qGroup.stats.length - 1 && qIdx === quarterlyStats.length - 1 ? 'none' : `1px solid ${REPORT_COLORS.border}50`,
+                                                background: idx % 2 === 0 ? 'transparent' : `${REPORT_COLORS.background.surface}30`
+                                            }}>
+                                                <span style={{ fontSize: 14, fontWeight: 700, color: REPORT_COLORS.text.primary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.subject}</span>
+                                                <span style={{ textAlign: 'center', fontSize: 16, fontWeight: 600, color: REPORT_COLORS.success }}>
+                                                    {item.approved}
+                                                </span>
+                                                <span style={{ textAlign: 'center', fontSize: 16, fontWeight: 600, color: item.failed > 0 ? REPORT_COLORS.danger : REPORT_COLORS.text.tertiary }}>
+                                                    {item.failed}
+                                                </span>
+                                                <span style={{ textAlign: 'right', fontSize: 18, fontWeight: 800, color: item.avg >= 6 ? REPORT_COLORS.success : REPORT_COLORS.danger }}>
+                                                    {item.avg.toFixed(1)}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ))
+                            ) : (
+                                chartData.map((item, idx) => (
+                                    <div key={idx} style={{
+                                        padding: '16px 20px',
+                                        display: 'grid',
+                                        gridTemplateColumns: '1.5fr 1fr 1fr 0.8fr',
+                                        gap: 12,
+                                        alignItems: 'center',
+                                        borderBottom: idx === chartData.length - 1 ? 'none' : `1px solid ${REPORT_COLORS.border}50`,
+                                        background: idx % 2 === 0 ? 'transparent' : `${REPORT_COLORS.background.surface}50`
+                                    }}>
+                                        <span style={{ fontSize: 18, fontWeight: 700, color: REPORT_COLORS.text.primary }}>{item.name}</span>
+                                        <span style={{ textAlign: 'center', fontSize: 20, fontWeight: 600, color: REPORT_COLORS.success }}>
+                                            {item.approved}
+                                        </span>
+                                        <span style={{ textAlign: 'center', fontSize: 20, fontWeight: 600, color: item.failed > 0 ? REPORT_COLORS.danger : REPORT_COLORS.text.tertiary }}>
+                                            {item.failed}
+                                        </span>
+                                        <span style={{ textAlign: 'right', fontSize: 22, fontWeight: 800, color: item.value >= 6 ? REPORT_COLORS.success : REPORT_COLORS.danger }}>
+                                            {item.value.toFixed(1)}
+                                        </span>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
 

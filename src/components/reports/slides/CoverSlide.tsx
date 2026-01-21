@@ -11,9 +11,11 @@ import { GraduationCap } from 'lucide-react';
 interface CoverSlideProps {
   classData: Class;
   period: string;
+  customTitle?: string;
+  customSubtitle?: string;
 }
 
-export const CoverSlide = ({ classData, period }: CoverSlideProps) => {
+export const CoverSlide = ({ classData, period, customTitle, customSubtitle }: CoverSlideProps) => {
   return (
     <SlideLayout variant="cover">
       {/* Icon */}
@@ -32,10 +34,10 @@ export const CoverSlide = ({ classData, period }: CoverSlideProps) => {
         <GraduationCap size={64} color={REPORT_COLORS.text.inverted} />
       </div>
 
-      {/* Class Name */}
+      {/* Class Name or Custom Title */}
       <h1
         style={{
-          fontSize: 84,
+          fontSize: customTitle ? 64 : 84,
           fontWeight: 800,
           margin: 0,
           letterSpacing: '-0.02em',
@@ -43,20 +45,20 @@ export const CoverSlide = ({ classData, period }: CoverSlideProps) => {
           textAlign: 'center',
         }}
       >
-        {classData.name}
+        {customTitle || classData.name}
       </h1>
 
-      {/* Course & Series */}
+      {/* Course & Series or Custom Subtitle */}
       <p
         style={{
-          fontSize: 32,
+          fontSize: customSubtitle ? 28 : 32,
           margin: '24px 0 0',
           opacity: 0.9,
           fontWeight: 500,
           textAlign: 'center',
         }}
       >
-        {classData.course} • {classData.series}
+        {customSubtitle || `${classData.course} • ${classData.series}`}
       </p>
 
       {/* Divider */}

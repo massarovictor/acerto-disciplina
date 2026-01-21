@@ -33,6 +33,10 @@ import {
 } from "@/hooks/useData";
 import { QUARTERS, SUBJECT_AREAS } from "@/lib/subjects";
 import { calculateCurrentYearFromCalendar } from "@/lib/classYearCalculator";
+import { calculateFinalGrade } from "@/lib/approvalCalculator";
+
+// Tipos para classificação por situação
+type SituationType = "critico" | "atencao" | "aprovado" | "excelencia";
 
 interface ClassSlidesProps {
   classes: Class[];
@@ -54,7 +58,8 @@ export const ClassSlides = ({
   const [selectedPeriod, setSelectedPeriod] = useState("all");
   const [selectedSchoolYear, setSelectedSchoolYear] = useState<1 | 2 | 3>(1);
   const [currentSlide, setCurrentSlide] = useState(1);
-  const [viewMode, setViewMode] = useState<"class" | "individual">("class");
+  const [viewMode, setViewMode] = useState<"class" | "individual" | "situation">("class");
+  const [selectedSituation, setSelectedSituation] = useState<SituationType | "">("");
   const { getProfessionalSubjects } = useProfessionalSubjects();
   const { templates } = useProfessionalSubjectTemplates();
   const { toast } = useToast();
@@ -71,6 +76,13 @@ export const ClassSlides = ({
     { value: 1, label: "1º ano" },
     { value: 2, label: "2º ano" },
     { value: 3, label: "3º ano" },
+  ];
+
+  const situationOptions: Array<{ value: SituationType; label: string; description: string }> = [
+    { value: "critico", label: "Crítico", description: "3+ disciplinas abaixo de 6" },
+    { value: "atencao", label: "Atenção", description: "1-2 disciplinas abaixo de 6" },
+    { value: "aprovado", label: "Aprovado", description: "Todas disciplinas ≥ 6" },
+    { value: "excelencia", label: "Excelência", description: "Todas ≥ 6 e média geral ≥ 8" },
   ];
 
   const classData = classes.find((c) => c.id === selectedClass);
@@ -212,6 +224,74 @@ export const ClassSlides = ({
       });
   }, [classStudents, periodGrades]);
 
+  // Classifica alunos por situação acadêmica
+  const studentsBySituation = useMemo(() => {
+    const result: Record<SituationType, { student: Student; average: number; subjectsBelowCount: number }[]> = {
+      critico: [],
+      atencao: [],
+      aprovado: [],
+      excelencia: [],
+    };
+
+    classStudents.forEach((student) => {
+      // Obter todas as disciplinas únicas do aluno
+      const studentGradesFiltered = periodGrades.filter((g) => g.studentId === student.id);
+      const subjects = [...new Set(studentGradesFiltered.map((g) => g.subject))];
+
+      if (subjects.length === 0) return; // Sem notas, não classificar
+
+      // Calcular média final de cada disciplina
+      let subjectsBelowCount = 0;
+      let totalSum = 0;
+      let totalCount = 0;
+
+      subjects.forEach((subject) => {
+        const subjectGrades = studentGradesFiltered.filter((g) => g.subject === subject);
+        if (subjectGrades.length > 0) {
+          const subjectAvg = subjectGrades.reduce((sum, g) => sum + g.grade, 0) / subjectGrades.length;
+          totalSum += subjectAvg;
+          totalCount++;
+          if (subjectAvg < 6) {
+            subjectsBelowCount++;
+          }
+        }
+      });
+
+      const overallAverage = totalCount > 0 ? totalSum / totalCount : 0;
+
+      // Classificar
+      if (subjectsBelowCount >= 3) {
+        result.critico.push({ student, average: overallAverage, subjectsBelowCount });
+      } else if (subjectsBelowCount >= 1) {
+        result.atencao.push({ student, average: overallAverage, subjectsBelowCount });
+      } else if (overallAverage >= 8) {
+        result.excelencia.push({ student, average: overallAverage, subjectsBelowCount });
+      } else {
+        result.aprovado.push({ student, average: overallAverage, subjectsBelowCount });
+      }
+    });
+
+    // Ordenar cada grupo do pior para o melhor
+    // Crítico e Atenção: mais disciplinas reprovadas primeiro, depois menor média
+    result.critico.sort((a, b) => {
+      if (b.subjectsBelowCount !== a.subjectsBelowCount) {
+        return b.subjectsBelowCount - a.subjectsBelowCount; // Mais reprovações primeiro
+      }
+      return a.average - b.average; // Menor média primeiro
+    });
+    result.atencao.sort((a, b) => {
+      if (b.subjectsBelowCount !== a.subjectsBelowCount) {
+        return b.subjectsBelowCount - a.subjectsBelowCount;
+      }
+      return a.average - b.average;
+    });
+    // Aprovado e Excelência: menor média primeiro (pior para melhor)
+    result.aprovado.sort((a, b) => a.average - b.average);
+    result.excelencia.sort((a, b) => a.average - b.average);
+
+    return result;
+  }, [classStudents, periodGrades]);
+
   const areasList = useMemo(() => {
     const list: string[] = [];
     if (
@@ -344,7 +424,74 @@ export const ClassSlides = ({
     studentRankings,
   ]);
 
-  const activeSlides = viewMode === "class" ? classSlides : individualSlides;
+  // Slides por situação
+  const situationSlides = useMemo(() => {
+    if (!selectedClass || !selectedSituation) return [];
+
+    const studentsInSituation = studentsBySituation[selectedSituation];
+    if (!studentsInSituation || studentsInSituation.length === 0) return [];
+
+    const slides: React.ReactNode[] = [];
+
+    // Slide de capa da situação
+    const situationLabel = situationOptions.find(s => s.value === selectedSituation)?.label || selectedSituation;
+    const situationDesc = situationOptions.find(s => s.value === selectedSituation)?.description || "";
+
+    slides.push(
+      <CoverSlide
+        key="situation-cover"
+        classData={classData!}
+        period={selectedPeriod}
+        customTitle={`Alunos em situação: ${situationLabel}`}
+        customSubtitle={`${studentsInSituation.length} aluno(s) - ${situationDesc}`}
+      />
+    );
+
+    // Slides individuais de cada aluno
+    studentsInSituation.forEach(({ student }, index) => {
+      const studentGrades = classGrades.filter((g) => g.studentId === student.id);
+      const position = studentRankings.findIndex((r) => r.student.id === student.id);
+      const displayPosition = position >= 0 ? studentRankings.length - position : 0;
+
+      slides.push(
+        <StudentMetricsSlide
+          key={`situation-metrics-${student.id}`}
+          student={student}
+          grades={studentGrades}
+          incidents={classIncidents}
+          period={selectedPeriod}
+          position={displayPosition}
+          totalStudents={studentRankings.length}
+        />
+      );
+      slides.push(
+        <StudentGradesTableSlide
+          key={`situation-grades-${student.id}`}
+          student={student}
+          grades={studentGrades}
+          period={selectedPeriod}
+        />
+      );
+    });
+
+    return slides;
+  }, [
+    selectedClass,
+    selectedSituation,
+    studentsBySituation,
+    classData,
+    classGrades,
+    classIncidents,
+    selectedPeriod,
+    studentRankings,
+    situationOptions,
+  ]);
+
+  const activeSlides = viewMode === "class"
+    ? classSlides
+    : viewMode === "individual"
+      ? individualSlides
+      : situationSlides;
   const maxSlides = Math.max(1, activeSlides.length);
   const effectiveScale = slideScale * previewZoom;
 
@@ -519,7 +666,9 @@ export const ClassSlides = ({
   const shouldShowSlides =
     selectedClass &&
     activeSlides.length > 0 &&
-    (viewMode === "class" || selectedStudent);
+    (viewMode === "class" ||
+      (viewMode === "individual" && selectedStudent) ||
+      (viewMode === "situation" && selectedSituation));
 
   return (
     <div className="space-y-6">
@@ -531,13 +680,17 @@ export const ClassSlides = ({
           <Tabs
             value={viewMode}
             onValueChange={(v) => {
-              setViewMode(v as "class" | "individual");
+              setViewMode(v as "class" | "individual" | "situation");
               setCurrentSlide(1);
+              if (v === "situation") {
+                setSelectedSituation("");
+              }
             }}
           >
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="class">Slides por Turma</TabsTrigger>
-              <TabsTrigger value="individual">Slides Individuais</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="class">Turma</TabsTrigger>
+              <TabsTrigger value="individual">Individuais</TabsTrigger>
+              <TabsTrigger value="situation">Situação</TabsTrigger>
             </TabsList>
 
             <TabsContent value="class" className="space-y-4">
@@ -712,6 +865,122 @@ export const ClassSlides = ({
                   </Select>
                 </div>
               </div>
+            </TabsContent>
+
+            <TabsContent value="situation" className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-4">
+                <div className="space-y-2">
+                  <Label>Turma</Label>
+                  <Select
+                    value={selectedClass}
+                    onValueChange={(v) => {
+                      setSelectedClass(v);
+                      setSelectedSituation("");
+                      setCurrentSlide(1);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a turma" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {classes.map((cls) => (
+                        <SelectItem key={cls.id} value={cls.id}>
+                          {cls.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Ano da turma</Label>
+                  <Select
+                    value={String(selectedSchoolYear)}
+                    onValueChange={(value) => {
+                      setSelectedSchoolYear(Number(value) as 1 | 2 | 3);
+                      setCurrentSlide(1);
+                    }}
+                    disabled={!selectedClass}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o ano" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {schoolYearOptions.map((option) => (
+                        <SelectItem
+                          key={option.value}
+                          value={String(option.value)}
+                        >
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Período</Label>
+                  <Select
+                    value={selectedPeriod}
+                    onValueChange={(v) => {
+                      setSelectedPeriod(v);
+                      setCurrentSlide(1);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Ano Letivo Completo</SelectItem>
+                      {QUARTERS.map((quarter) => (
+                        <SelectItem key={quarter} value={quarter}>
+                          {quarter}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Situação</Label>
+                  <Select
+                    value={selectedSituation}
+                    onValueChange={(v) => {
+                      setSelectedSituation(v as SituationType);
+                      setCurrentSlide(1);
+                    }}
+                    disabled={!selectedClass}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a situação" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {situationOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label} ({studentsBySituation[option.value]?.length || 0})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {selectedClass && (
+                <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
+                  {situationOptions.map((option) => {
+                    const count = studentsBySituation[option.value]?.length || 0;
+                    const bgColor = option.value === "critico" ? "bg-red-500/10 text-red-700"
+                      : option.value === "atencao" ? "bg-yellow-500/10 text-yellow-700"
+                        : option.value === "aprovado" ? "bg-green-500/10 text-green-700"
+                          : "bg-blue-500/10 text-blue-700";
+                    return (
+                      <div key={option.value} className={`px-3 py-1 rounded-full text-sm font-medium ${bgColor}`}>
+                        {option.label}: {count}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </TabsContent>
           </Tabs>
 

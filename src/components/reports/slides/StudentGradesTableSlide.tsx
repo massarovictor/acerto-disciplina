@@ -16,7 +16,9 @@ interface StudentGradesTableSlideProps {
 }
 
 export const StudentGradesTableSlide = ({ student, grades, period }: StudentGradesTableSlideProps) => {
-  const { sortedSubjects, overallAverage, approvedCount, recoveryCount } = useMemo(() => {
+  const quarters = ['1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre'];
+
+  const { sortedSubjects, overallAverage, approvedCount, recoveryCount, quarterAverages } = useMemo(() => {
     const filteredGrades = period === 'all'
       ? grades
       : grades.filter(g => g.quarter === period);
@@ -43,16 +45,24 @@ export const StudentGradesTableSlide = ({ student, grades, period }: StudentGrad
       ? sorted.reduce((sum, s) => sum + s.average, 0) / sorted.length
       : 0;
 
+    // Calculate overall average per quarter
+    const allStudentGrades = grades.filter(g => g.studentId === student.id);
+    const qAverages = quarters.map((quarter) => {
+      const qGrades = allStudentGrades.filter((g) => g.quarter === quarter);
+      if (qGrades.length === 0) return null;
+      return qGrades.reduce((sum, g) => sum + g.grade, 0) / qGrades.length;
+    });
+
     return {
       sortedSubjects: sorted,
       overallAverage: overall,
       approvedCount: sorted.filter(s => s.average >= 6).length,
       recoveryCount: sorted.filter(s => s.average < 6).length,
+      quarterAverages: qAverages,
     };
   }, [grades, period, student.id]);
 
   const initials = student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-  const quarters = ['1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre'];
 
   const GradeBadge = ({ value }: { value: number }) => {
     const color = getGradeColor(value);
@@ -179,6 +189,55 @@ export const StudentGradesTableSlide = ({ student, grades, period }: StudentGrad
                 </tr>
               ))}
             </tbody>
+            {/* Overall Average Row */}
+            <tfoot>
+              <tr style={{
+                background: `${REPORT_COLORS.primary}10`,
+                borderTop: `2px solid ${REPORT_COLORS.primary}30`
+              }}>
+                <td style={{ padding: '14px 20px', fontSize: 18, color: REPORT_COLORS.text.tertiary }}></td>
+                <td style={{
+                  padding: '14px 20px',
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: REPORT_COLORS.primary,
+                  textTransform: 'uppercase'
+                }}>
+                  Média Geral
+                </td>
+                {period === 'all' && quarterAverages.map((avg, idx) => (
+                  <td key={idx} style={{ padding: '10px 8px', textAlign: 'center' }}>
+                    {avg !== null ? (
+                      <span style={{
+                        padding: '6px 12px',
+                        borderRadius: 8,
+                        background: avg >= 6 ? `${STATUS_COLORS.approved.solid}20` : `${STATUS_COLORS.critical.solid}20`,
+                        color: avg >= 6 ? STATUS_COLORS.approved.solid : STATUS_COLORS.critical.solid,
+                        fontWeight: 700,
+                        fontSize: 18,
+                      }}>
+                        {avg.toFixed(1)}
+                      </span>
+                    ) : (
+                      <span style={{ color: REPORT_COLORS.text.tertiary }}>—</span>
+                    )}
+                  </td>
+                ))}
+                <td style={{ padding: '10px 16px', textAlign: 'center' }}>
+                  <span style={{
+                    padding: '8px 16px',
+                    borderRadius: 10,
+                    background: overallAverage >= 6 ? `${STATUS_COLORS.approved.solid}20` : `${STATUS_COLORS.critical.solid}20`,
+                    color: overallAverage >= 6 ? STATUS_COLORS.approved.solid : STATUS_COLORS.critical.solid,
+                    fontWeight: 800,
+                    fontSize: 20,
+                  }}>
+                    {overallAverage.toFixed(1)}
+                  </span>
+                </td>
+                <td></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
 

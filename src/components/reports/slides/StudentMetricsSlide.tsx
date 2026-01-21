@@ -5,7 +5,7 @@
  */
 
 import { useMemo } from "react";
-import { TrendingUp, AlertTriangle, Trophy, Users } from "lucide-react";
+import { TrendingUp, TrendingDown, AlertTriangle, Trophy, Users } from "lucide-react";
 import { Student, Grade, Incident } from "@/types";
 import { SlideLayout } from "./SlideLayout";
 import {
@@ -14,6 +14,9 @@ import {
   classifyStudent,
   StudentClassification,
 } from "@/lib/reportDesignSystem";
+import { calculateTrend } from "@/lib/advancedCalculations";
+import { LineChart } from "../charts/LineChart";
+import { HorizontalBarChart } from "../charts/HorizontalBarChart";
 
 interface StudentMetricsSlideProps {
   student: Student;
@@ -49,7 +52,7 @@ export const StudentMetricsSlide = ({
     const averageGrade =
       studentGrades.length > 0
         ? studentGrades.reduce((sum, g) => sum + g.grade, 0) /
-          studentGrades.length
+        studentGrades.length
         : 0;
 
     // Calculate subject averages for classification
@@ -72,6 +75,21 @@ export const StudentMetricsSlide = ({
     const classification = classifyStudent(averageGrade, redGradesCount);
     const statusColors = STATUS_COLORS[classification];
 
+    // Calculate average per quarter for trend chart (use all grades for this student)
+    const allStudentGrades = grades.filter((g) => g.studentId === student.id);
+    const quarters = ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
+    const quarterAverages = quarters.map((quarter) => {
+      const qGrades = allStudentGrades.filter((g) => g.quarter === quarter);
+      if (qGrades.length === 0) return null;
+      return qGrades.reduce((sum, g) => sum + g.grade, 0) / qGrades.length;
+    });
+
+    const trendData = quarterAverages
+      .map((avg, idx) => ({ x: idx + 1, y: avg }))
+      .filter((d): d is { x: number; y: number } => d.y !== null);
+
+    const trend = trendData.length >= 2 ? calculateTrend(trendData) : null;
+
     return {
       averageGrade,
       studentGrades,
@@ -81,6 +99,8 @@ export const StudentMetricsSlide = ({
       statusColors,
       redGradesCount,
       approvedGradesCount: studentGrades.filter((g) => g.grade >= 6).length,
+      quarterAverages,
+      trend,
     };
   }, [grades, incidents, period, student.id]);
   const initials = student.name
@@ -105,16 +125,17 @@ export const StudentMetricsSlide = ({
         }}
       >
         {/* Left Column */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          {/* Student Avatar Card */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+          {/* Student Avatar Card with Average and Position */}
           <div
             style={{
               background: REPORT_COLORS.background.card,
               borderRadius: 20,
-              padding: "24px 32px",
+              padding: "20px 28px",
               display: "flex",
               alignItems: "center",
-              gap: 24,
+              gap: 20,
               border: `1px solid ${REPORT_COLORS.border}`,
               boxShadow: "0 8px 16px -4px rgba(0,0,0,0.05)",
             }}
@@ -124,60 +145,59 @@ export const StudentMetricsSlide = ({
                 src={student.photoUrl}
                 alt={student.name}
                 style={{
-                  width: 140,
-                  height: 140,
-                  borderRadius: 70,
+                  width: 80,
+                  height: 80,
+                  borderRadius: 40,
                   objectFit: "cover",
-                  border: `4px solid ${REPORT_COLORS.primary}`,
+                  border: `3px solid ${REPORT_COLORS.primary}`,
                 }}
               />
             ) : (
               <div
                 style={{
-                  width: 140,
-                  height: 140,
-                  borderRadius: 70,
+                  width: 80,
+                  height: 80,
+                  borderRadius: 40,
                   background: `${REPORT_COLORS.primary}15`,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: 48,
+                  fontSize: 28,
                   fontWeight: 700,
                   color: REPORT_COLORS.primary,
-                  border: `4px solid ${REPORT_COLORS.primary}30`,
+                  border: `3px solid ${REPORT_COLORS.primary}30`,
                 }}
               >
                 {initials}
               </div>
             )}
-            <div>
+            <div style={{ flex: 1 }}>
               <p
                 style={{
-                  fontSize: 28,
+                  fontSize: 22,
                   fontWeight: 700,
                   color: REPORT_COLORS.text.primary,
-                  margin: "0 0 8px",
+                  margin: "0 0 4px",
                 }}
               >
                 {student.name}
               </p>
               <p
                 style={{
-                  fontSize: 20,
+                  fontSize: 14,
                   color: REPORT_COLORS.text.secondary,
-                  margin: 0,
+                  margin: "0 0 8px",
                 }}
               >
                 Matrícula: {student.enrollment || "—"}
               </p>
               <div
                 style={{
-                  marginTop: 16,
-                  padding: "8px 24px",
-                  borderRadius: 30,
+                  padding: "5px 14px",
+                  borderRadius: 16,
                   background: metrics.statusColors.bg,
                   color: metrics.statusColors.text,
-                  fontSize: 20,
+                  fontSize: 13,
                   fontWeight: 700,
                   display: "inline-block",
                   border: `1px solid ${metrics.statusColors.border}`,
@@ -186,63 +206,93 @@ export const StudentMetricsSlide = ({
                 {CLASSIFICATION_LABELS[metrics.classification]}
               </div>
             </div>
+
+
+
+            {/* Average Grade */}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                padding: "12px 20px",
+                borderRadius: 12,
+                background: `${metrics.statusColors.bg}`,
+                border: `2px solid ${metrics.statusColors.border}`,
+              }}
+            >
+              <TrendingUp size={20} color={metrics.statusColors.solid} />
+              <p
+                style={{
+                  fontSize: 36,
+                  fontWeight: 800,
+                  color: metrics.statusColors.text,
+                  margin: "2px 0 0",
+                  lineHeight: 1,
+                }}
+              >
+                {metrics.averageGrade.toFixed(1)}
+              </p>
+              <p
+                style={{
+                  fontSize: 10,
+                  color: metrics.statusColors.text,
+                  margin: "2px 0 0",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  opacity: 0.7,
+                }}
+              >
+                Média
+              </p>
+            </div>
           </div>
 
-          {/* Average Grade Card */}
+          {/* Trend Horizontal Bar Chart Card */}
           <div
             style={{
-              background: `linear-gradient(135deg, ${metrics.statusColors.bg} 0%, ${metrics.statusColors.bg}80 100%)`,
+              background: REPORT_COLORS.background.card,
               borderRadius: 20,
-              padding: "32px 40px",
-              border: `2px solid ${metrics.statusColors.border}`,
+              padding: "24px 32px",
+              border: `1px solid ${REPORT_COLORS.border}`,
+              boxShadow: "0 8px 16px -4px rgba(0,0,0,0.05)",
               flex: 1,
               display: "flex",
               flexDirection: "column",
-              justifyContent: "center",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
-              <div
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <h3
                 style={{
-                  width: 100,
-                  height: 100,
-                  borderRadius: 24,
-                  background: REPORT_COLORS.background.card,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: REPORT_COLORS.text.primary,
+                  margin: 0,
                 }}
               >
-                <TrendingUp size={56} color={metrics.statusColors.solid} />
-              </div>
-              <div>
-                <p
-                  style={{
-                    fontSize: 22,
-                    color: metrics.statusColors.text,
-                    margin: "0 0 4px",
-                    fontWeight: 600,
-                    textTransform: "uppercase",
-                    opacity: 0.8,
-                  }}
-                >
-                  Média Geral
-                </p>
-                <p
-                  style={{
-                    fontSize: 96,
-                    fontWeight: 800,
-                    color: metrics.statusColors.text,
-                    margin: 0,
-                    lineHeight: 1,
-                    letterSpacing: "-2px",
-                  }}
-                >
-                  {metrics.averageGrade.toFixed(1)}
-                </p>
-              </div>
+                Evolução por Bimestre
+              </h3>
+              {metrics.trend && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  {metrics.trend.direction === 'up' && <TrendingUp size={16} color="#16a34a" />}
+                  {metrics.trend.direction === 'down' && <TrendingDown size={16} color="#dc2626" />}
+                  <span style={{ fontSize: 12, color: REPORT_COLORS.text.secondary, fontWeight: 500 }}>
+                    {metrics.trend.direction === 'up' ? 'Melhoria' : metrics.trend.direction === 'down' ? 'Declínio' : 'Estável'}
+                  </span>
+                </div>
+              )}
             </div>
+
+            <HorizontalBarChart
+              data={metrics.quarterAverages
+                .map((avg, idx) => ({
+                  label: ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"][idx],
+                  value: avg ?? 0,
+                }))
+                .filter((d) => d.value > 0)}
+              height={240}
+              showValues={true}
+            />
           </div>
 
           {/* Position Card */}
@@ -260,21 +310,21 @@ export const StudentMetricsSlide = ({
                 display: "flex",
                 alignItems: "center",
                 gap: 24,
-                marginBottom: 24,
+                marginBottom: 20,
               }}
             >
               <div
                 style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 16,
+                  width: 56,
+                  height: 56,
+                  borderRadius: 14,
                   background: `${REPORT_COLORS.primary}15`,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                 }}
               >
-                <Trophy size={32} color={REPORT_COLORS.primary} />
+                <Trophy size={28} color={REPORT_COLORS.primary} />
               </div>
               <div style={{ flex: 1 }}>
                 <div
@@ -286,7 +336,7 @@ export const StudentMetricsSlide = ({
                 >
                   <p
                     style={{
-                      fontSize: 20,
+                      fontSize: 18,
                       color: REPORT_COLORS.text.secondary,
                       margin: 0,
                       fontWeight: 600,
@@ -296,7 +346,7 @@ export const StudentMetricsSlide = ({
                   </p>
                   <p
                     style={{
-                      fontSize: 48,
+                      fontSize: 40,
                       fontWeight: 800,
                       color: REPORT_COLORS.text.primary,
                       margin: 0,
@@ -305,7 +355,7 @@ export const StudentMetricsSlide = ({
                     {position}º{" "}
                     <span
                       style={{
-                        fontSize: 24,
+                        fontSize: 20,
                         color: REPORT_COLORS.text.tertiary,
                         fontWeight: 500,
                       }}
@@ -320,8 +370,8 @@ export const StudentMetricsSlide = ({
             <div
               style={{
                 width: "100%",
-                height: 16,
-                borderRadius: 8,
+                height: 14,
+                borderRadius: 7,
                 background: REPORT_COLORS.background.muted,
                 overflow: "hidden",
               }}
@@ -330,16 +380,16 @@ export const StudentMetricsSlide = ({
                 style={{
                   width: `${((totalStudents - position + 1) / totalStudents) * 100}%`,
                   height: "100%",
-                  borderRadius: 8,
+                  borderRadius: 7,
                   background: REPORT_COLORS.primary,
                 }}
               />
             </div>
             <p
               style={{
-                fontSize: 18,
+                fontSize: 16,
                 color: REPORT_COLORS.text.tertiary,
-                margin: "16px 0 0",
+                margin: "12px 0 0",
                 textAlign: "right",
               }}
             >
@@ -365,13 +415,12 @@ export const StudentMetricsSlide = ({
                     : STATUS_COLORS.attention.bg,
               borderRadius: 20,
               padding: "24px 32px",
-              border: `2px solid ${
-                metrics.studentIncidents.length === 0
-                  ? STATUS_COLORS.approved.border
-                  : metrics.criticalIncidents > 0
-                    ? STATUS_COLORS.critical.border
-                    : STATUS_COLORS.attention.border
-              }`,
+              border: `2px solid ${metrics.studentIncidents.length === 0
+                ? STATUS_COLORS.approved.border
+                : metrics.criticalIncidents > 0
+                  ? STATUS_COLORS.critical.border
+                  : STATUS_COLORS.attention.border
+                }`,
             }}
           >
             <div
