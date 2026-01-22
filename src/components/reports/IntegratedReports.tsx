@@ -18,13 +18,15 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Users, FileDown, UserCheck, Calendar } from "lucide-react";
+import { Users, FileDown, UserCheck, Calendar, GraduationCap } from "lucide-react";
 import { Class, Student, Incident } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import {
   useProfessionalSubjects,
   useProfessionalSubjectTemplates,
   useGrades,
+  useHistoricalGrades,
+  useExternalAssessments,
 } from "@/hooks/useData";
 import {
   Dialog,
@@ -36,6 +38,7 @@ import {
 } from "@/components/ui/dialog";
 import { generateStudentReportPDF } from "@/lib/studentReportPdfExport";
 import { generateProfessionalClassReportPDF } from "@/lib/classReportPdfExport";
+import { generateTrajectoryReportPDF } from "@/lib/trajectoryReportPdfExport";
 import { SUBJECT_AREAS, QUARTERS } from "@/lib/subjects";
 import { calculateCurrentYearFromCalendar } from "@/lib/classYearCalculator";
 
@@ -58,6 +61,8 @@ export const IntegratedReports = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
   const { grades } = useGrades();
+  const { historicalGrades } = useHistoricalGrades();
+  const { externalAssessments } = useExternalAssessments();
   // DISABLED: Attendance feature temporarily removed
   // const { attendance } = useAttendance();
   const { getProfessionalSubjects } = useProfessionalSubjects();
@@ -405,9 +410,46 @@ export const IntegratedReports = ({
     }
   };
 
+  const handleTrajectoryReport = async () => {
+    if (!selectedClassData || !selectedStudentData) {
+      toast({
+        variant: "destructive",
+        title: "Selecione a turma e o aluno",
+        description: "Escolha o aluno para gerar o relatório de trajetória.",
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      await generateTrajectoryReportPDF(
+        selectedStudentData,
+        selectedClassData,
+        historicalGrades,
+        grades,
+        externalAssessments,
+        incidents
+      );
+
+      toast({
+        title: "Relatório de Trajetória Gerado",
+        description: `A trajetória completa de ${selectedStudentData.name} foi baixada.`,
+      });
+    } catch (error) {
+      console.error("Erro ao gerar relatório de trajetória:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro na geração",
+        description: "Não foi possível criar o PDF de trajetória. Tente novamente.",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return (
     <>
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -671,7 +713,6 @@ export const IntegratedReports = ({
 
             <Button
               className="w-full"
-              variant="secondary"
               onClick={handleIndividualReport}
               disabled={!selectedStudent}
             >
@@ -682,6 +723,133 @@ export const IntegratedReports = ({
               O modelo individual segue o boletim com resumo, ocorrências e
               tabela anual de notas.
             </p>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Relatório de Trajetória */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <GraduationCap className="h-5 w-5 text-primary" />
+                  Relatório de Trajetória
+                </CardTitle>
+                <CardDescription>
+                  Visão completa do desempenho do aluno desde o ensino fundamental até o médio.
+                </CardDescription>
+              </div>
+              {selectedStudentData && (
+                <Badge variant="secondary">
+                  {selectedStudentData.name.split(' ')[0]}
+                </Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label>Turma</Label>
+              <Select
+                value={selectedClass}
+                onValueChange={(value) => {
+                  setSelectedClass(value);
+                  setSelectedStudent("");
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Escolha a turma" />
+                </SelectTrigger>
+                <SelectContent>
+                  {classes.length === 0 ? (
+                    <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                      Nenhuma turma cadastrada
+                    </div>
+                  ) : (
+                    classes
+                      .filter((cls) => !cls.archived)
+                      .map((cls) => (
+                        <SelectItem key={cls.id} value={cls.id}>
+                          {cls.name}
+                        </SelectItem>
+                      ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Aluno</Label>
+              <Select
+                value={selectedStudent}
+                onValueChange={setSelectedStudent}
+                disabled={!selectedClass}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      selectedClass
+                        ? "Escolha o aluno"
+                        : "Selecione a turma primeiro"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {classStudents.length === 0 ? (
+                    <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                      Nenhum aluno encontrado
+                    </div>
+                  ) : (
+                    classStudents.map((student) => (
+                      <SelectItem key={student.id} value={student.id}>
+                        {student.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedStudentData && (
+              <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Notas Fundamental</span>
+                  <span className="font-semibold text-foreground">
+                    {historicalGrades.filter(g => g.studentId === selectedStudentData.id).length}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Notas Ensino Médio</span>
+                  <span className="font-semibold text-foreground">
+                    {grades.filter(g => g.studentId === selectedStudentData.id).length}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Avaliações Externas</span>
+                  <span className="font-semibold text-foreground">
+                    {externalAssessments.filter(e => e.studentId === selectedStudentData.id).length}
+                  </span>
+                </div>
+                <Separator />
+                <p className="text-xs italic text-muted-foreground">
+                  Este relatório inclui toda a trajetória acadêmica, tendências de evolução e insights preditivos.
+                </p>
+              </div>
+            )}
+
+            <Button
+              className="w-full"
+              onClick={handleTrajectoryReport}
+              disabled={!selectedStudent || isGenerating}
+            >
+              {isGenerating ? (
+                "Gerando..."
+              ) : (
+                <>
+                  <FileDown className="mr-2 h-4 w-4" />
+                  Gerar Relatório de Trajetória
+                </>
+              )}
+            </Button>
           </CardContent>
         </Card>
       </div>

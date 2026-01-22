@@ -252,23 +252,7 @@ class StudentReportPDFGenerator {
       return {
         margin: [40, 20, 40, 10],
         stack: [
-          { text: this.config.schoolName, style: 'h1', margin: [0, 0, 0, 2] },
-          {
-            text: [
-              this.config.inep ? `INEP: ${this.config.inep}` : '',
-              this.config.phone ? ` | Tel: ${this.config.phone}` : '',
-              this.config.email ? ` | ${this.config.email}` : '',
-            ].filter(Boolean).join(''),
-            style: 'bodySmall',
-            margin: [0, 0, 0, 2],
-          },
-          this.config.address ? {
-            text: `${this.config.address}${this.config.city ? `, ${this.config.city}` : ''}${this.config.state ? ` - ${this.config.state}` : ''}`,
-            style: 'bodySmall',
-          } : '',
-          {
-            canvas: [{ type: 'line', x1: 0, y1: 5, x2: 515, y2: 5, lineWidth: 1, lineColor: PDF_COLORS.primary }],
-          },
+          { text: this.config.schoolName.toUpperCase(), fontSize: 12, alignment: 'center', color: PDF_COLORS.secondary, margin: [0, 0, 0, 5] },
         ],
       };
     }
@@ -599,7 +583,7 @@ class StudentReportPDFGenerator {
           ? PDF_COLORS.status.atencao
           : PDF_COLORS.tertiary;
 
-      return {
+      return ({
         table: {
           widths: [3, '*'],
           body: [[
@@ -626,7 +610,7 @@ class StudentReportPDFGenerator {
         layout: 'noBorders',
         margin: [0, 0, 0, 8],
         unbreakable: true,
-      };
+      } as unknown as Content);
     });
 
     return {
