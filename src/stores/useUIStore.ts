@@ -50,6 +50,16 @@ interface ReportsUIState {
     activeTab: string;
 }
 
+interface TrajectoryUIState {
+    selectedClassId: string;
+    selectedStudentId: string;
+    selectedSubject: string;
+    activeTab: string;
+    gridYear: number;
+    gridQuarter: string;
+    gridCalendarYear: number;
+}
+
 interface UIState {
     // Grades/Attendance page
     gradesUI: GradesUIState;
@@ -71,6 +81,9 @@ interface UIState {
 
     // Reports page
     reportsUI: ReportsUIState;
+
+    // Trajectory page
+    trajectoryUI: TrajectoryUIState;
 
     // Actions - Grades
     setGradesUI: (data: Partial<GradesUIState>) => void;
@@ -100,6 +113,10 @@ interface UIState {
     // Actions - Reports
     setReportsUI: (data: Partial<ReportsUIState>) => void;
     resetReportsUI: () => void;
+
+    // Actions - Trajectory
+    setTrajectoryUI: (data: Partial<TrajectoryUIState>) => void;
+    resetTrajectoryUI: () => void;
 }
 
 // ==================== INITIAL VALUES ====================
@@ -148,6 +165,16 @@ const initialReportsUI: ReportsUIState = {
     activeTab: 'integrated',
 };
 
+const initialTrajectoryUI: TrajectoryUIState = {
+    selectedClassId: '',
+    selectedStudentId: '',
+    selectedSubject: '',
+    activeTab: 'summary',
+    gridYear: 6,
+    gridQuarter: '1º Bimestre',
+    gridCalendarYear: new Date().getFullYear() - 4, // Default: ano atual - 4 (aproximação para 6º ano)
+};
+
 // ==================== STORE ====================
 
 export const useUIStore = create<UIState>()(
@@ -161,6 +188,7 @@ export const useUIStore = create<UIState>()(
             classesUI: initialClassesUI,
             gradesAttendanceUI: initialGradesAttendanceUI,
             reportsUI: initialReportsUI,
+            trajectoryUI: initialTrajectoryUI,
 
             // Actions - Grades
             setGradesUI: (data) =>
@@ -224,6 +252,14 @@ export const useUIStore = create<UIState>()(
                 })),
             resetReportsUI: () =>
                 set({ reportsUI: initialReportsUI }),
+
+            // Actions - Trajectory
+            setTrajectoryUI: (data) =>
+                set((state) => ({
+                    trajectoryUI: { ...state.trajectoryUI, ...data },
+                })),
+            resetTrajectoryUI: () =>
+                set({ trajectoryUI: initialTrajectoryUI }),
         }),
         {
             name: 'acerto-ui', // Nome da chave no localStorage

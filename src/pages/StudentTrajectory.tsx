@@ -1,20 +1,21 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useClasses, useStudents, useGrades, useHistoricalGrades, useExternalAssessments, useIncidents } from '@/hooks/useData';
-import { SUBJECT_AREAS, QUARTERS } from '@/lib/subjects';
+import { SUBJECT_AREAS, QUARTERS, FUNDAMENTAL_SUBJECT_AREAS, getFundamentalEquivalent, getEquivalentSubjects } from '@/lib/subjects';
 import { useToast } from '@/hooks/use-toast';
 import { HistoricalGrade, ExternalAssessment, ExternalAssessmentType } from '@/types';
 import { predictFinalGrade, identifyTrend } from '@/lib/performancePrediction';
 import { detectAnomalies, linearRegression } from '@/lib/mlAnalytics';
+import { useUIStore } from '@/stores/useUIStore';
 import {
     LineChart,
     Line,
@@ -75,21 +76,37 @@ const StudentTrajectory = () => {
     const { incidents } = useIncidents();
     const { toast } = useToast();
 
-    const [selectedClass, setSelectedClass] = useState('');
-    const [selectedStudent, setSelectedStudent] = useState('');
-    const [selectedSubject, setSelectedSubject] = useState('');
-    const [activeTab, setActiveTab] = useState('summary');
+    // ✅ Usando Zustand store para persistir seleções entre navegações
+    const { trajectoryUI, setTrajectoryUI } = useUIStore();
+    const selectedClass = trajectoryUI.selectedClassId;
+    const selectedStudent = trajectoryUI.selectedStudentId;
+    const selectedSubject = trajectoryUI.selectedSubject;
+    const activeTab = trajectoryUI.activeTab;
+    const gridYear = trajectoryUI.gridYear;
+    const gridQuarter = trajectoryUI.gridQuarter;
+    const gridCalendarYear = trajectoryUI.gridCalendarYear;
+
+    const setSelectedClass = (value: string) => setTrajectoryUI({ selectedClassId: value, selectedStudentId: '', selectedSubject: '' });
+    const setSelectedStudent = (value: string) => setTrajectoryUI({ selectedStudentId: value, selectedSubject: '' });
+    const setSelectedSubject = (value: string) => setTrajectoryUI({ selectedSubject: value });
+    const setActiveTab = (value: string) => setTrajectoryUI({ activeTab: value });
+    const setGridYear = (value: number) => setTrajectoryUI({ gridYear: value });
+    const setGridQuarter = (value: string) => setTrajectoryUI({ gridQuarter: value });
+    const setGridCalendarYear = (value: number) => setTrajectoryUI({ gridCalendarYear: value });
+
     const [showBatchAssessment, setShowBatchAssessment] = useState(false);
     const [showImport, setShowImport] = useState(false);
 
-    // Grid Entry State (Now Fundamental Only)
-    const [gridYear, setGridYear] = useState(6);
-    const [gridQuarter, setGridQuarter] = useState('1º Bimestre');
+    // Grid Entry State
     const [gridValues, setGridValues] = useState<Record<string, string>>({});
+    const [editingRecord, setEditingRecord] = useState<{ id: string, subject: string, gradeYear: number, quarter: string, grade: number } | null>(null);
+    const [editGradeValue, setEditGradeValue] = useState<string>('');
 
     // Simulation State
     const [simulationPoints, setSimulationPoints] = useState(1);
     const [showSimulation, setShowSimulation] = useState(false);
+    const [simulationScenario, setSimulationScenario] = useState<'optimistic' | 'realistic' | 'pessimistic'>('realistic');
+    const [targetGrade, setTargetGrade] = useState<string>('');
 
 
     // Basic Data Filters
@@ -168,44 +185,103 @@ const StudentTrajectory = () => {
         // Helper to add data points
         const addPoints = (level: string, years: number[]) => {
             years.forEach(year => {
-                QUARTERS.forEach(q => {
-                    const g = level === 'fundamental'
-                        ? studentHistorical.find(h => h.gradeYear === year && h.quarter === q && h.subject === selectedSubject)
-                        : studentRegularGrades.find(r => (r.schoolYear || 1) === year && r.quarter === q && r.subject === selectedSubject);
+                if (level === 'fundamental') {
+                    // Para fundamental, buscar a disciplina selecionada OU equivalente
+                    const fundamentalEquiv = getFundamentalEquivalent(selectedSubject);
 
-                    const ext = studentExternal.find(e => e.schoolLevel === level && e.gradeYear === year && e.quarter === q && (e.subject === selectedSubject || e.subject === 'geral' || !e.subject));
+                    // Primeiro: tentar buscar nota anual (formato da importação)
+                    const annualGrade = studentHistorical.find(h => {
+                        const isMatch = h.subject === selectedSubject || h.subject === fundamentalEquiv;
+                        // Fallback para nomes legados (Português/Língua Portuguesa)
+                        const isPortugueseMatch = (selectedSubject === 'Língua Portuguesa' && h.subject === 'Português') ||
+                            (selectedSubject === 'Português' && h.subject === 'Língua Portuguesa');
 
-                    // Incidents for this specific period (Simplified mapping)
-                    // Note: Incidents don't always have a quarter/gradeYear in their schema, 
-                    // ideally they would or we'd map by calendar_year. 
-                    // For now, let's map by date if possible, but the current schema uses createdAt.
-                    // This is an approximation.
-                    const periodIncidents = studentIncidents.filter(i => {
-                        const date = new Date(i.createdAt);
-                        const month = date.getMonth();
-                        const quarter = Math.floor(month / 3) + 1;
-                        const quarterStr = `${quarter}º Bimestre`;
-
-                        // We need to know if this incident happened during this year/level
-                        // This would require a mapping of calendar years to grade years
-                        return quarterStr === q; // Overly simplified for viz demo
+                        return h.gradeYear === year &&
+                            h.quarter === 'Anual' &&
+                            (isMatch || isPortugueseMatch);
                     });
 
-                    if (g || ext || (periodIncidents.length > 0 && data.length > 0)) {
+                    if (annualGrade) {
+                        // Se tem nota anual, adicionar como ponto único
                         data.push({
                             idx: idx++,
-                            label: `${year}º ${level === 'medio' ? 'EM' : 'Fund'} - ${q.replace(' Bimestre', 'B')}`,
-                            fundGrade: level === 'fundamental' ? g?.grade : undefined,
-                            emGrade: level === 'medio' ? g?.grade : undefined,
-                            external: ext ? (ext.score / ext.maxScore) * 10 : undefined,
-                            externalName: ext?.assessmentName,
-                            incident: periodIncidents.length > 0 ? periodIncidents.length * 2 : undefined, // Viz scaling
-                            incidentCount: periodIncidents.length,
-                            type: g ? 'Escolar' : ext ? 'Externa' : 'Ocorrência',
-                            continuousValue: g?.grade || (ext ? (ext.score / ext.maxScore) * 10 : undefined)
+                            label: `${year}º Fund (Anual)`,
+                            fundGrade: annualGrade.grade,
+                            type: 'Escolar',
+                            continuousValue: annualGrade.grade
+                        });
+                    } else {
+                        // Se não tem anual, buscar por bimestre
+                        QUARTERS.forEach(q => {
+                            const g = studentHistorical.find(h => {
+                                const isMatch = h.subject === selectedSubject || h.subject === fundamentalEquiv;
+                                // Fallback para nomes legados (Português/Língua Portuguesa)
+                                const isPortugueseMatch = (selectedSubject === 'Língua Portuguesa' && h.subject === 'Português') ||
+                                    (selectedSubject === 'Português' && h.subject === 'Língua Portuguesa');
+
+                                return h.gradeYear === year && h.quarter === q && (isMatch || isPortugueseMatch);
+                            });
+
+                            const ext = studentExternal.find(e =>
+                                e.schoolLevel === level &&
+                                e.gradeYear === year &&
+                                e.quarter === q &&
+                                (e.subject === selectedSubject || e.subject === 'geral' || !e.subject)
+                            );
+
+                            if (g || ext) {
+                                data.push({
+                                    idx: idx++,
+                                    label: `${year}º Fund - ${q.replace(' Bimestre', 'B')}`,
+                                    fundGrade: g?.grade,
+                                    external: ext ? (ext.score / ext.maxScore) * 10 : undefined,
+                                    externalName: ext?.assessmentName,
+                                    type: g ? 'Escolar' : 'Externa',
+                                    continuousValue: g?.grade || (ext ? (ext.score / ext.maxScore) * 10 : undefined)
+                                });
+                            }
                         });
                     }
-                });
+                } else {
+                    // Ensino Médio: buscar por bimestre
+                    QUARTERS.forEach(q => {
+                        const g = studentRegularGrades.find(r =>
+                            (r.schoolYear || 1) === year &&
+                            r.quarter === q &&
+                            r.subject === selectedSubject
+                        );
+
+                        const ext = studentExternal.find(e =>
+                            e.schoolLevel === level &&
+                            e.gradeYear === year &&
+                            e.quarter === q &&
+                            (e.subject === selectedSubject || e.subject === 'geral' || !e.subject)
+                        );
+
+                        // Incidents for this specific period
+                        const periodIncidents = studentIncidents.filter(i => {
+                            const date = new Date(i.createdAt);
+                            const month = date.getMonth();
+                            const quarter = Math.floor(month / 3) + 1;
+                            const quarterStr = `${quarter}º Bimestre`;
+                            return quarterStr === q;
+                        });
+
+                        if (g || ext || (periodIncidents.length > 0 && data.length > 0)) {
+                            data.push({
+                                idx: idx++,
+                                label: `${year}º EM - ${q.replace(' Bimestre', 'B')}`,
+                                emGrade: g?.grade,
+                                external: ext ? (ext.score / ext.maxScore) * 10 : undefined,
+                                externalName: ext?.assessmentName,
+                                incident: periodIncidents.length > 0 ? periodIncidents.length * 2 : undefined,
+                                incidentCount: periodIncidents.length,
+                                type: g ? 'Escolar' : ext ? 'Externa' : 'Ocorrência',
+                                continuousValue: g?.grade || (ext ? (ext.score / ext.maxScore) * 10 : undefined)
+                            });
+                        }
+                    });
+                }
             });
         };
 
@@ -219,27 +295,223 @@ const StudentTrajectory = () => {
     const simulationData = useMemo(() => {
         if (!showSimulation || subjectTimeline.length < 2) return [];
 
-        const gradesOnly = subjectTimeline.map(d => d.emGrade || d.fundGrade || d.external).filter(v => v !== undefined) as number[];
+        const gradesOnly = subjectTimeline.map(d => d.continuousValue).filter(v => v !== undefined) as number[];
+        if (gradesOnly.length < 2) return [];
+
         const x = gradesOnly.map((_, i) => i);
         const reg = linearRegression(x, gradesOnly);
 
-        const result = [...subjectTimeline.map(d => ({ ...d, isSimulated: false }))];
-        const lastIdx = subjectTimeline.length > 0 ? subjectTimeline[subjectTimeline.length - 1].idx : 0;
+        // Copiar dados existentes
+        const result = [...subjectTimeline.map(d => ({ ...d, isSimulated: false, simulatedGrade: undefined }))];
+        const lastIdx = gradesOnly.length - 1;
 
         for (let i = 1; i <= simulationPoints; i++) {
             const nextIdx = lastIdx + i;
-            const predictedValue = Math.max(0, Math.min(10, reg.slope * nextIdx + reg.intercept));
+            // Aplicar cenário
+            const scenarioMultiplier = simulationScenario === 'optimistic' ? 1.1 : simulationScenario === 'pessimistic' ? 0.9 : 1;
+            const predictedValue = Math.max(0, Math.min(10, (reg.slope * nextIdx + reg.intercept) * scenarioMultiplier));
             result.push({
-                idx: nextIdx,
-                label: `Futuro +${i}`,
-                emGrade: predictedValue,
+                idx: result.length,
+                label: `Proj +${i}`,
+                simulatedGrade: predictedValue,
+                continuousValue: predictedValue,
                 isSimulated: true,
                 type: 'Simulado'
             });
         }
 
         return result;
-    }, [subjectTimeline, showSimulation, simulationPoints]);
+    }, [subjectTimeline, showSimulation, simulationPoints, simulationScenario]);
+
+    // ============ ANÁLISE DE TENDÊNCIA ============
+    const trendAnalysis = useMemo(() => {
+        if (subjectTimeline.length < 2) return null;
+
+        const gradesOnly = subjectTimeline
+            .map(d => d.emGrade || d.fundGrade || d.external)
+            .filter(v => v !== undefined) as number[];
+
+        if (gradesOnly.length < 2) return null;
+
+        const firstGrade = gradesOnly[0];
+        const lastGrade = gradesOnly[gradesOnly.length - 1];
+        const variation = lastGrade - firstGrade;
+        const variationPercent = ((lastGrade - firstGrade) / firstGrade) * 100;
+
+        // Calcular regressão para tendência
+        const x = gradesOnly.map((_, i) => i);
+        const reg = linearRegression(x, gradesOnly);
+
+        let trend: 'ascending' | 'stable' | 'descending';
+        let trendLabel: string;
+        let trendIcon: string;
+        let trendColor: string;
+
+        if (reg.slope > 0.15) {
+            trend = 'ascending';
+            trendLabel = 'Em Ascensão';
+            trendIcon = '↑';
+            trendColor = 'text-emerald-600';
+        } else if (reg.slope < -0.15) {
+            trend = 'descending';
+            trendLabel = 'Em Declínio';
+            trendIcon = '↓';
+            trendColor = 'text-red-600';
+        } else {
+            trend = 'stable';
+            trendLabel = 'Estável';
+            trendIcon = '→';
+            trendColor = 'text-amber-600';
+        }
+
+        return {
+            trend,
+            trendLabel,
+            trendIcon,
+            trendColor,
+            variation,
+            variationPercent,
+            slope: reg.slope,
+            firstGrade,
+            lastGrade
+        };
+    }, [subjectTimeline]);
+
+    // ============ MÉTRICAS ENRIQUECIDAS ============
+    const enrichedMetrics = useMemo(() => {
+        if (subjectTimeline.length === 0) return null;
+
+        const gradesOnly = subjectTimeline
+            .map(d => ({ grade: d.emGrade || d.fundGrade || d.external, label: d.label }))
+            .filter(v => v.grade !== undefined) as { grade: number; label: string }[];
+
+        if (gradesOnly.length === 0) return null;
+
+        const grades = gradesOnly.map(g => g.grade);
+        const sum = grades.reduce((a, b) => a + b, 0);
+        const avg = sum / grades.length;
+
+        // Melhor e pior nota
+        const maxGrade = Math.max(...grades);
+        const minGrade = Math.min(...grades);
+        const bestPeriod = gradesOnly.find(g => g.grade === maxGrade)?.label || '';
+        const worstPeriod = gradesOnly.find(g => g.grade === minGrade)?.label || '';
+
+        // Coeficiente de variação (desvio padrão / média * 100)
+        const variance = grades.reduce((acc, g) => acc + Math.pow(g - avg, 2), 0) / grades.length;
+        const stdDev = Math.sqrt(variance);
+        const cv = (stdDev / avg) * 100;
+
+        // Classificação de consistência
+        let consistency: 'alta' | 'media' | 'baixa';
+        let consistencyLabel: string;
+        if (cv < 10) {
+            consistency = 'alta';
+            consistencyLabel = 'Muito Consistente';
+        } else if (cv < 20) {
+            consistency = 'media';
+            consistencyLabel = 'Moderada';
+        } else {
+            consistency = 'baixa';
+            consistencyLabel = 'Irregular';
+        }
+
+        // Percentual acima da média (6)
+        const aboveAverage = grades.filter(g => g >= 6).length;
+        const aboveAveragePercent = (aboveAverage / grades.length) * 100;
+
+        return {
+            average: avg,
+            maxGrade,
+            minGrade,
+            bestPeriod,
+            worstPeriod,
+            stdDev,
+            cv,
+            consistency,
+            consistencyLabel,
+            aboveAveragePercent,
+            totalGrades: grades.length
+        };
+    }, [subjectTimeline]);
+
+    // ============ INSIGHTS INTELIGENTES ============
+    const insights = useMemo(() => {
+        const result: { type: 'positive' | 'negative' | 'neutral' | 'warning'; message: string }[] = [];
+
+        if (!trendAnalysis || !enrichedMetrics || subjectTimeline.length < 3) return result;
+
+        // Insight de tendência
+        if (trendAnalysis.trend === 'ascending' && trendAnalysis.variationPercent > 15) {
+            result.push({
+                type: 'positive',
+                message: `Excelente evolução! A nota subiu ${trendAnalysis.variationPercent.toFixed(0)}% desde o início.`
+            });
+        } else if (trendAnalysis.trend === 'descending' && trendAnalysis.variationPercent < -15) {
+            result.push({
+                type: 'negative',
+                message: `Atenção: queda de ${Math.abs(trendAnalysis.variationPercent).toFixed(0)}% no desempenho.`
+            });
+        }
+
+        // Insight de consistência
+        if (enrichedMetrics.consistency === 'alta') {
+            result.push({
+                type: 'positive',
+                message: `Desempenho ${enrichedMetrics.consistencyLabel.toLowerCase()} - baixa variação entre notas.`
+            });
+        } else if (enrichedMetrics.consistency === 'baixa') {
+            result.push({
+                type: 'warning',
+                message: `Desempenho irregular - alta variação entre as notas.`
+            });
+        }
+
+        // Insight de média
+        if (enrichedMetrics.average >= 8) {
+            result.push({
+                type: 'positive',
+                message: `Média histórica excelente: ${enrichedMetrics.average.toFixed(1)}`
+            });
+        } else if (enrichedMetrics.average < 6) {
+            result.push({
+                type: 'negative',
+                message: `Média histórica abaixo do esperado: ${enrichedMetrics.average.toFixed(1)}`
+            });
+        }
+
+        // Insight de aprovação
+        if (enrichedMetrics.aboveAveragePercent >= 80) {
+            result.push({
+                type: 'positive',
+                message: `${enrichedMetrics.aboveAveragePercent.toFixed(0)}% das notas acima da média mínima.`
+            });
+        } else if (enrichedMetrics.aboveAveragePercent < 50) {
+            result.push({
+                type: 'warning',
+                message: `Apenas ${enrichedMetrics.aboveAveragePercent.toFixed(0)}% das notas acima da média mínima.`
+            });
+        }
+
+        // Detectar queda significativa
+        const gradesOnly = subjectTimeline
+            .map(d => d.emGrade || d.fundGrade || d.external)
+            .filter(v => v !== undefined) as number[];
+
+        for (let i = 1; i < gradesOnly.length; i++) {
+            const drop = gradesOnly[i - 1] - gradesOnly[i];
+            if (drop > 2) {
+                result.push({
+                    type: 'warning',
+                    message: `Queda significativa detectada no ${subjectTimeline[i]?.label || `período ${i + 1}`}.`
+                });
+                break; // Apenas uma queda significativa
+            }
+        }
+
+        return result.slice(0, 4); // Máximo 4 insights
+    }, [trendAnalysis, enrichedMetrics, subjectTimeline]);
+
 
 
     const handleSaveGrid = async () => {
@@ -255,9 +527,9 @@ const StudentTrajectory = () => {
                 schoolLevel: 'fundamental',
                 gradeYear: gridYear,
                 subject,
-                quarter: gridQuarter,
+                quarter: 'Anual', // Fundamental usa notas anuais
                 grade: gradeNum,
-                calendarYear: new Date().getFullYear() - (10 - gridYear) // Heurística simples
+                calendarYear: gridCalendarYear
             });
         });
 
@@ -271,471 +543,779 @@ const StudentTrajectory = () => {
     };
 
     return (
-        <div className="p-6 max-w-7xl mx-auto space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold flex items-center gap-2">
-                        <TrendingUp className="h-8 w-8 text-primary" />
-                        Trajetória Longitudinal
-                    </h1>
-                    <p className="text-muted-foreground">Analítica avançada do 6º Fundamental ao 3º Médio</p>
+        <div className="p-6 space-y-6">
+            {/* Header */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="space-y-1">
+                    <h1 className="text-3xl font-bold tracking-tight">Trajetória Estudantil</h1>
+                    <p className="text-muted-foreground">
+                        Acompanhamento longitudinal e simulação de desempenho
+                    </p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setShowImport(true)}>
-                        <FileSpreadsheet className="h-4 w-4 mr-2" /> Importação
+                    <Button variant="outline" onClick={() => setShowImport(true)} className="gap-2">
+                        <FileSpreadsheet className="h-4 w-4" /> Importação
                     </Button>
                     <Button onClick={() => setShowBatchAssessment(true)} className="gap-2">
-                        <Target className="h-4 w-4" /> Lançamento em Lote (Avaliações)
+                        <Target className="h-4 w-4" /> Lançamento em Lote
                     </Button>
                 </div>
             </div>
 
-            {/* Selectors */}
-            <Card className="bg-primary/5 border-none shadow-sm">
-                <CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label className="text-xs uppercase tracking-wider font-bold opacity-70">Turma</Label>
-                        <Select value={selectedClass} onValueChange={v => { setSelectedClass(v); setSelectedStudent(''); setSelectedSubject(''); }}>
-                            <SelectTrigger className="bg-white"><SelectValue placeholder="Selecione a Turma" /></SelectTrigger>
-                            <SelectContent>
-                                {classes.filter(c => c.active).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-2">
-                        <Label className="text-xs uppercase tracking-wider font-bold opacity-70">Aluno</Label>
-                        <Select value={selectedStudent} onValueChange={v => { setSelectedStudent(v); setSelectedSubject(''); setActiveTab('summary'); }}>
-                            <SelectTrigger className="bg-white" disabled={!selectedClass}><SelectValue placeholder="Selecione o Aluno" /></SelectTrigger>
-                            <SelectContent>
-                                {filteredStudents.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
+            {/* Main Filters Card */}
+            <Card className="bg-muted/50 border-muted">
+                <CardContent className="pt-6">
+                    <div className="grid gap-6 md:grid-cols-3">
+                        <div className="space-y-2">
+                            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Turma</Label>
+                            <Select value={selectedClass} onValueChange={setSelectedClass}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Selecione a turma" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {classes.length === 0 ? (
+                                        <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                                            Nenhuma turma cadastrada
+                                        </div>
+                                    ) : (
+                                        classes
+                                            .filter(cls => cls.active && !cls.archived)
+                                            .map(cls => (
+                                                <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+                                            ))
+                                    )}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Aluno</Label>
+                            <Select value={selectedStudent} onValueChange={setSelectedStudent} disabled={!selectedClass}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Selecione o aluno" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {filteredStudents.length === 0 ? (
+                                        <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                                            {selectedClass ? 'Nenhum aluno nesta turma' : 'Selecione uma turma primeiro'}
+                                        </div>
+                                    ) : (
+                                        filteredStudents.map(s => (
+                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                        ))
+                                    )}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Disciplina</Label>
+                            <Select value={selectedSubject} onValueChange={setSelectedSubject} disabled={!selectedStudent}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Escolha a disciplina" />
+                                </SelectTrigger>
+                                <SelectContent className="max-h-80">
+                                    {/* Áreas do Ensino Médio (ENEM) */}
+                                    {SUBJECT_AREAS.map(area => (
+                                        <SelectGroup key={area.name}>
+                                            <SelectLabel className="px-2 py-1.5 text-xs font-bold text-primary bg-primary/5 uppercase tracking-wider">
+                                                {area.name.replace(', Códigos e suas Tecnologias', '').replace(' e suas Tecnologias', '')}
+                                            </SelectLabel>
+                                            {area.subjects.map(s => (
+                                                <SelectItem key={s} value={s}>{s}</SelectItem>
+                                            ))}
+                                        </SelectGroup>
+                                    ))}
+                                    {/* Disciplinas específicas do Fundamental (não do médio) */}
+                                    <SelectGroup>
+                                        <SelectLabel className="px-2 py-1.5 text-xs font-bold text-amber-600 bg-amber-500/10 uppercase tracking-wider">
+                                            Específicas do Fundamental
+                                        </SelectLabel>
+                                        <SelectItem value="Ciências">
+                                            Ciências <span className="text-muted-foreground text-[10px]">(+ Natureza)</span>
+                                        </SelectItem>
+                                        <SelectItem value="Língua Inglesa">
+                                            Língua Inglesa <span className="text-muted-foreground text-[10px]">(+ Linguagens)</span>
+                                        </SelectItem>
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
                 </CardContent>
             </Card>
 
-            {!selectedStudent ? (
-                <Card className="h-64 flex flex-col items-center justify-center text-muted-foreground border-dashed">
-                    <User className="h-12 w-12 mb-2 opacity-20" />
-                    <p>Aguardando seleção de aluno...</p>
-                </Card>
-            ) : (
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                    <TabsList className="bg-muted p-1 rounded-lg w-full justify-start overflow-x-auto">
-                        <TabsTrigger value="summary" className="px-6">Resumo Holístico</TabsTrigger>
-                        <TabsTrigger value="trajectory" className="px-6">Trajetória e Simulação</TabsTrigger>
-                        <TabsTrigger value="entry" className="px-6 flex items-center gap-2 text-blue-600 font-bold">
-                            <Edit3 className="h-4 w-4" /> Lançamento Rápido
-                        </TabsTrigger>
-                        <TabsTrigger value="history" className="px-6">Histórico Timeline</TabsTrigger>
-                    </TabsList>
+            {
+                !selectedStudent ? (
+                    <Card className="h-64 flex flex-col items-center justify-center text-muted-foreground border-dashed">
+                        <User className="h-12 w-12 mb-2 opacity-20" />
+                        <p>Aguardando seleção de aluno...</p>
+                    </Card>
+                ) : (
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                        <TabsList className="bg-muted p-1 rounded-lg w-full justify-start overflow-x-auto">
+                            <TabsTrigger value="summary" className="px-6">Resumo Holístico</TabsTrigger>
+                            <TabsTrigger value="trajectory" className="px-6">Trajetória e Simulação</TabsTrigger>
+                            <TabsTrigger value="history" className="px-6">Histórico Timeline</TabsTrigger>
+                            <TabsTrigger value="entry" className="px-6">Lançamento Rápido</TabsTrigger>
+                        </TabsList>
 
-                    {/* TAB: SUMMARY (POTENCIALIDADES E DIFICULDADES) */}
-                    <TabsContent value="summary" className="space-y-6">
-                        {holisticSummary && (
-                            <>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 ml:grid-cols-4 gap-4">
-                                    <Card className="border-l-4 border-l-blue-500 shadow-sm">
-                                        <CardHeader className="py-2"><CardTitle className="text-[10px] uppercase text-muted-foreground font-bold">Média Fundamental</CardTitle></CardHeader>
-                                        <CardContent><div className="text-2xl font-black">{holisticSummary.fundAvg.toFixed(1)}</div></CardContent>
-                                    </Card>
-                                    <Card className="border-l-4 border-l-violet-500 shadow-sm">
-                                        <CardHeader className="py-2"><CardTitle className="text-[10px] uppercase text-muted-foreground font-bold">Média Médio</CardTitle></CardHeader>
-                                        <CardContent><div className="text-2xl font-black">{holisticSummary.emAvg.toFixed(1)}</div></CardContent>
-                                    </Card>
-                                    <Card className="border-l-4 border-l-amber-500 shadow-sm">
-                                        <CardHeader className="py-2"><CardTitle className="text-[10px] uppercase text-muted-foreground font-bold">Aval. Externas</CardTitle></CardHeader>
-                                        <CardContent><div className="text-2xl font-black">{holisticSummary.extAvg.toFixed(1)}</div></CardContent>
-                                    </Card>
-                                    <Card className="border-l-4 border-l-red-500 shadow-sm">
-                                        <CardHeader className="py-2"><CardTitle className="text-[10px] uppercase text-muted-foreground font-bold">Ocorrências</CardTitle></CardHeader>
-                                        <CardContent className="flex items-center justify-between">
-                                            <div className="text-2xl font-black">{holisticSummary.incidentCount}</div>
-                                            {holisticSummary.criticalIncidents > 0 && (
-                                                <Badge variant="destructive" className="h-5 px-1.5 animate-pulse text-[10px]">
-                                                    {holisticSummary.criticalIncidents} Críticas
-                                                </Badge>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-                                </div>
-
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {/* Potencialidades */}
-                                    <Card className="bg-green-50/50 border-green-100 shadow-sm">
-                                        <CardHeader>
-                                            <CardTitle className="text-green-700 flex items-center gap-2">
-                                                <Zap className="h-5 w-5" /> Potencialidades
-                                            </CardTitle>
-                                            <CardDescription>Onde o aluno mais se destaca historicamente</CardDescription>
-                                        </CardHeader>
-                                        <CardContent>
-                                            {holisticSummary.strengths.length > 0 ? (
-                                                <div className="flex flex-wrap gap-2">
-                                                    {holisticSummary.strengths.map(s => (
-                                                        <Badge key={s.name} variant="outline" className="bg-green-100/50 text-green-800 border-green-200 py-1.5 px-3">
-                                                            {s.name}: {s.avg.toFixed(1)}
-                                                        </Badge>
-                                                    ))}
-                                                </div>
-                                            ) : <p className="text-sm text-muted-foreground">Analítica buscando pontos de excelência...</p>}
-                                        </CardContent>
-                                    </Card>
-
-                                    {/* Dificuldades */}
-                                    <Card className="bg-red-50/50 border-red-100 shadow-sm">
-                                        <CardHeader>
-                                            <CardTitle className="text-red-700 flex items-center gap-2">
-                                                <AlertTriangle className="h-5 w-5" /> Áreas de Atenção
-                                            </CardTitle>
-                                            <CardDescription>Disciplinas com desempenho abaixo da média</CardDescription>
-                                        </CardHeader>
-                                        <CardContent>
-                                            {holisticSummary.difficulties.length > 0 ? (
-                                                <div className="flex flex-wrap gap-2">
-                                                    {holisticSummary.difficulties.map(d => (
-                                                        <Badge key={d.name} variant="destructive" className="py-1.5 px-3">
-                                                            {d.name}: {d.avg.toFixed(1)}
-                                                        </Badge>
-                                                    ))}
-                                                </div>
-                                            ) : <p className="text-sm text-muted-foreground">Nenhuma dificuldade crítica detectada no histórico.</p>}
-                                        </CardContent>
-                                    </Card>
-                                </div>
-                            </>
-                        )}
-                    </TabsContent>
-
-                    {/* TAB: ENTRY (GRID DE LANÇAMENTO) */}
-                    <TabsContent value="entry" className="space-y-6">
-                        <Card>
-                            <CardHeader>
-                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                    <div>
-                                        <CardTitle className="flex items-center gap-2">
-                                            <History className="h-5 w-5 text-amber-600" />
-                                            Histórico Fundamental (6º-9º Ano)
-                                        </CardTitle>
-                                        <CardDescription>Lance as notas do período fundamental para composição histórica</CardDescription>
+                        {/* TAB: SUMMARY (POTENCIALIDADES E DIFICULDADES) */}
+                        <TabsContent value="summary" className="space-y-6">
+                            {holisticSummary && (
+                                <>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                        <Card className="border-none shadow-sm bg-card">
+                                            <CardHeader className="py-2 pb-0">
+                                                <CardTitle className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Média Fundamental</CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="pt-1">
+                                                <div className="text-3xl font-black text-blue-600">{holisticSummary.fundAvg.toFixed(1)}</div>
+                                            </CardContent>
+                                        </Card>
+                                        <Card className="border-none shadow-sm bg-card">
+                                            <CardHeader className="py-2 pb-0">
+                                                <CardTitle className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Média Médio</CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="pt-1">
+                                                <div className="text-3xl font-black text-violet-600">{holisticSummary.emAvg.toFixed(1)}</div>
+                                            </CardContent>
+                                        </Card>
+                                        <Card className="border-none shadow-sm bg-card">
+                                            <CardHeader className="py-2 pb-0">
+                                                <CardTitle className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Aval. Externas</CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="pt-1">
+                                                <div className="text-3xl font-black text-amber-600">{holisticSummary.extAvg.toFixed(1)}</div>
+                                            </CardContent>
+                                        </Card>
+                                        <Card className="border-none shadow-sm bg-card">
+                                            <CardHeader className="py-2 pb-0">
+                                                <CardTitle className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Ocorrências</CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="pt-1 flex items-center justify-between">
+                                                <div className="text-3xl font-black text-red-600">{holisticSummary.incidentCount}</div>
+                                                {holisticSummary.criticalIncidents > 0 && (
+                                                    <Badge variant="destructive" className="h-5 px-1.5 animate-pulse text-[10px] font-bold">
+                                                        {holisticSummary.criticalIncidents} CRÍTICAS
+                                                    </Badge>
+                                                )}
+                                            </CardContent>
+                                        </Card>
                                     </div>
-                                    <Badge variant="outline" className="text-amber-600 bg-amber-50 gap-1.5 py-1 px-3">
-                                        <Lock className="h-3 w-3" />
-                                        Ensino Médio: Bloqueado
-                                    </Badge>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="space-y-6">
-                                <Alert className="bg-blue-50 border-blue-200">
-                                    <Activity className="h-4 w-4 text-blue-600" />
-                                    <AlertTitle>Importante</AlertTitle>
-                                    <AlertDescription>
-                                        As notas do Ensino Médio (1º ao 3º ano) são sincronizadas automaticamente da gestão de notas regular. Utilize esta aba apenas para registros do Fundamental II.
-                                    </AlertDescription>
-                                </Alert>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-muted/30 p-4 rounded-xl">
-                                    <div className="space-y-2">
-                                        <Label>Série / Ano Fundamental</Label>
-                                        <Select value={String(gridYear)} onValueChange={v => setGridYear(parseInt(v))}>
-                                            <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
-                                            <SelectContent>
-                                                {FUNDAMENTAL_YEARS.map(y => <SelectItem key={y} value={String(y)}>{y}º ano</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Bimestre</Label>
-                                        <Select value={gridQuarter} onValueChange={setGridQuarter}>
-                                            <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
-                                            <SelectContent>
-                                                {QUARTERS.map(q => <SelectItem key={q} value={q}>{q}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    {FUNDAMENTAL_SUBJECTS.map(subject => (
-                                        <div key={subject} className="space-y-1 p-3 border rounded-lg hover:border-primary transition-colors bg-white">
-                                            <Label className="text-[10px] uppercase font-bold text-muted-foreground truncate block">{subject}</Label>
-                                            <Input
-                                                className="h-8 font-bold border-none shadow-none focus-visible:ring-1 focus-visible:ring-primary text-lg px-1"
-                                                placeholder="0.0"
-                                                value={gridValues[subject] || ''}
-                                                onChange={e => setGridValues({ ...gridValues, [subject]: e.target.value })}
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="flex justify-end">
-                                    <Button onClick={handleSaveGrid} className="gap-2">
-                                        <Save className="h-4 w-4" /> Salvar / Atualizar Notas
-                                    </Button>
-                                </div>
-
-                                {/* Historical Records Table */}
-                                {studentHistorical.length > 0 && (
-                                    <div className="mt-8 space-y-4">
-                                        <div className="flex items-center gap-2 border-t pt-6">
-                                            <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
-                                            <h3 className="font-bold">Registros Salvos (Fundamental II)</h3>
-                                        </div>
-                                        <div className="border rounded-lg overflow-hidden bg-white">
-                                            <Table>
-                                                <TableHeader className="bg-muted/50">
-                                                    <TableRow>
-                                                        <TableHead>Ano</TableHead>
-                                                        <TableHead>Bimestre</TableHead>
-                                                        <TableHead>Disciplina</TableHead>
-                                                        <TableHead className="text-right">Nota</TableHead>
-                                                        <TableHead className="w-10"></TableHead>
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    {studentHistorical
-                                                        .sort((a, b) => b.gradeYear - a.gradeYear || b.quarter.localeCompare(a.quarter))
-                                                        .map(record => (
-                                                            <TableRow key={record.id} className="hover:bg-muted/30">
-                                                                <TableCell className="font-medium text-xs">{record.gradeYear}º ano</TableCell>
-                                                                <TableCell className="text-xs">{record.quarter}</TableCell>
-                                                                <TableCell className="text-xs">{record.subject}</TableCell>
-                                                                <TableCell className={`text-right font-bold ${record.grade >= 6 ? 'text-green-600' : 'text-red-600'}`}>
-                                                                    {record.grade.toFixed(1)}
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
-                                                                        onClick={() => deleteHistoricalGrade(record.id)}
-                                                                    >
-                                                                        <Trash2 className="h-4 w-4" />
-                                                                    </Button>
-                                                                </TableCell>
-                                                            </TableRow>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {/* Potencialidades */}
+                                        <Card className="border-none shadow-sm bg-card overflow-hidden">
+                                            <div className="h-1 bg-emerald-500 w-full" />
+                                            <CardHeader className="pb-3">
+                                                <CardTitle className="text-emerald-600 dark:text-emerald-500 flex items-center gap-2 text-base">
+                                                    <Zap className="h-4 w-4" /> Potencialidades
+                                                </CardTitle>
+                                                <CardDescription className="text-xs italic">Destaques históricos de excelência</CardDescription>
+                                            </CardHeader>
+                                            <CardContent>
+                                                {holisticSummary.strengths.length > 0 ? (
+                                                    <div className="grid gap-2">
+                                                        {holisticSummary.strengths.map(s => (
+                                                            <div key={s.name} className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                                                                <span className="text-sm font-medium text-emerald-900 dark:text-emerald-400">{s.name}</span>
+                                                                <Badge className="bg-emerald-600 hover:bg-emerald-700">{s.avg.toFixed(1)}</Badge>
+                                                            </div>
                                                         ))}
-                                                </TableBody>
-                                            </Table>
+                                                    </div>
+                                                ) : <p className="text-sm text-muted-foreground">O deserto de excelência aguarda seu oásis...</p>}
+                                            </CardContent>
+                                        </Card>
+
+                                        {/* Dificuldades */}
+                                        <Card className="border-none shadow-sm bg-card overflow-hidden">
+                                            <div className="h-1 bg-red-500 w-full" />
+                                            <CardHeader className="pb-3">
+                                                <CardTitle className="text-red-600 dark:text-red-500 flex items-center gap-2 text-base">
+                                                    <AlertTriangle className="h-4 w-4" /> Áreas de Atenção
+                                                </CardTitle>
+                                                <CardDescription className="text-xs italic">Disciplinas requerendo maior suporte</CardDescription>
+                                            </CardHeader>
+                                            <CardContent>
+                                                {holisticSummary.difficulties.length > 0 ? (
+                                                    <div className="grid gap-2">
+                                                        {holisticSummary.difficulties.map(d => (
+                                                            <div key={d.name} className="flex items-center justify-between p-2 rounded-lg bg-red-500/10 border border-red-500/20">
+                                                                <span className="text-sm font-medium text-red-900 dark:text-red-400">{d.name}</span>
+                                                                <Badge variant="destructive" className="font-bold">{d.avg.toFixed(1)}</Badge>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : <p className="text-sm text-muted-foreground">O mar da tranquilidade acadêmica prevalece...</p>}
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+                                </>
+                            )}
+                        </TabsContent>
+
+                        {/* TAB: ENTRY (GRID DE LANÇAMENTO) */}
+                        <TabsContent value="entry" className="space-y-6">
+                            <Card>
+                                <CardHeader>
+                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                        <div>
+                                            <CardTitle className="flex items-center gap-2">
+                                                <History className="h-5 w-5 text-amber-600" />
+                                                Histórico Fundamental (6º-9º Ano)
+                                            </CardTitle>
+                                            <CardDescription>Lance as notas do período fundamental para composição histórica</CardDescription>
+                                        </div>
+                                        <Badge variant="outline" className="text-amber-600 bg-amber-500/10 border-amber-500/20 gap-1.5 py-1 px-3">
+                                            <Lock className="h-3 w-3" />
+                                            Ensino Médio: Bloqueado
+                                        </Badge>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="space-y-6">
+                                    <Alert className="bg-blue-500/10 border-blue-500/20">
+                                        <Activity className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                        <AlertTitle>Importante</AlertTitle>
+                                        <AlertDescription>
+                                            As notas do Ensino Médio (1º ao 3º ano) são sincronizadas automaticamente da gestão de notas regular. Utilize esta aba apenas para registros do Fundamental II.
+                                        </AlertDescription>
+                                    </Alert>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-muted/30 p-4 rounded-xl">
+                                        <div className="space-y-2">
+                                            <Label>Série / Ano Fundamental</Label>
+                                            <Select value={String(gridYear)} onValueChange={v => setGridYear(parseInt(v))}>
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    {FUNDAMENTAL_YEARS.map(y => <SelectItem key={y} value={String(y)}>{y}º ano</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Ano Calendário *</Label>
+                                            <Select value={String(gridCalendarYear)} onValueChange={v => setGridCalendarYear(parseInt(v))}>
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                                                        <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                         </div>
                                     </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
 
-                    {/* TAB: TRAJECTORY & SIMULATION */}
-                    <TabsContent value="trajectory" className="space-y-6">
-                        <div className="flex flex-col md:flex-row gap-4 items-end bg-muted/30 p-4 rounded-xl">
-                            <div className="flex-1 space-y-2">
-                                <Label>Selecione a Disciplina para Analítica</Label>
-                                <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-                                    <SelectTrigger className="bg-white"><SelectValue placeholder="Escolha a disciplina" /></SelectTrigger>
-                                    <SelectContent>
-                                        {ALL_SUBJECTS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant={showSimulation ? "default" : "outline"}
-                                    onClick={() => setShowSimulation(!showSimulation)}
-                                    disabled={!selectedSubject || subjectTimeline.length < 2}
-                                >
-                                    <Target className="h-4 w-4 mr-2" />
-                                    {showSimulation ? "Parar Simulação" : "Simular Futuro"}
-                                </Button>
-                            </div>
-                        </div>
-
-                        {selectedSubject ? (
-                            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                                <Card className="lg:col-span-3 border-none shadow-sm bg-white">
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2">
-                                            {selectedSubject} - Evolução Longitudinal
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="h-[450px]">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <ComposedChart data={showSimulation ? simulationData : subjectTimeline}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ecf0f1" />
-                                                <XAxis dataKey="label" tick={{ fontSize: 10 }} height={60} interval={0} angle={-45} textAnchor="end" />
-                                                <YAxis domain={[0, 10]} />
-                                                <Tooltip />
-                                                <Legend />
-                                                <ReferenceLine y={6} stroke="#e74c3c" strokeDasharray="3 3" label={{ value: 'Média', position: 'right', fill: '#e74c3c' }} />
-
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="fundGrade"
-                                                    stroke="#8e44ad"
-                                                    strokeWidth={3}
-                                                    name="Histórico Fundamental"
-                                                    activeDot={{ r: 6 }}
-                                                    connectNulls
-                                                />
-
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="emGrade"
-                                                    stroke="#3498db"
-                                                    strokeWidth={3}
-                                                    name="Ensino Médio"
-                                                    activeDot={{ r: 6 }}
-                                                    connectNulls
-                                                />
-
-                                                <Scatter dataKey="external" fill="#f39c12" name="Aval. Externa" />
-
-                                                <Scatter dataKey="incident" fill="#e74c3c" name="Ocorrências" shape="triangle" />
-
-                                                {showSimulation && (
-                                                    <Line
-                                                        type="monotone"
-                                                        dataKey="emGrade"
-                                                        stroke="#2ecc71"
-                                                        strokeWidth={3}
-                                                        strokeDasharray="5 5"
-                                                        name="Projeção Futura"
-                                                        data={simulationData}
-                                                    />
-                                                )}
-                                            </ComposedChart>
-                                        </ResponsiveContainer>
-                                    </CardContent>
-                                </Card>
-
-                                <Card className="lg:col-span-4 border-none shadow-sm bg-white overflow-hidden">
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2">
-                                            <TrendingUp className="h-5 w-5 text-emerald-600" />
-                                            Pulso de Performance (Nuanças e Marcos)
-                                        </CardTitle>
-                                        <CardDescription>
-                                            Visão contínua com a nota exibida em cada marco da trajetória
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="h-[350px]">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <ComposedChart data={subjectTimeline}>
-                                                <defs>
-                                                    <linearGradient id="pulseGradientLight" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
-                                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                                                    </linearGradient>
-                                                </defs>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ecf0f1" />
-                                                <XAxis dataKey="label" tick={{ fontSize: 9 }} height={50} interval={0} angle={-45} textAnchor="end" />
-                                                <YAxis domain={[0, 11]} hide />
-                                                <Tooltip
-                                                    contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
-                                                />
-                                                <Area type="monotone" dataKey="continuousValue" stroke="none" fill="url(#pulseGradientLight)" />
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="continuousValue"
-                                                    stroke="#10b981"
-                                                    strokeWidth={3}
-                                                    dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }}
-                                                    activeDot={{ r: 6 }}
-                                                    animationDuration={1500}
-                                                >
-                                                    <LabelList
-                                                        dataKey="continuousValue"
-                                                        position="top"
-                                                        offset={10}
-                                                        formatter={(val: number) => val?.toFixed(1)}
-                                                        style={{ fontSize: '10px', fontWeight: 'bold', fill: '#059669' }}
-                                                    />
-                                                </Line>
-                                                <ReferenceLine y={6} stroke="#e74c3c" strokeDasharray="3 3" opacity={0.2} />
-                                            </ComposedChart>
-                                        </ResponsiveContainer>
-                                    </CardContent>
-                                </Card>
-
-                                <div className="space-y-4">
-                                    <Card className="border-none shadow-sm bg-primary/5">
-                                        <CardHeader className="pb-2 text-center">
-                                            <CardTitle className="text-xs uppercase text-primary opacity-70">Nota Final Projetada</CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="text-center">
-                                            {showSimulation ? (
-                                                <div className="text-4xl font-black text-primary">
-                                                    {simulationData[simulationData.length - 1]?.emGrade.toFixed(1)}
+                                    <div className="space-y-6">
+                                        {FUNDAMENTAL_SUBJECT_AREAS.map(area => (
+                                            <div key={area.name} className="space-y-3">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`h-3 w-1 rounded-full ${area.color.split(' ')[0]}`} />
+                                                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{area.name}</h3>
                                                 </div>
-                                            ) : (
-                                                <p className="text-xs text-muted-foreground">Ative a simulação para ver a projeção</p>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="h-96 flex flex-col items-center justify-center border rounded-xl border-dashed">
-                                <BookOpen className="h-12 w-12 opacity-10 mb-2" />
-                                <p className="text-muted-foreground">Escolha uma disciplina para visualizar a trajetória</p>
-                            </div>
-                        )}
-                    </TabsContent>
-
-                    {/* TAB: TIMELINE HISTORY */}
-                    <TabsContent value="history">
-                        <Card className="border-none shadow-sm">
-                            <CardHeader>
-                                <CardTitle>Jornada do Estudante (Continuidade)</CardTitle>
-                                <CardDescription>Visão compacta horizontal de toda a trajetória acadêmica e disciplinar</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="overflow-x-auto pb-4 custom-scrollbar">
-                                    <div className="flex gap-4 min-w-max p-2">
-                                        {subjectTimeline.map((event, i) => (
-                                            <div key={i} className="flex flex-col items-center gap-2 group">
-                                                <div className="text-[10px] font-bold text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    {event.label.split(' - ')[0]}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                                    {area.subjects.map(subject => (
+                                                        <div key={subject} className="space-y-1 p-3 border rounded-lg hover:border-primary transition-colors bg-card shadow-sm">
+                                                            <Label className="text-[10px] uppercase font-bold text-muted-foreground truncate block">{subject}</Label>
+                                                            <Input
+                                                                className="h-8 font-bold border-none shadow-none focus-visible:ring-1 focus-visible:ring-primary text-lg px-px bg-transparent"
+                                                                placeholder="0.0"
+                                                                value={gridValues[subject] || ''}
+                                                                onChange={e => setGridValues({ ...gridValues, [subject]: e.target.value })}
+                                                            />
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110 shadow-sm border-2 
-                                                    ${event.incidentCount > 0 ? 'bg-red-50 border-red-200' :
-                                                        event.external ? 'bg-amber-50 border-amber-200' :
-                                                            'bg-blue-50 border-blue-100'}`}>
-
-                                                    {event.incidentCount > 0 ? (
-                                                        <AlertTriangle className="h-6 w-6 text-red-600" />
-                                                    ) : event.external ? (
-                                                        <Target className="h-6 w-6 text-amber-600" />
-                                                    ) : (
-                                                        <GraduationCap className="h-6 w-6 text-blue-600" />
-                                                    )}
-                                                </div>
-                                                <div className="bg-white p-2 rounded-xl border shadow-sm min-w-[100px] text-center">
-                                                    <div className="text-lg font-black leading-tight">
-                                                        {(event.fundGrade || event.emGrade || event.external || 0).toFixed(1)}
-                                                    </div>
-                                                    <div className="text-[10px] uppercase font-bold text-muted-foreground truncate max-w-[80px]">
-                                                        {event.label.split(' - ')[1]}
-                                                    </div>
-                                                </div>
-                                                {event.incidentCount > 0 && (
-                                                    <Badge className="bg-red-500 text-[10px] h-4 px-1">{event.incidentCount} Ocor.</Badge>
-                                                )}
                                             </div>
                                         ))}
                                     </div>
-                                </div>
-                                {subjectTimeline.length === 0 && (
-                                    <div className="text-center py-20 flex flex-col items-center opacity-30">
-                                        <History className="h-16 w-16 mb-2" />
-                                        <p>Nenhum registro para exibir nesta disciplina.</p>
+
+                                    <div className="flex justify-end">
+                                        <Button onClick={handleSaveGrid} className="gap-2">
+                                            <Save className="h-4 w-4" /> Salvar / Atualizar Notas
+                                        </Button>
                                     </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                </Tabs>
-            )}
+
+                                    {/* Historical Records Table */}
+                                    {studentHistorical.length > 0 && (
+                                        <div className="mt-8 space-y-4">
+                                            <div className="flex items-center gap-2 border-t pt-6">
+                                                <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
+                                                <h3 className="font-bold">Registros Salvos (Fundamental II)</h3>
+                                            </div>
+                                            <div className="border rounded-lg overflow-hidden bg-card">
+                                                <Table>
+                                                    <TableHeader className="bg-muted/50">
+                                                        <TableRow>
+                                                            <TableHead>Ano</TableHead>
+                                                            <TableHead>Bimestre</TableHead>
+                                                            <TableHead>Disciplina</TableHead>
+                                                            <TableHead className="text-right">Nota</TableHead>
+                                                            <TableHead className="w-20">Ações</TableHead>
+                                                        </TableRow>
+                                                    </TableHeader>
+                                                    <TableBody>
+                                                        {studentHistorical
+                                                            .sort((a, b) => b.gradeYear - a.gradeYear || b.quarter.localeCompare(a.quarter))
+                                                            .map(record => (
+                                                                <TableRow key={record.id} className="hover:bg-muted/30">
+                                                                    <TableCell className="font-medium text-xs">{record.gradeYear}º ano</TableCell>
+                                                                    <TableCell className="text-xs">{record.quarter}</TableCell>
+                                                                    <TableCell className="text-xs">{record.subject}</TableCell>
+                                                                    <TableCell className={`text-right font-bold ${record.grade >= 6 ? 'text-green-600' : 'text-red-600'}`}>
+                                                                        {record.grade.toFixed(1)}
+                                                                    </TableCell>
+                                                                    <TableCell className="flex gap-1">
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-500/10"
+                                                                            onClick={() => {
+                                                                                setEditingRecord(record);
+                                                                                setEditGradeValue(String(record.grade).replace('.', ','));
+                                                                            }}
+                                                                        >
+                                                                            <Edit3 className="h-4 w-4" />
+                                                                        </Button>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                                                                            onClick={() => deleteHistoricalGrade(record.id)}
+                                                                        >
+                                                                            <Trash2 className="h-4 w-4" />
+                                                                        </Button>
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </div>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        {/* TAB: TRAJECTORY & SIMULATION */}
+                        <TabsContent value="trajectory" className="space-y-6">
+                            {/* Controles de Seleção e Simulação */}
+                            <Card className="bg-muted/30 border-muted">
+                                <CardContent className="pt-6">
+                                    <div className="grid gap-4 md:grid-cols-3">
+                                        {/* Removido o seletor de disciplina daqui pois foi movido para o topo */}
+
+                                        <div className="space-y-2">
+                                            <Label>Cenário</Label>
+                                            <Select value={simulationScenario} onValueChange={(v) => setSimulationScenario(v as typeof simulationScenario)}>
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="optimistic">🚀 Otimista (+10%)</SelectItem>
+                                                    <SelectItem value="realistic">📊 Realista</SelectItem>
+                                                    <SelectItem value="pessimistic">⚠️ Pessimista (-10%)</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label>Projeção (bimestres)</Label>
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    type="range"
+                                                    min="1"
+                                                    max="4"
+                                                    value={simulationPoints}
+                                                    onChange={(e) => setSimulationPoints(parseInt(e.target.value))}
+                                                    className="flex-1 h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                                                />
+                                                <span className="w-6 text-center font-bold text-primary">{simulationPoints}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-end gap-2">
+                                            <Button
+                                                variant={showSimulation ? "default" : "outline"}
+                                                onClick={() => setShowSimulation(!showSimulation)}
+                                                disabled={!selectedSubject || subjectTimeline.length < 2}
+                                                className="flex-1"
+                                            >
+                                                <Target className="h-4 w-4 mr-2" />
+                                                {showSimulation ? "Parar" : "Simular"}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {selectedSubject ? (
+                                <>
+                                    {/* Cards de Métricas Enriquecidas */}
+                                    {enrichedMetrics && trendAnalysis && (
+                                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                                            {/* Tendência */}
+                                            <Card className="border-none shadow-sm">
+                                                <CardContent className="pt-4 text-center">
+                                                    <div className={`text-4xl font-black ${trendAnalysis.trendColor}`}>
+                                                        {trendAnalysis.trendIcon}
+                                                    </div>
+                                                    <p className="text-xs font-bold mt-1">{trendAnalysis.trendLabel}</p>
+                                                    <p className="text-[10px] text-muted-foreground">
+                                                        {trendAnalysis.variationPercent >= 0 ? '+' : ''}{trendAnalysis.variationPercent.toFixed(0)}% variação
+                                                    </p>
+                                                </CardContent>
+                                            </Card>
+
+                                            {/* Média Histórica */}
+                                            <Card className="border-none shadow-sm">
+                                                <CardContent className="pt-4 text-center">
+                                                    <div className={`text-3xl font-black ${enrichedMetrics.average >= 6 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                        {enrichedMetrics.average.toFixed(1)}
+                                                    </div>
+                                                    <p className="text-xs font-bold mt-1">Média Histórica</p>
+                                                    <p className="text-[10px] text-muted-foreground">{enrichedMetrics.totalGrades} registros</p>
+                                                </CardContent>
+                                            </Card>
+
+                                            {/* Melhor Nota */}
+                                            <Card className="border-none shadow-sm bg-emerald-500/10">
+                                                <CardContent className="pt-4 text-center">
+                                                    <div className="text-3xl font-black text-emerald-600 dark:text-emerald-500">
+                                                        {enrichedMetrics.maxGrade.toFixed(1)}
+                                                    </div>
+                                                    <p className="text-xs font-bold mt-1 text-emerald-900 dark:text-emerald-100">Melhor Nota</p>
+                                                    <p className="text-[10px] text-muted-foreground truncate">{enrichedMetrics.bestPeriod}</p>
+                                                </CardContent>
+                                            </Card>
+
+                                            {/* Pior Nota */}
+                                            <Card className="border-none shadow-sm bg-red-500/10">
+                                                <CardContent className="pt-4 text-center">
+                                                    <div className="text-3xl font-black text-red-600 dark:text-red-500">
+                                                        {enrichedMetrics.minGrade.toFixed(1)}
+                                                    </div>
+                                                    <p className="text-xs font-bold mt-1 text-red-900 dark:text-red-100">Pior Nota</p>
+                                                    <p className="text-[10px] text-muted-foreground truncate">{enrichedMetrics.worstPeriod}</p>
+                                                </CardContent>
+                                            </Card>
+
+                                            {/* Consistência */}
+                                            <Card className="border-none shadow-sm">
+                                                <CardContent className="pt-4 text-center">
+                                                    <div className={`text-2xl font-black ${enrichedMetrics.consistency === 'alta' ? 'text-emerald-600' : enrichedMetrics.consistency === 'baixa' ? 'text-amber-600' : 'text-blue-600'}`}>
+                                                        {enrichedMetrics.consistencyLabel.split(' ')[0]}
+                                                    </div>
+                                                    <p className="text-xs font-bold mt-1">Consistência</p>
+                                                    <p className="text-[10px] text-muted-foreground">CV: {enrichedMetrics.cv.toFixed(0)}%</p>
+                                                </CardContent>
+                                            </Card>
+
+                                            {/* Projeção */}
+                                            <Card className="border-none shadow-sm bg-primary/5">
+                                                <CardContent className="pt-4 text-center">
+                                                    {showSimulation ? (
+                                                        <div className="text-3xl font-black text-primary">
+                                                            {simulationData[simulationData.length - 1]?.emGrade?.toFixed(1) || '-'}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-3xl font-black text-muted-foreground/30">-</div>
+                                                    )}
+                                                    <p className="text-xs font-bold mt-1">Projeção</p>
+                                                    <p className="text-[10px] text-muted-foreground">{showSimulation ? `+${simulationPoints} bim` : 'ativar simulação'}</p>
+                                                </CardContent>
+                                            </Card>
+                                        </div>
+                                    )}
+
+                                    {/* Insights Inteligentes */}
+                                    {insights.length > 0 && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                                            {insights.map((insight, idx) => (
+                                                <Alert
+                                                    key={idx}
+                                                    className={`${insight.type === 'positive' ? 'bg-emerald-500/10 border-emerald-500/20' :
+                                                        insight.type === 'negative' ? 'bg-red-500/10 border-red-500/20' :
+                                                            insight.type === 'warning' ? 'bg-amber-500/10 border-amber-500/20' :
+                                                                'bg-blue-500/10 border-blue-500/20'
+                                                        }`}
+                                                >
+                                                    <Lightbulb className={`h-4 w-4 ${insight.type === 'positive' ? 'text-emerald-600' :
+                                                        insight.type === 'negative' ? 'text-red-600' :
+                                                            insight.type === 'warning' ? 'text-amber-600' :
+                                                                'text-blue-600'
+                                                        }`} />
+                                                    <AlertDescription className="text-xs">
+                                                        {insight.message}
+                                                    </AlertDescription>
+                                                </Alert>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Gráfico Principal - Evolução Longitudinal */}
+                                    <Card className="border-none shadow-sm bg-card">
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-lg">
+                                                {selectedSubject} - Evolução Longitudinal
+                                                {showSimulation && (
+                                                    <Badge variant="outline" className="ml-2 text-xs">
+                                                        Simulação Ativa
+                                                    </Badge>
+                                                )}
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="h-[420px] pt-4">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <ComposedChart data={showSimulation ? simulationData : subjectTimeline} margin={{ top: 20, right: 80, left: 10, bottom: 20 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" strokeOpacity={0.1} />
+                                                    <XAxis
+                                                        dataKey="label"
+                                                        tick={{ fontSize: 9 }}
+                                                        height={70}
+                                                        interval="preserveStartEnd"
+                                                        angle={-35}
+                                                        textAnchor="end"
+                                                        padding={{ left: 10, right: 30 }}
+                                                    />
+                                                    <YAxis domain={[0, 10]} tick={{ fontSize: 11 }} />
+                                                    <Tooltip
+                                                        contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '8px', border: '1px solid hsl(var(--border))', color: 'hsl(var(--foreground))' }}
+                                                        itemStyle={{ color: 'hsl(var(--foreground))' }}
+                                                        formatter={(value: number, name: string) => [value?.toFixed(1), name]}
+                                                    />
+                                                    <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                                                    <ReferenceLine y={6} stroke="#e74c3c" strokeDasharray="3 3" />
+
+                                                    {/* Linha do Fundamental - Roxa */}
+                                                    <Line
+                                                        type="monotone"
+                                                        dataKey="fundGrade"
+                                                        stroke="#8e44ad"
+                                                        strokeWidth={3}
+                                                        name="Fundamental"
+                                                        dot={{ r: 5, fill: '#8e44ad', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+                                                        activeDot={{ r: 7 }}
+                                                        connectNulls
+                                                    >
+                                                        <LabelList
+                                                            dataKey="fundGrade"
+                                                            position="top"
+                                                            offset={8}
+                                                            formatter={(val: number) => val?.toFixed(1)}
+                                                            style={{ fontSize: '10px', fontWeight: 'bold', fill: '#8e44ad' }}
+                                                        />
+                                                    </Line>
+
+                                                    {/* Linha do Ensino Médio - Azul */}
+                                                    <Line
+                                                        type="monotone"
+                                                        dataKey="emGrade"
+                                                        stroke="#3498db"
+                                                        strokeWidth={3}
+                                                        name="Ensino Médio"
+                                                        dot={{ r: 5, fill: '#3498db', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+                                                        activeDot={{ r: 7 }}
+                                                        connectNulls
+                                                    >
+                                                        <LabelList
+                                                            dataKey="emGrade"
+                                                            position="top"
+                                                            offset={8}
+                                                            formatter={(val: number) => val?.toFixed(1)}
+                                                            style={{ fontSize: '10px', fontWeight: 'bold', fill: '#3498db' }}
+                                                        />
+                                                    </Line>
+
+                                                    {/* Avaliações Externas - Laranja */}
+                                                    <Scatter dataKey="external" fill="#f39c12" name="Aval. Externa" />
+
+                                                    {/* Ocorrências - Vermelho */}
+                                                    <Scatter dataKey="incident" fill="#e74c3c" name="Ocorrências" shape="triangle" />
+
+                                                    {/* Linha de Projeção/Simulação - Laranja tracejada */}
+                                                    {showSimulation && (
+                                                        <Line
+                                                            type="monotone"
+                                                            dataKey="simulatedGrade"
+                                                            stroke="#f97316"
+                                                            strokeWidth={3}
+                                                            strokeDasharray="5 5"
+                                                            name="Projeção"
+                                                            dot={{ r: 6, fill: '#f97316', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+                                                            activeDot={{ r: 8, fill: '#f97316' }}
+                                                            connectNulls
+                                                        >
+                                                            <LabelList
+                                                                dataKey="simulatedGrade"
+                                                                position="top"
+                                                                offset={8}
+                                                                formatter={(val: number) => val?.toFixed(1)}
+                                                                style={{ fontSize: '10px', fontWeight: 'bold', fill: '#f97316' }}
+                                                            />
+                                                        </Line>
+                                                    )}
+                                                </ComposedChart>
+                                            </ResponsiveContainer>
+                                        </CardContent>
+                                    </Card>
+
+                                    {/* Pulso de Performance - Abaixo com mesmo padrão */}
+                                    <Card className="border-none shadow-sm bg-card">
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-lg">
+                                                Pulso de Performance
+                                            </CardTitle>
+                                            <CardDescription>
+                                                Visão contínua com notas em cada período da trajetória
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="h-[300px] pt-4">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <ComposedChart data={showSimulation ? simulationData : subjectTimeline} margin={{ top: 20, right: 80, left: 10, bottom: 20 }}>
+                                                    <defs>
+                                                        <linearGradient id="pulseGradient2" x1="0" y1="0" x2="0" y2="1">
+                                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
+                                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                                        </linearGradient>
+                                                    </defs>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" strokeOpacity={0.1} />
+                                                    <XAxis
+                                                        dataKey="label"
+                                                        tick={{ fontSize: 9 }}
+                                                        height={70}
+                                                        interval="preserveStartEnd"
+                                                        angle={-35}
+                                                        textAnchor="end"
+                                                        padding={{ left: 10, right: 30 }}
+                                                    />
+                                                    <YAxis domain={[0, 10]} tick={{ fontSize: 11 }} />
+                                                    <Tooltip
+                                                        contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '8px', border: '1px solid hsl(var(--border))', color: 'hsl(var(--foreground))' }}
+                                                        itemStyle={{ color: 'hsl(var(--foreground))' }}
+                                                        formatter={(val: number, name: string) => [val?.toFixed(1), name]}
+                                                    />
+                                                    <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                                                    <ReferenceLine y={6} stroke="#e74c3c" strokeDasharray="3 3" />
+
+                                                    <Line
+                                                        type="monotone"
+                                                        dataKey="continuousValue"
+                                                        stroke="#10b981"
+                                                        strokeWidth={3}
+                                                        name="Performance"
+                                                        dot={{ r: 5, fill: '#10b981', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+                                                        activeDot={{ r: 7 }}
+                                                    >
+                                                        <LabelList
+                                                            dataKey="continuousValue"
+                                                            position="top"
+                                                            offset={10}
+                                                            formatter={(val: number) => val?.toFixed(1)}
+                                                            style={{ fontSize: '10px', fontWeight: 'bold', fill: '#10b981' }}
+                                                        />
+                                                    </Line>
+
+                                                    {showSimulation && (
+                                                        <Line
+                                                            type="monotone"
+                                                            dataKey="simulatedGrade"
+                                                            stroke="#f97316"
+                                                            strokeWidth={3}
+                                                            strokeDasharray="5 5"
+                                                            name="Projeção"
+                                                            dot={{ r: 6, fill: '#f97316', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+                                                            activeDot={{ r: 8, fill: '#f97316' }}
+                                                            connectNulls
+                                                        >
+                                                            <LabelList
+                                                                dataKey="simulatedGrade"
+                                                                position="top"
+                                                                offset={10}
+                                                                formatter={(val: number) => val?.toFixed(1)}
+                                                                style={{ fontSize: '10px', fontWeight: 'bold', fill: '#f97316' }}
+                                                            />
+                                                        </Line>
+                                                    )}
+                                                </ComposedChart>
+                                            </ResponsiveContainer>
+                                        </CardContent>
+                                    </Card>
+                                </>
+                            ) : (
+                                <Card className="h-80 flex flex-col items-center justify-center border-dashed">
+                                    <BookOpen className="h-12 w-12 opacity-10 mb-2" />
+                                    <p className="text-muted-foreground">Escolha uma disciplina para visualizar a trajetória</p>
+                                </Card>
+                            )}
+                        </TabsContent>
+
+                        {/* TAB: TIMELINE HISTORY */}
+                        <TabsContent value="history">
+                            <Card className="border-none shadow-sm">
+                                <CardHeader>
+                                    <CardTitle>
+                                        Jornada do Estudante
+                                        {selectedSubject && (
+                                            <Badge variant="secondary" className="ml-2 font-normal">
+                                                {selectedSubject}
+                                            </Badge>
+                                        )}
+                                    </CardTitle>
+                                    <CardDescription>
+                                        {selectedSubject
+                                            ? `Trajetória acadêmica em ${selectedSubject}`
+                                            : 'Selecione uma disciplina na aba "Trajetória e Simulação" para visualizar'}
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                        <div className="flex gap-4 min-w-max p-2">
+                                            {subjectTimeline.map((event, i) => (
+                                                <div key={i} className="flex flex-col items-center gap-2 group">
+                                                    <div className="text-[10px] font-bold text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        {event.label.split(' - ')[0]}
+                                                    </div>
+                                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110 shadow-sm border-2 
+                                                    ${event.incidentCount > 0 ? 'bg-red-500/10 border-red-500/20' :
+                                                            event.external ? 'bg-amber-500/10 border-amber-500/20' :
+                                                                'bg-blue-500/10 border-blue-500/20'}`}>
+
+                                                        {event.incidentCount > 0 ? (
+                                                            <AlertTriangle className="h-6 w-6 text-red-600" />
+                                                        ) : event.external ? (
+                                                            <Target className="h-6 w-6 text-amber-600" />
+                                                        ) : (
+                                                            <GraduationCap className="h-6 w-6 text-blue-600" />
+                                                        )}
+                                                    </div>
+                                                    <div className="bg-muted/50 p-2 rounded-xl border shadow-sm min-w-[100px] text-center">
+                                                        <div className="text-lg font-black leading-tight">
+                                                            {(event.fundGrade || event.emGrade || event.external || 0).toFixed(1)}
+                                                        </div>
+                                                        <div className="text-[10px] uppercase font-bold text-muted-foreground truncate max-w-[80px]">
+                                                            {event.label.split(' - ')[1]}
+                                                        </div>
+                                                    </div>
+                                                    {event.incidentCount > 0 && (
+                                                        <Badge className="bg-red-500 text-[10px] h-4 px-1">{event.incidentCount} Ocor.</Badge>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    {subjectTimeline.length === 0 && (
+                                        <div className="text-center py-20 flex flex-col items-center opacity-30">
+                                            <History className="h-16 w-16 mb-2" />
+                                            <p>Nenhum registro para exibir nesta disciplina.</p>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent >
+                    </Tabs >
+                )
+            }
 
             {/* Dialogs */}
             <ExternalAssessmentBatchDialog
@@ -745,7 +1325,59 @@ const StudentTrajectory = () => {
                 subjects={ALL_SUBJECTS}
             />
             <TrajectoryImportDialog open={showImport} onOpenChange={setShowImport} />
-        </div>
+
+            {/* Edit Grade Dialog */}
+            <Dialog open={!!editingRecord} onOpenChange={(open) => !open && setEditingRecord(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Editar Nota</DialogTitle>
+                        <DialogDescription>
+                            Editando nota de <strong>{editingRecord?.subject}</strong> referente ao <strong>{editingRecord?.quarter}</strong> do {editingRecord?.gradeYear}º ano.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label>Nota</Label>
+                            <Input
+                                value={editGradeValue}
+                                onChange={(e) => setEditGradeValue(e.target.value)}
+                                type="number"
+                                min="0"
+                                max="10"
+                                step="0.1"
+                                className="text-lg font-bold"
+                                autoFocus
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditingRecord(null)}>Cancelar</Button>
+                        <Button onClick={() => {
+                            if (!editingRecord) return;
+                            const newGrade = parseFloat(editGradeValue.replace(',', '.'));
+                            if (isNaN(newGrade) || newGrade < 0 || newGrade > 10) {
+                                toast({ title: "Valor inválido", description: "Insira uma nota entre 0 e 10", variant: "destructive" });
+                                return;
+                            }
+                            deleteHistoricalGrade(editingRecord.id);
+                            addHistoricalGrade({
+                                studentId: selectedStudent!,
+                                gradeYear: editingRecord.gradeYear,
+                                calendarYear: new Date().getFullYear(),
+                                quarter: editingRecord.quarter,
+                                subject: editingRecord.subject,
+                                grade: newGrade,
+                                schoolLevel: 'fundamental'
+                            });
+                            toast({ title: "Nota atualizada", description: "A nota foi corrigida com sucesso." });
+                            setEditingRecord(null);
+                        }}>Salvar Alterações</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div >
     );
 };
 
