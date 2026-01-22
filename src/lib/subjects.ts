@@ -12,6 +12,7 @@ export const SUBJECT_AREAS: SubjectArea[] = [
     name: 'Linguagens, Códigos e suas Tecnologias',
     subjects: [
       'Língua Portuguesa',
+      'Redação',
       'Inglês',
       'Espanhol',
       'Educação Física',
@@ -63,9 +64,13 @@ export const getAllSubjects = (): string[] => {
 
 // Obter área de conhecimento de uma disciplina (incluindo profissionais se fornecidas)
 export const getSubjectArea = (subject: string, professionalSubjects: string[] = []): SubjectArea | undefined => {
-  // Primeiro verifica nas áreas base
+  // Primeiro verifica nas áreas base (Ensino Médio)
   const baseArea = SUBJECT_AREAS.find(area => area.subjects.includes(subject));
   if (baseArea) return baseArea;
+
+  // Depois verifica nas áreas do fundamental
+  const fundamentalArea = FUNDAMENTAL_SUBJECT_AREAS.find(area => area.subjects.includes(subject));
+  if (fundamentalArea) return fundamentalArea;
 
   // Se não encontrou, verifica se é disciplina profissional
   if (professionalSubjects.includes(subject)) {

@@ -19,6 +19,7 @@ import { AlertTriangle, Save, CheckCircle2, FileUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   SUBJECT_AREAS,
+  FUNDAMENTAL_SUBJECT_AREAS,
   QUARTERS
 } from '@/lib/subjects';
 import { SigeImportDialog } from './SigeImportDialog';
@@ -166,9 +167,19 @@ export const GradesManager = () => {
   // Usar uma string para rastrear mudanças nas disciplinas profissionais
   const professionalSubjectsStr = `${selectedSchoolYear}:${allProfessionalSubjects.join(',')}`;
 
+  // Determinar se é Ensino Fundamental
+  const isFundamental = useMemo(() => {
+    if (!selectedClassData) return false;
+    const series = selectedClassData.series || '';
+    return ['6', '7', '8', '9'].some(s => series.includes(s));
+  }, [selectedClassData]);
+
+  // Escolher as áreas de disciplinas comuns baseadas no nível
+  const baseAreas = isFundamental ? FUNDAMENTAL_SUBJECT_AREAS : SUBJECT_AREAS;
+
   // Calcular allSubjects - disciplinas base + profissionais do ANO SELECIONADO
   const allSubjects = [
-    ...SUBJECT_AREAS.flatMap(area => area.subjects),
+    ...baseAreas.flatMap(area => area.subjects),
     ...professionalSubjects,  // Agora usa apenas disciplinas do ano selecionado
   ];
 
@@ -208,8 +219,9 @@ export const GradesManager = () => {
       lastInitialized.gradesKey !== gradesKey;
 
     if (needsReinit) {
+      const subjectsToUse = isFundamental ? FUNDAMENTAL_SUBJECT_AREAS : SUBJECT_AREAS;
       const currentAllSubjects = [
-        ...SUBJECT_AREAS.flatMap(area => area.subjects),
+        ...subjectsToUse.flatMap(area => area.subjects),
         ...allProfessionalSubjects,
       ];
 
@@ -245,8 +257,9 @@ export const GradesManager = () => {
       });
     } else {
       // Se apenas adicionou novas disciplinas profissionais, adicionar campos vazios sem resetar
+      const subjectsToUse = isFundamental ? FUNDAMENTAL_SUBJECT_AREAS : SUBJECT_AREAS;
       const currentAllSubjects = [
-        ...SUBJECT_AREAS.flatMap(area => area.subjects),
+        ...subjectsToUse.flatMap(area => area.subjects),
         ...allProfessionalSubjects,
       ];
 

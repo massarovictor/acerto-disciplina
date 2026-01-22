@@ -22,7 +22,7 @@ import {
   CLASSIFICATION_COLORS
 } from './advancedAnalytics';
 import { generateInsightsReport, InsightsReport } from './insightsEngine';
-import { QUARTERS, SUBJECT_AREAS, getSubjectArea } from './subjects';
+import { QUARTERS, SUBJECT_AREAS, FUNDAMENTAL_SUBJECT_AREAS, getSubjectArea } from './subjects';
 
 // pdfMake será carregado dinamicamente
 let pdfMakeInstance: any = null;
@@ -71,6 +71,7 @@ class ClassReportPDFGenerator {
   private config: SchoolConfig;
   private analytics: AdvancedAnalyticsResult | null = null;
   private insights: InsightsReport | null = null;
+  private currentClass: Class | null = null;
   private period: string = 'Anual';
   private grades: Grade[] = [];
   private students: Student[] = [];
@@ -86,7 +87,7 @@ class ClassReportPDFGenerator {
     students: Student[],
     grades: Grade[],
     incidents: Incident[],
-    attendance: AttendanceRecord[], // DISABLED: Kept for API compatibility, not used
+    attendance: AttendanceRecord[],
     professionalSubjects: string[] = [],
     selectedQuarter?: string
   ): Promise<void> {
@@ -95,6 +96,7 @@ class ClassReportPDFGenerator {
       this.students = students;
       this.incidents = incidents;
       this.professionalSubjects = professionalSubjects;
+      this.currentClass = cls;
 
       this.period = selectedQuarter && selectedQuarter !== 'anual'
         ? selectedQuarter
@@ -170,8 +172,14 @@ class ClassReportPDFGenerator {
   private analyzeAreas(): AreaAnalysis[] {
     const areas: AreaAnalysis[] = [];
 
-    // Incluir áreas padrão + profissional se houver
-    const allAreas = [...SUBJECT_AREAS];
+    // Determinar se é ensino fundamental com base na série
+    const series = this.currentClass?.series;
+    const isFundamental = series ? ['6º', '7º', '8º', '9º'].some(s => series.includes(s)) : false;
+
+    // Incluir áreas padrão (Médio ou Fundamental) + profissional se houver
+    const baseAreas = isFundamental ? FUNDAMENTAL_SUBJECT_AREAS : SUBJECT_AREAS;
+    const allAreas = [...baseAreas];
+
     if (this.professionalSubjects.length > 0) {
       allAreas.push({
         name: 'Formação Técnica e Profissional',

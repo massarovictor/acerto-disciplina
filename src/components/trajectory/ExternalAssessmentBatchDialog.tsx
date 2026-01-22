@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useExternalAssessments, useStudents } from '@/hooks/useData';
 import { QUARTERS } from '@/lib/subjects';
 import { ExternalAssessmentType } from '@/types';
+import { useEffect } from 'react';
 
 interface ExternalAssessmentBatchDialogProps {
     open: boolean;
@@ -46,10 +47,45 @@ export const ExternalAssessmentBatchDialog = ({ open, onOpenChange, classId, sub
 
     const [scores, setScores] = useState<Record<string, { score: string, proficiency: string }>>({});
 
+    const { externalAssessments } = useExternalAssessments();
+
     const classStudents = useMemo(() =>
         students.filter(s => s.classId === classId).sort((a, b) => a.name.localeCompare(b.name)),
         [students, classId]
     );
+
+    // Sincronizar notas existentes quando o formulário mudar
+    useEffect(() => {
+        if (!open) return;
+
+        const newScores: Record<string, { score: string, proficiency: string }> = {};
+
+        // Buscar apenas notas que batem com o cabeçalho atual (mesmo nome, tipo, disciplina, etc)
+        const relevantAssessments = externalAssessments.filter(e =>
+            e.assessmentName === form.assessmentName &&
+            e.assessmentType === form.assessmentType &&
+            (form.subject === 'geral' ? !e.subject : e.subject === form.subject) &&
+            e.schoolLevel === form.schoolLevel &&
+            e.gradeYear === form.gradeYear &&
+            e.quarter === form.quarter
+        );
+
+        relevantAssessments.forEach(e => {
+            newScores[e.studentId] = {
+                score: String(e.score).replace('.', ','),
+                proficiency: e.proficiencyLevel || ''
+            };
+        });
+
+        // Preencher com '' para os alunos que não tem nota
+        classStudents.forEach(s => {
+            if (!newScores[s.id]) {
+                newScores[s.id] = { score: '', proficiency: '' };
+            }
+        });
+
+        setScores(newScores);
+    }, [open, form.assessmentName, form.assessmentType, form.subject, form.schoolLevel, form.gradeYear, form.quarter, externalAssessments, classStudents]);
 
     const handleSave = async () => {
         if (!form.assessmentName) {

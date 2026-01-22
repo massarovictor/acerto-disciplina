@@ -50,7 +50,9 @@ interface DataState {
     // Actions - Historical Grades
     setHistoricalGrades: (grades: HistoricalGrade[]) => void;
     addHistoricalGrade: (grade: HistoricalGrade) => void;
+    addHistoricalGradesBatch: (grades: HistoricalGrade[]) => void;
     deleteHistoricalGrade: (id: string) => void;
+    deleteHistoricalGradesBatch: (ids: string[]) => void;
 
     // Actions - External Assessments
     setExternalAssessments: (assessments: ExternalAssessment[]) => void;
@@ -146,7 +148,11 @@ export const useDataStore = create<DataState>()((set) => ({
         })),
 
     // Actions - Historical Grades
-    setHistoricalGrades: (historicalGrades) => set({ historicalGrades }),
+    setHistoricalGrades: (historicalGrades) => {
+        // Deduplicate input to prevent warnings
+        const unique = new Map(historicalGrades.map(g => [g.id, g]));
+        set({ historicalGrades: Array.from(unique.values()) });
+    },
     addHistoricalGrade: (grade) =>
         set((state) => {
             const existing = state.historicalGrades.findIndex((g) => g.id === grade.id);
@@ -157,10 +163,30 @@ export const useDataStore = create<DataState>()((set) => ({
             }
             return { historicalGrades: [grade, ...state.historicalGrades] };
         }),
+    addHistoricalGradesBatch: (newGrades) =>
+        set((state) => {
+            // Criar um Map para busca rápida de notas existentes por ID
+            const gradesMap = new Map(state.historicalGrades.map(g => [g.id, g]));
+
+            // Atualizar/Inserir novas notas no Map
+            newGrades.forEach(grade => {
+                gradesMap.set(grade.id, grade);
+            });
+
+            // Converter de volta para array
+            return { historicalGrades: Array.from(gradesMap.values()) };
+        }),
     deleteHistoricalGrade: (id) =>
         set((state) => ({
             historicalGrades: state.historicalGrades.filter((g) => g.id !== id),
         })),
+    deleteHistoricalGradesBatch: (ids) =>
+        set((state) => {
+            const idsSet = new Set(ids);
+            return {
+                historicalGrades: state.historicalGrades.filter((g) => !idsSet.has(g.id)),
+            };
+        }),
 
     // Actions - External Assessments
     setExternalAssessments: (externalAssessments) => set({ externalAssessments }),

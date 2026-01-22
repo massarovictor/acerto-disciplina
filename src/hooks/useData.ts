@@ -476,13 +476,24 @@ export function useGrades() {
   useEffect(() => {
     if (!user?.id) return;
 
+    const {
+      setGrades,
+      addGrade: addGradeToStore,
+      deleteGrade: deleteGradeToStore
+    } = useDataStore.getState();
+
     const channel = supabase
       .channel("realtime:grades")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "grades" },
-        () => {
-          fetchGrades();
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const saved = mapGradeFromDb(payload.new as any);
+            addGradeToStore(saved);
+          } else if (payload.eventType === 'DELETE') {
+            deleteGradeToStore(payload.old.id);
+          }
         },
       )
       .subscribe();
@@ -519,6 +530,41 @@ export function useGrades() {
       }
       return [saved, ...prev];
     });
+  };
+
+  const addGrades = async (gradesData: Omit<Grade, "id" | "recordedAt">[]) => {
+    if (!user?.id || gradesData.length === 0) return;
+
+    const payload = gradesData.map(g => mapGradeToDb(g, user.id));
+
+    // Supabase allows bulk upsert
+    const { data, error } = await supabase
+      .from("grades")
+      .upsert(payload, {
+        onConflict: "student_id,class_id,subject,quarter,school_year",
+      })
+      .select("*");
+
+    if (error) {
+      logError("grades.bulk_upsert", error);
+      throw error;
+    }
+
+    if (data) {
+      const savedGrades = data.map(mapGradeFromDb);
+      setGrades((prev) => {
+        const newGrades = [...prev];
+        savedGrades.forEach(saved => {
+          const index = newGrades.findIndex(g => g.id === saved.id);
+          if (index >= 0) {
+            newGrades[index] = saved;
+          } else {
+            newGrades.unshift(saved);
+          }
+        });
+        return newGrades;
+      });
+    }
   };
 
   const updateGrade = async (id: string, updates: Partial<Grade>) => {
@@ -566,12 +612,24 @@ export function useGrades() {
     setGrades((prev) => prev.filter((grade) => grade.id !== id));
   };
 
+  const deleteGrades = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    const { error } = await supabase.from("grades").delete().in("id", ids);
+    if (error) {
+      logError("grades.bulk_delete", error);
+      throw error;
+    }
+    setGrades((prev) => prev.filter((grade) => !ids.includes(grade.id)));
+  };
+
   return {
     grades,
     refreshGrades: fetchGrades,
     addGrade,
+    addGrades,
     updateGrade,
     deleteGrade,
+    deleteGrades,
   };
 }
 
@@ -1236,30 +1294,82 @@ const mapHistoricalGradeToDb = (grade: Omit<HistoricalGrade, 'id' | 'createdAt' 
 });
 
 export function useHistoricalGrades() {
-  const { historicalGrades, setHistoricalGrades, addHistoricalGrade: addHistoricalGradeToStore, deleteHistoricalGrade: deleteHistoricalGradeFromStore } = useDataStore();
+  const {
+    historicalGrades,
+    setHistoricalGrades,
+    addHistoricalGrade: addHistoricalGradeToStore,
+    addHistoricalGradesBatch: addHistoricalGradesBatchToStore,
+    deleteHistoricalGrade: deleteHistoricalGradeFromStore,
+    deleteHistoricalGradesBatch: deleteHistoricalGradesBatchToStore
+  } = useDataStore();
   const [loading, setLoading] = useState(true);
 
   const fetchHistoricalGrades = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("historical_grades")
-      .select("*")
-      .order("calendar_year", { ascending: false });
+    const PAGE_SIZE = 1000;
+    let allData: any[] = [];
+    let page = 0;
+    let hasMore = true;
 
-    if (error) {
-      if (!error.message.includes("does not exist")) {
-        logError("historical_grades.select", error);
+    while (hasMore) {
+      const from = page * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      const { data, error } = await supabase
+        .from("historical_grades")
+        .select("*")
+        .order("calendar_year", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to);
+
+      if (error) {
+        if (!error.message.includes("does not exist")) {
+          logError("historical_grades.select", error);
+        }
+        hasMore = false;
+      } else if (data && data.length > 0) {
+        allData = [...allData, ...data];
+        page++;
+        hasMore = data.length === PAGE_SIZE;
+      } else {
+        hasMore = false;
       }
-      setHistoricalGrades([]);
-    } else {
-      setHistoricalGrades((data || []).map(mapHistoricalGradeFromDb));
     }
+
+    setHistoricalGrades(allData.map(mapHistoricalGradeFromDb));
     setLoading(false);
   }, [setHistoricalGrades]);
 
   useEffect(() => {
     fetchHistoricalGrades();
   }, [fetchHistoricalGrades]);
+
+  useEffect(() => {
+    const {
+      addHistoricalGrade: addHistoricalGradeToStore,
+      deleteHistoricalGrade: deleteHistoricalGradeFromStore
+    } = useDataStore.getState();
+
+    const channel = supabase
+      .channel("realtime:historical_grades")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "historical_grades" },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const saved = mapHistoricalGradeFromDb(payload.new as any);
+            addHistoricalGradeToStore(saved);
+          } else if (payload.eventType === 'DELETE') {
+            deleteHistoricalGradeFromStore(payload.old.id);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const addHistoricalGrade = async (
     grade: Omit<HistoricalGrade, 'id' | 'createdAt' | 'updatedAt'>
@@ -1280,6 +1390,103 @@ export function useHistoricalGrades() {
     const newGrade = mapHistoricalGradeFromDb(data);
     addHistoricalGradeToStore(newGrade);
     return newGrade;
+  };
+
+  const addHistoricalGradesBatch = async (
+    grades: Omit<HistoricalGrade, 'id' | 'createdAt' | 'updatedAt'>[]
+  ) => {
+    const payloads = grades.map(g => mapHistoricalGradeToDb(g));
+    const BATCH_SIZE = 50; // Reduzido de 200 para 50 para evitar erros de payload do Supabase
+    const allSavedGrades: HistoricalGrade[] = [];
+
+    for (let i = 0; i < payloads.length; i += BATCH_SIZE) {
+      const chunk = payloads.slice(i, i + BATCH_SIZE);
+      const { data, error } = await supabase
+        .from("historical_grades")
+        .upsert(chunk, {
+          onConflict: "student_id,school_level,grade_year,subject,quarter,calendar_year",
+        })
+        .select("*");
+
+      if (error) {
+        logError("historical_grades.upsert_batch", error);
+        throw error;
+      }
+
+      if (data) {
+        allSavedGrades.push(...data.map(mapHistoricalGradeFromDb));
+      }
+    }
+
+    addHistoricalGradesBatchToStore(allSavedGrades);
+    return allSavedGrades;
+  };
+
+  const deleteHistoricalGradesBatch = async (ids: string[]) => {
+    if (!ids.length) return;
+
+    const CHUNK_SIZE = 50;
+    for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+      const chunk = ids.slice(i, i + CHUNK_SIZE);
+      const { error } = await supabase
+        .from("historical_grades")
+        .delete()
+        .in("id", chunk);
+
+      if (error) {
+        logError("historical_grades.delete_batch", error);
+        throw error;
+      }
+    }
+
+    deleteHistoricalGradesBatchToStore(ids);
+  };
+
+  const clearHistoricalGradesForStudents = async (
+    studentIds: string[],
+    level: "fundamental" | "medio" = "fundamental"
+  ) => {
+    if (!studentIds.length) return;
+
+    const CHUNK_SIZE = 50;
+    const allIdsToDelete: string[] = [];
+
+    // Chunked Fetch
+    for (let i = 0; i < studentIds.length; i += CHUNK_SIZE) {
+      const chunk = studentIds.slice(i, i + CHUNK_SIZE);
+      const { data: toDelete, error: fetchError } = await supabase
+        .from("historical_grades")
+        .select("id")
+        .in("student_id", chunk)
+        .eq("school_level", level);
+
+      if (fetchError) {
+        logError("historical_grades.fetch_for_clear", fetchError);
+        throw fetchError;
+      }
+
+      if (toDelete) {
+        allIdsToDelete.push(...toDelete.map(g => g.id));
+      }
+    }
+
+    if (allIdsToDelete.length === 0) return;
+
+    // Chunked Delete
+    for (let i = 0; i < allIdsToDelete.length; i += CHUNK_SIZE) {
+      const chunk = allIdsToDelete.slice(i, i + CHUNK_SIZE);
+      const { error: deleteError } = await supabase
+        .from("historical_grades")
+        .delete()
+        .in("id", chunk);
+
+      if (deleteError) {
+        logError("historical_grades.clear_students", deleteError);
+        throw deleteError;
+      }
+    }
+
+    deleteHistoricalGradesBatchToStore(allIdsToDelete);
   };
 
   const deleteHistoricalGrade = async (id: string) => {
@@ -1306,7 +1513,10 @@ export function useHistoricalGrades() {
     loading,
     refreshHistoricalGrades: fetchHistoricalGrades,
     addHistoricalGrade,
+    addHistoricalGradesBatch,
     deleteHistoricalGrade,
+    deleteHistoricalGradesBatch,
+    clearHistoricalGradesForStudents,
     getStudentHistoricalGrades,
   };
 }

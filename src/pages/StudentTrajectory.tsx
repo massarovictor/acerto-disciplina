@@ -67,6 +67,15 @@ const FUNDAMENTAL_SUBJECTS = [
 const MEDIO_SUBJECTS = [...new Set(SUBJECT_AREAS.flatMap(a => a.subjects))].sort();
 const ALL_SUBJECTS = [...new Set([...FUNDAMENTAL_SUBJECTS, ...MEDIO_SUBJECTS])].sort();
 
+// Helper para normalização de nomes de disciplinas (comparação robusta)
+const normalizeSubjectName = (name: string): string => {
+    return name
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+};
+
 const StudentTrajectory = () => {
     const { classes } = useClasses();
     const { students } = useStudents();
@@ -86,8 +95,8 @@ const StudentTrajectory = () => {
     const gridQuarter = trajectoryUI.gridQuarter;
     const gridCalendarYear = trajectoryUI.gridCalendarYear;
 
-    const setSelectedClass = (value: string) => setTrajectoryUI({ selectedClassId: value, selectedStudentId: '', selectedSubject: '' });
-    const setSelectedStudent = (value: string) => setTrajectoryUI({ selectedStudentId: value, selectedSubject: '' });
+    const setSelectedClass = (value: string) => setTrajectoryUI({ selectedClassId: value, selectedStudentId: '' });
+    const setSelectedStudent = (value: string) => setTrajectoryUI({ selectedStudentId: value });
     const setSelectedSubject = (value: string) => setTrajectoryUI({ selectedSubject: value });
     const setActiveTab = (value: string) => setTrajectoryUI({ activeTab: value });
     const setGridYear = (value: number) => setTrajectoryUI({ gridYear: value });
@@ -116,14 +125,27 @@ const StudentTrajectory = () => {
     const studentExternal = useMemo(() => externalAssessments.filter(e => e.studentId === selectedStudent), [externalAssessments, selectedStudent]);
     const studentIncidents = useMemo(() => incidents.filter(i => i.studentIds.includes(selectedStudent)), [incidents, selectedStudent]);
 
+    const isStudentFundamental = useMemo(() => {
+        if (!studentData) return false;
+        // Se temos histórico do fundamental para este ano, ou se o ID da turma sugere fundamental
+        const cls = classes.find(c => c.id === studentData.classId);
+        if (!cls) return false;
+        return ['6', '7', '8', '9'].some(s => cls.series.includes(s));
+    }, [studentData, classes]);
+
     // Sync Grid Values with existing data
     useEffect(() => {
         if (!selectedStudent || activeTab !== 'entry') return;
 
         const newValues: Record<string, string> = {};
+        const s2 = normalizeSubjectName(''); // precompute normalized search if needed
+
         FUNDAMENTAL_SUBJECTS.forEach(subject => {
+            const normalizedSubject = normalizeSubjectName(subject);
             const existing = studentHistorical.find(
-                h => h.gradeYear === gridYear && h.quarter === gridQuarter && h.subject === subject
+                h => h.gradeYear === gridYear &&
+                    h.quarter === gridQuarter &&
+                    normalizeSubjectName(h.subject) === normalizedSubject
             );
             newValues[subject] = existing ? String(existing.grade).replace('.', ',') : '';
         });
@@ -140,16 +162,20 @@ const StudentTrajectory = () => {
         if (!selectedStudent) return null;
 
         const subjectStats: Record<string, { total: number, count: number, trend: number }> = {};
+        const displayNamesMap: Record<string, string> = {};
 
         // Process all grades (Historical + Regular)
         [...studentHistorical, ...studentRegularGrades.map(g => ({ ...g, gradeYear: g.schoolYear }))].forEach(g => {
-            if (!subjectStats[g.subject]) subjectStats[g.subject] = { total: 0, count: 0, trend: 0 };
-            subjectStats[g.subject].total += g.grade;
-            subjectStats[g.subject].count += 1;
+            const normalized = normalizeSubjectName(g.subject);
+            if (!displayNamesMap[normalized]) displayNamesMap[normalized] = g.subject;
+
+            if (!subjectStats[normalized]) subjectStats[normalized] = { total: 0, count: 0, trend: 0 };
+            subjectStats[normalized].total += g.grade;
+            subjectStats[normalized].count += 1;
         });
 
-        const averages = Object.entries(subjectStats).map(([name, stats]) => ({
-            name,
+        const averages = Object.entries(subjectStats).map(([normalized, stats]) => ({
+            name: displayNamesMap[normalized],
             avg: stats.total / stats.count,
             count: stats.count
         }));
@@ -191,10 +217,14 @@ const StudentTrajectory = () => {
 
                     // Primeiro: tentar buscar nota anual (formato da importação)
                     const annualGrade = studentHistorical.find(h => {
-                        const isMatch = h.subject === selectedSubject || h.subject === fundamentalEquiv;
-                        // Fallback para nomes legados (Português/Língua Portuguesa)
-                        const isPortugueseMatch = (selectedSubject === 'Língua Portuguesa' && h.subject === 'Português') ||
-                            (selectedSubject === 'Português' && h.subject === 'Língua Portuguesa');
+                        const s1 = normalizeSubjectName(h.subject);
+                        const s2 = normalizeSubjectName(selectedSubject);
+                        const sEquiv = fundamentalEquiv ? normalizeSubjectName(fundamentalEquiv) : null;
+
+                        const isMatch = s1 === s2 || (sEquiv && s1 === sEquiv);
+
+                        // Fallback para nomes legados
+                        const isPortugueseMatch = (s2.includes('portugues') && s1.includes('portugues'));
 
                         return h.gradeYear === year &&
                             h.quarter === 'Anual' &&
@@ -214,10 +244,12 @@ const StudentTrajectory = () => {
                         // Se não tem anual, buscar por bimestre
                         QUARTERS.forEach(q => {
                             const g = studentHistorical.find(h => {
-                                const isMatch = h.subject === selectedSubject || h.subject === fundamentalEquiv;
-                                // Fallback para nomes legados (Português/Língua Portuguesa)
-                                const isPortugueseMatch = (selectedSubject === 'Língua Portuguesa' && h.subject === 'Português') ||
-                                    (selectedSubject === 'Português' && h.subject === 'Língua Portuguesa');
+                                const s1 = normalizeSubjectName(h.subject);
+                                const s2 = normalizeSubjectName(selectedSubject);
+                                const sEquiv = fundamentalEquiv ? normalizeSubjectName(fundamentalEquiv) : null;
+
+                                const isMatch = s1 === s2 || (sEquiv && s1 === sEquiv);
+                                const isPortugueseMatch = (s2.includes('portugues') && s1.includes('portugues'));
 
                                 return h.gradeYear === year && h.quarter === q && (isMatch || isPortugueseMatch);
                             });
@@ -248,7 +280,7 @@ const StudentTrajectory = () => {
                         const g = studentRegularGrades.find(r =>
                             (r.schoolYear || 1) === year &&
                             r.quarter === q &&
-                            r.subject === selectedSubject
+                            normalizeSubjectName(r.subject) === normalizeSubjectName(selectedSubject)
                         );
 
                         const ext = studentExternal.find(e =>
@@ -615,8 +647,8 @@ const StudentTrajectory = () => {
                                     <SelectValue placeholder="Escolha a disciplina" />
                                 </SelectTrigger>
                                 <SelectContent className="max-h-80">
-                                    {/* Áreas do Ensino Médio (ENEM) */}
-                                    {SUBJECT_AREAS.map(area => (
+                                    {/* Áreas conforme o nível do aluno */}
+                                    {(isStudentFundamental ? FUNDAMENTAL_SUBJECT_AREAS : SUBJECT_AREAS).map(area => (
                                         <SelectGroup key={area.name}>
                                             <SelectLabel className="px-2 py-1.5 text-xs font-bold text-primary bg-primary/5 uppercase tracking-wider">
                                                 {area.name.replace(', Códigos e suas Tecnologias', '').replace(' e suas Tecnologias', '')}
@@ -626,18 +658,20 @@ const StudentTrajectory = () => {
                                             ))}
                                         </SelectGroup>
                                     ))}
-                                    {/* Disciplinas específicas do Fundamental (não do médio) */}
-                                    <SelectGroup>
-                                        <SelectLabel className="px-2 py-1.5 text-xs font-bold text-amber-600 bg-amber-500/10 uppercase tracking-wider">
-                                            Específicas do Fundamental
-                                        </SelectLabel>
-                                        <SelectItem value="Ciências">
-                                            Ciências <span className="text-muted-foreground text-[10px]">(+ Natureza)</span>
-                                        </SelectItem>
-                                        <SelectItem value="Língua Inglesa">
-                                            Língua Inglesa <span className="text-muted-foreground text-[10px]">(+ Linguagens)</span>
-                                        </SelectItem>
-                                    </SelectGroup>
+                                    {/* Mostrar Histórico Fundamental se estiver no Ensino Médio, caso tenha dados */}
+                                    {!isStudentFundamental && (
+                                        <SelectGroup>
+                                            <SelectLabel className="px-2 py-1.5 text-xs font-bold text-amber-600 bg-amber-500/10 uppercase tracking-wider">
+                                                Histórico Fundamental
+                                            </SelectLabel>
+                                            <SelectItem value="Ciências">
+                                                Ciências <span className="text-muted-foreground text-[10px]">(+ Natureza)</span>
+                                            </SelectItem>
+                                            <SelectItem value="Língua Inglesa">
+                                                Língua Inglesa <span className="text-muted-foreground text-[10px]">(+ Linguagens)</span>
+                                            </SelectItem>
+                                        </SelectGroup>
+                                    )}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -656,7 +690,6 @@ const StudentTrajectory = () => {
                         <TabsList className="bg-muted p-1 rounded-lg w-full justify-start overflow-x-auto">
                             <TabsTrigger value="summary" className="px-6">Resumo Holístico</TabsTrigger>
                             <TabsTrigger value="trajectory" className="px-6">Trajetória e Simulação</TabsTrigger>
-                            <TabsTrigger value="history" className="px-6">Histórico Timeline</TabsTrigger>
                             <TabsTrigger value="entry" className="px-6">Lançamento Rápido</TabsTrigger>
                         </TabsList>
 
@@ -1250,69 +1283,7 @@ const StudentTrajectory = () => {
                             )}
                         </TabsContent>
 
-                        {/* TAB: TIMELINE HISTORY */}
-                        <TabsContent value="history">
-                            <Card className="border-none shadow-sm">
-                                <CardHeader>
-                                    <CardTitle>
-                                        Jornada do Estudante
-                                        {selectedSubject && (
-                                            <Badge variant="secondary" className="ml-2 font-normal">
-                                                {selectedSubject}
-                                            </Badge>
-                                        )}
-                                    </CardTitle>
-                                    <CardDescription>
-                                        {selectedSubject
-                                            ? `Trajetória acadêmica em ${selectedSubject}`
-                                            : 'Selecione uma disciplina na aba "Trajetória e Simulação" para visualizar'}
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="overflow-x-auto pb-4 custom-scrollbar">
-                                        <div className="flex gap-4 min-w-max p-2">
-                                            {subjectTimeline.map((event, i) => (
-                                                <div key={i} className="flex flex-col items-center gap-2 group">
-                                                    <div className="text-[10px] font-bold text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        {event.label.split(' - ')[0]}
-                                                    </div>
-                                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110 shadow-sm border-2 
-                                                    ${event.incidentCount > 0 ? 'bg-red-500/10 border-red-500/20' :
-                                                            event.external ? 'bg-amber-500/10 border-amber-500/20' :
-                                                                'bg-blue-500/10 border-blue-500/20'}`}>
 
-                                                        {event.incidentCount > 0 ? (
-                                                            <AlertTriangle className="h-6 w-6 text-red-600" />
-                                                        ) : event.external ? (
-                                                            <Target className="h-6 w-6 text-amber-600" />
-                                                        ) : (
-                                                            <GraduationCap className="h-6 w-6 text-blue-600" />
-                                                        )}
-                                                    </div>
-                                                    <div className="bg-muted/50 p-2 rounded-xl border shadow-sm min-w-[100px] text-center">
-                                                        <div className="text-lg font-black leading-tight">
-                                                            {(event.fundGrade || event.emGrade || event.external || 0).toFixed(1)}
-                                                        </div>
-                                                        <div className="text-[10px] uppercase font-bold text-muted-foreground truncate max-w-[80px]">
-                                                            {event.label.split(' - ')[1]}
-                                                        </div>
-                                                    </div>
-                                                    {event.incidentCount > 0 && (
-                                                        <Badge className="bg-red-500 text-[10px] h-4 px-1">{event.incidentCount} Ocor.</Badge>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    {subjectTimeline.length === 0 && (
-                                        <div className="text-center py-20 flex flex-col items-center opacity-30">
-                                            <History className="h-16 w-16 mb-2" />
-                                            <p>Nenhum registro para exibir nesta disciplina.</p>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </TabsContent >
                     </Tabs >
                 )
             }

@@ -23,7 +23,7 @@ import {
     BookOpen
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useStudents, useHistoricalGrades } from '@/hooks/useData';
+import { useClasses, useStudents, useHistoricalGrades } from '@/hooks/useData';
 import {
     processTrajectoryFile,
     TrajectoryParseResult,
@@ -47,13 +47,18 @@ export const TrajectoryImportDialog = ({
     open,
     onOpenChange,
 }: TrajectoryImportDialogProps) => {
+    const { classes } = useClasses();
     const { students } = useStudents();
-    const { addHistoricalGrade, historicalGrades } = useHistoricalGrades();
+    const { addHistoricalGradesBatch, clearHistoricalGradesForStudents, historicalGrades } = useHistoricalGrades();
+
+    const [selectedClassId, setSelectedClassId] = useState<string>('');
     const { toast } = useToast();
 
     const [step, setStep] = useState<'upload' | 'match-students' | 'preview'>('upload');
     const [isProcessing, setIsProcessing] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
+    const [replaceExisting, setReplaceExisting] = useState(false);
+    const [importPhase, setImportPhase] = useState<'deleting' | 'importing'>('importing');
     const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
     const [parseResult, setParseResult] = useState<TrajectoryParseResult | null>(null);
     const [studentMatches, setStudentMatches] = useState<StudentMatch[]>([]);
@@ -86,13 +91,16 @@ export const TrajectoryImportDialog = ({
                     description: `${result.rows.length} alunos e ${result.subjects.length} disciplinas encontradas (anos ${result.years.join(', ')})`,
                 });
 
-                // Preparar matches
+                // Preparar matches - filtrar por turma se selecionada
                 const uniqueStudentNames = Array.from(new Set(result.rows.map(r => r.studentName)));
+                const filteredStudents = selectedClassId
+                    ? students.filter(s => s.classId === selectedClassId)
+                    : students;
 
                 const matches: StudentMatch[] = uniqueStudentNames.map(fileStudentName => {
                     let bestMatch: { student: typeof students[0], score: number } | null = null;
 
-                    for (const student of students) {
+                    for (const student of filteredStudents) {
                         const score = calculateNameSimilarity(fileStudentName, student.name);
                         if (!bestMatch || score > bestMatch.score) {
                             bestMatch = { student, score };
@@ -218,45 +226,82 @@ export const TrajectoryImportDialog = ({
         let imported = 0;
         let errors = 0;
 
-        for (let i = 0; i < toImport.length; i++) {
-            const grade = toImport[i];
+        try {
+            // Se a opção de substituir estiver ativa, limpar dados existentes para os alunos selecionados
+            if (replaceExisting) {
+                setImportPhase('deleting');
+                const studentIdsToClear = Array.from(new Set(toImport.map(g => g.studentId)));
 
-            try {
-                await addHistoricalGrade({
-                    studentId: grade.studentId,
-                    schoolLevel: grade.schoolLevel,
-                    gradeYear: grade.gradeYear,
-                    subject: grade.subject,
-                    quarter: grade.quarter,
-                    grade: grade.grade,
-                    calendarYear: grade.calendarYear
-                });
-                imported++;
-            } catch (error) {
-                console.error('Erro ao importar nota:', error);
-                errors++;
+                try {
+                    await clearHistoricalGradesForStudents(studentIdsToClear, 'fundamental');
+                } catch (error) {
+                    console.error('Erro ao limpar dados existentes:', error);
+                    toast({
+                        title: 'Erro ao limpar dados',
+                        description: 'Não foi possível remover os dados existentes. A importação continuará.',
+                        variant: 'destructive',
+                    });
+                }
             }
 
-            setImportProgress({ current: i + 1, total: toImport.length });
+            setImportPhase('importing');
+            // Reduzido para 50 para total estabilidade com Supabase (padrão SIGE)
+            const BATCH_SIZE = 50;
+            const totalRecords = toImport.length;
+
+            try {
+                for (let i = 0; i < totalRecords; i += BATCH_SIZE) {
+                    const chunk = toImport.slice(i, i + BATCH_SIZE);
+                    const batch = chunk.map(grade => ({
+                        studentId: grade.studentId,
+                        schoolLevel: grade.schoolLevel,
+                        gradeYear: grade.gradeYear,
+                        subject: grade.subject,
+                        quarter: grade.quarter,
+                        grade: grade.grade,
+                        calendarYear: grade.calendarYear
+                    }));
+
+                    try {
+                        const savedBatch = await addHistoricalGradesBatch(batch);
+                        imported += savedBatch.length;
+
+                        // Atualizar progresso de forma granular
+                        setImportProgress({
+                            current: Math.min(i + chunk.length, totalRecords),
+                            total: totalRecords
+                        });
+                    } catch (error) {
+                        console.error('Erro ao importar lote:', error);
+                        errors += batch.length;
+                    }
+                }
+            } catch (error) {
+                console.error('Erro crítico na importação:', error);
+                errors = toImport.length;
+            } finally {
+                setIsImporting(false);
+            }
+
+            if (errors > 0) {
+                toast({
+                    title: 'Importação parcial',
+                    description: `${imported} notas importadas, ${errors} erros detectados nos lotes.`,
+                    variant: 'destructive',
+                });
+            } else {
+                toast({
+                    title: 'Importação concluída!',
+                    description: `${imported} notas históricas importadas com sucesso em lotes.`,
+                });
+            }
+
+            onOpenChange(false);
+            resetState();
+        } catch (error) {
+            console.error('Erro crítico no handleImport:', error);
+            setIsImporting(false);
         }
-
-        setIsImporting(false);
-
-        if (errors > 0) {
-            toast({
-                title: 'Importação parcial',
-                description: `${imported} notas importadas, ${errors} erros.`,
-                variant: 'default',
-            });
-        } else {
-            toast({
-                title: 'Importação concluída!',
-                description: `${imported} notas históricas importadas com sucesso.`,
-            });
-        }
-
-        onOpenChange(false);
-        resetState();
     };
 
     const resetState = () => {
@@ -266,6 +311,7 @@ export const TrajectoryImportDialog = ({
         setImportableGrades([]);
         setIsProcessing(false);
         setIsImporting(false);
+        setSelectedClassId('');
     };
 
     const handleClose = () => {
@@ -309,6 +355,24 @@ export const TrajectoryImportDialog = ({
                             </Alert>
 
                             <div className="space-y-2">
+                                <Label>Turma (opcional - filtra alunos para vinculação)</Label>
+                                <Select value={selectedClassId || '_all'} onValueChange={v => setSelectedClassId(v === '_all' ? '' : v)}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Todas as turmas" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="_all">Todas as turmas</SelectItem>
+                                        {classes.filter(c => c.active).map(c => (
+                                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">
+                                    Selecione uma turma para facilitar a vinculação dos nomes do arquivo com os alunos do sistema
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
                                 <Label>Ano base para cálculo do calendário</Label>
                                 <Select value={String(calendarYearBase)} onValueChange={v => setCalendarYearBase(parseInt(v))}>
                                     <SelectTrigger>
@@ -323,6 +387,26 @@ export const TrajectoryImportDialog = ({
                                 <p className="text-xs text-muted-foreground">
                                     Se o aluno está no 9º ano em {calendarYearBase}, as notas do 6º ano serão de {calendarYearBase - 4}
                                 </p>
+                            </div>
+
+                            {/* Opção de substituir notas - Estilo SIGE */}
+                            <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30 mb-4">
+                                <div className="space-y-1 flex-1 pr-4">
+                                    <Label className="text-base font-medium">
+                                        Substituir dados existentes
+                                    </Label>
+                                    <p className="text-sm text-muted-foreground">
+                                        {replaceExisting
+                                            ? "Todas as notas antigas (6º ao 9º) dos alunos vinculados serão deletadas e substituídas pelas novas"
+                                            : "As notas do arquivo serão adicionadas/atualizadas mantendo as existentes"
+                                        }
+                                    </p>
+                                </div>
+                                <Checkbox
+                                    checked={replaceExisting}
+                                    onCheckedChange={(checked) => setReplaceExisting(!!checked)}
+                                    className="h-5 w-5"
+                                />
                             </div>
 
                             <div className="border-2 border-dashed rounded-lg p-8 text-center">
@@ -385,7 +469,7 @@ export const TrajectoryImportDialog = ({
                                                         </SelectTrigger>
                                                         <SelectContent>
                                                             <SelectItem value="_none">— Não vincular —</SelectItem>
-                                                            {students.map(s => (
+                                                            {(selectedClassId ? students.filter(s => s.classId === selectedClassId) : students).map(s => (
                                                                 <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                                                             ))}
                                                         </SelectContent>
@@ -468,12 +552,17 @@ export const TrajectoryImportDialog = ({
 
                     {/* Progress */}
                     {isImporting && (
-                        <div className="space-y-2 p-4">
-                            <div className="flex justify-between text-sm">
-                                <span>Importando notas...</span>
-                                <span>{importProgress.current} / {importProgress.total}</span>
+                        <div className="space-y-2 p-4 border-t bg-muted/30">
+                            <div className="flex justify-between items-center text-sm font-medium">
+                                <div className="flex items-center gap-2">
+                                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                    <span>
+                                        {importPhase === 'deleting' ? 'Limpando dados antigos...' : 'Importando notas...'}
+                                    </span>
+                                </div>
+                                <span className="text-xs text-muted-foreground">{importProgress.current} / {importProgress.total}</span>
                             </div>
-                            <Progress value={(importProgress.current / importProgress.total) * 100} />
+                            <Progress value={(importProgress.current / importProgress.total) * 100} className="h-2" />
                         </div>
                     )}
                 </div>
@@ -507,6 +596,6 @@ export const TrajectoryImportDialog = ({
                     )}
                 </DialogFooter>
             </DialogContent>
-        </Dialog>
+        </Dialog >
     );
 };

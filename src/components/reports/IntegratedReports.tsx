@@ -39,7 +39,7 @@ import {
 import { generateStudentReportPDF } from "@/lib/studentReportPdfExport";
 import { generateProfessionalClassReportPDF } from "@/lib/classReportPdfExport";
 import { generateTrajectoryReportPDF } from "@/lib/trajectoryReportPdfExport";
-import { SUBJECT_AREAS, QUARTERS } from "@/lib/subjects";
+import { SUBJECT_AREAS, QUARTERS, FUNDAMENTAL_SUBJECT_AREAS } from "@/lib/subjects";
 import { calculateCurrentYearFromCalendar } from "@/lib/classYearCalculator";
 
 interface IntegratedReportsProps {
@@ -247,7 +247,14 @@ export const IntegratedReports = ({
     if (gradeSubjects.length > 0) {
       return gradeSubjects.sort();
     }
-    const baseSubjects = SUBJECT_AREAS.flatMap((area) => area.subjects);
+
+    // Check if class is fundamental
+    const isFundamental = selectedClassData.series
+      ? ['6º', '7º', '8º', '9º'].some(s => selectedClassData.series.includes(s))
+      : false;
+
+    const areas = isFundamental ? FUNDAMENTAL_SUBJECT_AREAS : SUBJECT_AREAS;
+    const baseSubjects = areas.flatMap((area) => area.subjects);
     return [...new Set([...baseSubjects, ...professionalSubjects])].sort();
   }, [selectedClassData, classGrades, professionalSubjects]);
 
