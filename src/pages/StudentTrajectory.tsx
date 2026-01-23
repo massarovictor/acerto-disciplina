@@ -57,8 +57,11 @@ import {
     FileSpreadsheet,
     Edit3,
     Save,
-    Lock
+    Lock,
+    Users
 } from 'lucide-react';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 const FUNDAMENTAL_YEARS = [6, 7, 8, 9];
 const MEDIO_YEARS = [1, 2, 3];
@@ -752,26 +755,24 @@ const StudentTrajectory = () => {
     };
 
     return (
-        <div className="p-6 space-y-6">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div className="space-y-1">
-                    <h1 className="text-3xl font-bold tracking-tight">Trajetória Estudantil</h1>
-                    <p className="text-muted-foreground">
-                        Acompanhamento longitudinal e simulação de desempenho
-                    </p>
-                </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setShowImport(true)} className="gap-2">
-                        <FileSpreadsheet className="h-4 w-4" /> Importação
-                    </Button>
-                    <Button onClick={() => setShowBatchAssessment(true)} className="gap-2">
-                        <Target className="h-4 w-4" /> Lançamento em Lote
-                    </Button>
-                </div>
-            </div>
+        <PageContainer>
+            <PageHeader
+                title="Trajetória Estudantil"
+                description="Acompanhamento longitudinal e simulação de desempenho"
+                actions={
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => setShowImport(true)} className="gap-2">
+                            <FileSpreadsheet className="h-4 w-4" /> Importação
+                        </Button>
+                        <Button onClick={() => setShowBatchAssessment(true)} className="gap-2">
+                            <Target className="h-4 w-4" /> Lançamento em Lote
+                        </Button>
+                    </div>
+                }
+            />
+
             {/* Main Filters Card */}
-            <Card className="bg-muted/50 border-muted">
+            <Card className="bg-slate-50 border-none shadow-none rounded-xl">
                 <CardContent className="pt-6">
                     <div className="grid gap-6 md:grid-cols-3">
                         <div className="space-y-2">
@@ -875,7 +876,7 @@ const StudentTrajectory = () => {
                             {holisticSummary && (
                                 <>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                        <Card className="border-none shadow-sm bg-card">
+                                        <Card className="border-none shadow-sm bg-blue-50/50 rounded-xl border-l-4 border-blue-500">
                                             <CardHeader className="py-2 pb-0">
                                                 <CardTitle className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Média Fundamental</CardTitle>
                                             </CardHeader>
@@ -883,7 +884,7 @@ const StudentTrajectory = () => {
                                                 <div className="text-3xl font-black text-blue-600">{holisticSummary.fundAvg.toFixed(1)}</div>
                                             </CardContent>
                                         </Card>
-                                        <Card className="border-none shadow-sm bg-card">
+                                        <Card className="border-none shadow-sm bg-violet-50/50 rounded-xl border-l-4 border-violet-500">
                                             <CardHeader className="py-2 pb-0">
                                                 <CardTitle className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Média Médio</CardTitle>
                                             </CardHeader>
@@ -891,7 +892,7 @@ const StudentTrajectory = () => {
                                                 <div className="text-3xl font-black text-violet-600">{holisticSummary.emAvg.toFixed(1)}</div>
                                             </CardContent>
                                         </Card>
-                                        <Card className="border-none shadow-sm bg-card">
+                                        <Card className="border-none shadow-sm bg-amber-50/50 rounded-xl border-l-4 border-amber-500">
                                             <CardHeader className="py-2 pb-0">
                                                 <CardTitle className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Aval. Externas</CardTitle>
                                             </CardHeader>
@@ -899,7 +900,7 @@ const StudentTrajectory = () => {
                                                 <div className="text-3xl font-black text-amber-600">{holisticSummary.extAvg.toFixed(1)}</div>
                                             </CardContent>
                                         </Card>
-                                        <Card className="border-none shadow-sm bg-card">
+                                        <Card className="border-none shadow-sm bg-red-50/50 rounded-xl border-l-4 border-red-500">
                                             <CardHeader className="py-2 pb-0">
                                                 <CardTitle className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Ocorrências</CardTitle>
                                             </CardHeader>
@@ -1186,7 +1187,7 @@ const StudentTrajectory = () => {
                         {/* TAB: TRAJECTORY & SIMULATION */}
                         <TabsContent value="trajectory" className="space-y-6">
                             {/* Controles de Seleção e Simulação */}
-                            <Card className="bg-muted/30 border-muted">
+                            <Card className="bg-slate-50 border-none shadow-none rounded-xl">
                                 <CardContent className="pt-6">
                                     <div className="grid gap-4 md:grid-cols-3">
                                         {/* Removido o seletor de disciplina daqui pois foi movido para o topo */}
@@ -1757,7 +1758,7 @@ const StudentTrajectory = () => {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </div >
+        </PageContainer>
     );
 };
 

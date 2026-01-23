@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTrajectoryAnalytics } from '@/hooks/useTrajectoryAnalytics';
 import { useExternalAssessmentsScoped, useHistoricalGradesScoped } from '@/hooks/useData';
 import {
-    ComposedChart, Line, Bar, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Scatter
+    ComposedChart, Line, Bar, BarChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Scatter
 } from 'recharts';
 import { PERFORMANCE_BUCKETS, classifyAverage } from '@/lib/analytics/clusters';
 import { Brain, TrendingUp, Target, GraduationCap } from 'lucide-react';
@@ -132,43 +132,43 @@ export const StudentDeepTrajectory = ({ studentId }: StudentDeepTrajectoryProps)
         <div className="space-y-6 animate-in fade-in duration-500">
             {/* KPI Summary */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card className={`border-l-4 shadow-sm ${stats.bucket ? stats.bucket.tone.replace('text-', 'border-') : ''}`}>
+                <Card className={`border-none shadow-sm rounded-xl border-l-4 ${stats.bucket ? stats.bucket.tone.replace('text-', 'border-') : 'border-slate-200'}`}>
                     <CardHeader className="py-4">
-                        <CardTitle className="text-xs uppercase text-muted-foreground font-semibold">Desempenho Atual</CardTitle>
+                        <CardTitle className="text-xs uppercase text-muted-foreground font-semibold tracking-wider">Desempenho Atual</CardTitle>
                         <div className="flex items-baseline gap-2 mt-1">
-                            <span className={`text-3xl font-bold ${stats.bucket?.tone}`}>{stats.current.toFixed(1)}</span>
-                            <Badge variant="outline" className={stats.bucket?.bg}>{stats.bucket?.label}</Badge>
+                            <span className={`text-3xl font-black ${stats.bucket?.tone}`}>{stats.current.toFixed(1)}</span>
+                            <Badge variant="outline" className={`font-semibold ${stats.bucket?.bg}`}>{stats.bucket?.label}</Badge>
                         </div>
                     </CardHeader>
                 </Card>
 
-                <Card className="shadow-sm">
+                <Card className="border-none shadow-sm rounded-xl border-l-4 border-blue-500">
                     <CardHeader className="py-4">
                         <div className="flex items-center gap-2 mb-1">
                             <div className="p-1.5 bg-blue-100 rounded text-blue-600"><GraduationCap className="h-4 w-4" /></div>
-                            <CardTitle className="text-xs uppercase text-muted-foreground font-semibold">Média Fundamental</CardTitle>
+                            <CardTitle className="text-xs uppercase text-muted-foreground font-semibold tracking-wider">Média Fundamental</CardTitle>
                         </div>
-                        <span className="text-2xl font-bold text-slate-700">{stats.fundamental > 0 ? stats.fundamental.toFixed(1) : '-'}</span>
+                        <span className="text-2xl font-black text-slate-700">{stats.fundamental > 0 ? stats.fundamental.toFixed(1) : '-'}</span>
                     </CardHeader>
                 </Card>
 
-                <Card className="shadow-sm">
+                <Card className="border-none shadow-sm rounded-xl border-l-4 border-violet-500">
                     <CardHeader className="py-4">
                         <div className="flex items-center gap-2 mb-1">
                             <div className="p-1.5 bg-violet-100 rounded text-violet-600"><TrendingUp className="h-4 w-4" /></div>
-                            <CardTitle className="text-xs uppercase text-muted-foreground font-semibold">Média Ensino Médio</CardTitle>
+                            <CardTitle className="text-xs uppercase text-muted-foreground font-semibold tracking-wider">Média Ensino Médio</CardTitle>
                         </div>
-                        <span className="text-2xl font-bold text-slate-700">{stats.medio > 0 ? stats.medio.toFixed(1) : '-'}</span>
+                        <span className="text-2xl font-black text-slate-700">{stats.medio > 0 ? stats.medio.toFixed(1) : '-'}</span>
                     </CardHeader>
                 </Card>
 
-                <Card className="shadow-sm">
+                <Card className="border-none shadow-sm rounded-xl border-l-4 border-emerald-500">
                     <CardHeader className="py-4">
                         <div className="flex items-center gap-2 mb-1">
                             <div className="p-1.5 bg-emerald-100 rounded text-emerald-600"><Target className="h-4 w-4" /></div>
-                            <CardTitle className="text-xs uppercase text-muted-foreground font-semibold">Média Aval. Externas</CardTitle>
+                            <CardTitle className="text-xs uppercase text-muted-foreground font-semibold tracking-wider">Média Aval. Externas</CardTitle>
                         </div>
-                        <span className="text-2xl font-bold text-slate-700">{stats.external > 0 ? stats.external.toFixed(1) : '-'}</span>
+                        <span className="text-2xl font-black text-slate-700">{stats.external > 0 ? stats.external.toFixed(1) : '-'}</span>
                     </CardHeader>
                 </Card>
             </div>
