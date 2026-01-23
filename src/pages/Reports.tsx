@@ -39,6 +39,7 @@ const Reports = () => {
             classes={classes}
             students={students}
             incidents={incidents}
+            enabled={activeTab === "integrated"}
           />
         </TabsContent>
 
@@ -47,6 +48,7 @@ const Reports = () => {
             classes={classes}
             students={students}
             incidents={incidents}
+            enabled={activeTab === "slides"}
           />
         </TabsContent>
       </Tabs>

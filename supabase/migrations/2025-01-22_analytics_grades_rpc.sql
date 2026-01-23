@@ -26,14 +26,14 @@ as $$
   )
   from public.grades g
   where (
-      coalesce(array_length(class_ids, 1), 0) > 0
-      or student_id is not null
+      coalesce(array_length($1, 1), 0) > 0
+      or $2 is not null
     )
     and (
-      class_ids is null
-      or (coalesce(array_length(class_ids, 1), 0) > 0 and g.class_id = any(class_ids))
+      $1 is null
+      or (coalesce(array_length($1, 1), 0) > 0 and g.class_id = any($1))
     )
-    and (student_id is null or g.student_id = student_id)
-    and (quarter is null or g.quarter = quarter)
-    and (school_year is null or g.school_year = school_year);
+    and ($2 is null or g.student_id = $2)
+    and ($3 is null or g.quarter = $3)
+    and ($4 is null or g.school_year = $4);
 $$;

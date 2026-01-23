@@ -46,12 +46,14 @@ interface IntegratedReportsProps {
   classes: Class[];
   students: Student[];
   incidents: Incident[];
+  enabled?: boolean;
 }
 
 export const IntegratedReports = ({
   classes,
   students,
   incidents,
+  enabled = true,
 }: IntegratedReportsProps) => {
   const [selectedClass, setSelectedClass] = useState("");
   const [selectedStudent, setSelectedStudent] = useState("");
@@ -64,12 +66,14 @@ export const IntegratedReports = ({
     classId: selectedClass || undefined,
     quarter: selectedPeriod === "anual" ? undefined : selectedPeriod,
     schoolYear: selectedSchoolYear,
-  });
+  }, { enabled });
   const { historicalGrades } = useHistoricalGradesScoped(
     selectedStudent || undefined,
+    { enabled }
   );
   const { externalAssessments } = useExternalAssessmentsScoped(
     selectedStudent || undefined,
+    { enabled }
   );
   // DISABLED: Attendance feature temporarily removed
   // const { attendance } = useAttendance();

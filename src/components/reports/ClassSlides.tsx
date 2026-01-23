@@ -51,6 +51,7 @@ interface ClassSlidesProps {
   classes: Class[];
   students: Student[];
   incidents: Incident[];
+  enabled?: boolean;
   // DISABLED: Attendance feature temporarily removed
   // attendance: AttendanceRecord[];
 }
@@ -59,6 +60,7 @@ export const ClassSlides = ({
   classes,
   students,
   incidents,
+  enabled = true,
 }: ClassSlidesProps) => {
   const [selectedClass, setSelectedClass] = useState("");
   const [selectedStudent, setSelectedStudent] = useState("");
@@ -98,7 +100,7 @@ export const ClassSlides = ({
     classId: selectedClass || undefined,
     quarter: selectedPeriod === "all" ? undefined : selectedPeriod,
     schoolYear: selectedSchoolYear,
-  });
+  }, { enabled });
   const schoolClassIds = useMemo(
     () => (viewMode === "school" ? classes.map((cls) => cls.id) : []),
     [classes, viewMode],
@@ -106,7 +108,7 @@ export const ClassSlides = ({
   const { grades: schoolGrades } = useGradesAnalytics({
     classIds: schoolClassIds,
     quarter: schoolPeriod === "all" ? undefined : schoolPeriod,
-  });
+  }, { enabled: enabled && viewMode === "school" });
 
   const classData = classes.find((c) => c.id === selectedClass);
   useEffect(() => {

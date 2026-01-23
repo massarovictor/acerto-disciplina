@@ -46,26 +46,51 @@ export function useProfiles() {
   const { user } = useAuth();
   const [profiles, setProfiles] = useState<User[]>([]);
 
-  const fetchProfiles = useCallback(async () => {
+  const fetchProfiles = useCallback(async (force = false) => {
     if (!user?.id) {
       setProfiles([]);
       return;
     }
 
-    const done = perfTimer("profiles.fetch");
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id);
-
-    if (error) {
-      done({ ok: false });
-      logError("profiles.select", error);
+    const cacheKey = user.id;
+    const cached = profilesCache.get(cacheKey);
+    if (cached && !force) {
+      setProfiles(cached);
       return;
     }
 
-    done({ ok: true, rows: data?.length ?? 0 });
-    setProfiles((data || []).map(mapProfileFromDb));
+    const inflight = profilesInFlight.get(cacheKey);
+    if (inflight) {
+      await inflight;
+      setProfiles(profilesCache.get(cacheKey) ?? []);
+      return;
+    }
+
+    const fetchPromise = (async () => {
+      const done = perfTimer("profiles.fetch");
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id);
+
+      if (error) {
+        done({ ok: false });
+        logError("profiles.select", error);
+        return;
+      }
+
+      const mapped = (data || []).map(mapProfileFromDb);
+      done({ ok: true, rows: data?.length ?? 0 });
+      profilesCache.set(cacheKey, mapped);
+      setProfiles(mapped);
+    })();
+
+    profilesInFlight.set(cacheKey, fetchPromise);
+    try {
+      await fetchPromise;
+    } finally {
+      profilesInFlight.delete(cacheKey);
+    }
   }, [user?.id]);
 
   useEffect(() => {
@@ -85,7 +110,7 @@ export function useProfiles() {
           filter: `id=eq.${user.id}`,
         },
         () => {
-          fetchProfiles();
+          fetchProfiles(true);
         },
       )
       .subscribe();
@@ -95,7 +120,7 @@ export function useProfiles() {
     };
   }, [user?.id, fetchProfiles]);
 
-  return { profiles, refreshProfiles: fetchProfiles };
+  return { profiles, refreshProfiles: () => fetchProfiles(true) };
 }
 
 export function useAuthorizedEmails() {
@@ -104,30 +129,55 @@ export function useAuthorizedEmails() {
     { email: string; role: string }[]
   >([]);
 
-  const fetchAuthorizedEmails = useCallback(async () => {
+  const fetchAuthorizedEmails = useCallback(async (force = false) => {
     if (!user?.id) return;
 
-    const done = perfTimer("authorized_emails.fetch");
-    const { data, error } = await supabase
-      .from("authorized_emails")
-      .select("email, role")
-      .order("email");
-
-    if (error) {
-      done({ ok: false });
-      logError("authorized_emails.select", error);
+    const cacheKey = user.id;
+    const cached = authorizedEmailsCache.get(cacheKey);
+    if (cached && !force) {
+      setAuthorizedEmails(cached);
       return;
     }
 
-    done({ ok: true, rows: data?.length ?? 0 });
-    setAuthorizedEmails(data || []);
+    const inflight = authorizedEmailsInFlight.get(cacheKey);
+    if (inflight) {
+      await inflight;
+      setAuthorizedEmails(authorizedEmailsCache.get(cacheKey) ?? []);
+      return;
+    }
+
+    const fetchPromise = (async () => {
+      const done = perfTimer("authorized_emails.fetch");
+      const { data, error } = await supabase
+        .from("authorized_emails")
+        .select("email, role")
+        .order("email");
+
+      if (error) {
+        done({ ok: false });
+        logError("authorized_emails.select", error);
+        return;
+      }
+
+      const rows = data ?? [];
+      done({ ok: true, rows: rows.length });
+      authorizedEmailsCache.set(cacheKey, rows);
+      setAuthorizedEmails(rows);
+    })();
+
+    authorizedEmailsInFlight.set(cacheKey, fetchPromise);
+    try {
+      await fetchPromise;
+    } finally {
+      authorizedEmailsInFlight.delete(cacheKey);
+    }
   }, [user?.id]);
 
   useEffect(() => {
     fetchAuthorizedEmails();
   }, [fetchAuthorizedEmails]);
 
-  return { authorizedEmails, refreshAuthorizedEmails: fetchAuthorizedEmails };
+  return { authorizedEmails, refreshAuthorizedEmails: () => fetchAuthorizedEmails(true) };
 }
 
 export function useClasses() {
@@ -733,6 +783,10 @@ const getGradesScopeKey = (scope: ReturnType<typeof normalizeGradesScope>) => {
 
 const analyticsGradesCache = new Map<string, Grade[]>();
 const analyticsGradesInFlight = new Map<string, Promise<void>>();
+const authorizedEmailsCache = new Map<string, { email: string; role: string }[]>();
+const authorizedEmailsInFlight = new Map<string, Promise<void>>();
+const profilesCache = new Map<string, User[]>();
+const profilesInFlight = new Map<string, Promise<void>>();
 
 const normalizeHistoricalGradesScope = (scope: HistoricalGradesScope) => {
   const studentIds = scope.studentIds?.length ? [...scope.studentIds] : [];
@@ -748,6 +802,14 @@ const getHistoricalGradesScopeKey = (
 
 const historicalGradesAnalyticsCache = new Map<string, HistoricalGrade[]>();
 const historicalGradesInFlight = new Map<string, Promise<void>>();
+const historicalGradesGlobalInFlight = new Map<string, Promise<void>>();
+const externalAssessmentsGlobalInFlight = new Map<string, Promise<void>>();
+const professionalSubjectsCache = new Map<string, { id: string; classId: string; subject: string }[]>();
+const professionalSubjectsInFlight = new Map<string, Promise<void>>();
+const professionalSubjectTemplatesCache = new Map<string, ProfessionalSubjectTemplate[]>();
+const professionalSubjectTemplatesInFlight = new Map<string, Promise<void>>();
+const gradesScopedCache = new Map<string, Grade[]>();
+const gradesScopedInFlight = new Map<string, Promise<Grade[]>>();
 
 const gradeMatchesScope = (
   grade: Grade,
@@ -768,10 +830,14 @@ const gradeMatchesScope = (
   return true;
 };
 
-export function useGradesScoped(scope: GradesScope) {
+export function useGradesScoped(
+  scope: GradesScope,
+  options?: { enabled?: boolean },
+) {
   const { user } = useAuth();
   const [grades, setGrades] = useState<Grade[]>([]);
   const [loading, setLoading] = useState(false);
+  const enabled = options?.enabled ?? true;
 
   const normalizedScope = useMemo(
     () => normalizeGradesScope(scope),
@@ -783,8 +849,13 @@ export function useGradesScoped(scope: GradesScope) {
       scope.schoolYear,
     ],
   );
+  const scopeKey = useMemo(() => getGradesScopeKey(normalizedScope), [normalizedScope]);
 
   const fetchGrades = useCallback(async () => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
     if (!user?.id) {
       setGrades([]);
       return;
@@ -797,60 +868,86 @@ export function useGradesScoped(scope: GradesScope) {
       return;
     }
 
-    setLoading(true);
-    const done = perfTimer("grades_scoped.fetch");
-
-    const PAGE_SIZE = 1000;
-    let allGrades: any[] = [];
-    let page = 0;
-    let hasMore = true;
-
-    while (hasMore) {
-      const from = page * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
-
-      let query = supabase
-        .from("grades")
-        .select("*")
-        .order("recorded_at", { ascending: false });
-
-      if (normalizedScope.classIds.length === 1) {
-        query = query.eq("class_id", normalizedScope.classIds[0]);
-      } else if (normalizedScope.classIds.length > 1) {
-        query = query.in("class_id", normalizedScope.classIds);
-      }
-      if (normalizedScope.studentId) {
-        query = query.eq("student_id", normalizedScope.studentId);
-      }
-      if (normalizedScope.quarter) {
-        query = query.eq("quarter", normalizedScope.quarter);
-      }
-      if (normalizedScope.schoolYear) {
-        query = query.eq("school_year", normalizedScope.schoolYear);
-      }
-
-      const { data, error } = await query.range(from, to);
-
-      if (error) {
-        done({ ok: false, rows: allGrades.length, pages: page });
-        logError("grades_scoped.select", error);
-        setLoading(false);
-        return;
-      }
-
-      if (data && data.length > 0) {
-        allGrades = [...allGrades, ...data];
-        page += 1;
-        hasMore = data.length === PAGE_SIZE;
-      } else {
-        hasMore = false;
-      }
+    const cached = gradesScopedCache.get(scopeKey);
+    if (cached) {
+      setGrades(cached);
+      return;
     }
 
-    done({ ok: true, rows: allGrades.length, pages: page, pageSize: PAGE_SIZE });
-    setGrades(allGrades.map(mapGradeFromDb));
-    setLoading(false);
-  }, [user?.id, normalizedScope]);
+    const inflight = gradesScopedInFlight.get(scopeKey);
+    if (inflight) {
+      setLoading(true);
+      const result = await inflight;
+      setGrades(result);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const fetchPromise = (async () => {
+      const done = perfTimer("grades_scoped.fetch");
+
+      const PAGE_SIZE = 1000;
+      let allGrades: any[] = [];
+      let page = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+
+        let query = supabase
+          .from("grades")
+          .select("*")
+          .order("recorded_at", { ascending: false });
+
+        if (normalizedScope.classIds.length === 1) {
+          query = query.eq("class_id", normalizedScope.classIds[0]);
+        } else if (normalizedScope.classIds.length > 1) {
+          query = query.in("class_id", normalizedScope.classIds);
+        }
+        if (normalizedScope.studentId) {
+          query = query.eq("student_id", normalizedScope.studentId);
+        }
+        if (normalizedScope.quarter) {
+          query = query.eq("quarter", normalizedScope.quarter);
+        }
+        if (normalizedScope.schoolYear) {
+          query = query.eq("school_year", normalizedScope.schoolYear);
+        }
+
+        const { data, error } = await query.range(from, to);
+
+        if (error) {
+          done({ ok: false, rows: allGrades.length, pages: page });
+          logError("grades_scoped.select", error);
+          return [];
+        }
+
+        if (data && data.length > 0) {
+          allGrades = [...allGrades, ...data];
+          page += 1;
+          hasMore = data.length === PAGE_SIZE;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      done({ ok: true, rows: allGrades.length, pages: page, pageSize: PAGE_SIZE });
+      const mapped = allGrades.map(mapGradeFromDb);
+      gradesScopedCache.set(scopeKey, mapped);
+      return mapped;
+    })();
+
+    gradesScopedInFlight.set(scopeKey, fetchPromise);
+    try {
+      const result = await fetchPromise;
+      setGrades(result);
+    } finally {
+      gradesScopedInFlight.delete(scopeKey);
+      setLoading(false);
+    }
+  }, [enabled, user?.id, normalizedScope, scopeKey]);
 
   useEffect(() => {
     fetchGrades();
@@ -881,9 +978,12 @@ export function useGradesScoped(scope: GradesScope) {
       if (existingIndex >= 0) {
         const updated = [...prev];
         updated[existingIndex] = saved;
+        gradesScopedCache.set(scopeKey, updated);
         return updated;
       }
-      return [saved, ...prev];
+      const next = [saved, ...prev];
+      gradesScopedCache.set(scopeKey, next);
+      return next;
     });
   };
 
@@ -919,6 +1019,7 @@ export function useGradesScoped(scope: GradesScope) {
             next.unshift(saved);
           }
         });
+        gradesScopedCache.set(scopeKey, next);
         return next;
       });
     }
@@ -948,13 +1049,15 @@ export function useGradesScoped(scope: GradesScope) {
       throw error;
     }
 
-    setGrades((prev) =>
-      prev.map((grade) =>
+    setGrades((prev) => {
+      const next = prev.map((grade) =>
         grade.id === id
           ? { ...grade, ...updates, recordedAt: new Date().toISOString() }
           : grade,
-      ),
-    );
+      );
+      gradesScopedCache.set(scopeKey, next);
+      return next;
+    });
   };
 
   const deleteGrade = async (id: string) => {
@@ -963,7 +1066,11 @@ export function useGradesScoped(scope: GradesScope) {
       logError("grades_scoped.delete", error);
       throw error;
     }
-    setGrades((prev) => prev.filter((grade) => grade.id !== id));
+    setGrades((prev) => {
+      const next = prev.filter((grade) => grade.id !== id);
+      gradesScopedCache.set(scopeKey, next);
+      return next;
+    });
   };
 
   const deleteGrades = async (ids: string[]) => {
@@ -974,7 +1081,11 @@ export function useGradesScoped(scope: GradesScope) {
       throw error;
     }
     const idsSet = new Set(ids);
-    setGrades((prev) => prev.filter((grade) => !idsSet.has(grade.id)));
+    setGrades((prev) => {
+      const next = prev.filter((grade) => !idsSet.has(grade.id));
+      gradesScopedCache.set(scopeKey, next);
+      return next;
+    });
   };
 
   return {
@@ -989,10 +1100,14 @@ export function useGradesScoped(scope: GradesScope) {
   };
 }
 
-export function useGradesAnalytics(scope: GradesScope) {
+export function useGradesAnalytics(
+  scope: GradesScope,
+  options?: { enabled?: boolean },
+) {
   const { user } = useAuth();
   const [grades, setGrades] = useState<Grade[]>([]);
   const [loading, setLoading] = useState(false);
+  const enabled = options?.enabled ?? true;
 
   const normalizedScope = useMemo(
     () => normalizeGradesScope(scope),
@@ -1061,6 +1176,10 @@ export function useGradesAnalytics(scope: GradesScope) {
   }, [normalizedScope]);
 
   const fetchGrades = useCallback(async () => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
     if (!user?.id) {
       setGrades([]);
       return;
@@ -1099,14 +1218,14 @@ export function useGradesAnalytics(scope: GradesScope) {
       });
 
       if (error) {
-        done({ ok: false, fallback: true });
+        done({ ok: false, fallback: true, scopeKey });
         logError("grades_analytics.rpc", error);
         await fetchGradesWithPagination();
         return;
       }
 
       const rows = Array.isArray(data) ? data : data ?? [];
-      done({ ok: true, rows: rows.length });
+      done({ ok: true, rows: rows.length, scopeKey });
       const mapped = rows.map(mapGradeFromDb);
       analyticsGradesCache.set(scopeKey, mapped);
       setGrades(mapped);
@@ -1119,7 +1238,7 @@ export function useGradesAnalytics(scope: GradesScope) {
       analyticsGradesInFlight.delete(scopeKey);
       setLoading(false);
     }
-  }, [user?.id, normalizedScope, scopeKey, fetchGradesWithPagination]);
+  }, [enabled, user?.id, normalizedScope, scopeKey, fetchGradesWithPagination]);
 
   useEffect(() => {
     fetchGrades();
@@ -1646,25 +1765,50 @@ export function useProfessionalSubjects() {
     { id: string; classId: string; subject: string }[]
   >([]);
 
-  const fetchSubjects = useCallback(async () => {
+  const fetchSubjects = useCallback(async (force = false) => {
     if (!user?.id) {
       setItems([]);
       return;
     }
 
-    const done = perfTimer("professional_subjects.fetch");
-    const { data, error } = await supabase
-      .from("professional_subjects")
-      .select("*");
-
-    if (error) {
-      done({ ok: false });
-      logError("professional_subjects.select", error);
+    const cacheKey = user.id;
+    const cached = professionalSubjectsCache.get(cacheKey);
+    if (cached && !force) {
+      setItems(cached);
       return;
     }
 
-    done({ ok: true, rows: data?.length ?? 0 });
-    setItems((data || []).map(mapProfessionalSubjectFromDb));
+    const inflight = professionalSubjectsInFlight.get(cacheKey);
+    if (inflight) {
+      await inflight;
+      setItems(professionalSubjectsCache.get(cacheKey) ?? []);
+      return;
+    }
+
+    const fetchPromise = (async () => {
+      const done = perfTimer("professional_subjects.fetch");
+      const { data, error } = await supabase
+        .from("professional_subjects")
+        .select("*");
+
+      if (error) {
+        done({ ok: false });
+        logError("professional_subjects.select", error);
+        return;
+      }
+
+      const mapped = (data || []).map(mapProfessionalSubjectFromDb);
+      done({ ok: true, rows: data?.length ?? 0 });
+      professionalSubjectsCache.set(cacheKey, mapped);
+      setItems(mapped);
+    })();
+
+    professionalSubjectsInFlight.set(cacheKey, fetchPromise);
+    try {
+      await fetchPromise;
+    } finally {
+      professionalSubjectsInFlight.delete(cacheKey);
+    }
   }, [user?.id]);
 
   useEffect(() => {
@@ -1683,7 +1827,7 @@ export function useProfessionalSubjects() {
           table: "professional_subjects",
         },
         () => {
-          fetchSubjects();
+          fetchSubjects(true);
         },
       )
       .subscribe();
@@ -1715,7 +1859,7 @@ export function useProfessionalSubjects() {
       logError("professional_subjects.insert", error);
       throw error;
     }
-    await fetchSubjects();
+    await fetchSubjects(true);
   };
 
   const removeProfessionalSubject = async (
@@ -1731,7 +1875,7 @@ export function useProfessionalSubjects() {
       logError("professional_subjects.delete", error);
       throw error;
     }
-    await fetchSubjects();
+    await fetchSubjects(true);
   };
 
   const setProfessionalSubjectsForClass = async (
@@ -1760,7 +1904,7 @@ export function useProfessionalSubjects() {
       logError("professional_subjects.bulk_insert", error);
       throw error;
     }
-    await fetchSubjects();
+    await fetchSubjects(true);
   };
 
   return {
@@ -1776,26 +1920,51 @@ export function useProfessionalSubjectTemplates() {
   const { user } = useAuth();
   const [templates, setTemplates] = useState<ProfessionalSubjectTemplate[]>([]);
 
-  const fetchTemplates = useCallback(async () => {
+  const fetchTemplates = useCallback(async (force = false) => {
     if (!user?.id) {
       setTemplates([]);
       return;
     }
 
-    const done = perfTimer("professional_subject_templates.fetch");
-    const { data, error } = await supabase
-      .from("professional_subject_templates")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      done({ ok: false });
-      logError("templates.select", error);
+    const cacheKey = user.id;
+    const cached = professionalSubjectTemplatesCache.get(cacheKey);
+    if (cached && !force) {
+      setTemplates(cached);
       return;
     }
 
-    done({ ok: true, rows: data?.length ?? 0 });
-    setTemplates((data || []).map(mapTemplateFromDb));
+    const inflight = professionalSubjectTemplatesInFlight.get(cacheKey);
+    if (inflight) {
+      await inflight;
+      setTemplates(professionalSubjectTemplatesCache.get(cacheKey) ?? []);
+      return;
+    }
+
+    const fetchPromise = (async () => {
+      const done = perfTimer("professional_subject_templates.fetch");
+      const { data, error } = await supabase
+        .from("professional_subject_templates")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        done({ ok: false });
+        logError("templates.select", error);
+        return;
+      }
+
+      const mapped = (data || []).map(mapTemplateFromDb);
+      done({ ok: true, rows: data?.length ?? 0 });
+      professionalSubjectTemplatesCache.set(cacheKey, mapped);
+      setTemplates(mapped);
+    })();
+
+    professionalSubjectTemplatesInFlight.set(cacheKey, fetchPromise);
+    try {
+      await fetchPromise;
+    } finally {
+      professionalSubjectTemplatesInFlight.delete(cacheKey);
+    }
   }, [user?.id]);
 
   useEffect(() => {
@@ -1814,7 +1983,7 @@ export function useProfessionalSubjectTemplates() {
           table: "professional_subject_templates",
         },
         () => {
-          fetchTemplates();
+          fetchTemplates(true);
         },
       )
       .subscribe();
@@ -1844,7 +2013,13 @@ export function useProfessionalSubjectTemplates() {
     }
 
     const newTemplate = mapTemplateFromDb(data);
-    setTemplates((prev) => [newTemplate, ...prev]);
+    setTemplates((prev) => {
+      const next = [newTemplate, ...prev];
+      if (user?.id) {
+        professionalSubjectTemplatesCache.set(user.id, next);
+      }
+      return next;
+    });
     return newTemplate;
   };
 
@@ -1875,11 +2050,15 @@ export function useProfessionalSubjectTemplates() {
       throw error;
     }
 
-    setTemplates((prev) =>
-      prev.map((template) =>
+    setTemplates((prev) => {
+      const next = prev.map((template) =>
         template.id === id ? { ...template, ...updates } : template,
-      ),
-    );
+      );
+      if (user?.id) {
+        professionalSubjectTemplatesCache.set(user.id, next);
+      }
+      return next;
+    });
   };
 
   const deleteTemplate = async (id: string) => {
@@ -1954,12 +2133,21 @@ const mapHistoricalGradeToDb = (grade: Omit<HistoricalGrade, 'id' | 'createdAt' 
   calendar_year: grade.calendarYear,
 });
 
-export function useHistoricalGradesScoped(studentId?: string) {
+export function useHistoricalGradesScoped(
+  studentId?: string,
+  options?: { enabled?: boolean },
+) {
   const { user } = useAuth();
   const [historicalGrades, setHistoricalGrades] = useState<HistoricalGrade[]>([]);
   const [loading, setLoading] = useState(false);
+  const enabled = options?.enabled ?? true;
 
   const fetchHistoricalGrades = useCallback(async () => {
+    if (!enabled) {
+      setHistoricalGrades([]);
+      setLoading(false);
+      return;
+    }
     if (!user?.id || !studentId) {
       setHistoricalGrades([]);
       return;
@@ -2003,7 +2191,7 @@ export function useHistoricalGradesScoped(studentId?: string) {
     done({ ok: true, rows: allData.length, pages: page, pageSize: PAGE_SIZE });
     setHistoricalGrades(allData.map(mapHistoricalGradeFromDb));
     setLoading(false);
-  }, [user?.id, studentId]);
+  }, [enabled, user?.id, studentId]);
 
   useEffect(() => {
     setHistoricalGrades([]);
@@ -2083,6 +2271,13 @@ export function useHistoricalGrades() {
   const [loading, setLoading] = useState(true);
 
   const fetchHistoricalGrades = useCallback(async (force = false) => {
+    const inflight = historicalGradesGlobalInFlight.get("all");
+    if (inflight) {
+      setLoading(true);
+      await inflight;
+      setLoading(false);
+      return;
+    }
     if (historicalGradesFetching) {
       setLoading(false);
       return;
@@ -2091,46 +2286,57 @@ export function useHistoricalGrades() {
       setLoading(false);
       return;
     }
+
     setLoading(true);
     setHistoricalGradesFetching(true);
-    const done = perfTimer("historical_grades.fetch");
-    const PAGE_SIZE = 1000;
-    let allData: any[] = [];
-    let page = 0;
-    let hasMore = true;
-    let ok = true;
 
-    while (hasMore) {
-      const from = page * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
+    const fetchPromise = (async () => {
+      const done = perfTimer("historical_grades.fetch");
+      const PAGE_SIZE = 1000;
+      let allData: any[] = [];
+      let page = 0;
+      let hasMore = true;
+      let ok = true;
 
-      const { data, error } = await supabase
-        .from("historical_grades")
-        .select("*")
-        .order("calendar_year", { ascending: false })
-        .order("id", { ascending: true })
-        .range(from, to);
+      while (hasMore) {
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
 
-      if (error) {
-        ok = false;
-        if (!error.message.includes("does not exist")) {
-          logError("historical_grades.select", error);
+        const { data, error } = await supabase
+          .from("historical_grades")
+          .select("*")
+          .order("calendar_year", { ascending: false })
+          .order("id", { ascending: true })
+          .range(from, to);
+
+        if (error) {
+          ok = false;
+          if (!error.message.includes("does not exist")) {
+            logError("historical_grades.select", error);
+          }
+          hasMore = false;
+        } else if (data && data.length > 0) {
+          allData = [...allData, ...data];
+          page++;
+          hasMore = data.length === PAGE_SIZE;
+        } else {
+          hasMore = false;
         }
-        hasMore = false;
-      } else if (data && data.length > 0) {
-        allData = [...allData, ...data];
-        page++;
-        hasMore = data.length === PAGE_SIZE;
-      } else {
-        hasMore = false;
       }
-    }
 
-    done({ ok, rows: allData.length, pages: page, pageSize: PAGE_SIZE });
-    setHistoricalGrades(allData.map(mapHistoricalGradeFromDb));
-    setHistoricalGradesLoaded(ok);
-    setHistoricalGradesFetching(false);
-    setLoading(false);
+      done({ ok, rows: allData.length, pages: page, pageSize: PAGE_SIZE });
+      setHistoricalGrades(allData.map(mapHistoricalGradeFromDb));
+      setHistoricalGradesLoaded(ok);
+    })();
+
+    historicalGradesGlobalInFlight.set("all", fetchPromise);
+    try {
+      await fetchPromise;
+    } finally {
+      historicalGradesGlobalInFlight.delete("all");
+      setHistoricalGradesFetching(false);
+      setLoading(false);
+    }
   }, [
     historicalGradesLoaded,
     historicalGradesFetching,
@@ -2357,12 +2563,21 @@ const mapExternalAssessmentToDb = (assessment: Omit<ExternalAssessment, 'id' | '
   notes: assessment.notes,
 });
 
-export function useExternalAssessmentsScoped(studentId?: string) {
+export function useExternalAssessmentsScoped(
+  studentId?: string,
+  options?: { enabled?: boolean },
+) {
   const { user } = useAuth();
   const [externalAssessments, setExternalAssessments] = useState<ExternalAssessment[]>([]);
   const [loading, setLoading] = useState(false);
+  const enabled = options?.enabled ?? true;
 
   const fetchExternalAssessments = useCallback(async () => {
+    if (!enabled) {
+      setExternalAssessments([]);
+      setLoading(false);
+      return;
+    }
     if (!user?.id || !studentId) {
       setExternalAssessments([]);
       return;
@@ -2388,7 +2603,7 @@ export function useExternalAssessmentsScoped(studentId?: string) {
     done({ ok: true, rows });
     setExternalAssessments((data || []).map(mapExternalAssessmentFromDb));
     setLoading(false);
-  }, [user?.id, studentId]);
+  }, [enabled, user?.id, studentId]);
 
   useEffect(() => {
     setExternalAssessments([]);
@@ -2501,6 +2716,13 @@ export function useExternalAssessments() {
   const [loading, setLoading] = useState(true);
 
   const fetchExternalAssessments = useCallback(async (force = false) => {
+    const inflight = externalAssessmentsGlobalInFlight.get("all");
+    if (inflight) {
+      setLoading(true);
+      await inflight;
+      setLoading(false);
+      return;
+    }
     if (externalAssessmentsFetching) {
       setLoading(false);
       return;
@@ -2511,26 +2733,36 @@ export function useExternalAssessments() {
     }
     setLoading(true);
     setExternalAssessmentsFetching(true);
-    const done = perfTimer("external_assessments.fetch");
-    const { data, error } = await supabase
-      .from("external_assessments")
-      .select("*")
-      .order("applied_date", { ascending: false });
 
-    const rows = data?.length ?? 0;
-    if (error) {
-      if (!error.message.includes("does not exist")) {
-        logError("external_assessments.select", error);
+    const fetchPromise = (async () => {
+      const done = perfTimer("external_assessments.fetch");
+      const { data, error } = await supabase
+        .from("external_assessments")
+        .select("*")
+        .order("applied_date", { ascending: false });
+
+      const rows = data?.length ?? 0;
+      if (error) {
+        if (!error.message.includes("does not exist")) {
+          logError("external_assessments.select", error);
+        }
+        done({ ok: false, rows });
+        setExternalAssessments([]);
+      } else {
+        done({ ok: true, rows });
+        setExternalAssessments((data || []).map(mapExternalAssessmentFromDb));
       }
-      done({ ok: false, rows });
-      setExternalAssessments([]);
-    } else {
-      done({ ok: true, rows });
-      setExternalAssessments((data || []).map(mapExternalAssessmentFromDb));
+      setExternalAssessmentsLoaded(!error);
+    })();
+
+    externalAssessmentsGlobalInFlight.set("all", fetchPromise);
+    try {
+      await fetchPromise;
+    } finally {
+      externalAssessmentsGlobalInFlight.delete("all");
+      setExternalAssessmentsFetching(false);
+      setLoading(false);
     }
-    setExternalAssessmentsLoaded(!error);
-    setExternalAssessmentsFetching(false);
-    setLoading(false);
   }, [
     externalAssessmentsLoaded,
     externalAssessmentsFetching,

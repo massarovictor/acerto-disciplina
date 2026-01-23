@@ -22,12 +22,23 @@ export interface SchoolConfig {
 }
 
 const STORAGE_KEY = 'school_config';
+let schoolConfigCache: SchoolConfig | null = null;
+let schoolConfigInFlight: Promise<SchoolConfig> | null = null;
 
 export const getSchoolConfig = async (): Promise<SchoolConfig> => {
   if (typeof window === 'undefined') {
     return getDefaultConfig();
   }
 
+  if (schoolConfigCache) {
+    return schoolConfigCache;
+  }
+
+  if (schoolConfigInFlight) {
+    return schoolConfigInFlight;
+  }
+
+  schoolConfigInFlight = (async () => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -67,6 +78,15 @@ export const getSchoolConfig = async (): Promise<SchoolConfig> => {
     console.error('Erro ao buscar configurações:', error);
     return getSchoolConfigFromLocalStorage();
   }
+  })();
+
+  try {
+    const result = await schoolConfigInFlight;
+    schoolConfigCache = result;
+    return result;
+  } finally {
+    schoolConfigInFlight = null;
+  }
 };
 
 export const saveSchoolConfig = async (config: SchoolConfig): Promise<void> => {
@@ -104,10 +124,12 @@ export const saveSchoolConfig = async (config: SchoolConfig): Promise<void> => {
     done({ ok: true });
     // Também salva no localStorage como backup
     saveSchoolConfigToLocalStorage(config);
+    schoolConfigCache = config;
   } catch (error) {
     console.error('Erro ao salvar configurações:', error);
     // Fallback para localStorage em caso de erro
     saveSchoolConfigToLocalStorage(config);
+    schoolConfigCache = config;
     throw error;
   }
 };

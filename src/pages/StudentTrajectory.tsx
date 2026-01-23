@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useClasses, useStudents, useGrades, useHistoricalGrades, useExternalAssessments, useIncidents } from '@/hooks/useData';
+import { useClasses, useStudents, useGradesAnalytics, useHistoricalGrades, useExternalAssessments, useIncidents } from '@/hooks/useData';
 import { SUBJECT_AREAS, QUARTERS, FUNDAMENTAL_SUBJECT_AREAS, getFundamentalEquivalent, getEquivalentSubjects } from '@/lib/subjects';
 import { useToast } from '@/hooks/use-toast';
 import { HistoricalGrade, ExternalAssessment, ExternalAssessmentType } from '@/types';
@@ -83,11 +83,6 @@ const normalizeSubjectName = (name: string): string => {
 const StudentTrajectory = () => {
     const { classes } = useClasses();
     const { students } = useStudents();
-    const { grades, addGrade } = useGrades();
-    const { historicalGrades, addHistoricalGrade, deleteHistoricalGrade } = useHistoricalGrades();
-    const { externalAssessments, deleteExternalAssessment, updateExternalAssessment } = useExternalAssessments();
-    const { incidents } = useIncidents();
-    const { toast } = useToast();
 
     // ✅ Usando Zustand store para persistir seleções entre navegações
     const { trajectoryUI, setTrajectoryUI } = useUIStore();
@@ -98,6 +93,12 @@ const StudentTrajectory = () => {
     const gridYear = trajectoryUI.gridYear;
     const gridQuarter = trajectoryUI.gridQuarter;
     const gridCalendarYear = trajectoryUI.gridCalendarYear;
+
+    const { grades: regularGrades } = useGradesAnalytics({ studentId: selectedStudent || undefined });
+    const { historicalGrades, addHistoricalGrade, deleteHistoricalGrade } = useHistoricalGrades();
+    const { externalAssessments, deleteExternalAssessment, updateExternalAssessment } = useExternalAssessments();
+    const { incidents } = useIncidents();
+    const { toast } = useToast();
 
     const setSelectedClass = (value: string) => setTrajectoryUI({ selectedClassId: value, selectedStudentId: '' });
     const setSelectedStudent = (value: string) => setTrajectoryUI({ selectedStudentId: value });
@@ -137,7 +138,7 @@ const StudentTrajectory = () => {
 
     // Basic Data Filters
     const studentData = useMemo(() => students.find(s => s.id === selectedStudent), [students, selectedStudent]);
-    const studentRegularGrades = useMemo(() => grades.filter(g => g.studentId === selectedStudent), [grades, selectedStudent]);
+    const studentRegularGrades = useMemo(() => regularGrades, [regularGrades]);
     const studentHistorical = useMemo(() => historicalGrades.filter(g => g.studentId === selectedStudent), [historicalGrades, selectedStudent]);
     const studentExternal = useMemo(() => externalAssessments.filter(e => e.studentId === selectedStudent), [externalAssessments, selectedStudent]);
     const studentIncidents = useMemo(() => incidents.filter(i => i.studentIds.includes(selectedStudent)), [incidents, selectedStudent]);
