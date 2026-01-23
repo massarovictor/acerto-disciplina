@@ -51,6 +51,7 @@ interface ReportsUIState {
 }
 
 interface TrajectoryUIState {
+    viewMode: 'individual' | 'macro';
     selectedClassId: string;
     selectedStudentId: string;
     selectedSubject: string;
@@ -166,6 +167,7 @@ const initialReportsUI: ReportsUIState = {
 };
 
 const initialTrajectoryUI: TrajectoryUIState = {
+    viewMode: 'individual',
     selectedClassId: '',
     selectedStudentId: '',
     selectedSubject: '',

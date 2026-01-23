@@ -302,7 +302,9 @@ export const StudentsRegister = () => {
         if (!classExists) {
           const errorMsg = `Linha ${row.rowNumber}: ❌ Turma com ID "${row.data.classId}" não encontrada no sistema`;
           console.error(errorMsg, row);
-          console.error(`[IMPORTAÇÃO] Turmas disponíveis:`, classes.map(c => ({ id: c.id, name: c.name })));
+          if (import.meta.env.VITE_DEBUG_IMPORT === 'true') {
+            console.error(`[IMPORTAÇÃO] Turmas disponíveis:`, classes.map(c => ({ id: c.id, name: c.name })));
+          }
           errorMessages.push(errorMsg);
           errors++;
           continue;

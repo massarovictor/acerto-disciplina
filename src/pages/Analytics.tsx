@@ -21,13 +21,14 @@
  *    - Insights de risco
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { GraduationCap, AlertTriangle, Users, CheckCircle2, AlertCircle, Lightbulb, Sparkles } from 'lucide-react';
-import { useClasses, useStudents, useGrades, useAttendance, useIncidents } from '@/hooks/useData';
-import { useSchoolAnalytics, AnalyticsFilters, Insight } from '@/hooks/useSchoolAnalytics';
+import { useClasses, useStudents, useGradesAnalytics, useAttendance, useIncidents } from '@/hooks/useData';
+import { AnalyticsFilters, Insight } from '@/hooks/useSchoolAnalytics';
+import { useSchoolAnalyticsWorker } from '@/hooks/useSchoolAnalyticsWorker';
 import { AnalyticsFilters as FiltersBar } from '@/components/analytics/AnalyticsFilters';
 import { SchoolOverviewCards } from '@/components/analytics/SchoolOverviewCards';
 import { ClassificationChart } from '@/components/analytics/ClassificationChart';
@@ -40,6 +41,8 @@ import { CohortComparisonTable } from '@/components/analytics/CohortComparisonTa
 import { PredictionDialog } from '@/components/analytics/PredictionDialog';
 import { useUIStore } from '@/stores/useUIStore';
 import { calculateCurrentYearFromCalendar } from '@/lib/classYearCalculator';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 // Componente de Insights Inline
 const InlineInsights = ({
@@ -105,14 +108,41 @@ const InlineInsights = ({
 const Analytics = () => {
   const { classes } = useClasses();
   const { students } = useStudents();
-  const { grades } = useGrades();
-  // DISABLED: Attendance feature temporarily removed
-  // const { attendance } = useAttendance();
-  const { incidents } = useIncidents();
-
   // ✅ Usando Zustand store para persistir filtros entre navegações
   const { analyticsUI, setAnalyticsFilters } = useUIStore();
   const filters = analyticsUI.filters as AnalyticsFilters;
+
+  const classIdsForFetch = useMemo(() => {
+    let baseClasses = filters.includeArchived
+      ? classes
+      : classes.filter((c) => !c.archived);
+
+    if (filters.series.length > 0) {
+      baseClasses = baseClasses.filter((c) =>
+        filters.series.some((series) => c.series.includes(series)),
+      );
+    }
+
+    const baseIds = baseClasses.map((c) => c.id);
+    const selectedIds =
+      filters.classIds.length > 0 ? filters.classIds : baseIds;
+    return Array.from(
+      new Set([...selectedIds, ...filters.comparisonClassIds]),
+    );
+  }, [
+    classes,
+    filters.includeArchived,
+    filters.series,
+    filters.classIds,
+    filters.comparisonClassIds,
+  ]);
+
+  const { grades } = useGradesAnalytics({
+    classIds: classIdsForFetch,
+  });
+  // DISABLED: Attendance feature temporarily removed
+  // const { attendance } = useAttendance();
+  const { incidents } = useIncidents();
 
   const setFilters = (newFilters: Partial<AnalyticsFilters>) => {
     setAnalyticsFilters(newFilters);
@@ -121,7 +151,7 @@ const Analytics = () => {
   const [showComparison, setShowComparison] = useState(false);
   const [showPredictions, setShowPredictions] = useState(false);
 
-  const analytics = useSchoolAnalytics(
+  const { analytics, loading: analyticsLoading } = useSchoolAnalyticsWorker(
     students,
     classes,
     grades,
@@ -193,16 +223,16 @@ const Analytics = () => {
     filters.schoolYear === 'all' ? 'Ano atual das turmas' : `${filters.schoolYear}º ano`;
 
   return (
-    <div className="p-6 space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
-          <p className="text-muted-foreground mt-1">
-            Exploração de dados acadêmicos e comportamentais
-          </p>
-        </div>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Analytics"
+        description="Exploração de dados acadêmicos e comportamentais"
+        actions={
+          analyticsLoading && (
+            <Badge variant="secondary">Atualizando...</Badge>
+          )
+        }
+      />
 
       {/* Filters */}
       <FiltersBar
@@ -369,7 +399,7 @@ const Analytics = () => {
         summary={analytics.predictionSummary}
         schoolYearLabel={predictionYearLabel}
       />
-    </div>
+    </PageContainer>
   );
 };
 

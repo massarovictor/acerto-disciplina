@@ -39,7 +39,6 @@ import { Switch } from "@/components/ui/switch";
 import {
   useClasses,
   useStudents,
-  useGrades,
   // useAttendance, // DISABLED: Attendance feature temporarily removed
   useProfessionalSubjects,
   useIncidents,
@@ -48,6 +47,7 @@ import {
   useProfiles,
 } from "@/hooks/useData";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/services/supabase";
 import {
   Search,
   Edit,
@@ -70,7 +70,6 @@ interface ClassesManageProps {
 export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
   const { classes, updateClass, deleteClass, archiveClass } = useClasses();
   const { students, updateStudent } = useStudents();
-  const { grades, deleteGrade } = useGrades();
   // DISABLED: Attendance feature temporarily removed
   // const { attendance, deleteAttendance } = useAttendance();
   const attendance: any[] = []; // Empty array placeholder
@@ -340,10 +339,9 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
   };
 
 
-  const handleDeleteClick = (cls: Class) => {
+  const handleDeleteClick = async (cls: Class) => {
     // Coletar informações sobre dados vinculados
     const studentCount = students.filter((s) => s.classId === cls.id).length;
-    const gradeCount = grades.filter((g) => g.classId === cls.id).length;
     const attendanceCount = attendance.filter(
       (a) => a.classId === cls.id,
     ).length;
@@ -359,10 +357,24 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
       return;
     }
 
+    const { count: gradeCount, error: gradesError } = await supabase
+      .from("grades")
+      .select("id", { count: "exact", head: true })
+      .eq("class_id", cls.id);
+
+    if (gradesError) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar as notas da turma.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setDeleteConfirmData({
       classData: cls,
       studentCount,
-      gradeCount,
+      gradeCount: gradeCount ?? 0,
       attendanceCount,
       incidentCount,
     });
@@ -375,11 +387,13 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
       deleteConfirmData;
 
     try {
-      await Promise.all(
-        grades
-          .filter((g) => g.classId === classData.id)
-          .map((grade) => deleteGrade(grade.id)),
-      );
+      const { error: gradesError } = await supabase
+        .from("grades")
+        .delete()
+        .eq("class_id", classData.id);
+      if (gradesError) {
+        throw gradesError;
+      }
 
       await Promise.all(
         attendance

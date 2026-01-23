@@ -35,7 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useStudents, useClasses, useIncidents, useGrades } from '@/hooks/useData';
+import { useStudents, useClasses, useIncidents, useGradesAnalytics } from '@/hooks/useData';
 import { useToast } from '@/hooks/use-toast';
 import { exportStudentsList } from '@/lib/excelExport';
 import { Search, Edit, Download, Eye, Trash2, Camera, X, CheckCircle2, XCircle, AlertTriangle, ArrowRightLeft, Clock } from 'lucide-react';
@@ -63,7 +63,6 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
   const { students, updateStudent, deleteStudent } = useStudents();
   const { classes } = useClasses();
   const { incidents } = useIncidents();
-  const { grades } = useGrades();
   // DISABLED: Attendance feature temporarily removed
   // const { attendance } = useAttendance();
   const attendance: any[] = []; // Empty array placeholder
@@ -88,6 +87,15 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
   const [photoPreview, setPhotoPreview] = useState<string>('');
   const [transferringStudent, setTransferringStudent] = useState<Student | null>(null);
   const [transferTargetClassId, setTransferTargetClassId] = useState<string>('');
+  const classIdsForGrades = useMemo(() => {
+    if (classFilter === 'all') {
+      return classes.map((cls) => cls.id);
+    }
+    return classFilter ? [classFilter] : [];
+  }, [classFilter, classes]);
+  const { grades } = useGradesAnalytics({
+    classIds: classIdsForGrades,
+  });
 
   const getClassName = (classId: string) => {
     const classData = classes.find(c => c.id === classId);

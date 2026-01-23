@@ -5,6 +5,8 @@ import { StudentsRegister } from '@/components/students/StudentsRegister';
 import { StudentsManage } from '@/components/students/StudentsManage';
 import { StudentApprovalManager } from '@/components/students/StudentApprovalManager';
 import { useUIStore } from '@/stores/useUIStore';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 const Students = () => {
   // ✅ Usando Zustand store para persistir tab entre navegações
@@ -25,16 +27,14 @@ const Students = () => {
   }, [highlightId, setSearchParams]);
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Cadastro de Alunos</h1>
-        <p className="text-muted-foreground mt-1">
-          Registre novos alunos individualmente ou em lote, e gerencie dados cadastrais
-        </p>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Cadastro de Alunos"
+        description="Registre novos alunos individualmente ou em lote, e gerencie dados cadastrais"
+      />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-3 bg-muted/20 p-1">
           <TabsTrigger value="manage">Gerenciar Alunos</TabsTrigger>
           <TabsTrigger value="register">Cadastrar</TabsTrigger>
           <TabsTrigger value="approval">Aprovações</TabsTrigger>
@@ -52,9 +52,8 @@ const Students = () => {
           <StudentApprovalManager />
         </TabsContent>
       </Tabs>
-    </div>
+    </PageContainer>
   );
 };
 
 export default Students;
-

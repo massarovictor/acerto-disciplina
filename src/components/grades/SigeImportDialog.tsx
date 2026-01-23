@@ -25,7 +25,7 @@ import {
     Loader2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useClasses, useStudents, useGrades, useProfessionalSubjects, useProfessionalSubjectTemplates } from '@/hooks/useData';
+import { useClasses, useStudents, useGradesScoped, useProfessionalSubjects, useProfessionalSubjectTemplates } from '@/hooks/useData';
 import { QUARTERS, getAllSubjects } from '@/lib/subjects';
 import {
     processSigeFile,
@@ -56,7 +56,7 @@ interface SigeImportDialogProps {
     defaultClassId?: string;
     defaultQuarter?: string;
     defaultSchoolYear?: 1 | 2 | 3;
-    onRefresh: () => Promise<void>;
+    onRefresh?: () => Promise<void>;
 }
 
 export const SigeImportDialog = ({
@@ -69,7 +69,6 @@ export const SigeImportDialog = ({
 }: SigeImportDialogProps) => {
     const { classes } = useClasses();
     const { students } = useStudents();
-    const { addGrade, addGrades, deleteGrade, deleteGrades, grades: existingGrades } = useGrades();
     const { professionalSubjects } = useProfessionalSubjects();
     const { templates } = useProfessionalSubjectTemplates();
     const { toast } = useToast();
@@ -90,6 +89,12 @@ export const SigeImportDialog = ({
     const [subjectMappings, setSubjectMappings] = useState<SubjectMapping[]>([]);
     const [lastSelectedClass, setLastSelectedClass] = useState<string | null>(null);
     const mappingKeyRef = useRef<string | null>(null);
+
+    const { addGrades, deleteGrades, grades: existingGrades } = useGradesScoped({
+        classId: selectedClass || undefined,
+        quarter: selectedQuarter || undefined,
+        schoolYear: selectedSchoolYear,
+    });
 
     const activeClasses = classes.filter(c => !c.archived && c.active);
     const schoolYearOptions: Array<{ value: 1 | 2 | 3; label: string }> = [
@@ -764,7 +769,9 @@ export const SigeImportDialog = ({
 
             // Reset e fechar
             handleClose();
-            await onRefresh();
+                if (onRefresh) {
+                    await onRefresh();
+                }
 
         } catch (error) {
             console.error(error);

@@ -20,7 +20,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import { Class, Student, Incident, Grade, AttendanceRecord } from "@/types";
+import { Class, Student, Incident } from "@/types";
 import { CoverSlide } from "./slides/CoverSlide";
 import { ClassOverviewSlide } from "./slides/ClassOverviewSlide";
 import { AreaAnalysisSlide } from "./slides/AreaAnalysisSlide";
@@ -36,6 +36,8 @@ import { useToast } from "@/hooks/use-toast";
 import {
   useProfessionalSubjects,
   useProfessionalSubjectTemplates,
+  useGradesScoped,
+  useGradesAnalytics,
 } from "@/hooks/useData";
 import { QUARTERS, SUBJECT_AREAS } from "@/lib/subjects";
 import { calculateCurrentYearFromCalendar } from "@/lib/classYearCalculator";
@@ -49,7 +51,6 @@ interface ClassSlidesProps {
   classes: Class[];
   students: Student[];
   incidents: Incident[];
-  grades: Grade[];
   // DISABLED: Attendance feature temporarily removed
   // attendance: AttendanceRecord[];
 }
@@ -58,7 +59,6 @@ export const ClassSlides = ({
   classes,
   students,
   incidents,
-  grades,
 }: ClassSlidesProps) => {
   const [selectedClass, setSelectedClass] = useState("");
   const [selectedStudent, setSelectedStudent] = useState("");
@@ -67,6 +67,8 @@ export const ClassSlides = ({
   const [currentSlide, setCurrentSlide] = useState(1);
   const [viewMode, setViewMode] = useState<"class" | "individual" | "situation" | "school">("class");
   const [selectedSituation, setSelectedSituation] = useState<SituationType | "">("");
+  const [schoolName, setSchoolName] = useState("Instituição de Ensino");
+  const [schoolPeriod, setSchoolPeriod] = useState("all");
   const { getProfessionalSubjects } = useProfessionalSubjects();
   const { templates } = useProfessionalSubjectTemplates();
   const { toast } = useToast();
@@ -75,8 +77,6 @@ export const ClassSlides = ({
   const [slideScale, setSlideScale] = useState(1);
   const [previewZoom, setPreviewZoom] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
-  const [schoolName, setSchoolName] = useState("Instituição de Ensino");
-  const [schoolPeriod, setSchoolPeriod] = useState("all");
   const [exportingIndex, setExportingIndex] = useState<number | null>(null);
   const SLIDE_WIDTH = 1920;
   const SLIDE_HEIGHT = 1080;
@@ -93,6 +93,20 @@ export const ClassSlides = ({
     { value: "aprovado", label: "Aprovado", description: "Todas disciplinas ≥ 6" },
     { value: "excelencia", label: "Excelência", description: "Todas ≥ 6 e média geral ≥ 8" },
   ];
+
+  const { grades: scopedGrades } = useGradesScoped({
+    classId: selectedClass || undefined,
+    quarter: selectedPeriod === "all" ? undefined : selectedPeriod,
+    schoolYear: selectedSchoolYear,
+  });
+  const schoolClassIds = useMemo(
+    () => (viewMode === "school" ? classes.map((cls) => cls.id) : []),
+    [classes, viewMode],
+  );
+  const { grades: schoolGrades } = useGradesAnalytics({
+    classIds: schoolClassIds,
+    quarter: schoolPeriod === "all" ? undefined : schoolPeriod,
+  });
 
   const classData = classes.find((c) => c.id === selectedClass);
   useEffect(() => {
@@ -209,10 +223,9 @@ export const ClassSlides = ({
   const classIncidents = selectedClass
     ? incidents.filter((i) => i.classId === selectedClass)
     : [];
-  console.log(classIncidents);
 
   const classGrades = selectedClass
-    ? grades.filter(
+    ? scopedGrades.filter(
       (g) =>
         g.classId === selectedClass &&
         (g.schoolYear ?? 1) === selectedSchoolYear,
@@ -528,7 +541,10 @@ export const ClassSlides = ({
     if (viewMode !== "school") return [];
 
     const period = schoolPeriod;
-    const filteredGrades = period === 'all' ? grades : grades.filter(g => g.quarter === period);
+    const filteredGrades =
+      period === "all"
+        ? schoolGrades
+        : schoolGrades.filter((g) => g.quarter === period);
 
     if (students.length === 0 && classes.length === 0) return [];
 
@@ -617,7 +633,7 @@ export const ClassSlides = ({
     );
 
     return slides;
-  }, [viewMode, schoolPeriod, schoolName, classes, students, grades, incidents, allProfessionalSubjects]);
+  }, [viewMode, schoolPeriod, schoolName, classes, students, schoolGrades, incidents, allProfessionalSubjects]);
 
   const activeSlides = viewMode === "class"
     ? classSlides

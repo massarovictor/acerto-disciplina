@@ -24,9 +24,9 @@ import { useToast } from "@/hooks/use-toast";
 import {
   useProfessionalSubjects,
   useProfessionalSubjectTemplates,
-  useGrades,
-  useHistoricalGrades,
-  useExternalAssessments,
+  useGradesScoped,
+  useHistoricalGradesScoped,
+  useExternalAssessmentsScoped,
 } from "@/hooks/useData";
 import {
   Dialog,
@@ -60,9 +60,17 @@ export const IntegratedReports = ({
   const [selectedSchoolYear, setSelectedSchoolYear] = useState<1 | 2 | 3>(1);
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
-  const { grades } = useGrades();
-  const { historicalGrades } = useHistoricalGrades();
-  const { externalAssessments } = useExternalAssessments();
+  const { grades } = useGradesScoped({
+    classId: selectedClass || undefined,
+    quarter: selectedPeriod === "anual" ? undefined : selectedPeriod,
+    schoolYear: selectedSchoolYear,
+  });
+  const { historicalGrades } = useHistoricalGradesScoped(
+    selectedStudent || undefined,
+  );
+  const { externalAssessments } = useExternalAssessmentsScoped(
+    selectedStudent || undefined,
+  );
   // DISABLED: Attendance feature temporarily removed
   // const { attendance } = useAttendance();
   const { getProfessionalSubjects } = useProfessionalSubjects();

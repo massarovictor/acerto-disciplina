@@ -18,34 +18,60 @@ interface DataState {
     historicalGrades: HistoricalGrade[];
     externalAssessments: ExternalAssessment[];
 
+    // Status
+    incidentsLoaded: boolean;
+    incidentsFetching: boolean;
+    studentsLoaded: boolean;
+    studentsFetching: boolean;
+    classesLoaded: boolean;
+    classesFetching: boolean;
+    gradesLoaded: boolean;
+    gradesFetching: boolean;
+    attendanceLoaded: boolean;
+    attendanceFetching: boolean;
+    historicalGradesLoaded: boolean;
+    historicalGradesFetching: boolean;
+    externalAssessmentsLoaded: boolean;
+    externalAssessmentsFetching: boolean;
+
     // Actions - Incidents
     setIncidents: (incidents: Incident[]) => void;
     addIncident: (incident: Incident) => void;
     updateIncident: (id: string, updates: Partial<Incident>) => void;
     deleteIncident: (id: string) => void;
+    setIncidentsLoaded: (loaded: boolean) => void;
+    setIncidentsFetching: (fetching: boolean) => void;
 
     // Actions - Students
     setStudents: (students: Student[]) => void;
     addStudent: (student: Student) => void;
     updateStudent: (id: string, updates: Partial<Student>) => void;
     deleteStudent: (id: string) => void;
+    setStudentsLoaded: (loaded: boolean) => void;
+    setStudentsFetching: (fetching: boolean) => void;
 
     // Actions - Classes
     setClasses: (classes: Class[]) => void;
     addClass: (classData: Class) => void;
     updateClass: (id: string, updates: Partial<Class>) => void;
     deleteClass: (id: string) => void;
+    setClassesLoaded: (loaded: boolean) => void;
+    setClassesFetching: (fetching: boolean) => void;
 
     // Actions - Grades
     setGrades: (grades: Grade[]) => void;
     addGrade: (grade: Grade) => void;
     updateGrade: (id: string, updates: Partial<Grade>) => void;
     deleteGrade: (id: string) => void;
+    setGradesLoaded: (loaded: boolean) => void;
+    setGradesFetching: (fetching: boolean) => void;
 
     // Actions - Attendance
     setAttendance: (attendance: AttendanceRecord[]) => void;
     addAttendance: (record: AttendanceRecord) => void;
     deleteAttendance: (id: string) => void;
+    setAttendanceLoaded: (loaded: boolean) => void;
+    setAttendanceFetching: (fetching: boolean) => void;
 
     // Actions - Historical Grades
     setHistoricalGrades: (grades: HistoricalGrade[]) => void;
@@ -53,11 +79,15 @@ interface DataState {
     addHistoricalGradesBatch: (grades: HistoricalGrade[]) => void;
     deleteHistoricalGrade: (id: string) => void;
     deleteHistoricalGradesBatch: (ids: string[]) => void;
+    setHistoricalGradesLoaded: (loaded: boolean) => void;
+    setHistoricalGradesFetching: (fetching: boolean) => void;
 
     // Actions - External Assessments
     setExternalAssessments: (assessments: ExternalAssessment[]) => void;
     addExternalAssessment: (assessment: ExternalAssessment) => void;
     deleteExternalAssessment: (id: string) => void;
+    setExternalAssessmentsLoaded: (loaded: boolean) => void;
+    setExternalAssessmentsFetching: (fetching: boolean) => void;
 }
 
 export const useDataStore = create<DataState>()((set) => ({
@@ -69,6 +99,20 @@ export const useDataStore = create<DataState>()((set) => ({
     attendance: [],
     historicalGrades: [],
     externalAssessments: [],
+    incidentsLoaded: false,
+    incidentsFetching: false,
+    studentsLoaded: false,
+    studentsFetching: false,
+    classesLoaded: false,
+    classesFetching: false,
+    gradesLoaded: false,
+    gradesFetching: false,
+    attendanceLoaded: false,
+    attendanceFetching: false,
+    historicalGradesLoaded: false,
+    historicalGradesFetching: false,
+    externalAssessmentsLoaded: false,
+    externalAssessmentsFetching: false,
 
     // Actions - Incidents
     setIncidents: (incidents) => set({ incidents }),
@@ -84,6 +128,8 @@ export const useDataStore = create<DataState>()((set) => ({
         set((state) => ({
             incidents: state.incidents.filter((i) => i.id !== id),
         })),
+    setIncidentsLoaded: (loaded) => set({ incidentsLoaded: loaded }),
+    setIncidentsFetching: (fetching) => set({ incidentsFetching: fetching }),
 
     // Actions - Students
     setStudents: (students) => set({ students }),
@@ -99,6 +145,8 @@ export const useDataStore = create<DataState>()((set) => ({
         set((state) => ({
             students: state.students.filter((s) => s.id !== id),
         })),
+    setStudentsLoaded: (loaded) => set({ studentsLoaded: loaded }),
+    setStudentsFetching: (fetching) => set({ studentsFetching: fetching }),
 
     // Actions - Classes
     setClasses: (classes) => set({ classes }),
@@ -114,6 +162,8 @@ export const useDataStore = create<DataState>()((set) => ({
         set((state) => ({
             classes: state.classes.filter((c) => c.id !== id),
         })),
+    setClassesLoaded: (loaded) => set({ classesLoaded: loaded }),
+    setClassesFetching: (fetching) => set({ classesFetching: fetching }),
 
     // Actions - Grades
     setGrades: (grades) => set({ grades }),
@@ -137,6 +187,8 @@ export const useDataStore = create<DataState>()((set) => ({
         set((state) => ({
             grades: state.grades.filter((g) => g.id !== id),
         })),
+    setGradesLoaded: (loaded) => set({ gradesLoaded: loaded }),
+    setGradesFetching: (fetching) => set({ gradesFetching: fetching }),
 
     // Actions - Attendance
     setAttendance: (attendance) => set({ attendance }),
@@ -146,6 +198,8 @@ export const useDataStore = create<DataState>()((set) => ({
         set((state) => ({
             attendance: state.attendance.filter((a) => a.id !== id),
         })),
+    setAttendanceLoaded: (loaded) => set({ attendanceLoaded: loaded }),
+    setAttendanceFetching: (fetching) => set({ attendanceFetching: fetching }),
 
     // Actions - Historical Grades
     setHistoricalGrades: (historicalGrades) => {
@@ -187,6 +241,8 @@ export const useDataStore = create<DataState>()((set) => ({
                 historicalGrades: state.historicalGrades.filter((g) => !idsSet.has(g.id)),
             };
         }),
+    setHistoricalGradesLoaded: (loaded) => set({ historicalGradesLoaded: loaded }),
+    setHistoricalGradesFetching: (fetching) => set({ historicalGradesFetching: fetching }),
 
     // Actions - External Assessments
     setExternalAssessments: (externalAssessments) => set({ externalAssessments }),
@@ -204,4 +260,6 @@ export const useDataStore = create<DataState>()((set) => ({
         set((state) => ({
             externalAssessments: state.externalAssessments.filter((a) => a.id !== id),
         })),
+    setExternalAssessmentsLoaded: (loaded) => set({ externalAssessmentsLoaded: loaded }),
+    setExternalAssessmentsFetching: (fetching) => set({ externalAssessmentsFetching: fetching }),
 }));

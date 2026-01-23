@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useClasses, useStudents, useGrades, useProfessionalSubjects, useProfessionalSubjectTemplates } from '@/hooks/useData';
+import { useClasses, useStudents, useGradesScoped, useProfessionalSubjects, useProfessionalSubjectTemplates } from '@/hooks/useData';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle2, XCircle, AlertTriangle, RefreshCw, Clock, Users, BookOpen } from 'lucide-react';
@@ -19,7 +19,6 @@ import { QUARTERS, SUBJECT_AREAS } from '@/lib/subjects';
 export const StudentApprovalManager = () => {
   const { classes } = useClasses();
   const { students } = useStudents();
-  const { grades } = useGrades();
   const { getProfessionalSubjects } = useProfessionalSubjects();
   const { templates } = useProfessionalSubjectTemplates();
   const { incidents, addIncident } = useIncidents();
@@ -35,6 +34,10 @@ export const StudentApprovalManager = () => {
   const [pendingQuarterResults, setPendingQuarterResults] = useState<
     { studentId: string; studentName: string; missingSubjects: string[] }[]
   >([]);
+  const { grades } = useGradesScoped({
+    classId: selectedClass || undefined,
+    schoolYear: selectedSchoolYear,
+  });
 
   const classStudents = students
     .filter((s) => s.classId === selectedClass)

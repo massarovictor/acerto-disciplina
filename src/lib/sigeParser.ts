@@ -5,6 +5,13 @@
 
 import * as XLSX from 'xlsx';
 
+const sigeDebug = import.meta.env.VITE_DEBUG_SIGE === 'true';
+const debugLog = (...args: unknown[]) => {
+    if (sigeDebug) {
+        console.log(...args);
+    }
+};
+
 /**
  * Estrutura de uma linha de notas extraída do SIGE
  */
@@ -612,8 +619,9 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
                         if (!key) continue;
                         subjectColumnsMap.set(j, display);
 
-                        // Log de debug - REMOVER DEPOIS
-                        console.log(`[DEBUG] (${sheetName}) Linha ${i}, Coluna ${j}: "${rawValue}" -> "${display}" (comum: ${hasKeywords})`);
+                        debugLog(
+                            `[DEBUG] (${sheetName}) Linha ${i}, Coluna ${j}: "${rawValue}" -> "${display}" (comum: ${hasKeywords})`,
+                        );
                     }
                 }
 
@@ -657,11 +665,13 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
                     }
                 }
 
-                // Log de debug - REMOVER DEPOIS
-                console.log(`[DEBUG] (${sheetName}) Bloco ${blocks.length} encontrado na linha ${i} com ${subjectColumns.length} disciplinas:`, subjectColumns.map(s => s.name).join(', '));
+                debugLog(
+                    `[DEBUG] (${sheetName}) Bloco ${blocks.length} encontrado na linha ${i} com ${subjectColumns.length} disciplinas:`,
+                    subjectColumns.map(s => s.name).join(', '),
+                );
             }
 
-            console.log(`[DEBUG] (${sheetName}) Total de blocos identificados: ${blocks.length}`);
+            debugLog(`[DEBUG] (${sheetName}) Total de blocos identificados: ${blocks.length}`);
 
             if (blocks.length === 0) {
                 continue;
@@ -678,7 +688,9 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
                     block.nameColumnIndex,
                 );
 
-                console.log(`[DEBUG] (${sheetName}) Processando bloco ${b + 1}/${blocks.length}, linhas ${block.headerRow + 1} até ${nextBlockStart - 1}, coluna de nome: ${nameColumnIndex}`);
+                debugLog(
+                    `[DEBUG] (${sheetName}) Processando bloco ${b + 1}/${blocks.length}, linhas ${block.headerRow + 1} até ${nextBlockStart - 1}, coluna de nome: ${nameColumnIndex}`,
+                );
 
                 // Processar linhas de dados deste bloco
                 let studentsInBlock = 0;
@@ -720,11 +732,13 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
                     }
 
                     if (gradesAddedForStudent > 0) {
-                        console.log(`[DEBUG] (${sheetName}) Aluno "${studentName}" - ${gradesAddedForStudent} notas capturadas neste bloco`);
+                        debugLog(
+                            `[DEBUG] (${sheetName}) Aluno "${studentName}" - ${gradesAddedForStudent} notas capturadas neste bloco`,
+                        );
                     }
                 }
 
-                console.log(`[DEBUG] (${sheetName}) Bloco ${b + 1}: ${studentsInBlock} alunos processados`);
+                debugLog(`[DEBUG] (${sheetName}) Bloco ${b + 1}: ${studentsInBlock} alunos processados`);
             }
         }
 
@@ -740,16 +754,17 @@ export async function parseSigeExcel(file: File): Promise<SigeParseResult> {
             }
         }
 
-        // Log de resumo - REMOVER DEPOIS
-        console.log(`[DEBUG] === RESUMO DA IMPORTAÇÃO ===`);
-        console.log(`[DEBUG] Total de disciplinas únicas: ${allSubjects.length}`);
-        console.log(`[DEBUG] Disciplinas: ${allSubjects.join(', ')}`);
-        console.log(`[DEBUG] Total de alunos: ${rows.length}`);
+        debugLog(`[DEBUG] === RESUMO DA IMPORTAÇÃO ===`);
+        debugLog(`[DEBUG] Total de disciplinas únicas: ${allSubjects.length}`);
+        debugLog(`[DEBUG] Disciplinas: ${allSubjects.join(', ')}`);
+        debugLog(`[DEBUG] Total de alunos: ${rows.length}`);
         if (rows.length > 0) {
-            console.log(`[DEBUG] Exemplo - ${rows[0].studentName}: ${Object.keys(rows[0].grades).length} disciplinas`);
-            console.log(`[DEBUG] Disciplinas do aluno: ${Object.keys(rows[0].grades).join(', ')}`);
+            debugLog(
+                `[DEBUG] Exemplo - ${rows[0].studentName}: ${Object.keys(rows[0].grades).length} disciplinas`,
+            );
+            debugLog(`[DEBUG] Disciplinas do aluno: ${Object.keys(rows[0].grades).join(', ')}`);
         }
-        console.log(`[DEBUG] =============================`);
+        debugLog(`[DEBUG] =============================`);
 
         if (rows.length === 0) {
             errors.push('Não foi possível identificar as linhas de notas.');

@@ -1,6 +1,13 @@
 import * as XLSX from 'xlsx';
 import { Student, Class } from '@/types';
 
+const importDebug = import.meta.env.VITE_DEBUG_IMPORT === 'true';
+const debugLog = (...args: unknown[]) => {
+  if (importDebug) {
+    console.log(...args);
+  }
+};
+
 export interface ImportRow {
   rowNumber: number;
   data: Partial<Student>;
@@ -226,8 +233,8 @@ export const validateImportData = (
     // Validar turma - usar nome da turma da planilha
     let classData: Class | undefined;
     
-    console.log(`[VALIDAÇÃO] Linha ${rowNumber}: Buscando turma pelo nome "${classNameStr}"`);
-    console.log(`[VALIDAÇÃO] Turmas disponíveis:`, classes.map(c => ({ id: c.id, name: c.name })));
+    debugLog(`[VALIDAÇÃO] Linha ${rowNumber}: Buscando turma pelo nome "${classNameStr}"`);
+    debugLog(`[VALIDAÇÃO] Turmas disponíveis:`, classes.map(c => ({ id: c.id, name: c.name })));
 
     const normalizedLookup = normalizeClassLabel(classNameStr);
     classData = classes.find(c => normalizeClassLabel(c.name) === normalizedLookup);
@@ -245,24 +252,24 @@ export const validateImportData = (
     }
 
     if (classData) {
-      console.log(`[VALIDAÇÃO] ✅ Turma encontrada:`, { id: classData.id, name: classData.name });
+      debugLog(`[VALIDAÇÃO] ✅ Turma encontrada:`, { id: classData.id, name: classData.name });
     }
 
     // Se não encontrou e há turma pré-selecionada, verificar se corresponde
     if (!classData && selectedClassId) {
-      console.log(`[VALIDAÇÃO] Turma não encontrada pelo nome, verificando turma pré-selecionada: ${selectedClassId}`);
+      debugLog(`[VALIDAÇÃO] Turma não encontrada pelo nome, verificando turma pré-selecionada: ${selectedClassId}`);
       const selectedClass = classes.find(c => c.id === selectedClassId);
       if (selectedClass) {
         const normalizedSelectedName = normalizeClassLabel(selectedClass.name);
         if (normalizedLookup === normalizedSelectedName) {
           classData = selectedClass;
-          console.log(`[VALIDAÇÃO] ✅ Usando turma pré-selecionada:`, { id: classData.id, name: classData.name });
+          debugLog(`[VALIDAÇÃO] ✅ Usando turma pré-selecionada:`, { id: classData.id, name: classData.name });
         } else if (classNameStr) {
           const legacyNumber = buildLegacyClassNumber(selectedClass);
           if (legacyNumber && legacyNumber.toUpperCase() === classNameStr.toUpperCase().trim()) {
             classData = selectedClass;
             warnings.push(`Identificação no formato antigo. Use o nome "${selectedClass.name}".`);
-            console.log(`[VALIDAÇÃO] ⚠️ Formato antigo, usando turma pré-selecionada:`, { id: selectedClass.id, name: selectedClass.name });
+            debugLog(`[VALIDAÇÃO] ⚠️ Formato antigo, usando turma pré-selecionada:`, { id: selectedClass.id, name: selectedClass.name });
           }
         }
       }
@@ -313,16 +320,18 @@ export const validateImportData = (
       // Usar turma encontrada pelo número da planilha
       finalClassId = classData.id;
       finalClassData = classData;
-      console.log(`[VALIDAÇÃO] Linha ${rowNumber}: finalClassId definido como "${finalClassId}" para turma "${classData.name}"`);
+      debugLog(`[VALIDAÇÃO] Linha ${rowNumber}: finalClassId definido como "${finalClassId}" para turma "${classData.name}"`);
     } else {
       // Se não encontrou turma, classId fica vazio (será marcado como inválido)
       finalClassId = '';
       finalClassData = undefined;
-      console.error(`[VALIDAÇÃO] Linha ${rowNumber}: ❌ finalClassId VAZIO - turma não encontrada!`);
+      if (importDebug) {
+        console.error(`[VALIDAÇÃO] Linha ${rowNumber}: ❌ finalClassId VAZIO - turma não encontrada!`);
+      }
     }
 
     const isValid = errors.length === 0 && !!finalClassData && !!finalClassId;
-    console.log(`[VALIDAÇÃO] Linha ${rowNumber}: isValid = ${isValid}, errors = ${errors.length}, finalClassId = "${finalClassId}"`);
+    debugLog(`[VALIDAÇÃO] Linha ${rowNumber}: isValid = ${isValid}, errors = ${errors.length}, finalClassId = "${finalClassId}"`);
 
     rows.push({
       rowNumber,

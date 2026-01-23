@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useClasses, useStudents, useGrades, useHistoricalGrades, useExternalAssessments, useIncidents } from '@/hooks/useData';
@@ -81,7 +82,7 @@ const StudentTrajectory = () => {
     const { students } = useStudents();
     const { grades, addGrade } = useGrades();
     const { historicalGrades, addHistoricalGrade, deleteHistoricalGrade } = useHistoricalGrades();
-    const { externalAssessments, addExternalAssessment, deleteExternalAssessment } = useExternalAssessments();
+    const { externalAssessments, deleteExternalAssessment, updateExternalAssessment } = useExternalAssessments();
     const { incidents } = useIncidents();
     const { toast } = useToast();
 
@@ -110,6 +111,19 @@ const StudentTrajectory = () => {
     const [gridValues, setGridValues] = useState<Record<string, string>>({});
     const [editingRecord, setEditingRecord] = useState<{ id: string, subject: string, gradeYear: number, quarter: string, grade: number } | null>(null);
     const [editGradeValue, setEditGradeValue] = useState<string>('');
+    const [editingExternalAssessment, setEditingExternalAssessment] = useState<ExternalAssessment | null>(null);
+    const [externalForm, setExternalForm] = useState({
+        assessmentType: 'Simulado' as ExternalAssessmentType,
+        assessmentName: '',
+        subject: '',
+        score: '',
+        maxScore: '',
+        appliedDate: '',
+        schoolLevel: 'medio' as 'fundamental' | 'medio',
+        gradeYear: '',
+        quarter: '',
+        notes: ''
+    });
 
     // Simulation State
     const [simulationPoints, setSimulationPoints] = useState(1);
@@ -124,6 +138,13 @@ const StudentTrajectory = () => {
     const studentHistorical = useMemo(() => historicalGrades.filter(g => g.studentId === selectedStudent), [historicalGrades, selectedStudent]);
     const studentExternal = useMemo(() => externalAssessments.filter(e => e.studentId === selectedStudent), [externalAssessments, selectedStudent]);
     const studentIncidents = useMemo(() => incidents.filter(i => i.studentIds.includes(selectedStudent)), [incidents, selectedStudent]);
+    const studentExternalSorted = useMemo(() => {
+        return [...studentExternal].sort((a, b) => {
+            const aDate = new Date(a.appliedDate).getTime();
+            const bDate = new Date(b.appliedDate).getTime();
+            return bDate - aDate;
+        });
+    }, [studentExternal]);
 
     const isStudentFundamental = useMemo(() => {
         if (!studentData) return false;
@@ -156,6 +177,8 @@ const StudentTrajectory = () => {
         students.filter(s => s.classId === selectedClass).sort((a, b) => a.name.localeCompare(b.name)),
         [students, selectedClass]
     );
+
+
 
     // Holistic Analysis (Potencialidades e Dificuldades)
     const holisticSummary = useMemo(() => {
@@ -207,11 +230,60 @@ const StudentTrajectory = () => {
 
         const data: any[] = [];
         let idx = 0;
+        const isAllSubjects = selectedSubject === 'all';
+        const average = (values: number[]) => {
+            const valid = values.filter((value) => Number.isFinite(value));
+            if (valid.length === 0) return null;
+            return valid.reduce((sum, value) => sum + value, 0) / valid.length;
+        };
 
         // Helper to add data points
         const addPoints = (level: string, years: number[]) => {
             years.forEach(year => {
                 if (level === 'fundamental') {
+                    if (isAllSubjects) {
+                        const annualGrades = studentHistorical.filter(h =>
+                            h.gradeYear === year && h.quarter === 'Anual'
+                        );
+                        const annualAvg = average(annualGrades.map(h => h.grade));
+
+                        if (annualAvg !== null) {
+                            data.push({
+                                idx: idx++,
+                                label: `${year}º Fund (Anual)`,
+                                fundGrade: annualAvg,
+                                type: 'Escolar',
+                                continuousValue: annualAvg
+                            });
+                            return;
+                        }
+
+                        QUARTERS.forEach(q => {
+                            const periodGrades = studentHistorical.filter(h =>
+                                h.gradeYear === year && h.quarter === q
+                            );
+                            const gradeAvg = average(periodGrades.map(h => h.grade));
+
+                            const externalScores = studentExternal
+                                .filter(e => e.schoolLevel === level && e.gradeYear === year && e.quarter === q)
+                                .map(e => (e.maxScore ? (e.score / e.maxScore) * 10 : NaN));
+                            const externalAvg = average(externalScores);
+
+                            if (gradeAvg !== null || externalAvg !== null) {
+                                data.push({
+                                    idx: idx++,
+                                    label: `${year}º Fund - ${q.replace(' Bimestre', 'B')}`,
+                                    fundGrade: gradeAvg ?? undefined,
+                                    external: externalAvg ?? undefined,
+                                    externalName: externalScores.length > 1 ? 'Avaliações' : undefined,
+                                    type: gradeAvg !== null ? 'Escolar' : 'Externa',
+                                    continuousValue: gradeAvg ?? externalAvg ?? undefined
+                                });
+                            }
+                        });
+                        return;
+                    }
+
                     // Para fundamental, buscar a disciplina selecionada OU equivalente
                     const fundamentalEquiv = getFundamentalEquivalent(selectedSubject);
 
@@ -277,6 +349,41 @@ const StudentTrajectory = () => {
                 } else {
                     // Ensino Médio: buscar por bimestre
                     QUARTERS.forEach(q => {
+                        if (isAllSubjects) {
+                            const periodGrades = studentRegularGrades.filter(r =>
+                                (r.schoolYear || 1) === year && r.quarter === q
+                            );
+                            const gradeAvg = average(periodGrades.map(r => r.grade));
+
+                            const externalScores = studentExternal
+                                .filter(e => e.schoolLevel === level && e.gradeYear === year && e.quarter === q)
+                                .map(e => (e.maxScore ? (e.score / e.maxScore) * 10 : NaN));
+                            const externalAvg = average(externalScores);
+
+                            const periodIncidents = studentIncidents.filter(i => {
+                                const date = new Date(i.createdAt);
+                                const month = date.getMonth();
+                                const quarter = Math.floor(month / 3) + 1;
+                                const quarterStr = `${quarter}º Bimestre`;
+                                return quarterStr === q;
+                            });
+
+                            if (gradeAvg !== null || externalAvg !== null || (periodIncidents.length > 0 && data.length > 0)) {
+                                data.push({
+                                    idx: idx++,
+                                    label: `${year}º EM - ${q.replace(' Bimestre', 'B')}`,
+                                    emGrade: gradeAvg ?? undefined,
+                                    external: externalAvg ?? undefined,
+                                    externalName: externalScores.length > 1 ? 'Avaliações' : undefined,
+                                    incident: periodIncidents.length > 0 ? periodIncidents.length * 2 : undefined,
+                                    incidentCount: periodIncidents.length,
+                                    type: gradeAvg !== null ? 'Escolar' : externalAvg !== null ? 'Externa' : 'Ocorrência',
+                                    continuousValue: gradeAvg ?? externalAvg ?? undefined
+                                });
+                            }
+                            return;
+                        }
+
                         const g = studentRegularGrades.find(r =>
                             (r.schoolYear || 1) === year &&
                             r.quarter === q &&
@@ -544,6 +651,8 @@ const StudentTrajectory = () => {
         return result.slice(0, 4); // Máximo 4 insights
     }, [trendAnalysis, enrichedMetrics, subjectTimeline]);
 
+    const selectedSubjectLabel = selectedSubject === 'all' ? 'Todas as disciplinas' : selectedSubject;
+
 
 
     const handleSaveGrid = async () => {
@@ -574,6 +683,74 @@ const StudentTrajectory = () => {
         }
     };
 
+    const formatDateInput = (value?: string) => {
+        if (!value) return '';
+        if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return '';
+        return parsed.toISOString().slice(0, 10);
+    };
+
+    const openExternalEdit = (assessment: ExternalAssessment) => {
+        setEditingExternalAssessment(assessment);
+        setExternalForm({
+            assessmentType: assessment.assessmentType,
+            assessmentName: assessment.assessmentName,
+            subject: assessment.subject ?? '',
+            score: String(assessment.score),
+            maxScore: String(assessment.maxScore),
+            appliedDate: formatDateInput(assessment.appliedDate),
+            schoolLevel: assessment.schoolLevel,
+            gradeYear: String(assessment.gradeYear),
+            quarter: assessment.quarter ?? '',
+            notes: assessment.notes ?? ''
+        });
+    };
+
+    const handleExternalSave = async () => {
+        if (!editingExternalAssessment) return;
+        const score = Number(externalForm.score);
+        const maxScore = Number(externalForm.maxScore);
+        const gradeYear = Number(externalForm.gradeYear);
+
+        if (!externalForm.assessmentName.trim()) {
+            toast({ title: "Nome obrigatório", description: "Informe o nome da avaliação.", variant: "destructive" });
+            return;
+        }
+        if (!externalForm.appliedDate) {
+            toast({ title: "Data obrigatória", description: "Informe a data de aplicação.", variant: "destructive" });
+            return;
+        }
+        if (!Number.isFinite(score) || !Number.isFinite(maxScore) || maxScore <= 0) {
+            toast({ title: "Valores inválidos", description: "Informe nota e pontuação máxima válidas.", variant: "destructive" });
+            return;
+        }
+        if (!Number.isFinite(gradeYear)) {
+            toast({ title: "Ano inválido", description: "Informe o ano escolar.", variant: "destructive" });
+            return;
+        }
+
+        try {
+            await updateExternalAssessment({
+                ...editingExternalAssessment,
+                assessmentType: externalForm.assessmentType,
+                assessmentName: externalForm.assessmentName.trim(),
+                subject: externalForm.subject.trim() || undefined,
+                score,
+                maxScore,
+                appliedDate: externalForm.appliedDate,
+                schoolLevel: externalForm.schoolLevel,
+                gradeYear,
+                quarter: externalForm.quarter || undefined,
+                notes: externalForm.notes.trim() || undefined,
+            });
+            toast({ title: "Avaliação atualizada", description: "Registro atualizado com sucesso." });
+            setEditingExternalAssessment(null);
+        } catch (e) {
+            toast({ title: "Erro ao atualizar", description: "Não foi possível salvar a avaliação.", variant: "destructive" });
+        }
+    };
+
     return (
         <div className="p-6 space-y-6">
             {/* Header */}
@@ -593,7 +770,6 @@ const StudentTrajectory = () => {
                     </Button>
                 </div>
             </div>
-
             {/* Main Filters Card */}
             <Card className="bg-muted/50 border-muted">
                 <CardContent className="pt-6">
@@ -647,6 +823,7 @@ const StudentTrajectory = () => {
                                     <SelectValue placeholder="Escolha a disciplina" />
                                 </SelectTrigger>
                                 <SelectContent className="max-h-80">
+                                    <SelectItem value="all">Todas as disciplinas</SelectItem>
                                     {/* Áreas conforme o nível do aluno */}
                                     {(isStudentFundamental ? FUNDAMENTAL_SUBJECT_AREAS : SUBJECT_AREAS).map(area => (
                                         <SelectGroup key={area.name}>
@@ -926,6 +1103,82 @@ const StudentTrajectory = () => {
                                             </div>
                                         </div>
                                     )}
+
+                                    <div className="mt-10 space-y-4">
+                                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-t pt-6">
+                                            <div className="flex items-center gap-2">
+                                                <Target className="h-5 w-5 text-muted-foreground" />
+                                                <h3 className="font-bold">Avaliações Externas</h3>
+                                            </div>
+                                            <Button variant="outline" className="gap-2" onClick={() => setShowBatchAssessment(true)}>
+                                                <Target className="h-4 w-4" />
+                                                Lançar Avaliações
+                                            </Button>
+                                        </div>
+
+                                        {studentExternalSorted.length === 0 ? (
+                                            <div className="border rounded-lg p-6 text-center text-muted-foreground bg-muted/20">
+                                                Nenhuma avaliação externa registrada para este aluno.
+                                            </div>
+                                        ) : (
+                                            <div className="border rounded-lg overflow-hidden bg-card">
+                                                <Table>
+                                                    <TableHeader className="bg-muted/50">
+                                                        <TableRow>
+                                                            <TableHead>Data</TableHead>
+                                                            <TableHead>Tipo</TableHead>
+                                                            <TableHead>Avaliação</TableHead>
+                                                            <TableHead>Disciplina</TableHead>
+                                                            <TableHead className="text-right">Nota</TableHead>
+                                                            <TableHead>Ano</TableHead>
+                                                            <TableHead>Bimestre</TableHead>
+                                                            <TableHead className="w-20">Ações</TableHead>
+                                                        </TableRow>
+                                                    </TableHeader>
+                                                    <TableBody>
+                                                        {studentExternalSorted.map((assessment) => {
+                                                            const appliedLabel = formatDateInput(assessment.appliedDate);
+                                                            return (
+                                                                <TableRow key={assessment.id} className="hover:bg-muted/30">
+                                                                    <TableCell className="text-xs">{appliedLabel || '-'}</TableCell>
+                                                                    <TableCell className="text-xs">{assessment.assessmentType}</TableCell>
+                                                                    <TableCell className="text-xs">{assessment.assessmentName}</TableCell>
+                                                                    <TableCell className="text-xs">{assessment.subject || 'Geral'}</TableCell>
+                                                                    <TableCell className="text-right font-bold text-xs">
+                                                                        {assessment.score}/{assessment.maxScore}
+                                                                    </TableCell>
+                                                                    <TableCell className="text-xs">
+                                                                        {assessment.schoolLevel === 'fundamental'
+                                                                            ? `${assessment.gradeYear}º Fund`
+                                                                            : `${assessment.gradeYear}º EM`}
+                                                                    </TableCell>
+                                                                    <TableCell className="text-xs">{assessment.quarter || '-'}</TableCell>
+                                                                    <TableCell className="flex gap-1">
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-500/10"
+                                                                            onClick={() => openExternalEdit(assessment)}
+                                                                        >
+                                                                            <Edit3 className="h-4 w-4" />
+                                                                        </Button>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                                                                            onClick={() => deleteExternalAssessment(assessment.id)}
+                                                                        >
+                                                                            <Trash2 className="h-4 w-4" />
+                                                                        </Button>
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            );
+                                                        })}
+                                                    </TableBody>
+                                                </Table>
+                                            </div>
+                                        )}
+                                    </div>
                                 </CardContent>
                             </Card>
                         </TabsContent>
@@ -1090,7 +1343,7 @@ const StudentTrajectory = () => {
                                     <Card className="border-none shadow-sm bg-card">
                                         <CardHeader className="pb-2">
                                             <CardTitle className="text-lg">
-                                                {selectedSubject} - Evolução Longitudinal
+                                                {selectedSubjectLabel} - Evolução Longitudinal
                                                 {showSimulation && (
                                                     <Badge variant="outline" className="ml-2 text-xs">
                                                         Simulação Ativa
@@ -1278,7 +1531,7 @@ const StudentTrajectory = () => {
                             ) : (
                                 <Card className="h-80 flex flex-col items-center justify-center border-dashed">
                                     <BookOpen className="h-12 w-12 opacity-10 mb-2" />
-                                    <p className="text-muted-foreground">Escolha uma disciplina para visualizar a trajetória</p>
+                                    <p className="text-muted-foreground">Escolha uma disciplina ou todas para visualizar a trajetória</p>
                                 </Card>
                             )}
                         </TabsContent>
@@ -1345,6 +1598,162 @@ const StudentTrajectory = () => {
                             toast({ title: "Nota atualizada", description: "A nota foi corrigida com sucesso." });
                             setEditingRecord(null);
                         }}>Salvar Alterações</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={!!editingExternalAssessment}
+                onOpenChange={(open) => !open && setEditingExternalAssessment(null)}
+            >
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Editar Avaliação Externa</DialogTitle>
+                        <DialogDescription>
+                            Atualize os dados da avaliação registrada.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
+                        <div className="space-y-2">
+                            <Label>Tipo</Label>
+                            <Select
+                                value={externalForm.assessmentType}
+                                onValueChange={(value) => setExternalForm({ ...externalForm, assessmentType: value as ExternalAssessmentType })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {['SAEB', 'SIGE', 'Diagnóstica', 'Simulado', 'Outro'].map((type) => (
+                                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Nome da avaliação</Label>
+                            <Input
+                                value={externalForm.assessmentName}
+                                onChange={(e) => setExternalForm({ ...externalForm, assessmentName: e.target.value })}
+                                placeholder="Ex.: Simulado SAEPI"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Disciplina</Label>
+                            <Input
+                                value={externalForm.subject}
+                                onChange={(e) => setExternalForm({ ...externalForm, subject: e.target.value })}
+                                placeholder="Geral ou disciplina"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Data de aplicação</Label>
+                            <Input
+                                type="date"
+                                value={externalForm.appliedDate}
+                                onChange={(e) => setExternalForm({ ...externalForm, appliedDate: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Nota</Label>
+                            <Input
+                                type="number"
+                                min="0"
+                                value={externalForm.score}
+                                onChange={(e) => setExternalForm({ ...externalForm, score: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Pontuação máxima</Label>
+                            <Input
+                                type="number"
+                                min="1"
+                                value={externalForm.maxScore}
+                                onChange={(e) => setExternalForm({ ...externalForm, maxScore: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Nível</Label>
+                            <Select
+                                value={externalForm.schoolLevel}
+                                onValueChange={(value) => {
+                                    const nextLevel = value as 'fundamental' | 'medio';
+                                    const nextYearOptions = nextLevel === 'fundamental' ? FUNDAMENTAL_YEARS : MEDIO_YEARS;
+                                    const nextYear = nextYearOptions.includes(Number(externalForm.gradeYear))
+                                        ? externalForm.gradeYear
+                                        : String(nextYearOptions[0]);
+                                    setExternalForm({
+                                        ...externalForm,
+                                        schoolLevel: nextLevel,
+                                        gradeYear: nextYear,
+                                    });
+                                }}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="fundamental">Fundamental</SelectItem>
+                                    <SelectItem value="medio">Ensino Médio</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Ano</Label>
+                            <Select
+                                value={externalForm.gradeYear}
+                                onValueChange={(value) => setExternalForm({ ...externalForm, gradeYear: value })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {(externalForm.schoolLevel === 'fundamental' ? FUNDAMENTAL_YEARS : MEDIO_YEARS)
+                                        .map((year) => (
+                                            <SelectItem key={year} value={String(year)}>
+                                                {externalForm.schoolLevel === 'fundamental' ? `${year}º ano` : `${year}º EM`}
+                                            </SelectItem>
+                                        ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Bimestre</Label>
+                            <Select
+                                value={externalForm.quarter || 'none'}
+                                onValueChange={(value) => setExternalForm({ ...externalForm, quarter: value === 'none' ? '' : value })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">Sem bimestre</SelectItem>
+                                    <SelectItem value="Anual">Anual</SelectItem>
+                                    {QUARTERS.map((quarter) => (
+                                        <SelectItem key={quarter} value={quarter}>{quarter}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                            <Label>Observações</Label>
+                            <Textarea
+                                rows={3}
+                                value={externalForm.notes}
+                                onChange={(e) => setExternalForm({ ...externalForm, notes: e.target.value })}
+                                placeholder="Comentários, observações ou contexto"
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditingExternalAssessment(null)}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleExternalSave}>
+                            Salvar alterações
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

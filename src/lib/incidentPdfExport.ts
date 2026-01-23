@@ -2,6 +2,7 @@ import { Incident, Student, Class, FollowUpRecord, Comment } from '@/types';
 import { INCIDENT_EPISODES } from '@/data/mockData';
 import { BasePDFGenerator } from './basePdfExport';
 import { supabase } from '@/services/supabase/client';
+import { perfTimer } from '@/lib/perf';
 
 /**
  * Gerador de PDF de Ocorrências Disciplinares
@@ -41,6 +42,7 @@ class IncidentPDF extends BasePDFGenerator {
 
     // Se não tiver, busca o email do usuário que criou o incidente
     if (incident.createdBy) {
+      const done = perfTimer('incident_pdf.profile_lookup');
       try {
         const { data: profile } = await supabase
           .from('profiles')
@@ -49,9 +51,12 @@ class IncidentPDF extends BasePDFGenerator {
           .single();
 
         if (profile?.email) {
+          done({ ok: true });
           return profile.email;
         }
+        done({ ok: true, email: 'missing' });
       } catch (e) {
+        done({ ok: false });
         console.error('Erro ao buscar email do responsável:', e);
       }
     }

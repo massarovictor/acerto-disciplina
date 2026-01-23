@@ -17,6 +17,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useIncidents, useClasses, useStudents } from '@/hooks/useData';
 import { SchoolConfigDialog } from '@/components/settings/SchoolConfigDialog';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 interface NavigationCard {
   title: string;
@@ -30,7 +32,7 @@ interface NavigationCard {
 }
 
 const Dashboard = () => {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { incidents } = useIncidents();
   const { classes } = useClasses();
@@ -109,30 +111,27 @@ const Dashboard = () => {
   ];
 
   return (
-    <div className="p-6 space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
+    <PageContainer>
+      <PageHeader
+        title={
+          <>
             <Sparkles className="h-6 w-6 text-primary" />
-            <h1 className="text-3xl font-bold tracking-tight">
-              Olá, {user?.email?.split('@')[0] || 'Usuário'}
-            </h1>
-          </div>
-          <p className="text-muted-foreground">
-            O que você gostaria de fazer hoje?
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="lg"
-          onClick={() => setShowSchoolConfig(true)}
-          className="gap-2"
-        >
-          <Settings className="h-5 w-5" />
-          Configurar Escola
-        </Button>
-      </div>
+            <span>Olá, {user?.email?.split('@')[0] || 'Usuário'}</span>
+          </>
+        }
+        description="O que você gostaria de fazer hoje?"
+        actions={
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => setShowSchoolConfig(true)}
+            className="gap-2"
+          >
+            <Settings className="h-5 w-5" />
+            Configurar Escola
+          </Button>
+        }
+      />
 
       {/* Navigation Cards Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -195,7 +194,7 @@ const Dashboard = () => {
         open={showSchoolConfig}
         onOpenChange={setShowSchoolConfig}
       />
-    </div>
+    </PageContainer>
   );
 };
 

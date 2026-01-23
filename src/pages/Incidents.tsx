@@ -26,6 +26,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Incident } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useUIStore } from '@/stores/useUIStore';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 const Incidents = () => {
   const navigate = useNavigate();
@@ -141,7 +143,7 @@ const Incidents = () => {
           return (
             <div
               key={incident.id}
-              className="flex items-center gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+              className="flex items-center gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors bg-white shadow-sm"
             >
               <div className={`w-3 h-3 rounded-full ${getUrgencyDot(incident.finalSeverity)}`} />
 
@@ -217,20 +219,17 @@ const Incidents = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Ocorrências</h1>
-          <p className="text-muted-foreground mt-1">
-            Acompanhe e gerencie as ocorrências por status
-          </p>
-        </div>
-        <Button size="lg" onClick={() => setShowNewIncidentDialog(true)}>
-          <Plus className="h-5 w-5 mr-2" />
-          Registrar Ocorrência
-        </Button>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Ocorrências"
+        description="Acompanhe e gerencie as ocorrências da escola"
+        actions={
+          <Button size="lg" onClick={() => setShowNewIncidentDialog(true)}>
+            <Plus className="h-5 w-5 mr-2" />
+            Registrar Ocorrência
+          </Button>
+        }
+      />
 
       {/* Stats Cards */}
       <div className="grid gap-4 grid-cols-3">
@@ -264,7 +263,7 @@ const Incidents = () => {
       </div>
 
       {/* Search and Filters */}
-      <div className="flex gap-4">
+      <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
@@ -292,7 +291,7 @@ const Incidents = () => {
 
       {/* Tabs by Status */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'aberta' | 'acompanhamento' | 'resolvida')} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-3 bg-muted/20 p-1">
           <TabsTrigger value="aberta">
             Abertas ({filteredOpenIncidents.length})
           </TabsTrigger>
@@ -414,7 +413,7 @@ const Incidents = () => {
           <IncidentWizard onComplete={() => setShowNewIncidentDialog(false)} />
         </DialogContent>
       </Dialog>
-    </div>
+    </PageContainer>
   );
 };
 

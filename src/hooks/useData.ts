@@ -36,6 +36,7 @@ import {
   mapTemplateFromDb,
   mapTemplateToDb,
 } from "@/services/supabase/mappers";
+import { perfTimer } from "@/lib/perf";
 
 const logError = (scope: string, error: unknown) => {
   console.error(`[Supabase:${scope}]`, error);
@@ -51,16 +52,19 @@ export function useProfiles() {
       return;
     }
 
+    const done = perfTimer("profiles.fetch");
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", user.id);
 
     if (error) {
+      done({ ok: false });
       logError("profiles.select", error);
       return;
     }
 
+    done({ ok: true, rows: data?.length ?? 0 });
     setProfiles((data || []).map(mapProfileFromDb));
   }, [user?.id]);
 
@@ -103,16 +107,19 @@ export function useAuthorizedEmails() {
   const fetchAuthorizedEmails = useCallback(async () => {
     if (!user?.id) return;
 
+    const done = perfTimer("authorized_emails.fetch");
     const { data, error } = await supabase
       .from("authorized_emails")
       .select("email, role")
       .order("email");
 
     if (error) {
+      done({ ok: false });
       logError("authorized_emails.select", error);
       return;
     }
 
+    done({ ok: true, rows: data?.length ?? 0 });
     setAuthorizedEmails(data || []);
   }, [user?.id]);
 
@@ -125,26 +132,51 @@ export function useAuthorizedEmails() {
 
 export function useClasses() {
   const { user } = useAuth();
-  const [classes, setClasses] = useState<Class[]>([]);
+  const classes = useDataStore((state) => state.classes);
+  const setClasses = useDataStore((state) => state.setClasses);
+  const addClassToStore = useDataStore((state) => state.addClass);
+  const updateClassInStore = useDataStore((state) => state.updateClass);
+  const deleteClassFromStore = useDataStore((state) => state.deleteClass);
+  const classesLoaded = useDataStore((state) => state.classesLoaded);
+  const classesFetching = useDataStore((state) => state.classesFetching);
+  const setClassesLoaded = useDataStore((state) => state.setClassesLoaded);
+  const setClassesFetching = useDataStore((state) => state.setClassesFetching);
 
-  const fetchClasses = useCallback(async () => {
+  const fetchClasses = useCallback(async (force = false) => {
     if (!user?.id) {
       setClasses([]);
+      setClassesLoaded(false);
       return;
     }
+    if (classesFetching) return;
+    if (!force && classesLoaded) return;
 
+    setClassesFetching(true);
+    const done = perfTimer("classes.fetch");
     const { data, error } = await supabase
       .from("classes")
       .select("*")
       .order("created_at", { ascending: false });
 
     if (error) {
+      done({ ok: false });
       logError("classes.select", error);
+      setClassesFetching(false);
       return;
     }
 
+    done({ ok: true, rows: data?.length ?? 0 });
     setClasses((data || []).map(mapClassFromDb));
-  }, [user?.id]);
+    setClassesLoaded(true);
+    setClassesFetching(false);
+  }, [
+    user?.id,
+    classesLoaded,
+    classesFetching,
+    setClasses,
+    setClassesLoaded,
+    setClassesFetching,
+  ]);
 
   useEffect(() => {
     fetchClasses();
@@ -185,7 +217,7 @@ export function useClasses() {
     }
 
     const newClass = mapClassFromDb(data);
-    setClasses((prev) => [newClass, ...prev]);
+    addClassToStore(newClass);
     return newClass;
   };
 
@@ -260,9 +292,7 @@ export function useClasses() {
 
     if (data) {
       const updatedClass = mapClassFromDb(data);
-      setClasses((prev) =>
-        prev.map((cls) => (cls.id === id ? updatedClass : cls)),
-      );
+      updateClassInStore(id, updatedClass);
     }
   };
 
@@ -272,7 +302,7 @@ export function useClasses() {
       logError("classes.delete", error);
       throw error;
     }
-    setClasses((prev) => prev.filter((cls) => cls.id !== id));
+    deleteClassFromStore(id);
   };
 
   const archiveClass = async (id: string, reason?: string) => {
@@ -295,7 +325,7 @@ export function useClasses() {
 
   return {
     classes,
-    refreshClasses: fetchClasses,
+    refreshClasses: () => fetchClasses(true),
     addClass,
     updateClass,
     deleteClass,
@@ -306,26 +336,51 @@ export function useClasses() {
 
 export function useStudents() {
   const { user } = useAuth();
-  const [students, setStudents] = useState<Student[]>([]);
+  const students = useDataStore((state) => state.students);
+  const setStudents = useDataStore((state) => state.setStudents);
+  const addStudentToStore = useDataStore((state) => state.addStudent);
+  const updateStudentInStore = useDataStore((state) => state.updateStudent);
+  const deleteStudentFromStore = useDataStore((state) => state.deleteStudent);
+  const studentsLoaded = useDataStore((state) => state.studentsLoaded);
+  const studentsFetching = useDataStore((state) => state.studentsFetching);
+  const setStudentsLoaded = useDataStore((state) => state.setStudentsLoaded);
+  const setStudentsFetching = useDataStore((state) => state.setStudentsFetching);
 
-  const fetchStudents = useCallback(async () => {
+  const fetchStudents = useCallback(async (force = false) => {
     if (!user?.id) {
       setStudents([]);
+      setStudentsLoaded(false);
       return;
     }
+    if (studentsFetching) return;
+    if (!force && studentsLoaded) return;
 
+    setStudentsFetching(true);
+    const done = perfTimer("students.fetch");
     const { data, error } = await supabase
       .from("students")
       .select("*")
       .order("created_at", { ascending: false });
 
     if (error) {
+      done({ ok: false });
       logError("students.select", error);
+      setStudentsFetching(false);
       return;
     }
 
+    done({ ok: true, rows: data?.length ?? 0 });
     setStudents((data || []).map(mapStudentFromDb));
-  }, [user?.id]);
+    setStudentsLoaded(true);
+    setStudentsFetching(false);
+  }, [
+    user?.id,
+    studentsLoaded,
+    studentsFetching,
+    setStudents,
+    setStudentsLoaded,
+    setStudentsFetching,
+  ]);
 
   useEffect(() => {
     fetchStudents();
@@ -363,7 +418,7 @@ export function useStudents() {
     }
 
     const newStudent = mapStudentFromDb(data);
-    setStudents((prev) => [newStudent, ...prev]);
+    addStudentToStore(newStudent);
     return newStudent;
   };
 
@@ -397,11 +452,7 @@ export function useStudents() {
       throw error;
     }
 
-    setStudents((prev) =>
-      prev.map((student) =>
-        student.id === id ? { ...student, ...updates } : student,
-      ),
-    );
+    updateStudentInStore(id, updates);
   };
 
   const deleteStudent = async (id: string) => {
@@ -410,12 +461,12 @@ export function useStudents() {
       logError("students.delete", error);
       throw error;
     }
-    setStudents((prev) => prev.filter((student) => student.id !== id));
+    deleteStudentFromStore(id);
   };
 
   return {
     students,
-    refreshStudents: fetchStudents,
+    refreshStudents: () => fetchStudents(true),
     addStudent,
     updateStudent,
     deleteStudent,
@@ -424,14 +475,27 @@ export function useStudents() {
 
 export function useGrades() {
   const { user } = useAuth();
-  const [grades, setGrades] = useState<Grade[]>([]);
+  const grades = useDataStore((state) => state.grades);
+  const setGrades = useDataStore((state) => state.setGrades);
+  const addGradeToStore = useDataStore((state) => state.addGrade);
+  const updateGradeInStore = useDataStore((state) => state.updateGrade);
+  const deleteGradeFromStore = useDataStore((state) => state.deleteGrade);
+  const gradesLoaded = useDataStore((state) => state.gradesLoaded);
+  const gradesFetching = useDataStore((state) => state.gradesFetching);
+  const setGradesLoaded = useDataStore((state) => state.setGradesLoaded);
+  const setGradesFetching = useDataStore((state) => state.setGradesFetching);
 
-  const fetchGrades = useCallback(async () => {
+  const fetchGrades = useCallback(async (force = false) => {
     if (!user?.id) {
       setGrades([]);
+      setGradesLoaded(false);
       return;
     }
+    if (gradesFetching) return;
+    if (!force && gradesLoaded) return;
 
+    setGradesFetching(true);
+    const done = perfTimer("grades.fetch");
     // Supabase has a server-side limit of 1000 rows per query.
     // We use pagination to get all grades.
     const PAGE_SIZE = 1000;
@@ -450,7 +514,9 @@ export function useGrades() {
         .range(from, to);
 
       if (error) {
+        done({ ok: false, rows: allGrades.length, pages: page });
         logError("grades.select", error);
+        setGradesFetching(false);
         return;
       }
 
@@ -463,11 +529,18 @@ export function useGrades() {
       }
     }
 
-    console.log(
-      `[GRADES FETCH] Supabase retornou ${allGrades.length} notas (${page} página(s))`,
-    );
+    done({ ok: true, rows: allGrades.length, pages: page, pageSize: PAGE_SIZE });
     setGrades(allGrades.map(mapGradeFromDb));
-  }, [user?.id]);
+    setGradesLoaded(true);
+    setGradesFetching(false);
+  }, [
+    user?.id,
+    gradesLoaded,
+    gradesFetching,
+    setGrades,
+    setGradesLoaded,
+    setGradesFetching,
+  ]);
 
   useEffect(() => {
     fetchGrades();
@@ -521,15 +594,7 @@ export function useGrades() {
     }
 
     const saved = mapGradeFromDb(data);
-    setGrades((prev) => {
-      const existingIndex = prev.findIndex((g) => g.id === saved.id);
-      if (existingIndex >= 0) {
-        const updated = [...prev];
-        updated[existingIndex] = saved;
-        return updated;
-      }
-      return [saved, ...prev];
-    });
+    addGradeToStore(saved);
   };
 
   const addGrades = async (gradesData: Omit<Grade, "id" | "recordedAt">[]) => {
@@ -552,18 +617,16 @@ export function useGrades() {
 
     if (data) {
       const savedGrades = data.map(mapGradeFromDb);
-      setGrades((prev) => {
-        const newGrades = [...prev];
-        savedGrades.forEach(saved => {
-          const index = newGrades.findIndex(g => g.id === saved.id);
-          if (index >= 0) {
-            newGrades[index] = saved;
-          } else {
-            newGrades.unshift(saved);
-          }
-        });
-        return newGrades;
+      const nextGrades = [...useDataStore.getState().grades];
+      savedGrades.forEach((saved) => {
+        const index = nextGrades.findIndex((g) => g.id === saved.id);
+        if (index >= 0) {
+          nextGrades[index] = saved;
+        } else {
+          nextGrades.unshift(saved);
+        }
       });
+      setGrades(nextGrades);
     }
   };
 
@@ -594,6 +657,297 @@ export function useGrades() {
       throw error;
     }
 
+    updateGradeInStore(id, {
+      ...updates,
+      recordedAt: new Date().toISOString(),
+    });
+  };
+
+  const deleteGrade = async (id: string) => {
+    const { error } = await supabase.from("grades").delete().eq("id", id);
+    if (error) {
+      logError("grades.delete", error);
+      throw error;
+    }
+    deleteGradeFromStore(id);
+  };
+
+  const deleteGrades = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    const { error } = await supabase.from("grades").delete().in("id", ids);
+    if (error) {
+      logError("grades.bulk_delete", error);
+      throw error;
+    }
+    const idsSet = new Set(ids);
+    const currentGrades = useDataStore.getState().grades;
+    setGrades(currentGrades.filter((grade) => !idsSet.has(grade.id)));
+  };
+
+  return {
+    grades,
+    refreshGrades: () => fetchGrades(true),
+    addGrade,
+    addGrades,
+    updateGrade,
+    deleteGrade,
+    deleteGrades,
+  };
+}
+
+type GradesScope = {
+  classId?: string;
+  classIds?: string[];
+  studentId?: string;
+  quarter?: string;
+  schoolYear?: 1 | 2 | 3;
+};
+
+type HistoricalGradesScope = {
+  studentIds?: string[];
+};
+
+const normalizeGradesScope = (scope: GradesScope) => {
+  const classIds = scope.classIds?.length
+    ? [...scope.classIds]
+    : scope.classId
+      ? [scope.classId]
+      : [];
+  classIds.sort();
+  return {
+    classIds,
+    studentId: scope.studentId ?? null,
+    quarter: scope.quarter ?? null,
+    schoolYear: scope.schoolYear ?? null,
+  };
+};
+
+const getGradesScopeKey = (scope: ReturnType<typeof normalizeGradesScope>) => {
+  return [
+    scope.classIds.join("|"),
+    scope.studentId ?? "",
+    scope.quarter ?? "",
+    scope.schoolYear ?? "",
+  ].join("::");
+};
+
+const analyticsGradesCache = new Map<string, Grade[]>();
+const analyticsGradesInFlight = new Map<string, Promise<void>>();
+
+const normalizeHistoricalGradesScope = (scope: HistoricalGradesScope) => {
+  const studentIds = scope.studentIds?.length ? [...scope.studentIds] : [];
+  studentIds.sort();
+  return { studentIds };
+};
+
+const getHistoricalGradesScopeKey = (
+  scope: ReturnType<typeof normalizeHistoricalGradesScope>,
+) => {
+  return scope.studentIds.join("|");
+};
+
+const historicalGradesAnalyticsCache = new Map<string, HistoricalGrade[]>();
+const historicalGradesInFlight = new Map<string, Promise<void>>();
+
+const gradeMatchesScope = (
+  grade: Grade,
+  scope: ReturnType<typeof normalizeGradesScope>,
+) => {
+  if (scope.classIds.length > 0 && !scope.classIds.includes(grade.classId)) {
+    return false;
+  }
+  if (scope.studentId && grade.studentId !== scope.studentId) {
+    return false;
+  }
+  if (scope.quarter && grade.quarter !== scope.quarter) {
+    return false;
+  }
+  if (scope.schoolYear && (grade.schoolYear ?? 1) !== scope.schoolYear) {
+    return false;
+  }
+  return true;
+};
+
+export function useGradesScoped(scope: GradesScope) {
+  const { user } = useAuth();
+  const [grades, setGrades] = useState<Grade[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const normalizedScope = useMemo(
+    () => normalizeGradesScope(scope),
+    [
+      scope.classId,
+      scope.classIds?.join(","),
+      scope.studentId,
+      scope.quarter,
+      scope.schoolYear,
+    ],
+  );
+
+  const fetchGrades = useCallback(async () => {
+    if (!user?.id) {
+      setGrades([]);
+      return;
+    }
+
+    const hasScope =
+      normalizedScope.classIds.length > 0 || Boolean(normalizedScope.studentId);
+    if (!hasScope) {
+      setGrades([]);
+      return;
+    }
+
+    setLoading(true);
+    const done = perfTimer("grades_scoped.fetch");
+
+    const PAGE_SIZE = 1000;
+    let allGrades: any[] = [];
+    let page = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const from = page * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      let query = supabase
+        .from("grades")
+        .select("*")
+        .order("recorded_at", { ascending: false });
+
+      if (normalizedScope.classIds.length === 1) {
+        query = query.eq("class_id", normalizedScope.classIds[0]);
+      } else if (normalizedScope.classIds.length > 1) {
+        query = query.in("class_id", normalizedScope.classIds);
+      }
+      if (normalizedScope.studentId) {
+        query = query.eq("student_id", normalizedScope.studentId);
+      }
+      if (normalizedScope.quarter) {
+        query = query.eq("quarter", normalizedScope.quarter);
+      }
+      if (normalizedScope.schoolYear) {
+        query = query.eq("school_year", normalizedScope.schoolYear);
+      }
+
+      const { data, error } = await query.range(from, to);
+
+      if (error) {
+        done({ ok: false, rows: allGrades.length, pages: page });
+        logError("grades_scoped.select", error);
+        setLoading(false);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        allGrades = [...allGrades, ...data];
+        page += 1;
+        hasMore = data.length === PAGE_SIZE;
+      } else {
+        hasMore = false;
+      }
+    }
+
+    done({ ok: true, rows: allGrades.length, pages: page, pageSize: PAGE_SIZE });
+    setGrades(allGrades.map(mapGradeFromDb));
+    setLoading(false);
+  }, [user?.id, normalizedScope]);
+
+  useEffect(() => {
+    fetchGrades();
+  }, [fetchGrades]);
+
+  const addGrade = async (grade: Omit<Grade, "id" | "recordedAt">) => {
+    if (!user?.id) return;
+
+    const payload = mapGradeToDb(grade, user.id);
+    const { data, error } = await supabase
+      .from("grades")
+      .upsert(payload, {
+        onConflict: "student_id,class_id,subject,quarter,school_year",
+      })
+      .select("*")
+      .single();
+
+    if (error) {
+      logError("grades_scoped.upsert", error);
+      throw error;
+    }
+
+    const saved = mapGradeFromDb(data);
+    if (!gradeMatchesScope(saved, normalizedScope)) return;
+
+    setGrades((prev) => {
+      const existingIndex = prev.findIndex((g) => g.id === saved.id);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = saved;
+        return updated;
+      }
+      return [saved, ...prev];
+    });
+  };
+
+  const addGrades = async (gradesData: Omit<Grade, "id" | "recordedAt">[]) => {
+    if (!user?.id || gradesData.length === 0) return;
+
+    const payload = gradesData.map((g) => mapGradeToDb(g, user.id));
+    const { data, error } = await supabase
+      .from("grades")
+      .upsert(payload, {
+        onConflict: "student_id,class_id,subject,quarter,school_year",
+      })
+      .select("*");
+
+    if (error) {
+      logError("grades_scoped.bulk_upsert", error);
+      throw error;
+    }
+
+    if (data) {
+      const savedGrades = data
+        .map(mapGradeFromDb)
+        .filter((saved) => gradeMatchesScope(saved, normalizedScope));
+      if (savedGrades.length === 0) return;
+
+      setGrades((prev) => {
+        const next = [...prev];
+        savedGrades.forEach((saved) => {
+          const index = next.findIndex((g) => g.id === saved.id);
+          if (index >= 0) {
+            next[index] = saved;
+          } else {
+            next.unshift(saved);
+          }
+        });
+        return next;
+      });
+    }
+  };
+
+  const updateGrade = async (id: string, updates: Partial<Grade>) => {
+    if (!user?.id) return;
+    const base = grades.find((g) => g.id === id);
+    if (!base) return;
+
+    const payload = mapGradeToDb(
+      {
+        studentId: updates.studentId ?? base.studentId,
+        classId: updates.classId ?? base.classId,
+        subject: updates.subject ?? base.subject,
+        quarter: updates.quarter ?? base.quarter,
+        schoolYear: updates.schoolYear ?? base.schoolYear,
+        grade: updates.grade ?? base.grade,
+        observation: updates.observation ?? base.observation,
+      },
+      user.id,
+    );
+
+    const { error } = await supabase.from("grades").update(payload).eq("id", id);
+    if (error) {
+      logError("grades_scoped.update", error);
+      throw error;
+    }
+
     setGrades((prev) =>
       prev.map((grade) =>
         grade.id === id
@@ -606,7 +960,7 @@ export function useGrades() {
   const deleteGrade = async (id: string) => {
     const { error } = await supabase.from("grades").delete().eq("id", id);
     if (error) {
-      logError("grades.delete", error);
+      logError("grades_scoped.delete", error);
       throw error;
     }
     setGrades((prev) => prev.filter((grade) => grade.id !== id));
@@ -616,14 +970,16 @@ export function useGrades() {
     if (ids.length === 0) return;
     const { error } = await supabase.from("grades").delete().in("id", ids);
     if (error) {
-      logError("grades.bulk_delete", error);
+      logError("grades_scoped.bulk_delete", error);
       throw error;
     }
-    setGrades((prev) => prev.filter((grade) => !ids.includes(grade.id)));
+    const idsSet = new Set(ids);
+    setGrades((prev) => prev.filter((grade) => !idsSet.has(grade.id)));
   };
 
   return {
     grades,
+    loading,
     refreshGrades: fetchGrades,
     addGrade,
     addGrades,
@@ -633,25 +989,296 @@ export function useGrades() {
   };
 }
 
-export function useAttendance() {
+export function useGradesAnalytics(scope: GradesScope) {
   const { user } = useAuth();
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [grades, setGrades] = useState<Grade[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const fetchAttendance = useCallback(async () => {
+  const normalizedScope = useMemo(
+    () => normalizeGradesScope(scope),
+    [
+      scope.classId,
+      scope.classIds?.join(","),
+      scope.studentId,
+      scope.quarter,
+      scope.schoolYear,
+    ],
+  );
+  const scopeKey = useMemo(() => getGradesScopeKey(normalizedScope), [normalizedScope]);
+
+  const fetchGradesWithPagination = useCallback(async () => {
+    const PAGE_SIZE = 1000;
+    let allGrades: any[] = [];
+    let page = 0;
+    let hasMore = true;
+    const done = perfTimer("grades_scoped.fetch");
+
+    while (hasMore) {
+      const from = page * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      let query = supabase
+        .from("grades")
+        .select("*")
+        .order("recorded_at", { ascending: false });
+
+      if (normalizedScope.classIds.length === 1) {
+        query = query.eq("class_id", normalizedScope.classIds[0]);
+      } else if (normalizedScope.classIds.length > 1) {
+        query = query.in("class_id", normalizedScope.classIds);
+      }
+      if (normalizedScope.studentId) {
+        query = query.eq("student_id", normalizedScope.studentId);
+      }
+      if (normalizedScope.quarter) {
+        query = query.eq("quarter", normalizedScope.quarter);
+      }
+      if (normalizedScope.schoolYear) {
+        query = query.eq("school_year", normalizedScope.schoolYear);
+      }
+
+      const { data, error } = await query.range(from, to);
+
+      if (error) {
+        done({ ok: false, rows: allGrades.length, pages: page });
+        logError("grades_scoped.select", error);
+        setLoading(false);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        allGrades = [...allGrades, ...data];
+        page += 1;
+        hasMore = data.length === PAGE_SIZE;
+      } else {
+        hasMore = false;
+      }
+    }
+
+    done({ ok: true, rows: allGrades.length, pages: page, pageSize: PAGE_SIZE });
+    setGrades(allGrades.map(mapGradeFromDb));
+    setLoading(false);
+  }, [normalizedScope]);
+
+  const fetchGrades = useCallback(async () => {
     if (!user?.id) {
-      setAttendance([]);
+      setGrades([]);
       return;
     }
 
+    const hasScope =
+      normalizedScope.classIds.length > 0 || Boolean(normalizedScope.studentId);
+    if (!hasScope) {
+      setGrades([]);
+      return;
+    }
+
+    const cached = analyticsGradesCache.get(scopeKey);
+    if (cached) {
+      setGrades(cached);
+      return;
+    }
+
+    const inflight = analyticsGradesInFlight.get(scopeKey);
+    if (inflight) {
+      setLoading(true);
+      await inflight;
+      setGrades(analyticsGradesCache.get(scopeKey) ?? []);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const fetchPromise = (async () => {
+      const done = perfTimer("grades_analytics.fetch");
+      const { data, error } = await supabase.rpc("fetch_grades_analytics", {
+        class_ids: normalizedScope.classIds.length > 0 ? normalizedScope.classIds : null,
+        student_id: normalizedScope.studentId,
+        quarter: normalizedScope.quarter,
+        school_year: normalizedScope.schoolYear,
+      });
+
+      if (error) {
+        done({ ok: false, fallback: true });
+        logError("grades_analytics.rpc", error);
+        await fetchGradesWithPagination();
+        return;
+      }
+
+      const rows = Array.isArray(data) ? data : data ?? [];
+      done({ ok: true, rows: rows.length });
+      const mapped = rows.map(mapGradeFromDb);
+      analyticsGradesCache.set(scopeKey, mapped);
+      setGrades(mapped);
+    })();
+
+    analyticsGradesInFlight.set(scopeKey, fetchPromise);
+    try {
+      await fetchPromise;
+    } finally {
+      analyticsGradesInFlight.delete(scopeKey);
+      setLoading(false);
+    }
+  }, [user?.id, normalizedScope, scopeKey, fetchGradesWithPagination]);
+
+  useEffect(() => {
+    fetchGrades();
+  }, [fetchGrades]);
+
+  return {
+    grades,
+    loading,
+    refreshGrades: fetchGrades,
+  };
+}
+
+export function useHistoricalGradesAnalytics(scope: HistoricalGradesScope) {
+  const { user } = useAuth();
+  const [historicalGrades, setHistoricalGrades] = useState<HistoricalGrade[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const normalizedScope = useMemo(
+    () => normalizeHistoricalGradesScope(scope),
+    [scope.studentIds?.join(",")],
+  );
+  const scopeKey = useMemo(
+    () => getHistoricalGradesScopeKey(normalizedScope),
+    [normalizedScope],
+  );
+
+  const fetchHistoricalGrades = useCallback(async () => {
+    if (!user?.id) {
+      setHistoricalGrades([]);
+      return;
+    }
+
+    if (normalizedScope.studentIds.length === 0) {
+      setHistoricalGrades([]);
+      return;
+    }
+
+    const cached = historicalGradesAnalyticsCache.get(scopeKey);
+    if (cached) {
+      setHistoricalGrades(cached);
+      return;
+    }
+
+    const inflight = historicalGradesInFlight.get(scopeKey);
+    if (inflight) {
+      setLoading(true);
+      await inflight;
+      setHistoricalGrades(historicalGradesAnalyticsCache.get(scopeKey) ?? []);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const fetchPromise = (async () => {
+      const CHUNK_SIZE = 800;
+      const PAGE_SIZE = 1000;
+      let allRows: any[] = [];
+      const done = perfTimer("historical_grades_analytics.fetch");
+
+      for (let i = 0; i < normalizedScope.studentIds.length; i += CHUNK_SIZE) {
+        const chunk = normalizedScope.studentIds.slice(i, i + CHUNK_SIZE);
+        let page = 0;
+        let hasMore = true;
+
+        while (hasMore) {
+          const from = page * PAGE_SIZE;
+          const to = from + PAGE_SIZE - 1;
+          const { data, error } = await supabase
+            .from("historical_grades")
+            .select("*")
+            .in("student_id", chunk)
+            .eq("school_level", "fundamental")
+            .range(from, to);
+
+          if (error) {
+            done({ ok: false, rows: allRows.length });
+            logError("historical_grades_analytics.select", error);
+            return;
+          }
+
+          if (data && data.length > 0) {
+            allRows = [...allRows, ...data];
+            page += 1;
+            hasMore = data.length === PAGE_SIZE;
+          } else {
+            hasMore = false;
+          }
+        }
+      }
+
+      done({ ok: true, rows: allRows.length });
+      const mapped = allRows.map(mapHistoricalGradeFromDb);
+      historicalGradesAnalyticsCache.set(scopeKey, mapped);
+      setHistoricalGrades(mapped);
+    })();
+
+    historicalGradesInFlight.set(scopeKey, fetchPromise);
+    try {
+      await fetchPromise;
+    } finally {
+      historicalGradesInFlight.delete(scopeKey);
+      setLoading(false);
+    }
+  }, [user?.id, normalizedScope, scopeKey]);
+
+  useEffect(() => {
+    fetchHistoricalGrades();
+  }, [fetchHistoricalGrades]);
+
+  return {
+    historicalGrades,
+    loading,
+    refreshHistoricalGrades: fetchHistoricalGrades,
+  };
+}
+
+export function useAttendance() {
+  const { user } = useAuth();
+  const attendance = useDataStore((state) => state.attendance);
+  const setAttendance = useDataStore((state) => state.setAttendance);
+  const addAttendanceToStore = useDataStore((state) => state.addAttendance);
+  const deleteAttendanceFromStore = useDataStore((state) => state.deleteAttendance);
+  const attendanceLoaded = useDataStore((state) => state.attendanceLoaded);
+  const attendanceFetching = useDataStore((state) => state.attendanceFetching);
+  const setAttendanceLoaded = useDataStore((state) => state.setAttendanceLoaded);
+  const setAttendanceFetching = useDataStore((state) => state.setAttendanceFetching);
+
+  const fetchAttendance = useCallback(async (force = false) => {
+    if (!user?.id) {
+      setAttendance([]);
+      setAttendanceLoaded(false);
+      return;
+    }
+    if (attendanceFetching) return;
+    if (!force && attendanceLoaded) return;
+
+    setAttendanceFetching(true);
+    const done = perfTimer("attendance.fetch");
     const { data, error } = await supabase.from("attendance").select("*");
 
     if (error) {
+      done({ ok: false });
       logError("attendance.select", error);
+      setAttendanceFetching(false);
       return;
     }
 
+    done({ ok: true, rows: data?.length ?? 0 });
     setAttendance((data || []).map(mapAttendanceFromDb));
-  }, [user?.id]);
+    setAttendanceLoaded(true);
+    setAttendanceFetching(false);
+  }, [
+    user?.id,
+    attendanceLoaded,
+    attendanceFetching,
+    setAttendance,
+    setAttendanceLoaded,
+    setAttendanceFetching,
+  ]);
 
   useEffect(() => {
     fetchAttendance();
@@ -692,7 +1319,7 @@ export function useAttendance() {
     }
 
     const newRecord = mapAttendanceFromDb(data);
-    setAttendance((prev) => [newRecord, ...prev]);
+    addAttendanceToStore(newRecord);
     return newRecord;
   };
 
@@ -702,12 +1329,12 @@ export function useAttendance() {
       logError("attendance.delete", error);
       throw error;
     }
-    setAttendance((prev) => prev.filter((record) => record.id !== id));
+    deleteAttendanceFromStore(id);
   };
 
   return {
     attendance,
-    refreshAttendance: fetchAttendance,
+    refreshAttendance: () => fetchAttendance(true),
     addAttendance,
     deleteAttendance,
   };
@@ -722,27 +1349,40 @@ export function useIncidents() {
   const storeAddIncident = useDataStore((state) => state.addIncident);
   const storeUpdateIncident = useDataStore((state) => state.updateIncident);
   const storeDeleteIncident = useDataStore((state) => state.deleteIncident);
+  const incidentsLoaded = useDataStore((state) => state.incidentsLoaded);
+  const incidentsFetching = useDataStore((state) => state.incidentsFetching);
+  const setIncidentsLoaded = useDataStore((state) => state.setIncidentsLoaded);
+  const setIncidentsFetching = useDataStore((state) => state.setIncidentsFetching);
 
-  const fetchIncidents = useCallback(async () => {
+  const fetchIncidents = useCallback(async (force = false) => {
     if (!user?.id) {
       setIncidents([]);
+      setIncidentsLoaded(false);
       return;
     }
+    if (incidentsFetching) return;
+    if (!force && incidentsLoaded) return;
 
+    setIncidentsFetching(true);
+    const done = perfTimer("incidents.fetch");
     const { data: incidentRows, error } = await supabase
       .from("incidents")
       .select("*")
       .order("created_at", { ascending: false });
-    console.log(incidentRows);
 
     if (error) {
+      done({ ok: false });
       logError("incidents.select", error);
+      setIncidentsFetching(false);
       return;
     }
 
     const ids = (incidentRows || []).map((row) => row.id);
     if (ids.length === 0) {
+      done({ ok: true, incidents: 0, followUps: 0, comments: 0 });
       setIncidents([]);
+      setIncidentsLoaded(true);
+      setIncidentsFetching(false);
       return;
     }
 
@@ -769,6 +1409,12 @@ export function useIncidents() {
       logError("comments.select", commentError);
     }
 
+    done({
+      ok: true,
+      incidents: incidentRows?.length ?? 0,
+      followUps: followUpRows?.length ?? 0,
+      comments: commentRows?.length ?? 0,
+    });
     const followUpsByIncident = (followUpRows || []).reduce<
       Record<string, FollowUpRecord[]>
     >((acc, row) => {
@@ -795,7 +1441,16 @@ export function useIncidents() {
     });
 
     setIncidents(mappedIncidents);
-  }, [user?.id, setIncidents]);
+    setIncidentsLoaded(true);
+    setIncidentsFetching(false);
+  }, [
+    user?.id,
+    incidentsLoaded,
+    incidentsFetching,
+    setIncidents,
+    setIncidentsLoaded,
+    setIncidentsFetching,
+  ]);
 
   useEffect(() => {
     fetchIncidents();
@@ -975,7 +1630,7 @@ export function useIncidents() {
 
   return {
     incidents,
-    refreshIncidents: fetchIncidents,
+    refreshIncidents: () => fetchIncidents(true),
     addIncident,
     updateIncident,
     deleteIncident,
@@ -997,15 +1652,18 @@ export function useProfessionalSubjects() {
       return;
     }
 
+    const done = perfTimer("professional_subjects.fetch");
     const { data, error } = await supabase
       .from("professional_subjects")
       .select("*");
 
     if (error) {
+      done({ ok: false });
       logError("professional_subjects.select", error);
       return;
     }
 
+    done({ ok: true, rows: data?.length ?? 0 });
     setItems((data || []).map(mapProfessionalSubjectFromDb));
   }, [user?.id]);
 
@@ -1124,16 +1782,19 @@ export function useProfessionalSubjectTemplates() {
       return;
     }
 
+    const done = perfTimer("professional_subject_templates.fetch");
     const { data, error } = await supabase
       .from("professional_subject_templates")
       .select("*")
       .order("created_at", { ascending: false });
 
     if (error) {
+      done({ ok: false });
       logError("templates.select", error);
       return;
     }
 
+    done({ ok: true, rows: data?.length ?? 0 });
     setTemplates((data || []).map(mapTemplateFromDb));
   }, [user?.id]);
 
@@ -1275,7 +1936,7 @@ const mapHistoricalGradeFromDb = (row: any): HistoricalGrade => ({
   gradeYear: row.grade_year,
   subject: row.subject,
   quarter: row.quarter,
-  grade: row.grade,
+  grade: Number(String(row.grade ?? '').replace(',', '.')),
   schoolName: row.school_name,
   calendarYear: row.calendar_year,
   createdAt: row.created_at,
@@ -1293,6 +1954,119 @@ const mapHistoricalGradeToDb = (grade: Omit<HistoricalGrade, 'id' | 'createdAt' 
   calendar_year: grade.calendarYear,
 });
 
+export function useHistoricalGradesScoped(studentId?: string) {
+  const { user } = useAuth();
+  const [historicalGrades, setHistoricalGrades] = useState<HistoricalGrade[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchHistoricalGrades = useCallback(async () => {
+    if (!user?.id || !studentId) {
+      setHistoricalGrades([]);
+      return;
+    }
+
+    setLoading(true);
+    const done = perfTimer("historical_grades_scoped.fetch");
+    const PAGE_SIZE = 1000;
+    let allData: any[] = [];
+    let page = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const from = page * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      const { data, error } = await supabase
+        .from("historical_grades")
+        .select("*")
+        .eq("student_id", studentId)
+        .order("calendar_year", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to);
+
+      if (error) {
+        done({ ok: false, rows: allData.length, pages: page });
+        logError("historical_grades_scoped.select", error);
+        setLoading(false);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        allData = [...allData, ...data];
+        page += 1;
+        hasMore = data.length === PAGE_SIZE;
+      } else {
+        hasMore = false;
+      }
+    }
+
+    done({ ok: true, rows: allData.length, pages: page, pageSize: PAGE_SIZE });
+    setHistoricalGrades(allData.map(mapHistoricalGradeFromDb));
+    setLoading(false);
+  }, [user?.id, studentId]);
+
+  useEffect(() => {
+    setHistoricalGrades([]);
+  }, [studentId]);
+
+  useEffect(() => {
+    fetchHistoricalGrades();
+  }, [fetchHistoricalGrades]);
+
+  const addHistoricalGrade = async (
+    grade: Omit<HistoricalGrade, "id" | "createdAt" | "updatedAt">,
+  ) => {
+    const { data, error } = await supabase
+      .from("historical_grades")
+      .upsert(mapHistoricalGradeToDb(grade), {
+        onConflict: "student_id,school_level,grade_year,subject,quarter,calendar_year",
+      })
+      .select()
+      .single();
+
+    if (error) {
+      logError("historical_grades_scoped.upsert", error);
+      throw error;
+    }
+
+    const newGrade = mapHistoricalGradeFromDb(data);
+    if (!studentId || newGrade.studentId !== studentId) return newGrade;
+
+    setHistoricalGrades((prev) => {
+      const existingIndex = prev.findIndex((g) => g.id === newGrade.id);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = newGrade;
+        return updated;
+      }
+      return [newGrade, ...prev];
+    });
+    return newGrade;
+  };
+
+  const deleteHistoricalGrade = async (id: string) => {
+    const { error } = await supabase
+      .from("historical_grades")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      logError("historical_grades_scoped.delete", error);
+      throw error;
+    }
+
+    setHistoricalGrades((prev) => prev.filter((grade) => grade.id !== id));
+  };
+
+  return {
+    historicalGrades,
+    loading,
+    refreshHistoricalGrades: fetchHistoricalGrades,
+    addHistoricalGrade,
+    deleteHistoricalGrade,
+  };
+}
+
 export function useHistoricalGrades() {
   const {
     historicalGrades,
@@ -1300,16 +2074,31 @@ export function useHistoricalGrades() {
     addHistoricalGrade: addHistoricalGradeToStore,
     addHistoricalGradesBatch: addHistoricalGradesBatchToStore,
     deleteHistoricalGrade: deleteHistoricalGradeFromStore,
-    deleteHistoricalGradesBatch: deleteHistoricalGradesBatchToStore
+    deleteHistoricalGradesBatch: deleteHistoricalGradesBatchToStore,
+    historicalGradesLoaded,
+    historicalGradesFetching,
+    setHistoricalGradesLoaded,
+    setHistoricalGradesFetching
   } = useDataStore();
   const [loading, setLoading] = useState(true);
 
-  const fetchHistoricalGrades = useCallback(async () => {
+  const fetchHistoricalGrades = useCallback(async (force = false) => {
+    if (historicalGradesFetching) {
+      setLoading(false);
+      return;
+    }
+    if (!force && historicalGradesLoaded) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
+    setHistoricalGradesFetching(true);
+    const done = perfTimer("historical_grades.fetch");
     const PAGE_SIZE = 1000;
     let allData: any[] = [];
     let page = 0;
     let hasMore = true;
+    let ok = true;
 
     while (hasMore) {
       const from = page * PAGE_SIZE;
@@ -1323,6 +2112,7 @@ export function useHistoricalGrades() {
         .range(from, to);
 
       if (error) {
+        ok = false;
         if (!error.message.includes("does not exist")) {
           logError("historical_grades.select", error);
         }
@@ -1336,9 +2126,18 @@ export function useHistoricalGrades() {
       }
     }
 
+    done({ ok, rows: allData.length, pages: page, pageSize: PAGE_SIZE });
     setHistoricalGrades(allData.map(mapHistoricalGradeFromDb));
+    setHistoricalGradesLoaded(ok);
+    setHistoricalGradesFetching(false);
     setLoading(false);
-  }, [setHistoricalGrades]);
+  }, [
+    historicalGradesLoaded,
+    historicalGradesFetching,
+    setHistoricalGrades,
+    setHistoricalGradesLoaded,
+    setHistoricalGradesFetching,
+  ]);
 
   useEffect(() => {
     fetchHistoricalGrades();
@@ -1511,7 +2310,7 @@ export function useHistoricalGrades() {
   return {
     historicalGrades,
     loading,
-    refreshHistoricalGrades: fetchHistoricalGrades,
+    refreshHistoricalGrades: () => fetchHistoricalGrades(true),
     addHistoricalGrade,
     addHistoricalGradesBatch,
     deleteHistoricalGrade,
@@ -1558,27 +2357,187 @@ const mapExternalAssessmentToDb = (assessment: Omit<ExternalAssessment, 'id' | '
   notes: assessment.notes,
 });
 
-export function useExternalAssessments() {
-  const { externalAssessments, setExternalAssessments, addExternalAssessment: addExternalAssessmentToStore, deleteExternalAssessment: deleteExternalAssessmentFromStore } = useDataStore();
-  const [loading, setLoading] = useState(true);
+export function useExternalAssessmentsScoped(studentId?: string) {
+  const { user } = useAuth();
+  const [externalAssessments, setExternalAssessments] = useState<ExternalAssessment[]>([]);
+  const [loading, setLoading] = useState(false);
 
   const fetchExternalAssessments = useCallback(async () => {
+    if (!user?.id || !studentId) {
+      setExternalAssessments([]);
+      return;
+    }
+
     setLoading(true);
+    const done = perfTimer("external_assessments_scoped.fetch");
+    const { data, error } = await supabase
+      .from("external_assessments")
+      .select("*")
+      .eq("student_id", studentId)
+      .order("applied_date", { ascending: false });
+
+    const rows = data?.length ?? 0;
+    if (error) {
+      logError("external_assessments_scoped.select", error);
+      done({ ok: false, rows });
+      setExternalAssessments([]);
+      setLoading(false);
+      return;
+    }
+
+    done({ ok: true, rows });
+    setExternalAssessments((data || []).map(mapExternalAssessmentFromDb));
+    setLoading(false);
+  }, [user?.id, studentId]);
+
+  useEffect(() => {
+    setExternalAssessments([]);
+  }, [studentId]);
+
+  useEffect(() => {
+    fetchExternalAssessments();
+  }, [fetchExternalAssessments]);
+
+  const addExternalAssessment = async (
+    assessment: Omit<ExternalAssessment, "id" | "createdAt" | "updatedAt">,
+  ) => {
+    const { data, error } = await supabase
+      .from("external_assessments")
+      .insert(mapExternalAssessmentToDb(assessment))
+      .select()
+      .single();
+
+    if (error) {
+      logError("external_assessments_scoped.insert", error);
+      throw error;
+    }
+
+    const newAssessment = mapExternalAssessmentFromDb(data);
+    if (!studentId || newAssessment.studentId !== studentId) return newAssessment;
+
+    setExternalAssessments((prev) => {
+      const existingIndex = prev.findIndex((a) => a.id === newAssessment.id);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = newAssessment;
+        return updated;
+      }
+      return [newAssessment, ...prev];
+    });
+    return newAssessment;
+  };
+
+  const deleteExternalAssessment = async (id: string) => {
+    const { error } = await supabase
+      .from("external_assessments")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      logError("external_assessments_scoped.delete", error);
+      throw error;
+    }
+
+    setExternalAssessments((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  const updateExternalAssessment = async (assessment: ExternalAssessment) => {
+    const { id, createdAt, updatedAt, ...payload } = assessment;
+    const { data, error } = await supabase
+      .from("external_assessments")
+      .update(mapExternalAssessmentToDb(payload))
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      logError("external_assessments_scoped.update", error);
+      throw error;
+    }
+
+    const updatedAssessment = mapExternalAssessmentFromDb(data);
+    if (!studentId || updatedAssessment.studentId !== studentId) return updatedAssessment;
+
+    setExternalAssessments((prev) => {
+      const existingIndex = prev.findIndex((a) => a.id === updatedAssessment.id);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = updatedAssessment;
+        return updated;
+      }
+      return [updatedAssessment, ...prev];
+    });
+    return updatedAssessment;
+  };
+
+  const getStudentExternalAssessments = useCallback(
+    (targetStudentId: string) =>
+      externalAssessments.filter((a) => a.studentId === targetStudentId),
+    [externalAssessments],
+  );
+
+  return {
+    externalAssessments,
+    loading,
+    refreshExternalAssessments: fetchExternalAssessments,
+    addExternalAssessment,
+    deleteExternalAssessment,
+    updateExternalAssessment,
+    getStudentExternalAssessments,
+  };
+}
+
+export function useExternalAssessments() {
+  const {
+    externalAssessments,
+    setExternalAssessments,
+    addExternalAssessment: addExternalAssessmentToStore,
+    deleteExternalAssessment: deleteExternalAssessmentFromStore,
+    externalAssessmentsLoaded,
+    externalAssessmentsFetching,
+    setExternalAssessmentsLoaded,
+    setExternalAssessmentsFetching
+  } = useDataStore();
+  const [loading, setLoading] = useState(true);
+
+  const fetchExternalAssessments = useCallback(async (force = false) => {
+    if (externalAssessmentsFetching) {
+      setLoading(false);
+      return;
+    }
+    if (!force && externalAssessmentsLoaded) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setExternalAssessmentsFetching(true);
+    const done = perfTimer("external_assessments.fetch");
     const { data, error } = await supabase
       .from("external_assessments")
       .select("*")
       .order("applied_date", { ascending: false });
 
+    const rows = data?.length ?? 0;
     if (error) {
       if (!error.message.includes("does not exist")) {
         logError("external_assessments.select", error);
       }
+      done({ ok: false, rows });
       setExternalAssessments([]);
     } else {
+      done({ ok: true, rows });
       setExternalAssessments((data || []).map(mapExternalAssessmentFromDb));
     }
+    setExternalAssessmentsLoaded(!error);
+    setExternalAssessmentsFetching(false);
     setLoading(false);
-  }, [setExternalAssessments]);
+  }, [
+    externalAssessmentsLoaded,
+    externalAssessmentsFetching,
+    setExternalAssessments,
+    setExternalAssessmentsLoaded,
+    setExternalAssessmentsFetching,
+  ]);
 
   useEffect(() => {
     fetchExternalAssessments();
@@ -1617,6 +2576,25 @@ export function useExternalAssessments() {
     deleteExternalAssessmentFromStore(id);
   };
 
+  const updateExternalAssessment = async (assessment: ExternalAssessment) => {
+    const { id, createdAt, updatedAt, ...payload } = assessment;
+    const { data, error } = await supabase
+      .from("external_assessments")
+      .update(mapExternalAssessmentToDb(payload))
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      logError("external_assessments.update", error);
+      throw error;
+    }
+
+    const updatedAssessment = mapExternalAssessmentFromDb(data);
+    addExternalAssessmentToStore(updatedAssessment);
+    return updatedAssessment;
+  };
+
   const getStudentExternalAssessments = useCallback(
     (studentId: string) => externalAssessments.filter((a) => a.studentId === studentId),
     [externalAssessments]
@@ -1625,9 +2603,10 @@ export function useExternalAssessments() {
   return {
     externalAssessments,
     loading,
-    refreshExternalAssessments: fetchExternalAssessments,
+    refreshExternalAssessments: () => fetchExternalAssessments(true),
     addExternalAssessment,
     deleteExternalAssessment,
+    updateExternalAssessment,
     getStudentExternalAssessments,
   };
 }

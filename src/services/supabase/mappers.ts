@@ -273,7 +273,7 @@ export const mapGradeFromDb = (row: GradeRow): Grade => ({
   subject: row.subject,
   quarter: row.quarter,
   schoolYear: (row.school_year ?? 1) as Grade['schoolYear'],
-  grade: row.grade,
+  grade: Number(String(row.grade ?? '').replace(',', '.')),
   observation: row.observation ?? undefined,
   recordedAt: row.recorded_at,
 });

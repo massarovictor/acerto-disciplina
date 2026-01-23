@@ -2,6 +2,8 @@
 import { GradesManager } from '@/components/grades/GradesManager';
 // import { AttendanceManager } from '@/components/grades/AttendanceManager'; // DISABLED: Attendance feature temporarily removed
 // import { useUIStore } from '@/stores/useUIStore';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 const GradesAttendance = () => {
   // DISABLED: Tab navigation removed - only grades for now
@@ -10,13 +12,11 @@ const GradesAttendance = () => {
   // const setActiveTab = (value: string) => setGradesAttendanceUI({ activeTab: value });
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Notas</h1>
-        <p className="text-muted-foreground mt-1">
-          Lance notas dos alunos por turma e bimestre
-        </p>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Notas"
+        description="Lance notas dos alunos por turma e bimestre"
+      />
 
       {/* DISABLED: Tabs removed - only GradesManager for now
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -36,9 +36,8 @@ const GradesAttendance = () => {
       */}
 
       <GradesManager />
-    </div>
+    </PageContainer>
   );
 };
 
 export default GradesAttendance;
-

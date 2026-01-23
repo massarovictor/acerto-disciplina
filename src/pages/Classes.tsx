@@ -7,6 +7,8 @@ import { ClassesManage } from '@/components/classes/ClassesManage';
 import { ClassesCreate } from '@/components/classes/ClassesCreate';
 import { SubjectTemplatesManager } from '@/components/classes/SubjectTemplatesManager';
 import { useUIStore } from '@/stores/useUIStore';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 const Classes = () => {
   // ✅ Usando Zustand store para persistir tab entre navegações
@@ -28,22 +30,20 @@ const Classes = () => {
   }, [highlightId, setSearchParams]);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Configurar Turmas</h1>
-          <p className="text-muted-foreground mt-1">
-            Gerencie turmas, atribua diretores e acompanhe a estrutura escolar
-          </p>
-        </div>
-        <Button variant="outline" onClick={() => navigate('/turmas-arquivadas')}>
-          <Archive className="h-4 w-4 mr-2" />
-          Turmas Arquivadas
-        </Button>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Configurar Turmas"
+        description="Gerencie turmas, atribua diretores e acompanhe a estrutura escolar"
+        actions={
+          <Button variant="outline" onClick={() => navigate('/turmas-arquivadas')}>
+            <Archive className="h-4 w-4 mr-2" />
+            Turmas Arquivadas
+          </Button>
+        }
+      />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-3 bg-muted/20 p-1">
           <TabsTrigger value="manage">Gerenciar Turmas</TabsTrigger>
           <TabsTrigger value="create">Criar Nova Turma</TabsTrigger>
           <TabsTrigger value="templates">Templates</TabsTrigger>
@@ -61,9 +61,8 @@ const Classes = () => {
           <SubjectTemplatesManager />
         </TabsContent>
       </Tabs>
-    </div>
+    </PageContainer>
   );
 };
 
 export default Classes;
-

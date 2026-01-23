@@ -11,6 +11,7 @@ import { classifyStudent, StudentClassification, ClassificationResult } from '@/
 import { analyzeStudentPerformance } from '@/lib/performancePrediction';
 import { getSubjectArea, SUBJECT_AREAS } from '@/lib/subjects';
 import { QUARTERS } from '@/lib/subjects';
+import { perfTimer } from '@/lib/perf';
 
 // ============================================
 // TIPOS
@@ -227,7 +228,55 @@ export const CLASSIFICATION_BG_COLORS: Record<StudentClassification, string> = {
 // HOOK PRINCIPAL
 // ============================================
 
-export function useSchoolAnalytics(
+export const EMPTY_ANALYTICS_RESULT: SchoolAnalyticsResult = {
+  overview: {
+    totalStudents: 0,
+    totalClasses: 0,
+    overallAverage: 0,
+    overallFrequency: 0,
+    totalIncidents: 0,
+    classifications: {
+      critico: 0,
+      atencao: 0,
+      aprovado: 0,
+      excelencia: 0,
+    },
+  },
+  classRanking: [],
+  topStudents: [],
+  criticalStudents: [],
+  studentPredictions: [],
+  predictionSummary: {
+    total: 0,
+    highRisk: 0,
+    mediumRisk: 0,
+    lowRisk: 0,
+    insufficient: 0,
+  },
+  subjectAnalytics: [],
+  areaAnalytics: [],
+  bestSubjects: [],
+  worstSubjects: [],
+  behavioralAnalytics: {
+    incidentsBySeverity: [],
+    classIncidentRanking: [],
+    topStudentsByIncidents: [],
+    monthlyTrend: [],
+    openIncidentsCount: 0,
+    resolvedIncidentsCount: 0,
+    averageIncidentsPerStudent: 0,
+  },
+  insights: [],
+  categorizedInsights: {
+    academic: [],
+    behavioral: [],
+    risk: [],
+  },
+  comparisonData: [],
+  cohortAnalytics: [],
+};
+
+export function computeSchoolAnalytics(
   students: Student[],
   classes: Class[],
   grades: Grade[],
@@ -282,7 +331,22 @@ export function useSchoolAnalytics(
   const resolveStartYearDate = (cls: Class) =>
     cls.startYearDate || (cls.startCalendarYear ? `${cls.startCalendarYear}-02-01` : undefined);
 
-  return useMemo(() => {
+  const groupById = <T,>(items: T[], keyFn: (item: T) => string) => {
+    const map = new Map<string, T[]>();
+    items.forEach((item) => {
+      const key = keyFn(item);
+      const bucket = map.get(key);
+      if (bucket) {
+        bucket.push(item);
+      } else {
+        map.set(key, [item]);
+      }
+    });
+    return map;
+  };
+
+  
+    const done = perfTimer('analytics.compute');
     const targetSchoolYear = filters.schoolYear === 'all' ? null : (filters.schoolYear ?? 1);
     const useAllYears = targetSchoolYear === null;
     // Filtrar turmas ativas (não arquivadas)
@@ -336,6 +400,7 @@ export function useSchoolAnalytics(
     }
 
     const filteredClassIds = new Set(filteredClasses.map(c => c.id));
+    const filteredClassById = new Map(filteredClasses.map((cls) => [cls.id, cls]));
 
     // Filtrar alunos das turmas selecionadas
     const filteredStudents = students.filter(s =>
@@ -415,7 +480,7 @@ export function useSchoolAnalytics(
       // Filtrar notas pelo ano calendário
       filteredGrades = filteredGrades.filter(g => {
         // Usar a data se disponível, ou calcular a partir do schoolYear da nota
-        const cls = filteredClasses.find(c => c.id === g.classId);
+        const cls = filteredClassById.get(g.classId);
         if (!cls) return false;
 
         const startYear = getStartCalendarYear(cls);
@@ -441,20 +506,57 @@ export function useSchoolAnalytics(
       });
     }
 
+    const filteredStudentsById = new Map(filteredStudents.map((student) => [student.id, student]));
+    const filteredStudentsByClassId = groupById(filteredStudents, (student) => student.classId);
+    const gradesByClassId = groupById(filteredGrades, (grade) => grade.classId);
+    const gradesByStudentId = groupById(filteredGrades, (grade) => grade.studentId);
+    const gradesByClassStudentId = new Map<string, Map<string, Grade[]>>();
+    filteredGrades.forEach((grade) => {
+      let classMap = gradesByClassStudentId.get(grade.classId);
+      if (!classMap) {
+        classMap = new Map<string, Grade[]>();
+        gradesByClassStudentId.set(grade.classId, classMap);
+      }
+      let studentGrades = classMap.get(grade.studentId);
+      if (!studentGrades) {
+        studentGrades = [];
+        classMap.set(grade.studentId, studentGrades);
+      }
+      studentGrades.push(grade);
+    });
+    const yearGradesByClassId = groupById(yearGrades, (grade) => grade.classId);
+    const yearGradesByStudentId = groupById(yearGrades, (grade) => grade.studentId);
+    const attendanceByClassId = groupById(filteredAttendance, (record) => record.classId);
+    const attendanceByStudentId = groupById(filteredAttendance, (record) => record.studentId);
+    const incidentsByClassId = groupById(filteredIncidents, (incident) => incident.classId);
+    const incidentsByStudentId = new Map<string, Incident[]>();
+    filteredIncidents.forEach((incident) => {
+      incident.studentIds.forEach((studentId) => {
+        const bucket = incidentsByStudentId.get(studentId);
+        if (bucket) {
+          bucket.push(incident);
+        } else {
+          incidentsByStudentId.set(studentId, [incident]);
+        }
+      });
+    });
+    const allGradesByStudentId = groupById(allGrades, (grade) => grade.studentId);
+    const fullGradesByStudentId = groupById(grades, (grade) => grade.studentId);
+
     // ============================================
     // CALCULAR ANALYTICS POR ALUNO
     // ============================================
 
     const studentAnalyticsList: StudentAnalytics[] = filteredStudents.map(student => {
-      const studentGrades = filteredGrades.filter(g => g.studentId === student.id);
-      const studentAttendance = filteredAttendance.filter(a => a.studentId === student.id);
-      const studentIncidents = filteredIncidents.filter(i => i.studentIds.includes(student.id));
+      const studentGrades = gradesByStudentId.get(student.id) ?? [];
+      const studentAttendance = attendanceByStudentId.get(student.id) ?? [];
+      const studentIncidents = incidentsByStudentId.get(student.id) ?? [];
 
       const classification = classifyStudent(studentGrades, studentAttendance);
-      const studentClass = filteredClasses.find(c => c.id === student.classId);
+      const studentClass = filteredClassById.get(student.classId);
 
       // Calcular tendência (considera o ano letivo inteiro)
-      const trendGrades = yearGrades.filter(g => g.studentId === student.id);
+      const trendGrades = yearGradesByStudentId.get(student.id) ?? [];
       const quarterAverages = QUARTERS.map(q => {
         const qGrades = trendGrades.filter(g => g.quarter === q);
         return qGrades.length > 0 ? qGrades.reduce((s, g) => s + g.grade, 0) / qGrades.length : 0;
@@ -476,16 +578,22 @@ export function useSchoolAnalytics(
       };
     });
 
+    const studentAnalyticsByClassId = groupById(
+      studentAnalyticsList,
+      (entry) => entry.student.classId,
+    );
+
     // ============================================
     // CALCULAR ANALYTICS POR TURMA
     // ============================================
 
     const classAnalyticsList: ClassAnalytics[] = filteredClasses.map(cls => {
-      const classStudents = studentAnalyticsList.filter(s => s.student.classId === cls.id);
-      const classGrades = filteredGrades.filter(g => g.classId === cls.id);
-      const classYearGrades = yearGrades.filter(g => g.classId === cls.id);
-      const classAttendance = filteredAttendance.filter(a => a.classId === cls.id);
-      const classIncidents = filteredIncidents.filter(i => i.classId === cls.id);
+      const classStudents = studentAnalyticsByClassId.get(cls.id) ?? [];
+      const classGrades = gradesByClassId.get(cls.id) ?? [];
+      const classYearGrades = yearGradesByClassId.get(cls.id) ?? [];
+      const classAttendance = attendanceByClassId.get(cls.id) ?? [];
+      const classIncidents = incidentsByClassId.get(cls.id) ?? [];
+      const classGradesByStudentId = gradesByClassStudentId.get(cls.id);
 
       // Calcular média da turma: Média das médias dos alunos
       let totalStudentAverages = 0;
@@ -493,7 +601,7 @@ export function useSchoolAnalytics(
 
       classStudents.forEach(studentAnalytics => {
         const student = studentAnalytics.student;
-        const studentGrades = classGrades.filter(g => g.studentId === student.id);
+        const studentGrades = classGradesByStudentId?.get(student.id) ?? [];
 
         if (studentGrades.length > 0) {
           // Média do aluno = Soma das notas / Quantidade de notas
@@ -586,21 +694,20 @@ export function useSchoolAnalytics(
 
       entry.classIds.add(cls.id);
 
-      filteredStudents
-        .filter((student) => student.classId === cls.id)
-        .forEach((student) => entry.studentIds.add(student.id));
+      const classStudents = filteredStudentsByClassId.get(cls.id) ?? [];
+      classStudents.forEach((student) => entry.studentIds.add(student.id));
 
-      const classGrades = filteredGrades.filter((grade) => grade.classId === cls.id);
+      const classGrades = gradesByClassId.get(cls.id) ?? [];
       classGrades.forEach((grade) => {
         entry.gradeSum += grade.grade;
         entry.gradeCount += 1;
       });
 
-      const classAttendance = filteredAttendance.filter((record) => record.classId === cls.id);
+      const classAttendance = attendanceByClassId.get(cls.id) ?? [];
       entry.attendanceTotal += classAttendance.length;
       entry.attendancePresent += classAttendance.filter((record) => record.status === 'presente').length;
 
-      entry.incidentCount += filteredIncidents.filter((incident) => incident.classId === cls.id).length;
+      entry.incidentCount += (incidentsByClassId.get(cls.id) ?? []).length;
 
       const classGrowth = classAnalyticsList.find((c) => c.classData.id === cls.id)?.growth;
       if (typeof classGrowth === 'number') {
@@ -726,8 +833,8 @@ export function useSchoolAnalytics(
 
     const studentPredictions: StudentPrediction[] = filteredStudents.map((student) => {
       const classInfo = classById.get(student.classId);
-      const studentGradesAll = allGrades.filter(
-        (grade) => grade.studentId === student.id && grade.classId === student.classId,
+      const studentGradesAll = (allGradesByStudentId.get(student.id) ?? []).filter(
+        (grade) => grade.classId === student.classId,
       );
       const resolvePredictionYear = () => {
         if (targetSchoolYear) return targetSchoolYear;
@@ -743,8 +850,7 @@ export function useSchoolAnalytics(
         (grade) => (grade.schoolYear ?? 1) === predictionYear,
       );
 
-      const historyGrades = grades.filter((grade) => {
-        if (grade.studentId !== student.id) return false;
+      const historyGrades = (fullGradesByStudentId.get(student.id) ?? []).filter((grade) => {
         const gradeYear = grade.schoolYear ?? 1;
         if (gradeYear >= predictionYear) return false;
         if (filters.includeArchived) return true;
@@ -840,8 +946,8 @@ export function useSchoolAnalytics(
 
     // Ranking de turmas por ocorrências
     const classIncidentRanking: ClassIncidentRanking[] = filteredClasses.map(cls => {
-      const classIncidents = filteredIncidents.filter(i => i.classId === cls.id);
-      const classStudentCount = filteredStudents.filter(s => s.classId === cls.id).length;
+      const classIncidents = incidentsByClassId.get(cls.id) ?? [];
+      const classStudentCount = filteredStudentsByClassId.get(cls.id)?.length ?? 0;
       return {
         classData: cls,
         incidentCount: classIncidents.length,
@@ -872,8 +978,8 @@ export function useSchoolAnalytics(
 
     const topStudentsByIncidents: StudentIncidentRanking[] = Array.from(studentIncidentMap.entries())
       .map(([studentId, data]) => {
-        const student = filteredStudents.find(s => s.id === studentId);
-        const studentClass = filteredClasses.find(c => c.id === student?.classId);
+        const student = filteredStudentsById.get(studentId);
+        const studentClass = student ? filteredClassById.get(student.classId) : undefined;
         return student ? {
           student,
           className: studentClass?.name || 'Sem turma',
@@ -1120,7 +1226,7 @@ export function useSchoolAnalytics(
       ? classAnalyticsList.filter(c => filters.comparisonClassIds.includes(c.classData.id))
       : [];
 
-    return {
+    const result = {
       overview,
       classRanking,
       topStudents,
@@ -1137,8 +1243,41 @@ export function useSchoolAnalytics(
       comparisonData,
       cohortAnalytics,
     };
-  }, [students, classes, grades, attendance, incidents, filters]);
+    done({
+      classes: filteredClasses.length,
+      students: filteredStudents.length,
+      grades: filteredGrades.length,
+      incidents: filteredIncidents.length,
+      attendance: filteredAttendance.length,
+      calendarYear: filters.calendarYear,
+      quarter: filters.quarter,
+    });
+    return result;
+  
 }
+
+export function useSchoolAnalytics(
+  students: Student[],
+  classes: Class[],
+  grades: Grade[],
+  attendance: AttendanceRecord[],
+  incidents: Incident[],
+  filters: AnalyticsFilters
+): SchoolAnalyticsResult {
+  return useMemo(
+    () =>
+      computeSchoolAnalytics(
+        students,
+        classes,
+        grades,
+        attendance,
+        incidents,
+        filters,
+      ),
+    [students, classes, grades, attendance, incidents, filters],
+  );
+}
+
 
 // Helper para formatar números
 export function formatNumber(num: number, decimals: number = 1): string {

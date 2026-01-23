@@ -14,7 +14,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { useClasses, useStudents, useGrades, useProfessionalSubjects, useProfessionalSubjectTemplates } from '@/hooks/useData';
+import { useClasses, useStudents, useGradesScoped, useProfessionalSubjects, useProfessionalSubjectTemplates } from '@/hooks/useData';
 import { AlertTriangle, Save, CheckCircle2, FileUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -44,7 +44,6 @@ interface StudentGrades {
 export const GradesManager = () => {
   const { classes } = useClasses();
   const { students } = useStudents();
-  const { grades, addGrade, refreshGrades } = useGrades();
   const { toast } = useToast();
   const { templates } = useProfessionalSubjectTemplates();
   const {
@@ -56,6 +55,12 @@ export const GradesManager = () => {
   const selectedClass = gradesUI.selectedClassId;
   const selectedQuarter = gradesUI.selectedQuarter;
   const selectedSchoolYear = gradesUI.selectedSchoolYear as 1 | 2 | 3;
+
+  const { grades, addGrade } = useGradesScoped({
+    classId: selectedClass || undefined,
+    quarter: selectedQuarter || undefined,
+    schoolYear: selectedSchoolYear,
+  });
 
   const setSelectedClass = (value: string) => setGradesUI({ selectedClassId: value });
   const setSelectedQuarter = (value: string) => setGradesUI({ selectedQuarter: value });
@@ -757,14 +762,15 @@ export const GradesManager = () => {
       )}
 
       {/* SIGE Import Dialog */}
-      <SigeImportDialog
-        open={showSigeImport}
-        onOpenChange={setShowSigeImport}
-        defaultClassId={selectedClass}
-        defaultQuarter={selectedQuarter}
-        defaultSchoolYear={selectedSchoolYear}
-        onRefresh={refreshGrades}
-      />
+      {showSigeImport && (
+        <SigeImportDialog
+          open={showSigeImport}
+          onOpenChange={setShowSigeImport}
+          defaultClassId={selectedClass}
+          defaultQuarter={selectedQuarter}
+          defaultSchoolYear={selectedSchoolYear}
+        />
+      )}
     </div>
   );
 };

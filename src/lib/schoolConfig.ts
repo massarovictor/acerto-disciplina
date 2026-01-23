@@ -3,6 +3,7 @@
  */
 
 import { supabase } from '@/services/supabase/client';
+import { perfTimer } from '@/lib/perf';
 
 export interface SchoolConfig {
   schoolName: string;
@@ -36,6 +37,7 @@ export const getSchoolConfig = async (): Promise<SchoolConfig> => {
 
     // Busca a configuração global (única linha na tabela com ID fixo)
     const SINGLETON_ID = '00000000-0000-0000-0000-000000000000';
+    const done = perfTimer('school_config.fetch');
     const { data, error } = await supabase
       .from('school_config')
       .select('*')
@@ -44,18 +46,22 @@ export const getSchoolConfig = async (): Promise<SchoolConfig> => {
 
     if (error) {
       if (error.code === 'PGRST116') {
+        done({ ok: true, source: 'default' });
         // Nenhum registro encontrado, retorna default
         return getDefaultConfig();
       }
       console.error('Erro ao buscar configurações da escola:', error);
+      done({ ok: false, source: 'supabase' });
       // Fallback para localStorage em caso de erro
       return getSchoolConfigFromLocalStorage();
     }
 
     if (data) {
+      done({ ok: true, source: 'supabase' });
       return mapFromDb(data);
     }
 
+    done({ ok: true, source: 'default' });
     return getDefaultConfig();
   } catch (error) {
     console.error('Erro ao buscar configurações:', error);
@@ -79,6 +85,7 @@ export const saveSchoolConfig = async (config: SchoolConfig): Promise<void> => {
     const SINGLETON_ID = '00000000-0000-0000-0000-000000000000';
 
     // Usa upsert com ID fixo para garantir que sempre existe apenas uma linha
+    const done = perfTimer('school_config.save');
     const { error } = await supabase
       .from('school_config')
       .upsert({
@@ -90,9 +97,11 @@ export const saveSchoolConfig = async (config: SchoolConfig): Promise<void> => {
 
     if (error) {
       console.error('Erro ao salvar configurações da escola:', error);
+      done({ ok: false });
       throw error;
     }
 
+    done({ ok: true });
     // Também salva no localStorage como backup
     saveSchoolConfigToLocalStorage(config);
   } catch (error) {
