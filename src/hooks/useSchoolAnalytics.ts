@@ -20,11 +20,17 @@ import { perfTimer } from '@/lib/perf';
 export interface AnalyticsFilters {
   series: string[];              // ['1º', '2º', '3º']
   classIds: string[];            // IDs das turmas selecionadas
+  subjects: string[];            // Disciplinas selecionadas
   quarter: string;               // 'all' | '1º Bimestre' | etc
+  useQuarterRange?: boolean;     // Intervalo de bimestres
+  quarterRangeStart?: string;    // Início do intervalo
+  quarterRangeEnd?: string;      // Fim do intervalo
   schoolYear: 1 | 2 | 3 | 'all'; // Ano/série da turma ou todos os anos
   calendarYear: 'all' | number;  // Ano calendário para comparação entre turmas
   includeArchived: boolean;      // Incluir turmas arquivadas
   comparisonClassIds: string[];  // Turmas para comparação lado a lado
+  comparisonMode?: 'calendar' | 'courseYear';
+  comparisonCourseYear?: 1 | 2 | 3;
 }
 
 export interface StudentAnalytics {
@@ -158,6 +164,18 @@ export interface CategorizedInsights {
   risk: Insight[];
 }
 
+export interface AnalyticsContextSummary {
+  mode: 'general' | 'subject';
+  classCount: number;
+  studentCount: number;
+  gradeCount: number;
+  subjectCount: number;
+  hasSubjectFilter: boolean;
+  quarterLabel: string;
+  schoolYear: AnalyticsFilters['schoolYear'];
+  calendarYear: AnalyticsFilters['calendarYear'];
+}
+
 export interface SchoolAnalyticsResult {
   // Overview
   overview: SchoolOverview;
@@ -166,6 +184,8 @@ export interface SchoolAnalyticsResult {
   classRanking: ClassAnalytics[];
   topStudents: StudentAnalytics[];
   criticalStudents: StudentAnalytics[];
+  allStudentsRanking: StudentAnalytics[];
+  allCriticalStudents: StudentAnalytics[];
 
   // Predições
   studentPredictions: StudentPrediction[];
@@ -186,6 +206,7 @@ export interface SchoolAnalyticsResult {
 
   // Comparison data
   comparisonData: ClassAnalytics[];
+  comparisonCourseYearData: ClassAnalytics[];
 
   // Cohorts (ano calendário)
   cohortAnalytics: {
@@ -197,6 +218,9 @@ export interface SchoolAnalyticsResult {
     incidentCount: number;
     growthAverage: number | null;
   }[];
+
+  // Contexto do recorte aplicado
+  context: AnalyticsContextSummary;
 }
 
 // ============================================
@@ -245,6 +269,8 @@ export const EMPTY_ANALYTICS_RESULT: SchoolAnalyticsResult = {
   classRanking: [],
   topStudents: [],
   criticalStudents: [],
+  allStudentsRanking: [],
+  allCriticalStudents: [],
   studentPredictions: [],
   predictionSummary: {
     total: 0,
@@ -273,7 +299,19 @@ export const EMPTY_ANALYTICS_RESULT: SchoolAnalyticsResult = {
     risk: [],
   },
   comparisonData: [],
+  comparisonCourseYearData: [],
   cohortAnalytics: [],
+  context: {
+    mode: 'general',
+    classCount: 0,
+    studentCount: 0,
+    gradeCount: 0,
+    subjectCount: 0,
+    hasSubjectFilter: false,
+    quarterLabel: 'Anual',
+    schoolYear: 'all',
+    calendarYear: 'all',
+  },
 };
 
 export function computeSchoolAnalytics(
@@ -312,6 +350,23 @@ export function computeSchoolAnalytics(
     const rangeStart = addMonths(currentYearStart, index * 2);
     const rangeEnd = addMonths(currentYearStart, index * 2 + 2);
     return { start: rangeStart, end: rangeEnd };
+  };
+  const getQuarterIndex = (quarter: string) => QUARTERS.indexOf(quarter);
+  const getQuarterRangeSpan = (
+    startYearDate: string | undefined,
+    schoolYear: number,
+    startQuarter: string,
+    endQuarter: string,
+  ) => {
+    const startIndex = getQuarterIndex(startQuarter);
+    const endIndex = getQuarterIndex(endQuarter);
+    if (startIndex < 0 || endIndex < 0) return null;
+    const start = Math.min(startIndex, endIndex);
+    const end = Math.max(startIndex, endIndex);
+    const rangeStart = getQuarterRange(startYearDate, schoolYear, QUARTERS[start]);
+    const rangeEnd = getQuarterRange(startYearDate, schoolYear, QUARTERS[end]);
+    if (!rangeStart || !rangeEnd) return null;
+    return { start: rangeStart.start, end: rangeEnd.end };
   };
   const getSchoolYearRange = (startYearDate: string | undefined, schoolYear: number) => {
     if (!startYearDate) return null;
@@ -355,31 +410,78 @@ export function computeSchoolAnalytics(
     const getStartCalendarYear = (cls: Class) => {
       if (cls.startCalendarYear) return cls.startCalendarYear;
       if (cls.startYearDate) return parseLocalDate(cls.startYearDate).getFullYear();
-      return undefined;
+      const inferredYear =
+        cls.currentYear && [1, 2, 3].includes(cls.currentYear)
+          ? new Date().getFullYear() - (cls.currentYear - 1)
+          : undefined;
+      return inferredYear;
     };
+
+    const parseSeriesYear = (value: string) => {
+      const match = value.match(/\d+/);
+      if (!match) return null;
+      const parsed = Number(match[0]);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    const getCourseYearForCalendarYear = (cls: Class, targetYear: number) => {
+      const startYear = getStartCalendarYear(cls);
+      if (!startYear) return null;
+      const courseYear = targetYear - startYear + 1;
+      if (courseYear < 1 || courseYear > 3) return null;
+      return courseYear;
+    };
+
+    const comparisonMode = filters.comparisonMode ?? 'calendar';
+    const comparisonCourseYear =
+      filters.comparisonCourseYear ??
+      (filters.schoolYear === 'all' ? 1 : filters.schoolYear);
 
     const classCalendarYearMap = new Map<string, number | null>();
     activeClasses.forEach((cls) => {
-      if (useAllYears || targetSchoolYear === null) {
-        classCalendarYearMap.set(cls.id, null);
-        return;
-      }
+    if (useAllYears || targetSchoolYear === null) {
+      classCalendarYearMap.set(cls.id, null);
+      return;
+    }
       const startYear = getStartCalendarYear(cls);
       const calendarYear = startYear ? startYear + (targetSchoolYear - 1) : null;
       classCalendarYearMap.set(cls.id, calendarYear);
     });
 
-    // Aplicar filtros
-    let filteredClasses = activeClasses;
+    // Aplicar filtros iniciais de turma
+    let candidateClasses = activeClasses;
 
     if (filters.series.length > 0) {
-      filteredClasses = filteredClasses.filter(c =>
-        filters.series.some(s => c.series.includes(s))
-      );
+      const seriesYears = filters.series
+        .map(parseSeriesYear)
+        .filter((year): year is number => Boolean(year));
+      const hasDerivedSeries =
+        seriesYears.length > 0 && (filters.calendarYear !== 'all' || targetSchoolYear !== null);
+
+      candidateClasses = candidateClasses.filter((cls) => {
+        if (hasDerivedSeries) {
+          const targetCalendarYear =
+            filters.calendarYear !== 'all'
+              ? (filters.calendarYear as number)
+              : (() => {
+                  if (targetSchoolYear === null) return null;
+                  const startYear = getStartCalendarYear(cls);
+                  if (!startYear) return null;
+                  return startYear + (targetSchoolYear - 1);
+                })();
+          if (targetCalendarYear) {
+            const courseYear = getCourseYearForCalendarYear(cls, targetCalendarYear);
+            if (courseYear) {
+              return seriesYears.includes(courseYear);
+            }
+          }
+        }
+        return filters.series.some((s) => cls.series.includes(s));
+      });
     }
 
     if (filters.classIds.length > 0) {
-      filteredClasses = filteredClasses.filter(c =>
+      candidateClasses = candidateClasses.filter(c =>
         filters.classIds.includes(c.id)
       );
     }
@@ -388,23 +490,21 @@ export function computeSchoolAnalytics(
     // Quando calendarYear é definido, filtra turmas que estavam ativas naquele ano
     if (filters.calendarYear !== 'all') {
       const targetCalendarYear = filters.calendarYear as number;
-      filteredClasses = filteredClasses.filter((cls) => {
+      candidateClasses = candidateClasses.filter((cls) => {
         const startYear = getStartCalendarYear(cls);
         const endYear = cls.endCalendarYear ?? (startYear ? startYear + 2 : undefined);
 
-        if (!startYear) return false;
+        if (!startYear) return true;
 
         // Turma estava ativa naquele ano calendário
         return startYear <= targetCalendarYear && targetCalendarYear <= (endYear || startYear + 2);
       });
     }
 
-    const filteredClassIds = new Set(filteredClasses.map(c => c.id));
-    const filteredClassById = new Map(filteredClasses.map((cls) => [cls.id, cls]));
-
-    // Filtrar alunos das turmas selecionadas
-    const filteredStudents = students.filter(s =>
-      filteredClassIds.has(s.classId) && s.status === 'active'
+    const candidateClassIds = new Set(candidateClasses.map(c => c.id));
+    const candidateStudents = students.filter(
+      (student) =>
+        candidateClassIds.has(student.classId) && student.status === 'active',
     );
 
     const classById = new Map(classes.map((cls) => [cls.id, cls]));
@@ -418,23 +518,601 @@ export function computeSchoolAnalytics(
       return QUARTERS[0];
     };
 
-    const allGrades = grades.filter(g => filteredClassIds.has(g.classId));
+    const allGrades = grades.filter(g => candidateClassIds.has(g.classId));
     const yearGrades = useAllYears
       ? allGrades
       : allGrades.filter(g => (g.schoolYear ?? 1) === targetSchoolYear);
 
+    const normalizeSubjectName = (value: string) =>
+      value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+
+    const normalizeSubjectTokens = (value: string) =>
+      normalizeSubjectName(value)
+        .split(/[^a-z0-9]+/g)
+        .filter((token) => token.length >= 3);
+
+    const selectedSubjects = filters.subjects ?? [];
+    const subjectSet =
+      selectedSubjects.length > 0
+        ? new Set(selectedSubjects.map(normalizeSubjectName))
+        : null;
+    const subjectMatchers = selectedSubjects.map((subject) => ({
+      normalized: normalizeSubjectName(subject),
+      tokens: normalizeSubjectTokens(subject),
+    }));
+    const matchesSelectedSubject = (subject: string) => {
+      if (!subjectSet) return true;
+      const normalized = normalizeSubjectName(subject);
+      for (const matcher of subjectMatchers) {
+        if (normalized === matcher.normalized) return true;
+        if (matcher.tokens.length === 0) continue;
+        const tokens = normalizeSubjectTokens(subject);
+        if (matcher.tokens.every((token) => tokens.includes(token))) {
+          return true;
+        }
+      }
+      return false;
+    };
+    const classifyStudentByAverage = (
+      gradesList: Grade[],
+      attendanceList: AttendanceRecord[],
+    ): ClassificationResult => {
+      const subjectGradesRaw: Record<string, number[]> = {};
+      gradesList.forEach((g) => {
+        if (!subjectGradesRaw[g.subject]) subjectGradesRaw[g.subject] = [];
+        subjectGradesRaw[g.subject].push(g.grade);
+      });
+
+      const subjectAverages: Record<string, number> = {};
+      Object.entries(subjectGradesRaw).forEach(([subject, gradeList]) => {
+        subjectAverages[subject] = gradeList.reduce((a, b) => a + b, 0) / gradeList.length;
+      });
+
+      const subjectsBelow6 = Object.entries(subjectAverages)
+        .filter(([, avg]) => avg < 6)
+        .map(([subject, avg]) => ({ subject, average: avg }))
+        .sort((a, b) => a.average - b.average);
+
+      const subjectAverageValues = Object.values(subjectAverages);
+      const average =
+        subjectAverageValues.length > 0
+          ? subjectAverageValues.reduce((sum, value) => sum + value, 0) / subjectAverageValues.length
+          : 0;
+
+      const present = attendanceList.filter((a) => a.status === 'presente').length;
+      const frequency =
+        attendanceList.length > 0 ? (present / attendanceList.length) * 100 : 100;
+
+      let classification: StudentClassification;
+      if (average < 6) {
+        classification = 'critico';
+      } else if (average < 7) {
+        classification = 'atencao';
+      } else if (average < 8) {
+        classification = 'aprovado';
+      } else {
+        classification = 'excelencia';
+      }
+
+      return {
+        classification,
+        subjectsBelow6,
+        subjectsBelow6Count: subjectsBelow6.length,
+        subjectAverages,
+        average,
+        frequency,
+      };
+    };
+
+    const classifyStudentForAnalytics = (
+      gradesList: Grade[],
+      attendanceList: AttendanceRecord[],
+    ) =>
+      subjectSet
+        ? classifyStudentByAverage(gradesList, attendanceList)
+        : classifyStudent(gradesList, attendanceList);
+
     let filteredGrades = useAllYears ? allGrades : yearGrades;
-    if (filters.quarter !== 'all') {
+    const hasQuarterRange =
+      filters.useQuarterRange &&
+      filters.quarterRangeStart &&
+      filters.quarterRangeEnd;
+    if (hasQuarterRange) {
+      const startIndex = getQuarterIndex(filters.quarterRangeStart!);
+      const endIndex = getQuarterIndex(filters.quarterRangeEnd!);
+      if (startIndex >= 0 && endIndex >= 0) {
+        const minIndex = Math.min(startIndex, endIndex);
+        const maxIndex = Math.max(startIndex, endIndex);
+        filteredGrades = filteredGrades.filter((g) => {
+          const qIndex = getQuarterIndex(g.quarter);
+          return qIndex >= minIndex && qIndex <= maxIndex;
+        });
+      }
+    } else if (filters.quarter !== 'all') {
       filteredGrades = filteredGrades.filter(g => g.quarter === filters.quarter);
     }
 
-    let filteredAttendance = attendance.filter(a => filteredClassIds.has(a.classId));
-    let filteredIncidents = incidents.filter(i => filteredClassIds.has(i.classId));
+    let filteredGradesForClassification = filteredGrades;
+
+    if (subjectSet) {
+      filteredGrades = filteredGrades.filter((g) => matchesSelectedSubject(g.subject));
+    }
+
+    const buildComparisonCourseYearData = (courseYear: 1 | 2 | 3) => {
+      if (filters.comparisonClassIds.length === 0) return [];
+      const comparisonClasses = filters.comparisonClassIds
+        .map((id) => classById.get(id))
+        .filter((cls): cls is Class =>
+          !!cls && (filters.includeArchived || !cls.archived),
+        );
+      if (comparisonClasses.length === 0) return [];
+
+      const comparisonClassIdsSet = new Set(comparisonClasses.map((cls) => cls.id));
+      const comparisonStudentsAll = students.filter(
+        (student) => comparisonClassIdsSet.has(student.classId) && student.status === 'active',
+      );
+
+      const comparisonGradesAll = grades.filter((grade) =>
+        comparisonClassIdsSet.has(grade.classId),
+      );
+      const comparisonYearGrades = comparisonGradesAll.filter(
+        (grade) => (grade.schoolYear ?? 1) === courseYear,
+      );
+
+      let comparisonGrades = comparisonYearGrades;
+      if (hasQuarterRange) {
+        const startIndex = getQuarterIndex(filters.quarterRangeStart!);
+        const endIndex = getQuarterIndex(filters.quarterRangeEnd!);
+        if (startIndex >= 0 && endIndex >= 0) {
+          const minIndex = Math.min(startIndex, endIndex);
+          const maxIndex = Math.max(startIndex, endIndex);
+          comparisonGrades = comparisonGrades.filter((grade) => {
+            const qIndex = getQuarterIndex(grade.quarter);
+            return qIndex >= minIndex && qIndex <= maxIndex;
+          });
+        }
+      } else if (filters.quarter !== 'all') {
+        comparisonGrades = comparisonGrades.filter((grade) => grade.quarter === filters.quarter);
+      }
+
+      const comparisonGradesForClassification = comparisonGrades;
+
+      if (subjectSet) {
+        comparisonGrades = comparisonGrades.filter((grade) =>
+          matchesSelectedSubject(grade.subject),
+        );
+      }
+
+      const classRanges = new Map<string, { start: Date; end: Date } | null>();
+      comparisonClasses.forEach((cls) => {
+        const startYearDate = resolveStartYearDate(cls);
+        const range = hasQuarterRange
+          ? getQuarterRangeSpan(
+              startYearDate,
+              courseYear,
+              filters.quarterRangeStart!,
+              filters.quarterRangeEnd!,
+            )
+          : filters.quarter !== 'all'
+            ? getQuarterRange(startYearDate, courseYear, filters.quarter)
+            : getSchoolYearRange(startYearDate, courseYear);
+        classRanges.set(cls.id, range);
+      });
+
+      const comparisonAttendance = attendance.filter((record) =>
+        comparisonClassIdsSet.has(record.classId) &&
+        isDateInRange(record.date, classRanges.get(record.classId)),
+      );
+      const comparisonIncidents = incidents.filter((incident) =>
+        comparisonClassIdsSet.has(incident.classId) &&
+        isDateInRange(incident.date, classRanges.get(incident.classId)),
+      );
+
+      const comparisonStudentIdsWithGrades = new Set(comparisonGrades.map((grade) => grade.studentId));
+      const comparisonStudents = comparisonStudentsAll.filter((student) =>
+        comparisonStudentIdsWithGrades.has(student.id),
+      );
+      const comparisonGradesByClassId = groupById(comparisonGrades, (grade) => grade.classId);
+      const comparisonGradesByStudentId = groupById(comparisonGrades, (grade) => grade.studentId);
+      const comparisonGradesForClassificationByStudentId = groupById(
+        comparisonGradesForClassification,
+        (grade) => grade.studentId,
+      );
+      const comparisonClassificationGradesByStudentId = subjectSet
+        ? comparisonGradesByStudentId
+        : comparisonGradesForClassificationByStudentId;
+      const comparisonGradesByClassStudentId = new Map<string, Map<string, Grade[]>>();
+      comparisonGrades.forEach((grade) => {
+        let classMap = comparisonGradesByClassStudentId.get(grade.classId);
+        if (!classMap) {
+          classMap = new Map<string, Grade[]>();
+          comparisonGradesByClassStudentId.set(grade.classId, classMap);
+        }
+        let studentGrades = classMap.get(grade.studentId);
+        if (!studentGrades) {
+          studentGrades = [];
+          classMap.set(grade.studentId, studentGrades);
+        }
+        studentGrades.push(grade);
+      });
+
+      const comparisonStudentsByClassId = groupById(comparisonStudents, (student) => student.classId);
+      const comparisonAttendanceByClassId = groupById(comparisonAttendance, (record) => record.classId);
+      const comparisonAttendanceByStudentId = groupById(comparisonAttendance, (record) => record.studentId);
+      const comparisonIncidentsByClassId = groupById(comparisonIncidents, (incident) => incident.classId);
+
+      const comparisonStudentAnalyticsList = comparisonStudents.map((student) => {
+        const studentGrades = comparisonClassificationGradesByStudentId.get(student.id) ?? [];
+        const studentAttendance = comparisonAttendanceByStudentId.get(student.id) ?? [];
+        const classification = classifyStudentForAnalytics(studentGrades, studentAttendance);
+        const studentClass = classById.get(student.classId);
+        return {
+          student,
+          classification,
+          className: studentClass?.name || 'Sem turma',
+          incidentCount: 0,
+          trend: 'stable' as const,
+        };
+      });
+
+      const comparisonStudentAnalyticsByClassId = groupById(
+        comparisonStudentAnalyticsList,
+        (entry) => entry.student.classId,
+      );
+
+      const comparisonYearGradesForTrends = subjectSet
+        ? comparisonYearGrades.filter((grade) => matchesSelectedSubject(grade.subject))
+        : comparisonYearGrades;
+      const comparisonYearGradesByClassId = groupById(
+        comparisonYearGradesForTrends,
+        (grade) => grade.classId,
+      );
+
+      return comparisonClasses.map((cls) => {
+        const classStudents = comparisonStudentAnalyticsByClassId.get(cls.id) ?? [];
+        const classGrades = comparisonGradesByClassId.get(cls.id) ?? [];
+        const classYearGrades = comparisonYearGradesByClassId.get(cls.id) ?? [];
+        const classAttendance = comparisonAttendanceByClassId.get(cls.id) ?? [];
+        const classIncidents = comparisonIncidentsByClassId.get(cls.id) ?? [];
+        const classGradesByStudentId = comparisonGradesByClassStudentId.get(cls.id);
+
+        let totalStudentAverages = 0;
+        let studentCountWithGrades = 0;
+
+        classStudents.forEach((studentAnalytics) => {
+          const studentGrades = classGradesByStudentId?.get(studentAnalytics.student.id) ?? [];
+          if (studentGrades.length > 0) {
+            const studentAvg =
+              studentGrades.reduce((sum, grade) => sum + grade.grade, 0) /
+              studentGrades.length;
+            totalStudentAverages += studentAvg;
+            studentCountWithGrades += 1;
+          }
+        });
+
+        const average = studentCountWithGrades > 0 ? totalStudentAverages / studentCountWithGrades : 0;
+
+        const present = classAttendance.filter((record) => record.status === 'presente').length;
+        const frequency =
+          classAttendance.length > 0 ? (present / classAttendance.length) * 100 : 100;
+
+        const classifications = {
+          critico: classStudents.filter((student) => student.classification.classification === 'critico').length,
+          atencao: classStudents.filter((student) => student.classification.classification === 'atencao').length,
+          aprovado: classStudents.filter((student) => student.classification.classification === 'aprovado').length,
+          excelencia: classStudents.filter((student) => student.classification.classification === 'excelencia').length,
+        };
+
+        const quarterAverages = QUARTERS.map((quarter) => {
+          const quarterGrades = classYearGrades.filter((grade) => grade.quarter === quarter);
+          return quarterGrades.length > 0
+            ? quarterGrades.reduce((sum, grade) => sum + grade.grade, 0) / quarterGrades.length
+            : 0;
+        }).filter((value) => value > 0);
+
+        let trend: 'up' | 'down' | 'stable' = 'stable';
+        if (quarterAverages.length >= 2) {
+          const diff = quarterAverages[quarterAverages.length - 1] - quarterAverages[quarterAverages.length - 2];
+          if (diff > 0.2) trend = 'up';
+          else if (diff < -0.2) trend = 'down';
+        }
+
+        const growth =
+          quarterAverages.length >= 2
+            ? quarterAverages[quarterAverages.length - 1] - quarterAverages[0]
+            : null;
+
+        const startYear = getStartCalendarYear(cls);
+        const calendarYear = startYear ? startYear + (courseYear - 1) : undefined;
+
+        return {
+          classData: cls,
+          calendarYear,
+          studentCount: classStudents.length,
+          average,
+          frequency,
+          growth,
+          classifications,
+          incidentCount: classIncidents.length,
+          trend,
+        };
+      });
+    };
+
+    const buildComparisonCalendarData = () => {
+      if (filters.comparisonClassIds.length === 0) return [];
+      const comparisonClasses = filters.comparisonClassIds
+        .map((id) => classById.get(id))
+        .filter((cls): cls is Class =>
+          !!cls && (filters.includeArchived || !cls.archived),
+        );
+      if (comparisonClasses.length === 0) return [];
+
+      const comparisonClassIdsSet = new Set(comparisonClasses.map((cls) => cls.id));
+      const comparisonStudentsAll = students.filter(
+        (student) => comparisonClassIdsSet.has(student.classId) && student.status === 'active',
+      );
+
+      const comparisonGradesAll = grades.filter((grade) =>
+        comparisonClassIdsSet.has(grade.classId),
+      );
+      const comparisonGradesBase = useAllYears
+        ? comparisonGradesAll
+        : comparisonGradesAll.filter((grade) => (grade.schoolYear ?? 1) === targetSchoolYear);
+
+      let comparisonGrades = comparisonGradesBase;
+      if (hasQuarterRange) {
+        const startIndex = getQuarterIndex(filters.quarterRangeStart!);
+        const endIndex = getQuarterIndex(filters.quarterRangeEnd!);
+        if (startIndex >= 0 && endIndex >= 0) {
+          const minIndex = Math.min(startIndex, endIndex);
+          const maxIndex = Math.max(startIndex, endIndex);
+          comparisonGrades = comparisonGrades.filter((grade) => {
+            const qIndex = getQuarterIndex(grade.quarter);
+            return qIndex >= minIndex && qIndex <= maxIndex;
+          });
+        }
+      } else if (filters.quarter !== 'all') {
+        comparisonGrades = comparisonGrades.filter((grade) => grade.quarter === filters.quarter);
+      }
+
+      let comparisonGradesForClassification = comparisonGrades;
+
+      if (subjectSet) {
+        comparisonGrades = comparisonGrades.filter((grade) =>
+          matchesSelectedSubject(grade.subject),
+        );
+      }
+
+      let comparisonAttendance = attendance.filter((record) =>
+        comparisonClassIdsSet.has(record.classId),
+      );
+      let comparisonIncidents = incidents.filter((incident) =>
+        comparisonClassIdsSet.has(incident.classId),
+      );
+
+      let comparisonYearGradesBase = comparisonGradesBase;
+
+      if (!useAllYears && targetSchoolYear !== null) {
+        const classRanges = new Map<string, { start: Date; end: Date } | null>();
+        comparisonClasses.forEach((cls) => {
+          if (filters.calendarYear !== 'all') {
+            const startYear = getStartCalendarYear(cls);
+            if (startYear) {
+              const specificYear = startYear + (targetSchoolYear - 1);
+              if (specificYear !== filters.calendarYear) {
+                classRanges.set(cls.id, null);
+                return;
+              }
+            }
+          }
+
+          const startYearDate = resolveStartYearDate(cls);
+          const range = hasQuarterRange
+            ? getQuarterRangeSpan(
+                startYearDate,
+                targetSchoolYear,
+                filters.quarterRangeStart!,
+                filters.quarterRangeEnd!,
+              )
+            : filters.quarter !== 'all'
+              ? getQuarterRange(startYearDate, targetSchoolYear, filters.quarter)
+              : getSchoolYearRange(startYearDate, targetSchoolYear);
+          classRanges.set(cls.id, range);
+        });
+
+        const rangeFilter = (g: Grade) => {
+          const range = classRanges.get(g.classId);
+          return range !== null && range !== undefined;
+        };
+
+        comparisonGrades = comparisonGrades.filter(rangeFilter);
+        comparisonGradesForClassification = comparisonGradesForClassification.filter(rangeFilter);
+        comparisonYearGradesBase = comparisonYearGradesBase.filter(rangeFilter);
+
+        comparisonAttendance = comparisonAttendance.filter((record) =>
+          isDateInRange(record.date, classRanges.get(record.classId)),
+        );
+        comparisonIncidents = comparisonIncidents.filter((incident) =>
+          isDateInRange(incident.date, classRanges.get(incident.classId)),
+        );
+      } else if (useAllYears && filters.calendarYear !== 'all') {
+        const targetCalYear = filters.calendarYear as number;
+
+        const calendarFilter = (g: Grade) => {
+          const cls = classById.get(g.classId);
+          if (!cls) return false;
+
+          const startYear = getStartCalendarYear(cls);
+          if (!startYear) return true;
+
+          const gradeCalendarYear = startYear + ((g.schoolYear ?? 1) - 1);
+          return gradeCalendarYear === targetCalYear;
+        };
+
+        comparisonGrades = comparisonGrades.filter(calendarFilter);
+        comparisonGradesForClassification = comparisonGradesForClassification.filter(calendarFilter);
+        comparisonYearGradesBase = comparisonYearGradesBase.filter(calendarFilter);
+
+        comparisonAttendance = comparisonAttendance.filter((record) => {
+          const date = parseLocalDate(record.date);
+          if (Number.isNaN(date.getTime())) return false;
+          return date.getFullYear() === targetCalYear;
+        });
+        comparisonIncidents = comparisonIncidents.filter((incident) => {
+          const date = parseLocalDate(incident.date);
+          if (Number.isNaN(date.getTime())) return false;
+          return date.getFullYear() === targetCalYear;
+        });
+      }
+
+      const comparisonStudentIdsWithGrades = new Set(
+        comparisonGrades.map((grade) => grade.studentId),
+      );
+      const comparisonStudents = comparisonStudentsAll.filter((student) =>
+        comparisonStudentIdsWithGrades.has(student.id),
+      );
+
+      const comparisonGradesByClassId = groupById(comparisonGrades, (grade) => grade.classId);
+      const comparisonGradesByStudentId = groupById(comparisonGrades, (grade) => grade.studentId);
+      const comparisonGradesForClassificationByStudentId = groupById(
+        comparisonGradesForClassification,
+        (grade) => grade.studentId,
+      );
+      const comparisonClassificationGradesByStudentId = subjectSet
+        ? comparisonGradesByStudentId
+        : comparisonGradesForClassificationByStudentId;
+      const comparisonGradesByClassStudentId = new Map<string, Map<string, Grade[]>>();
+      comparisonGrades.forEach((grade) => {
+        let classMap = comparisonGradesByClassStudentId.get(grade.classId);
+        if (!classMap) {
+          classMap = new Map<string, Grade[]>();
+          comparisonGradesByClassStudentId.set(grade.classId, classMap);
+        }
+        let studentGrades = classMap.get(grade.studentId);
+        if (!studentGrades) {
+          studentGrades = [];
+          classMap.set(grade.studentId, studentGrades);
+        }
+        studentGrades.push(grade);
+      });
+
+      const comparisonStudentsByClassId = groupById(comparisonStudents, (student) => student.classId);
+      const comparisonAttendanceByClassId = groupById(comparisonAttendance, (record) => record.classId);
+      const comparisonAttendanceByStudentId = groupById(comparisonAttendance, (record) => record.studentId);
+      const comparisonIncidentsByClassId = groupById(comparisonIncidents, (incident) => incident.classId);
+
+      const comparisonStudentAnalyticsList = comparisonStudents.map((student) => {
+        const studentGrades = comparisonClassificationGradesByStudentId.get(student.id) ?? [];
+        const studentAttendance = comparisonAttendanceByStudentId.get(student.id) ?? [];
+        const classification = classifyStudentForAnalytics(studentGrades, studentAttendance);
+        const studentClass = classById.get(student.classId);
+        return {
+          student,
+          classification,
+          className: studentClass?.name || 'Sem turma',
+          incidentCount: 0,
+          trend: 'stable' as const,
+        };
+      });
+
+      const comparisonStudentAnalyticsByClassId = groupById(
+        comparisonStudentAnalyticsList,
+        (entry) => entry.student.classId,
+      );
+
+      const comparisonYearGradesForTrends = subjectSet
+        ? comparisonYearGradesBase.filter((grade) => matchesSelectedSubject(grade.subject))
+        : comparisonYearGradesBase;
+      const comparisonYearGradesByClassId = groupById(
+        comparisonYearGradesForTrends,
+        (grade) => grade.classId,
+      );
+
+      return comparisonClasses.map((cls) => {
+        const classStudents = comparisonStudentAnalyticsByClassId.get(cls.id) ?? [];
+        const classGrades = comparisonGradesByClassId.get(cls.id) ?? [];
+        const classYearGrades = comparisonYearGradesByClassId.get(cls.id) ?? [];
+        const classAttendance = comparisonAttendanceByClassId.get(cls.id) ?? [];
+        const classIncidents = comparisonIncidentsByClassId.get(cls.id) ?? [];
+        const classGradesByStudentId = comparisonGradesByClassStudentId.get(cls.id);
+
+        let totalStudentAverages = 0;
+        let studentCountWithGrades = 0;
+
+        classStudents.forEach((studentAnalytics) => {
+          const studentGrades = classGradesByStudentId?.get(studentAnalytics.student.id) ?? [];
+          if (studentGrades.length > 0) {
+            const studentAvg =
+              studentGrades.reduce((sum, grade) => sum + grade.grade, 0) /
+              studentGrades.length;
+            totalStudentAverages += studentAvg;
+            studentCountWithGrades += 1;
+          }
+        });
+
+        const average = studentCountWithGrades > 0 ? totalStudentAverages / studentCountWithGrades : 0;
+
+        const present = classAttendance.filter((record) => record.status === 'presente').length;
+        const frequency =
+          classAttendance.length > 0 ? (present / classAttendance.length) * 100 : 100;
+
+        const classifications = {
+          critico: classStudents.filter((student) => student.classification.classification === 'critico').length,
+          atencao: classStudents.filter((student) => student.classification.classification === 'atencao').length,
+          aprovado: classStudents.filter((student) => student.classification.classification === 'aprovado').length,
+          excelencia: classStudents.filter((student) => student.classification.classification === 'excelencia').length,
+        };
+
+        const quarterAverages = QUARTERS.map((quarter) => {
+          const quarterGrades = classYearGrades.filter((grade) => grade.quarter === quarter);
+          return quarterGrades.length > 0
+            ? quarterGrades.reduce((sum, grade) => sum + grade.grade, 0) / quarterGrades.length
+            : 0;
+        }).filter((value) => value > 0);
+
+        let trend: 'up' | 'down' | 'stable' = 'stable';
+        if (quarterAverages.length >= 2) {
+          const diff = quarterAverages[quarterAverages.length - 1] - quarterAverages[quarterAverages.length - 2];
+          if (diff > 0.2) trend = 'up';
+          else if (diff < -0.2) trend = 'down';
+        }
+
+        const growth =
+          quarterAverages.length >= 2
+            ? quarterAverages[quarterAverages.length - 1] - quarterAverages[0]
+            : null;
+
+        const startYear = getStartCalendarYear(cls);
+        const calendarYear = useAllYears || targetSchoolYear === null
+          ? undefined
+          : (startYear ? startYear + (targetSchoolYear - 1) : undefined);
+
+        return {
+          classData: cls,
+          calendarYear,
+          studentCount: classStudents.length,
+          average,
+          frequency,
+          growth,
+          classifications,
+          incidentCount: classIncidents.length,
+          trend,
+        };
+      });
+    };
+
+    let filteredAttendance = attendance.filter(a => candidateClassIds.has(a.classId));
+    let filteredIncidents = incidents.filter(i => candidateClassIds.has(i.classId));
 
     // Filtrar por range de datas quando schoolYear específico
     if (!useAllYears && targetSchoolYear !== null) {
       const classRanges = new Map<string, { start: Date; end: Date } | null>();
-      filteredClasses.forEach(cls => {
+      candidateClasses.forEach(cls => {
         // Se temos um ano calendário específico, verificamos se o schoolYear da turma cai nesse ano
         if (filters.calendarYear !== 'all') {
           const startYear = getStartCalendarYear(cls);
@@ -449,38 +1127,42 @@ export function computeSchoolAnalytics(
         }
 
         const startYearDate = resolveStartYearDate(cls);
-        const range = filters.quarter !== 'all'
-          ? getQuarterRange(startYearDate, targetSchoolYear, filters.quarter)
-          : getSchoolYearRange(startYearDate, targetSchoolYear);
+        const range = hasQuarterRange
+          ? getQuarterRangeSpan(startYearDate, targetSchoolYear, filters.quarterRangeStart!, filters.quarterRangeEnd!)
+          : filters.quarter !== 'all'
+            ? getQuarterRange(startYearDate, targetSchoolYear, filters.quarter)
+            : getSchoolYearRange(startYearDate, targetSchoolYear);
         classRanges.set(cls.id, range);
       });
 
       filteredAttendance = attendance.filter(a => {
-        if (!filteredClassIds.has(a.classId)) return false;
+        if (!candidateClassIds.has(a.classId)) return false;
         const range = classRanges.get(a.classId);
         return range ? isDateInRange(a.date, range) : false;
       });
 
       filteredIncidents = incidents.filter(i => {
-        if (!filteredClassIds.has(i.classId)) return false;
+        if (!candidateClassIds.has(i.classId)) return false;
         const range = classRanges.get(i.classId);
         return range ? isDateInRange(i.date, range) : false;
       });
 
       // Também precisamos filtrar as notas se o range for nulo (fora do ano)
-      filteredGrades = filteredGrades.filter(g => {
+      const rangeFilter = (g: Grade) => {
         const range = classRanges.get(g.classId);
         return range !== null && range !== undefined; // Se range é null/undefined, a turma não cursou a série neste ano
-      });
+      };
+      filteredGrades = filteredGrades.filter(rangeFilter);
+      filteredGradesForClassification = filteredGradesForClassification.filter(rangeFilter);
     }
     // Filtrar por ano calendário quando schoolYear é 'all' mas calendarYear é específico
     else if (useAllYears && filters.calendarYear !== 'all') {
       const targetCalYear = filters.calendarYear as number;
 
       // Filtrar notas pelo ano calendário
-      filteredGrades = filteredGrades.filter(g => {
+      const calendarFilter = (g: Grade) => {
         // Usar a data se disponível, ou calcular a partir do schoolYear da nota
-        const cls = filteredClassById.get(g.classId);
+        const cls = classById.get(g.classId);
         if (!cls) return false;
 
         const startYear = getStartCalendarYear(cls);
@@ -489,7 +1171,9 @@ export function computeSchoolAnalytics(
         // Nota do schoolYear X corresponde ao ano calendário startYear + X - 1
         const gradeCalendarYear = startYear + ((g.schoolYear ?? 1) - 1);
         return gradeCalendarYear === targetCalYear;
-      });
+      };
+      filteredGrades = filteredGrades.filter(calendarFilter);
+      filteredGradesForClassification = filteredGradesForClassification.filter(calendarFilter);
 
       // Filtrar frequência pelo ano calendário
       filteredAttendance = filteredAttendance.filter(a => {
@@ -506,10 +1190,35 @@ export function computeSchoolAnalytics(
       });
     }
 
+
+    const classIdsWithGrades = new Set(filteredGrades.map((grade) => grade.classId));
+    const studentIdsWithGrades = new Set(filteredGrades.map((grade) => grade.studentId));
+    const filteredClasses = candidateClasses.filter((cls) => classIdsWithGrades.has(cls.id));
+    const filteredClassIds = new Set(filteredClasses.map((cls) => cls.id));
+    const filteredClassById = new Map(filteredClasses.map((cls) => [cls.id, cls]));
+
+    const filteredStudents = students.filter(
+      (student) =>
+        filteredClassIds.has(student.classId) &&
+        student.status === 'active' &&
+        studentIdsWithGrades.has(student.id),
+    );
+
+    filteredAttendance = filteredAttendance.filter(a => filteredClassIds.has(a.classId));
+    filteredIncidents = filteredIncidents.filter(i => filteredClassIds.has(i.classId));
+
+    const hasGradesInScope = filteredGrades.length > 0;
+    const displayClasses = hasGradesInScope ? filteredClasses : candidateClasses;
+    const displayStudents = hasGradesInScope ? filteredStudents : candidateStudents;
+
     const filteredStudentsById = new Map(filteredStudents.map((student) => [student.id, student]));
     const filteredStudentsByClassId = groupById(filteredStudents, (student) => student.classId);
     const gradesByClassId = groupById(filteredGrades, (grade) => grade.classId);
     const gradesByStudentId = groupById(filteredGrades, (grade) => grade.studentId);
+    const gradesForClassificationByStudentId = groupById(
+      filteredGradesForClassification,
+      (grade) => grade.studentId,
+    );
     const gradesByClassStudentId = new Map<string, Map<string, Grade[]>>();
     filteredGrades.forEach((grade) => {
       let classMap = gradesByClassStudentId.get(grade.classId);
@@ -524,8 +1233,11 @@ export function computeSchoolAnalytics(
       }
       studentGrades.push(grade);
     });
-    const yearGradesByClassId = groupById(yearGrades, (grade) => grade.classId);
-    const yearGradesByStudentId = groupById(yearGrades, (grade) => grade.studentId);
+    const yearGradesForTrends = subjectSet
+      ? yearGrades.filter((grade) => matchesSelectedSubject(grade.subject))
+      : yearGrades;
+    const yearGradesByClassId = groupById(yearGradesForTrends, (grade) => grade.classId);
+    const yearGradesByStudentId = groupById(yearGradesForTrends, (grade) => grade.studentId);
     const attendanceByClassId = groupById(filteredAttendance, (record) => record.classId);
     const attendanceByStudentId = groupById(filteredAttendance, (record) => record.studentId);
     const incidentsByClassId = groupById(filteredIncidents, (incident) => incident.classId);
@@ -543,16 +1255,26 @@ export function computeSchoolAnalytics(
     const allGradesByStudentId = groupById(allGrades, (grade) => grade.studentId);
     const fullGradesByStudentId = groupById(grades, (grade) => grade.studentId);
 
+    const quarterLabel = filters.useQuarterRange
+      ? `${filters.quarterRangeStart ?? QUARTERS[0]} → ${filters.quarterRangeEnd ?? QUARTERS[QUARTERS.length - 1]}`
+      : filters.quarter === 'all'
+        ? 'Anual'
+        : filters.quarter;
+
     // ============================================
     // CALCULAR ANALYTICS POR ALUNO
     // ============================================
 
+    const classificationGradesByStudentId = subjectSet
+      ? gradesByStudentId
+      : gradesForClassificationByStudentId;
+
     const studentAnalyticsList: StudentAnalytics[] = filteredStudents.map(student => {
-      const studentGrades = gradesByStudentId.get(student.id) ?? [];
+      const studentGrades = classificationGradesByStudentId.get(student.id) ?? [];
       const studentAttendance = attendanceByStudentId.get(student.id) ?? [];
       const studentIncidents = incidentsByStudentId.get(student.id) ?? [];
 
-      const classification = classifyStudent(studentGrades, studentAttendance);
+      const classification = classifyStudentForAnalytics(studentGrades, studentAttendance);
       const studentClass = filteredClassById.get(student.classId);
 
       // Calcular tendência (considera o ano letivo inteiro)
@@ -811,11 +1533,11 @@ export function computeSchoolAnalytics(
     // RANKINGS DE ALUNOS
     // ============================================
 
-    const topStudents = [...studentAnalyticsList]
-      .sort((a, b) => b.classification.average - a.classification.average)
-      .slice(0, 10);
+    const allStudentsRanking = [...studentAnalyticsList]
+      .sort((a, b) => b.classification.average - a.classification.average);
+    const topStudents = allStudentsRanking.slice(0, 10);
 
-    const criticalStudents = studentAnalyticsList
+    const allCriticalStudents = studentAnalyticsList
       .filter(s => s.classification.classification === 'critico' || s.classification.classification === 'atencao')
       .sort((a, b) => {
         // Primeiro ordenar por classificação (crítico antes de atenção)
@@ -825,7 +1547,8 @@ export function computeSchoolAnalytics(
         // Depois por média (menor primeiro)
         return a.classification.average - b.classification.average;
       })
-      .slice(0, 15);
+      ;
+    const criticalStudents = allCriticalStudents.slice(0, 15);
 
     // ============================================
     // PREDIÇÕES (com histórico opcional)
@@ -916,8 +1639,8 @@ export function computeSchoolAnalytics(
       : 100;
 
     const overview: SchoolOverview = {
-      totalStudents: filteredStudents.length,
-      totalClasses: filteredClasses.length,
+      totalStudents: displayStudents.length,
+      totalClasses: displayClasses.length,
       overallAverage,
       overallFrequency,
       totalIncidents: filteredIncidents.length,
@@ -1041,12 +1764,15 @@ export function computeSchoolAnalytics(
     // Insight: Alunos críticos
     if (totalClassifications.critico > 0) {
       const percent = ((totalClassifications.critico / filteredStudents.length) * 100).toFixed(0);
+      const description = subjectSet
+        ? `${percent}% dos alunos estão com média abaixo de 6.0 nas disciplinas selecionadas.`
+        : `${percent}% dos alunos estão reprovados em 3 ou mais disciplinas e precisam de intervenção imediata.`;
       insights.push({
         id: 'critical-students',
         type: 'alert',
         category: 'risk',
         title: `${totalClassifications.critico} alunos em situação crítica`,
-        description: `${percent}% dos alunos estão reprovados em 3 ou mais disciplinas e precisam de intervenção imediata.`,
+        description,
         actionLabel: 'Ver alunos',
         actionData: { filter: 'critico' },
       });
@@ -1058,12 +1784,15 @@ export function computeSchoolAnalytics(
     );
     if (classWithMostCritical) {
       const percent = ((classWithMostCritical.classifications.critico / classWithMostCritical.studentCount) * 100).toFixed(0);
+      const description = subjectSet
+        ? `${percent}% dos alunos desta turma estão com média abaixo de 6.0 nas disciplinas selecionadas.`
+        : `${percent}% dos alunos desta turma estão em situação crítica.`;
       insights.push({
         id: 'class-critical',
         type: 'warning',
         category: 'risk',
         title: `${classWithMostCritical.classData.name} precisa de atenção`,
-        description: `${percent}% dos alunos desta turma estão em situação crítica.`,
+        description,
         actionLabel: 'Ver turma',
         actionData: { classId: classWithMostCritical.classData.id },
       });
@@ -1078,18 +1807,23 @@ export function computeSchoolAnalytics(
         category: 'academic',
         title: `${worstSubject.subject} é a disciplina mais crítica`,
         description: `${worstSubject.studentsBelow6Percent.toFixed(0)}% das notas estão abaixo de 6.0 (média: ${worstSubject.average.toFixed(1)}).`,
+        actionLabel: 'Filtrar disciplina',
+        actionData: { subject: worstSubject.subject },
       });
     }
 
     // Insight: Alunos de excelência
     if (totalClassifications.excelencia > 0) {
       const percent = ((totalClassifications.excelencia / filteredStudents.length) * 100).toFixed(0);
+      const description = subjectSet
+        ? `${percent}% dos alunos têm média igual ou acima de 8.0 nas disciplinas selecionadas.`
+        : `${percent}% dos alunos têm média geral acima de 8.0 em todas as disciplinas.`;
       insights.push({
         id: 'excellence-students',
         type: 'success',
         category: 'academic',
         title: `${totalClassifications.excelencia} alunos de excelência`,
-        description: `${percent}% dos alunos têm média geral acima de 8.0 em todas as disciplinas.`,
+        description,
         actionLabel: 'Ver alunos',
         actionData: { filter: 'excelencia' },
       });
@@ -1115,6 +1849,8 @@ export function computeSchoolAnalytics(
         category: 'academic',
         title: `${bestClass.classData.name} lidera o ranking`,
         description: `Média de ${bestClass.average.toFixed(1)} e ${bestClass.classifications.excelencia} alunos de excelência.`,
+        actionLabel: 'Ver turma',
+        actionData: { classId: bestClass.classData.id },
       });
     }
 
@@ -1193,6 +1929,8 @@ export function computeSchoolAnalytics(
         category: 'behavioral',
         title: `${classWithMostIncidents.classData.name} lidera em ocorrências`,
         description: `${classWithMostIncidents.incidentCount} ocorrências registradas (${classWithMostIncidents.incidentsPerStudent.toFixed(1)} por aluno).`,
+        actionLabel: 'Ver turma',
+        actionData: { classId: classWithMostIncidents.classData.id },
       });
     }
 
@@ -1223,14 +1961,31 @@ export function computeSchoolAnalytics(
     // ============================================
 
     const comparisonData = filters.comparisonClassIds.length > 0
-      ? classAnalyticsList.filter(c => filters.comparisonClassIds.includes(c.classData.id))
+      ? buildComparisonCalendarData()
       : [];
+    const comparisonCourseYearData =
+      comparisonMode === 'courseYear'
+        ? buildComparisonCourseYearData(comparisonCourseYear as 1 | 2 | 3)
+        : [];
 
-    const result = {
+    const result: SchoolAnalyticsResult = {
+      context: {
+        mode: subjectSet ? 'subject' : 'general',
+        classCount: displayClasses.length,
+        studentCount: displayStudents.length,
+        gradeCount: filteredGrades.length,
+        subjectCount: selectedSubjects.length,
+        hasSubjectFilter: selectedSubjects.length > 0,
+        quarterLabel,
+        schoolYear: filters.schoolYear,
+        calendarYear: filters.calendarYear,
+      },
       overview,
       classRanking,
       topStudents,
       criticalStudents,
+      allStudentsRanking,
+      allCriticalStudents,
       studentPredictions,
       predictionSummary,
       subjectAnalytics,
@@ -1241,11 +1996,12 @@ export function computeSchoolAnalytics(
       insights,
       categorizedInsights,
       comparisonData,
+      comparisonCourseYearData,
       cohortAnalytics,
     };
     done({
-      classes: filteredClasses.length,
-      students: filteredStudents.length,
+      classes: displayClasses.length,
+      students: displayStudents.length,
       grades: filteredGrades.length,
       incidents: filteredIncidents.length,
       attendance: filteredAttendance.length,
@@ -1253,8 +2009,7 @@ export function computeSchoolAnalytics(
       quarter: filters.quarter,
     });
     return result;
-  
-}
+  }
 
 export function useSchoolAnalytics(
   students: Student[],

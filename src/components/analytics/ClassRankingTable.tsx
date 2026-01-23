@@ -2,7 +2,8 @@
  * Tabela de Ranking de Turmas
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowUpDown, TrendingUp, TrendingDown, Minus, GitCompare } from 'lucide-react';
+import { ArrowUpDown, TrendingUp, TrendingDown, Minus, GitCompare, ArrowUpRight } from 'lucide-react';
 import { 
   ClassAnalytics, 
   CLASSIFICATION_COLORS, 
@@ -25,14 +26,26 @@ import {
 interface ClassRankingTableProps {
   classRanking: ClassAnalytics[];
   onSelectForComparison: (classIds: string[]) => void;
+  subjectMode?: boolean;
 }
 
 type SortKey = 'rank' | 'average' | 'frequency' | 'excelencia' | 'critico' | 'growth';
 
-export function ClassRankingTable({ classRanking, onSelectForComparison }: ClassRankingTableProps) {
+export function ClassRankingTable({
+  classRanking,
+  onSelectForComparison,
+  subjectMode = false,
+}: ClassRankingTableProps) {
+  const navigate = useNavigate();
   const [sortKey, setSortKey] = useState<SortKey>('rank');
   const [sortAsc, setSortAsc] = useState(false);
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+  const [showAll, setShowAll] = useState(false);
+
+  useEffect(() => {
+    const validIds = new Set(classRanking.map((cls) => cls.classData.id));
+    setSelectedClasses((prev) => prev.filter((id) => validIds.has(id)));
+  }, [classRanking]);
   
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -131,6 +144,8 @@ export function ClassRankingTable({ classRanking, onSelectForComparison }: Class
     );
   };
 
+  const visibleRows = showAll ? sortedData : sortedData.slice(0, 8);
+
   return (
     <Card>
       <CardHeader>
@@ -138,15 +153,28 @@ export function ClassRankingTable({ classRanking, onSelectForComparison }: Class
           <div>
             <CardTitle>Ranking de Turmas</CardTitle>
             <CardDescription>
-              Ordenado por desempenho geral • Clique nas colunas para reordenar
+              {subjectMode
+                ? 'Ordenado pela média das disciplinas selecionadas'
+                : 'Ordenado por desempenho geral • Clique nas colunas para reordenar'}
             </CardDescription>
           </div>
-          {selectedClasses.length >= 2 && (
-            <Button size="sm" onClick={handleCompare} className="gap-2">
-              <GitCompare className="h-4 w-4" />
-              Comparar ({selectedClasses.length})
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {sortedData.length > 8 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAll((prev) => !prev)}
+              >
+                {showAll ? 'Mostrar menos' : `Ver todas (${sortedData.length})`}
+              </Button>
+            )}
+            {selectedClasses.length >= 2 && (
+              <Button size="sm" onClick={handleCompare} className="gap-2">
+                <GitCompare className="h-4 w-4" />
+                Comparar ({selectedClasses.length})
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -159,14 +187,16 @@ export function ClassRankingTable({ classRanking, onSelectForComparison }: Class
                 <TableHead className="text-center">
                   <SortButton column="average" label="Média" />
                 </TableHead>
+                {!subjectMode && (
+                  <TableHead className="text-center">
+                    <SortButton column="frequency" label="Freq." />
+                  </TableHead>
+                )}
                 <TableHead className="text-center">
-                  <SortButton column="frequency" label="Freq." />
+                  <SortButton column="excelencia" label={subjectMode ? '≥ 8' : 'Excelência'} />
                 </TableHead>
                 <TableHead className="text-center">
-                  <SortButton column="excelencia" label="Excelência" />
-                </TableHead>
-                <TableHead className="text-center">
-                  <SortButton column="critico" label="Críticos" />
+                  <SortButton column="critico" label={subjectMode ? '< 6' : 'Críticos'} />
                 </TableHead>
                 <TableHead className="text-center">
                   <SortButton column="growth" label="Crescimento" />
@@ -178,14 +208,17 @@ export function ClassRankingTable({ classRanking, onSelectForComparison }: Class
             <TableBody>
               {sortedData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                  <TableCell
+                    colSpan={subjectMode ? 8 : 9}
+                    className="text-center py-8 text-muted-foreground"
+                  >
                     Nenhuma turma encontrada com os filtros atuais
                   </TableCell>
                 </TableRow>
               ) : (
-                sortedData.map((cls, index) => {
+                visibleRows.map((cls, index) => {
                   const isSelected = selectedClasses.includes(cls.classData.id);
-                  const rank = index + 1;
+                  const rank = sortedData.findIndex((item) => item.classData.id === cls.classData.id) + 1;
                   
                   return (
                     <TableRow 
@@ -201,11 +234,22 @@ export function ClassRankingTable({ classRanking, onSelectForComparison }: Class
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div>
-                          <p className="font-medium">{cls.classData.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {cls.studentCount} alunos
-                          </p>
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-medium">{cls.classData.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {cls.studentCount} alunos
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => navigate('/turmas')}
+                            title="Abrir turmas"
+                          >
+                            <ArrowUpRight className="h-4 w-4" />
+                          </Button>
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
@@ -213,11 +257,13 @@ export function ClassRankingTable({ classRanking, onSelectForComparison }: Class
                           {formatNumber(cls.average)}
                         </span>
                       </TableCell>
-                      <TableCell className="text-center">
-                        <span className={cls.frequency >= 75 ? 'text-emerald-600' : 'text-amber-600'}>
-                          {formatNumber(cls.frequency, 0)}%
-                        </span>
-                      </TableCell>
+                      {!subjectMode && (
+                        <TableCell className="text-center">
+                          <span className={cls.frequency >= 75 ? 'text-emerald-600' : 'text-amber-600'}>
+                            {formatNumber(cls.frequency, 0)}%
+                          </span>
+                        </TableCell>
+                      )}
                       <TableCell className="text-center">
                         <Badge 
                           variant="outline"

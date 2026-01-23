@@ -10,6 +10,7 @@ type CacheEntry = {
 const DB_NAME = "analytics-cache";
 const STORE_NAME = "analytics_results";
 const DB_VERSION = 1;
+const CACHE_VERSION = "2";
 const MAX_ENTRIES = 50;
 const MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
 
@@ -45,6 +46,11 @@ export const getCachedAnalytics = async (
       }
       const isExpired = Date.now() - entry.createdAt > MAX_AGE_MS;
       if (isExpired) {
+        void deleteCachedAnalytics(key);
+        resolve(null);
+        return;
+      }
+      if (!entry.result || !(entry.result as SchoolAnalyticsResult).context) {
         void deleteCachedAnalytics(key);
         resolve(null);
         return;
@@ -191,11 +197,18 @@ export const buildAnalyticsCacheKey = (
 ) =>
   [
     "analytics",
+    CACHE_VERSION,
     dataSignature,
     normalizeArray(filters.series),
     normalizeArray(filters.classIds),
+    normalizeArray(filters.subjects ?? []),
     normalizeArray(filters.comparisonClassIds),
+    filters.comparisonMode ?? "calendar",
+    filters.comparisonCourseYear ?? "",
     filters.quarter,
+    filters.useQuarterRange ? "range" : "single",
+    filters.quarterRangeStart ?? "",
+    filters.quarterRangeEnd ?? "",
     filters.schoolYear,
     filters.calendarYear,
     filters.includeArchived ? "1" : "0",

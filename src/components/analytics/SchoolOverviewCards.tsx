@@ -8,9 +8,19 @@ import { SchoolOverview, CLASSIFICATION_COLORS, CLASSIFICATION_LABELS } from '@/
 
 interface SchoolOverviewCardsProps {
   overview: SchoolOverview;
+  showBehavior?: boolean;
+  showClassification?: boolean;
+  subjectMode?: boolean;
+  hasGrades?: boolean;
 }
 
-export function SchoolOverviewCards({ overview }: SchoolOverviewCardsProps) {
+export function SchoolOverviewCards({
+  overview,
+  showBehavior = true,
+  showClassification = true,
+  subjectMode = false,
+  hasGrades = true,
+}: SchoolOverviewCardsProps) {
   const cards = [
     {
       title: 'Total de Alunos',
@@ -21,12 +31,20 @@ export function SchoolOverviewCards({ overview }: SchoolOverviewCardsProps) {
       bgColor: 'bg-blue-100',
     },
     {
-      title: 'Média Geral',
-      value: overview.overallAverage.toFixed(1),
+      title: subjectMode ? 'Média do Recorte' : 'Média Geral',
+      value: hasGrades ? overview.overallAverage.toFixed(1) : '—',
       icon: GraduationCap,
-      description: overview.overallAverage >= 6 ? 'Acima da média' : 'Abaixo da média',
-      color: overview.overallAverage >= 6 ? 'text-emerald-600' : 'text-red-600',
-      bgColor: overview.overallAverage >= 6 ? 'bg-emerald-100' : 'bg-red-100',
+      description: hasGrades
+        ? subjectMode
+          ? 'Média nas disciplinas selecionadas'
+          : overview.overallAverage >= 6 ? 'Acima da média' : 'Abaixo da média'
+        : 'Sem notas lançadas no recorte',
+      color: hasGrades
+        ? overview.overallAverage >= 6 ? 'text-emerald-600' : 'text-red-600'
+        : 'text-muted-foreground',
+      bgColor: hasGrades
+        ? overview.overallAverage >= 6 ? 'bg-emerald-100' : 'bg-red-100'
+        : 'bg-muted',
     },
     // DISABLED: Frequência removida temporariamente
     // {
@@ -37,14 +55,18 @@ export function SchoolOverviewCards({ overview }: SchoolOverviewCardsProps) {
     //   color: overview.overallFrequency >= 75 ? 'text-emerald-600' : 'text-amber-600',
     //   bgColor: overview.overallFrequency >= 75 ? 'bg-emerald-100' : 'bg-amber-100',
     // },
-    {
-      title: 'Ocorrências',
-      value: overview.totalIncidents.toString(),
-      icon: AlertTriangle,
-      description: 'Total registrado',
-      color: 'text-amber-600',
-      bgColor: 'bg-amber-100',
-    },
+    ...(showBehavior
+      ? [
+          {
+            title: 'Ocorrências',
+            value: overview.totalIncidents.toString(),
+            icon: AlertTriangle,
+            description: 'Total registrado',
+            color: 'text-amber-600',
+            bgColor: 'bg-amber-100',
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -69,37 +91,39 @@ export function SchoolOverviewCards({ overview }: SchoolOverviewCardsProps) {
       ))}
 
       {/* Classification Summary */}
-      <Card className="md:col-span-2 lg:col-span-4">
-        <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-4 justify-center">
-            {(Object.keys(overview.classifications) as Array<keyof typeof overview.classifications>).map((key) => {
-              const count = overview.classifications[key];
-              const percent = overview.totalStudents > 0
-                ? ((count / overview.totalStudents) * 100).toFixed(0)
-                : '0';
+      {showClassification && (
+        <Card className="md:col-span-2 lg:col-span-4">
+          <CardContent className="pt-6">
+            <div className="flex flex-wrap gap-4 justify-center">
+              {(Object.keys(overview.classifications) as Array<keyof typeof overview.classifications>).map((key) => {
+                const count = overview.classifications[key];
+                const percent = overview.totalStudents > 0
+                  ? ((count / overview.totalStudents) * 100).toFixed(0)
+                  : '0';
 
-              return (
-                <div
-                  key={key}
-                  className="flex items-center gap-3 px-4 py-2 rounded-lg border"
-                  style={{ borderColor: CLASSIFICATION_COLORS[key] }}
-                >
+                return (
                   <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: CLASSIFICATION_COLORS[key] }}
-                  />
-                  <div>
-                    <p className="text-sm font-medium">{CLASSIFICATION_LABELS[key]}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {count} alunos ({percent}%)
-                    </p>
+                    key={key}
+                    className="flex items-center gap-3 px-4 py-2 rounded-lg border"
+                    style={{ borderColor: CLASSIFICATION_COLORS[key] }}
+                  >
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: CLASSIFICATION_COLORS[key] }}
+                    />
+                    <div>
+                      <p className="text-sm font-medium">{CLASSIFICATION_LABELS[key]}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {count} alunos ({percent}%)
+                      </p>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

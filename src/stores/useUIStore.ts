@@ -30,11 +30,17 @@ interface AnalyticsUIState {
     filters: {
         series: string[];
         classIds: string[];
+        subjects: string[];
         quarter: string;
-        schoolYear: number | 'all';
+        useQuarterRange?: boolean;
+        quarterRangeStart?: string;
+        quarterRangeEnd?: string;
+        schoolYear: 1 | 2 | 3 | 'all';
         calendarYear: number | 'all';
         includeArchived: boolean;
         comparisonClassIds: string[];
+        comparisonMode?: 'calendar' | 'courseYear';
+        comparisonCourseYear?: 1 | 2 | 3;
     };
 }
 
@@ -146,11 +152,17 @@ const initialAnalyticsUI: AnalyticsUIState = {
     filters: {
         series: [],
         classIds: [],
+        subjects: [],
         quarter: 'all',
+        useQuarterRange: false,
+        quarterRangeStart: '1º Bimestre',
+        quarterRangeEnd: '4º Bimestre',
         schoolYear: 'all',
         calendarYear: currentCalendarYear,  // ✅ Ano atual por padrão
         includeArchived: false,
         comparisonClassIds: [],
+        comparisonMode: 'calendar',
+        comparisonCourseYear: 1,
     },
 };
 

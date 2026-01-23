@@ -43,7 +43,10 @@ const Dashboard = () => {
   // Calculate badges
   const activeClasses = classes.filter(c => !c.archived);
   const activeStudents = students.filter(s => s.status === 'active');
-  const pendingIncidents = incidents.filter(i => i.status !== 'resolvida');
+  const activeClassIds = new Set(activeClasses.map((c) => c.id));
+  const pendingIncidents = incidents.filter(
+    (i) => i.status !== 'resolvida' && activeClassIds.has(i.classId),
+  );
 
   const navigationCards: NavigationCard[] = [
     {
