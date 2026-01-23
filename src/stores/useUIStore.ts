@@ -65,6 +65,7 @@ interface TrajectoryUIState {
     gridYear: number;
     gridQuarter: string;
     gridCalendarYear: number;
+    source?: '' | 'analytics';
 }
 
 interface UIState {
@@ -187,6 +188,7 @@ const initialTrajectoryUI: TrajectoryUIState = {
     gridYear: 6,
     gridQuarter: '1º Bimestre',
     gridCalendarYear: new Date().getFullYear() - 4, // Default: ano atual - 4 (aproximação para 6º ano)
+    source: '',
 };
 
 // ==================== STORE ====================

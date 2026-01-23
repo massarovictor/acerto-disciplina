@@ -49,7 +49,7 @@ import { CohortComparisonTable } from '@/components/analytics/CohortComparisonTa
 import { useUIStore } from '@/stores/useUIStore';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { QUARTERS } from '@/lib/subjects';
+import { QUARTERS, getAllSubjects } from '@/lib/subjects';
 import { Class } from '@/types';
 
 // Componente de Insights Inline
@@ -185,6 +185,13 @@ const Analytics = () => {
       );
     }
 
+    baseClasses = filterClassesBySeries(
+      baseClasses,
+      filters.series,
+      filters.calendarYear,
+      filters.schoolYear,
+    );
+
     const baseIds = baseClasses.map((c) => c.id);
     const selectedIds =
       filters.classIds.length > 0 ? filters.classIds : baseIds;
@@ -197,6 +204,8 @@ const Analytics = () => {
     filters.series,
     filters.classIds,
     filters.comparisonClassIds,
+    filters.calendarYear,
+    filters.schoolYear,
   ]);
 
   const { grades } = useGradesAnalytics({
@@ -361,13 +370,18 @@ const Analytics = () => {
   }, [classes, templatesById, templateSubjectsByCourse, normalizeSubjectName, normalizeCourseName]);
 
   const professionalSubjectsByClassId = useMemo(() => {
-    const map = new Map<string, Set<string>>();
+    const map = new Map<string, { all: Set<string>; labels: Map<string, string> }>();
     professionalSubjects.forEach((item) => {
       const key = item.classId;
       if (!map.has(key)) {
-        map.set(key, new Set());
+        map.set(key, { all: new Set(), labels: new Map() });
       }
-      map.get(key)!.add(normalizeSubjectName(item.subject));
+      const entry = map.get(key)!;
+      const normalized = normalizeSubjectName(item.subject);
+      entry.all.add(normalized);
+      if (!entry.labels.has(normalized)) {
+        entry.labels.set(normalized, item.subject);
+      }
     });
     return map;
   }, [professionalSubjects, normalizeSubjectName]);
@@ -405,7 +419,7 @@ const Analytics = () => {
         const cls = classById.get(grade.classId);
         if (!cls) return false;
         const startYear = getStartCalendarYear(cls);
-        if (!startYear) return true;
+        if (!startYear) return false;
 
         if (filters.schoolYear !== 'all') {
           const schoolYear = Number(filters.schoolYear);
@@ -448,6 +462,13 @@ const Analytics = () => {
           subjectLabelMap.set(subjectKey, entry.labels.get(subjectKey) ?? subjectKey);
         }
       });
+    });
+
+    getAllSubjects().forEach((subject) => {
+      const key = normalizeSubjectName(subject);
+      if (!subjectLabelMap.has(key)) {
+        subjectLabelMap.set(key, subject);
+      }
     });
 
     return Array.from(subjectLabelMap.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'));
@@ -573,6 +594,19 @@ const Analytics = () => {
     const scopedClassIds = new Set(scopedClasses.map((c) => c.id));
     const classById = new Map(scopedClasses.map((cls) => [cls.id, cls]));
     const eligibleFromMapping = new Set<string>();
+    const matchesSubjectSet = (
+      subjects: Set<string> | undefined,
+      labels?: Map<string, string>,
+    ) => {
+      if (!subjects) return false;
+      for (const key of subjects) {
+        if (subjectSet.has(key)) return true;
+        const label = labels?.get(key) ?? key;
+        if (matchesSelectedSubject(label)) return true;
+      }
+      return false;
+    };
+
     scopedClasses.forEach((cls) => {
       const mapped = professionalSubjectsByClassId.get(cls.id);
       const templateEntry = templateSubjectsByClassId.get(cls.id);
@@ -580,13 +614,20 @@ const Analytics = () => {
         nextFilters.schoolYear === 'all'
           ? templateEntry?.all
           : templateEntry?.byYear.get(Number(nextFilters.schoolYear));
-      for (const subject of subjectSet) {
-        if (mapped?.has(subject) || templateSubjects?.has(subject)) {
-          eligibleFromMapping.add(cls.id);
-          break;
-        }
+      if (
+        matchesSubjectSet(mapped?.all, mapped?.labels) ||
+        matchesSubjectSet(templateSubjects, templateEntry?.labels)
+      ) {
+        eligibleFromMapping.add(cls.id);
       }
     });
+
+    const hasBaseSubject = getAllSubjects().some((subject) =>
+      matchesSelectedSubject(subject),
+    );
+    if (hasBaseSubject) {
+      scopedClasses.forEach((cls) => eligibleFromMapping.add(cls.id));
+    }
 
     let pool = grades.filter((grade) => {
       if (!scopedClassIds.has(grade.classId)) return false;
@@ -625,7 +666,7 @@ const Analytics = () => {
         const cls = classById.get(grade.classId);
         if (!cls) return false;
         const startYear = getStartCalendarYear(cls);
-        if (!startYear) return true;
+        if (!startYear) return false;
         if (nextFilters.schoolYear !== 'all') {
           const schoolYear = Number(nextFilters.schoolYear);
           if (!Number.isFinite(schoolYear)) return false;
@@ -683,10 +724,15 @@ const Analytics = () => {
     if (eligibleClassIds && eligibleClassIds.size > 0) {
       if (next.classIds.length > 0) {
         next.classIds = next.classIds.filter((id) => eligibleClassIds.has(id));
+      } else if ((next.subjects ?? []).length > 0) {
+        next.classIds = Array.from(eligibleClassIds).sort();
       }
       next.comparisonClassIds = next.comparisonClassIds.filter((id) =>
         eligibleClassIds.has(id),
       );
+    } else if ((next.subjects ?? []).length > 0) {
+      next.classIds = [];
+      next.comparisonClassIds = [];
     }
 
     if ('useQuarterRange' in patch && next.useQuarterRange) {

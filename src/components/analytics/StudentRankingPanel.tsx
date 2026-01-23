@@ -71,16 +71,24 @@ export function StudentRankingPanel({
 
   const handleOpenStudent = useCallback(
     (student: StudentAnalytics) => {
+      const normalizedSubjects = (activeSubjects || []).filter(Boolean);
+      const resolvedSubject =
+        normalizedSubjects.length === 1
+          ? normalizedSubjects[0]
+          : normalizedSubjects.length > 1
+            ? 'all'
+            : '';
       setTrajectoryUI({
         viewMode: 'individual',
         selectedClassId: student.student.classId,
         selectedStudentId: student.student.id,
-        selectedSubject: '',
+        selectedSubject: resolvedSubject,
         activeTab: 'summary',
+        source: 'analytics',
       });
       navigate('/trajetoria');
     },
-    [navigate, setTrajectoryUI],
+    [activeSubjects, navigate, setTrajectoryUI],
   );
 
   const TrendIcon = ({ trend }: { trend: 'up' | 'down' | 'stable' }) => {

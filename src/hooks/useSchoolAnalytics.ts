@@ -494,7 +494,7 @@ export function computeSchoolAnalytics(
         const startYear = getStartCalendarYear(cls);
         const endYear = cls.endCalendarYear ?? (startYear ? startYear + 2 : undefined);
 
-        if (!startYear) return true;
+        if (!startYear) return false;
 
         // Turma estava ativa naquele ano calendário
         return startYear <= targetCalendarYear && targetCalendarYear <= (endYear || startYear + 2);
@@ -502,9 +502,8 @@ export function computeSchoolAnalytics(
     }
 
     const candidateClassIds = new Set(candidateClasses.map(c => c.id));
-    const candidateStudents = students.filter(
-      (student) =>
-        candidateClassIds.has(student.classId) && student.status === 'active',
+    const candidateStudents = students.filter((student) =>
+      candidateClassIds.has(student.classId),
     );
 
     const classById = new Map(classes.map((cls) => [cls.id, cls]));
@@ -653,7 +652,7 @@ export function computeSchoolAnalytics(
 
       const comparisonClassIdsSet = new Set(comparisonClasses.map((cls) => cls.id));
       const comparisonStudentsAll = students.filter(
-        (student) => comparisonClassIdsSet.has(student.classId) && student.status === 'active',
+        (student) => comparisonClassIdsSet.has(student.classId),
       );
 
       const comparisonGradesAll = grades.filter((grade) =>
@@ -854,7 +853,7 @@ export function computeSchoolAnalytics(
 
       const comparisonClassIdsSet = new Set(comparisonClasses.map((cls) => cls.id));
       const comparisonStudentsAll = students.filter(
-        (student) => comparisonClassIdsSet.has(student.classId) && student.status === 'active',
+        (student) => comparisonClassIdsSet.has(student.classId),
       );
 
       const comparisonGradesAll = grades.filter((grade) =>
@@ -948,7 +947,7 @@ export function computeSchoolAnalytics(
           if (!cls) return false;
 
           const startYear = getStartCalendarYear(cls);
-          if (!startYear) return true;
+          if (!startYear) return false;
 
           const gradeCalendarYear = startYear + ((g.schoolYear ?? 1) - 1);
           return gradeCalendarYear === targetCalYear;
@@ -1166,7 +1165,7 @@ export function computeSchoolAnalytics(
         if (!cls) return false;
 
         const startYear = getStartCalendarYear(cls);
-        if (!startYear) return true; // Se não conseguir determinar, mantém
+        if (!startYear) return false;
 
         // Nota do schoolYear X corresponde ao ano calendário startYear + X - 1
         const gradeCalendarYear = startYear + ((g.schoolYear ?? 1) - 1);
@@ -1200,7 +1199,6 @@ export function computeSchoolAnalytics(
     const filteredStudents = students.filter(
       (student) =>
         filteredClassIds.has(student.classId) &&
-        student.status === 'active' &&
         studentIdsWithGrades.has(student.id),
     );
 

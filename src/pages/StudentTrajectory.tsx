@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useClasses, useStudents, useGradesAnalytics, useHistoricalGrades, useExternalAssessments, useIncidents } from '@/hooks/useData';
+import { useClasses, useStudents, useGradesAnalytics, useHistoricalGrades, useExternalAssessments, useIncidents, useProfessionalSubjects, useProfessionalSubjectTemplates } from '@/hooks/useData';
 import { SUBJECT_AREAS, QUARTERS, FUNDAMENTAL_SUBJECT_AREAS, getFundamentalEquivalent, getEquivalentSubjects } from '@/lib/subjects';
 import { useToast } from '@/hooks/use-toast';
 import { HistoricalGrade, ExternalAssessment, ExternalAssessmentType } from '@/types';
@@ -93,16 +93,23 @@ const StudentTrajectory = () => {
     const gridYear = trajectoryUI.gridYear;
     const gridQuarter = trajectoryUI.gridQuarter;
     const gridCalendarYear = trajectoryUI.gridCalendarYear;
+    const source = trajectoryUI.source;
 
     const { grades: regularGrades } = useGradesAnalytics({ studentId: selectedStudent || undefined });
     const { historicalGrades, addHistoricalGrade, deleteHistoricalGrade } = useHistoricalGrades();
     const { externalAssessments, deleteExternalAssessment, updateExternalAssessment } = useExternalAssessments();
     const { incidents } = useIncidents();
+    const { getProfessionalSubjects } = useProfessionalSubjects();
+    const { getTemplate, getTemplatesByCourse } = useProfessionalSubjectTemplates();
     const { toast } = useToast();
 
     const setSelectedClass = (value: string) => setTrajectoryUI({ selectedClassId: value, selectedStudentId: '' });
     const setSelectedStudent = (value: string) => setTrajectoryUI({ selectedStudentId: value });
-    const setSelectedSubject = (value: string) => setTrajectoryUI({ selectedSubject: value });
+    const setSelectedSubject = (value: string) =>
+        setTrajectoryUI({
+            selectedSubject: value,
+            source: source === 'analytics' ? '' : source,
+        });
     const setActiveTab = (value: string) => setTrajectoryUI({ activeTab: value });
     const setGridYear = (value: number) => setTrajectoryUI({ gridYear: value });
     const setGridQuarter = (value: string) => setTrajectoryUI({ gridQuarter: value });
@@ -110,6 +117,7 @@ const StudentTrajectory = () => {
 
     const [showBatchAssessment, setShowBatchAssessment] = useState(false);
     const [showImport, setShowImport] = useState(false);
+    const [subjectFallbackNotice, setSubjectFallbackNotice] = useState('');
 
     // Grid Entry State
     const [gridValues, setGridValues] = useState<Record<string, string>>({});
@@ -138,6 +146,7 @@ const StudentTrajectory = () => {
 
     // Basic Data Filters
     const studentData = useMemo(() => students.find(s => s.id === selectedStudent), [students, selectedStudent]);
+    const selectedClassData = useMemo(() => classes.find(c => c.id === selectedClass), [classes, selectedClass]);
     const studentRegularGrades = useMemo(() => regularGrades, [regularGrades]);
     const studentHistorical = useMemo(() => historicalGrades.filter(g => g.studentId === selectedStudent), [historicalGrades, selectedStudent]);
     const studentExternal = useMemo(() => externalAssessments.filter(e => e.studentId === selectedStudent), [externalAssessments, selectedStudent]);
@@ -157,6 +166,92 @@ const StudentTrajectory = () => {
         if (!cls) return false;
         return ['6', '7', '8', '9'].some(s => cls.series.includes(s));
     }, [studentData, classes]);
+
+    const templateSubjectsAllYears = useMemo(() => {
+        if (!selectedClassData) return [];
+        let templateSubjects: string[] = [];
+        if (selectedClassData.templateId) {
+            const template = getTemplate(selectedClassData.templateId);
+            if (template) {
+                templateSubjects = template.subjectsByYear.flatMap(entry => entry.subjects || []);
+            }
+        } else if (selectedClassData.course) {
+            const templates = getTemplatesByCourse(selectedClassData.course);
+            templateSubjects = templates.flatMap(template =>
+                template.subjectsByYear.flatMap(entry => entry.subjects || [])
+            );
+        }
+        return templateSubjects.filter(Boolean);
+    }, [getTemplate, getTemplatesByCourse, selectedClassData]);
+
+    const classProfessionalSubjects = useMemo(
+        () => (selectedClass ? getProfessionalSubjects(selectedClass) : []),
+        [getProfessionalSubjects, selectedClass]
+    );
+
+    const professionalSubjectsExpanded = useMemo(() => {
+        const subjectMap = new Map<string, string>();
+        [...classProfessionalSubjects, ...templateSubjectsAllYears].forEach(subject => {
+            const key = normalizeSubjectName(subject);
+            if (!subjectMap.has(key)) {
+                subjectMap.set(key, subject);
+            }
+        });
+        return Array.from(subjectMap.values());
+    }, [classProfessionalSubjects, templateSubjectsAllYears]);
+
+    const professionalSubjectsForSelect = useMemo(() => {
+        if (professionalSubjectsExpanded.length === 0) return [];
+        const baseSubjects = (isStudentFundamental ? FUNDAMENTAL_SUBJECT_AREAS : SUBJECT_AREAS).flatMap(area => area.subjects);
+        const baseNormalized = new Set(baseSubjects.map(normalizeSubjectName));
+        return professionalSubjectsExpanded
+            .filter(subject => !baseNormalized.has(normalizeSubjectName(subject)))
+            .sort((a, b) => a.localeCompare(b));
+    }, [professionalSubjectsExpanded, isStudentFundamental]);
+
+    const subjectsForBatchDialog = useMemo(() => {
+        if (professionalSubjectsExpanded.length === 0) return ALL_SUBJECTS;
+        const map = new Map<string, string>();
+        ALL_SUBJECTS.forEach(subject => map.set(normalizeSubjectName(subject), subject));
+        professionalSubjectsExpanded.forEach(subject => {
+            const key = normalizeSubjectName(subject);
+            if (!map.has(key)) {
+                map.set(key, subject);
+            }
+        });
+        return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
+    }, [professionalSubjectsExpanded]);
+
+    const studentSubjectSet = useMemo(() => {
+        const allSubjects = [...studentHistorical, ...studentRegularGrades].map(g => g.subject).filter(Boolean);
+        return new Set(allSubjects.map(normalizeSubjectName));
+    }, [studentHistorical, studentRegularGrades]);
+
+    const normalizedSelectedSubject = useMemo(
+        () => (selectedSubject && selectedSubject !== 'all' ? normalizeSubjectName(selectedSubject) : ''),
+        [selectedSubject]
+    );
+
+    const selectedSubjectHasData = useMemo(() => {
+        if (!normalizedSelectedSubject) return true;
+        return studentSubjectSet.has(normalizedSelectedSubject);
+    }, [normalizedSelectedSubject, studentSubjectSet]);
+
+    useEffect(() => {
+        if (!selectedStudent || !selectedSubject || selectedSubject === 'all') {
+            setSubjectFallbackNotice('');
+            return;
+        }
+        if (!selectedSubjectHasData) {
+            setSubjectFallbackNotice(`Sem notas registradas para "${selectedSubject}".`);
+            return;
+        }
+        setSubjectFallbackNotice('');
+    }, [selectedStudent, selectedSubject, selectedSubjectHasData]);
+
+    useEffect(() => {
+        setSubjectFallbackNotice('');
+    }, [selectedStudent]);
 
     // Sync Grid Values with existing data
     useEffect(() => {
@@ -772,6 +867,39 @@ const StudentTrajectory = () => {
                 }
             />
 
+            {source === 'analytics' && (
+                <Alert className="mb-4">
+                    <AlertTitle>Filtro recebido do Analytics</AlertTitle>
+                    <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+                        <span>
+                            Abrindo trajetória com disciplina{' '}
+                            <strong>
+                                {selectedSubject
+                                    ? selectedSubject === 'all'
+                                        ? 'todas as disciplinas'
+                                        : selectedSubject
+                                    : 'não definida'}
+                            </strong>
+                            .
+                        </span>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setTrajectoryUI({ source: '', selectedSubject: '' })}
+                        >
+                            Limpar filtro
+                        </Button>
+                    </AlertDescription>
+                </Alert>
+            )}
+
+            {subjectFallbackNotice && (
+                <Alert className="mb-4">
+                    <AlertTitle>Sem notas registradas</AlertTitle>
+                    <AlertDescription>{subjectFallbackNotice}</AlertDescription>
+                </Alert>
+            )}
+
             {/* Main Filters Card */}
             <Card className="bg-slate-50 border-none shadow-none rounded-xl">
                 <CardContent className="pt-6">
@@ -837,6 +965,16 @@ const StudentTrajectory = () => {
                                             ))}
                                         </SelectGroup>
                                     ))}
+                                    {professionalSubjectsForSelect.length > 0 && (
+                                        <SelectGroup>
+                                            <SelectLabel className="px-2 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-500/10 uppercase tracking-wider">
+                                                Profissionais
+                                            </SelectLabel>
+                                            {professionalSubjectsForSelect.map(subject => (
+                                                <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                                            ))}
+                                        </SelectGroup>
+                                    )}
                                     {/* Mostrar Histórico Fundamental se estiver no Ensino Médio, caso tenha dados */}
                                     {!isStudentFundamental && (
                                         <SelectGroup>
@@ -1354,8 +1492,15 @@ const StudentTrajectory = () => {
                                             </CardTitle>
                                         </CardHeader>
                                         <CardContent className="h-[420px] pt-4">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <ComposedChart data={showSimulation ? simulationData : subjectTimeline} margin={{ top: 20, right: 80, left: 10, bottom: 20 }}>
+                                            {subjectTimeline.length === 0 ? (
+                                                <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+                                                    <BookOpen className="h-10 w-10 opacity-20" />
+                                                    <div>Sem notas para esta disciplina.</div>
+                                                    <div className="text-xs">0 registros no período selecionado.</div>
+                                                </div>
+                                            ) : (
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <ComposedChart data={showSimulation ? simulationData : subjectTimeline} margin={{ top: 20, right: 80, left: 10, bottom: 20 }}>
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" strokeOpacity={0.1} />
                                                     <XAxis
                                                         dataKey="label"
@@ -1443,8 +1588,9 @@ const StudentTrajectory = () => {
                                                             />
                                                         </Line>
                                                     )}
-                                                </ComposedChart>
-                                            </ResponsiveContainer>
+                                                    </ComposedChart>
+                                                </ResponsiveContainer>
+                                            )}
                                         </CardContent>
                                     </Card>
 
@@ -1459,8 +1605,15 @@ const StudentTrajectory = () => {
                                             </CardDescription>
                                         </CardHeader>
                                         <CardContent className="h-[300px] pt-4">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <ComposedChart data={showSimulation ? simulationData : subjectTimeline} margin={{ top: 20, right: 80, left: 10, bottom: 20 }}>
+                                            {subjectTimeline.length === 0 ? (
+                                                <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+                                                    <BookOpen className="h-10 w-10 opacity-20" />
+                                                    <div>Sem notas para esta disciplina.</div>
+                                                    <div className="text-xs">0 registros no período selecionado.</div>
+                                                </div>
+                                            ) : (
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <ComposedChart data={showSimulation ? simulationData : subjectTimeline} margin={{ top: 20, right: 80, left: 10, bottom: 20 }}>
                                                     <defs>
                                                         <linearGradient id="pulseGradient2" x1="0" y1="0" x2="0" y2="1">
                                                             <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
@@ -1525,8 +1678,9 @@ const StudentTrajectory = () => {
                                                             />
                                                         </Line>
                                                     )}
-                                                </ComposedChart>
-                                            </ResponsiveContainer>
+                                                    </ComposedChart>
+                                                </ResponsiveContainer>
+                                            )}
                                         </CardContent>
                                     </Card>
                                 </>
@@ -1548,7 +1702,7 @@ const StudentTrajectory = () => {
                 open={showBatchAssessment}
                 onOpenChange={setShowBatchAssessment}
                 classId={selectedClass}
-                subjects={ALL_SUBJECTS}
+                subjects={subjectsForBatchDialog}
             />
             <TrajectoryImportDialog open={showImport} onOpenChange={setShowImport} />
 
