@@ -141,14 +141,25 @@ export interface StudentAcademicStatus {
   calculatedAt: string;
 }
 
+export interface ProfessionalSubject {
+  id: string;
+  classId: string;
+  subject: string;
+  category?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SubjectByYear {
+  year: 1 | 2 | 3;
+  subjects: string[];
+}
+
 export interface ProfessionalSubjectTemplate {
   id: string;
   name: string;
   course: string;
-  subjectsByYear: {
-    year: 1 | 2 | 3;
-    subjects: string[];
-  }[];
+  subjectsByYear: SubjectByYear[];
   createdAt: string;
   updatedAt: string;
 }

@@ -57,15 +57,15 @@ export function SchoolOverviewCards({
     // },
     ...(showBehavior
       ? [
-          {
-            title: 'Ocorrências',
-            value: overview.totalIncidents.toString(),
-            icon: AlertTriangle,
-            description: 'Total registrado',
-            color: 'text-amber-600',
-            bgColor: 'bg-amber-100',
-          },
-        ]
+        {
+          title: 'Ocorrências',
+          value: overview.totalIncidents.toString(),
+          icon: AlertTriangle,
+          description: 'Total registrado',
+          color: 'text-amber-600',
+          bgColor: 'bg-amber-100',
+        },
+      ]
       : []),
   ];
 
@@ -89,41 +89,6 @@ export function SchoolOverviewCards({
           </CardContent>
         </Card>
       ))}
-
-      {/* Classification Summary */}
-      {showClassification && (
-        <Card className="md:col-span-2 lg:col-span-4">
-          <CardContent className="pt-6">
-            <div className="flex flex-wrap gap-4 justify-center">
-              {(Object.keys(overview.classifications) as Array<keyof typeof overview.classifications>).map((key) => {
-                const count = overview.classifications[key];
-                const percent = overview.totalStudents > 0
-                  ? ((count / overview.totalStudents) * 100).toFixed(0)
-                  : '0';
-
-                return (
-                  <div
-                    key={key}
-                    className="flex items-center gap-3 px-4 py-2 rounded-lg border"
-                    style={{ borderColor: CLASSIFICATION_COLORS[key] }}
-                  >
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: CLASSIFICATION_COLORS[key] }}
-                    />
-                    <div>
-                      <p className="text-sm font-medium">{CLASSIFICATION_LABELS[key]}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {count} alunos ({percent}%)
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

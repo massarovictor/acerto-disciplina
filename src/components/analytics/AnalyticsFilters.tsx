@@ -48,10 +48,10 @@ interface AnalyticsFiltersProps {
 
 const SERIES_OPTIONS = ['1º', '2º', '3º'];
 const SCHOOL_YEAR_OPTIONS: Array<{ value: FiltersType['schoolYear']; label: string }> = [
-  { value: 'all', label: 'Todos os anos' },
-  { value: 1, label: '1º ano' },
-  { value: 2, label: '2º ano' },
-  { value: 3, label: '3º ano' },
+  { value: 'all', label: 'Todas as Séries' },
+  { value: 1, label: '1ª Série' },
+  { value: 2, label: '2ª Série' },
+  { value: 3, label: '3ª Série' },
 ];
 const DEFAULT_RANGE_START = QUARTERS[0];
 const DEFAULT_RANGE_END = QUARTERS[QUARTERS.length - 1];
@@ -143,11 +143,11 @@ export function AnalyticsFilters({
           filters.calendarYear !== 'all'
             ? (filters.calendarYear as number)
             : (() => {
-                const startYear = getStartCalendarYear(cls);
-                if (!startYear) return null;
-                if (filters.schoolYear === 'all') return null;
-                return startYear + (Number(filters.schoolYear) - 1);
-              })();
+              const startYear = getStartCalendarYear(cls);
+              if (!startYear) return null;
+              if (filters.schoolYear === 'all') return null;
+              return startYear + (Number(filters.schoolYear) - 1);
+            })();
         if (targetCalendarYear) {
           const courseYear = getCourseYearForCalendarYear(cls, targetCalendarYear);
           if (courseYear) {
@@ -289,22 +289,24 @@ export function AnalyticsFilters({
 
   // Handlers para presets
   const handlePresetCurrentYear = () => {
-    onFilterChange({ calendarYear: currentYear, schoolYear: 'all' });
+    // Ao trocar de ano, limpamos as turmas selecionadas pois elas podem não existir no ano destino
+    onFilterChange({ calendarYear: currentYear, schoolYear: 'all', classIds: [] });
   };
 
   const handlePresetLastYear = () => {
-    onFilterChange({ calendarYear: lastYear, schoolYear: 'all' });
+    // Ao trocar de ano, limpamos as turmas selecionadas pois elas podem não existir no ano destino
+    onFilterChange({ calendarYear: lastYear, schoolYear: 'all', classIds: [] });
   };
 
   const handlePresetHistory = () => {
-    onFilterChange({ calendarYear: 'all', schoolYear: 'all' });
+    onFilterChange({ calendarYear: 'all', schoolYear: 'all', series: [], classIds: [] });
   };
 
   return (
     <div className="space-y-3">
       {/* Indicador de Período + Presets */}
       <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border">
-        <span className="text-sm font-medium text-muted-foreground">📅 Período:</span>
+        <span className="text-sm font-medium text-muted-foreground">Ano Letivo:</span>
         <div className="flex gap-2">
           <Button
             variant={isCurrentYearActive ? 'default' : 'outline'}
@@ -325,15 +327,15 @@ export function AnalyticsFilters({
           <Button
             variant={isHistoryActive ? 'secondary' : 'outline'}
             size="sm"
-            onClick={handlePresetHistory}
+            onClick={() => onFilterChange({ calendarYear: 'all', schoolYear: 'all', series: [], classIds: [] })}
             className={isHistoryActive ? 'border-amber-500/50 bg-amber-500/10 text-amber-700' : 'text-muted-foreground'}
           >
-            Histórico completo
+            Histórico Global
           </Button>
         </div>
         {isHistoryActive && (
           <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600">
-            ⚠️ Exibindo todos os anos
+            Modo Histórico Ativado
           </Badge>
         )}
       </div>
@@ -378,7 +380,7 @@ export function AnalyticsFilters({
                     onCheckedChange={() => handleSeriesToggle(series)}
                   />
                   <Label htmlFor={`series-${series}`} className="text-sm cursor-pointer">
-                    {series} Ano
+                    {series}ª Série
                   </Label>
                 </div>
               ))}
@@ -491,14 +493,11 @@ export function AnalyticsFilters({
                   </Label>
                 </div>
               ))}
-              {filteredSubjectOptions.length === 0 && (
-                <p className="text-sm text-muted-foreground">Nenhuma disciplina disponível</p>
-              )}
             </div>
           </PopoverContent>
         </Popover>
 
-        {/* Filtro por Período */}
+        {/* Filtro por Bimestre */}
         <div className="flex items-center gap-1">
           <Select
             value={filters.quarter}
@@ -506,10 +505,10 @@ export function AnalyticsFilters({
             disabled={filters.useQuarterRange}
           >
             <SelectTrigger className="w-40">
-              <SelectValue placeholder="Período" />
+              <SelectValue placeholder="Bimestre" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Anual</SelectItem>
+              <SelectItem value="all">Resultado Anual</SelectItem>
               {QUARTERS.map(q => (
                 <SelectItem key={q} value={q}>{q}</SelectItem>
               ))}
@@ -518,16 +517,15 @@ export function AnalyticsFilters({
           <AutoBadge active={autoIndicators.quarter} />
         </div>
 
-        {/* Intervalo de Bimestres */}
+        {/* Acumular Ciclo */}
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" className="gap-2">
               <Filter className="h-4 w-4" />
-              Intervalo
+              Acumular Ciclo
               {filters.useQuarterRange && (
                 <Badge variant="secondary" className="ml-1">
-                  {filters.quarterRangeStart?.replace('º Bimestre', 'º') ?? DEFAULT_RANGE_START}→
-                  {filters.quarterRangeEnd?.replace('º Bimestre', 'º') ?? DEFAULT_RANGE_END}
+                  {filters.quarterRangeStart?.replace('º Bimestre', 'º') ?? DEFAULT_RANGE_START} - {filters.quarterRangeEnd?.replace('º Bimestre', 'º') ?? DEFAULT_RANGE_END}
                 </Badge>
               )}
               <AutoBadge active={autoIndicators.useQuarterRange} />
@@ -536,7 +534,7 @@ export function AnalyticsFilters({
           <PopoverContent className="w-64" align="start">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">Usar intervalo</Label>
+                <Label className="text-sm font-medium">Ativar Acúmulo</Label>
                 <Switch
                   checked={!!filters.useQuarterRange}
                   onCheckedChange={(checked) => {
@@ -586,68 +584,13 @@ export function AnalyticsFilters({
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
-                Quando ativo, o intervalo substitui o filtro de período único.
+                Soma o desempenho do intervalo de bimestres selecionado.
               </p>
             </div>
           </PopoverContent>
         </Popover>
 
-        {/* Filtro por Ano */}
-        <div className="flex items-center gap-1">
-          <Select
-            value={String(filters.schoolYear)}
-            onValueChange={(value) => {
-              if (value === 'all') {
-                onFilterChange({ schoolYear: 'all', calendarYear: 'all' });
-                return;
-              }
-              const numericValue = Number(value);
-              const fallbackCalendarYear = filters.calendarYear === 'all' ? currentYear : filters.calendarYear;
-              onFilterChange({
-                schoolYear: numericValue,
-                calendarYear: numericValue > 3 ? 'all' : fallbackCalendarYear,
-              });
-            }}
-          >
-            <SelectTrigger className="w-36">
-              <SelectValue placeholder="Ano" />
-            </SelectTrigger>
-            <SelectContent>
-              {SCHOOL_YEAR_OPTIONS.map(option => (
-                <SelectItem key={String(option.value)} value={String(option.value)}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <AutoBadge active={autoIndicators.schoolYear} />
-        </div>
-
-        {/* Filtro por Ano Calendário */}
-        <div className="flex items-center gap-1">
-          <Select
-            value={filters.calendarYear === 'all' ? 'all' : String(filters.calendarYear)}
-            disabled={filters.schoolYear === 'all' || calendarYears.length === 0}
-            onValueChange={(value) =>
-              onFilterChange({
-                calendarYear: value === 'all' ? 'all' : Number(value),
-              })
-            }
-          >
-            <SelectTrigger className="w-36">
-              <SelectValue placeholder="Ano" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              {calendarYears.map((year) => (
-                <SelectItem key={year} value={String(year)}>
-                  {year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <AutoBadge active={autoIndicators.calendarYear} />
-        </div>
+        <div className="flex-1" />
 
         {/* Incluir Arquivadas */}
         <div className="flex items-center gap-2">

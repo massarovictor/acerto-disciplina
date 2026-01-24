@@ -19,13 +19,13 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Trophy, AlertCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { 
-  StudentAnalytics, 
-  CLASSIFICATION_COLORS, 
+import {
+  StudentAnalytics,
+  CLASSIFICATION_COLORS,
   CLASSIFICATION_LABELS,
   CLASSIFICATION_BG_COLORS,
   getTrendColor,
-  formatNumber 
+  formatNumber
 } from '@/hooks/useSchoolAnalytics';
 import { useUIStore } from '@/stores/useUIStore';
 
@@ -117,7 +117,7 @@ export function StudentRankingPanel({
           <span className="text-sm font-bold">{rank}</span>
         </div>
       )}
-      
+
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="font-medium truncate">{student.student.name}</p>
@@ -127,9 +127,9 @@ export function StudentRankingPanel({
           {student.className}
         </p>
       </div>
-      
+
       <div className="flex items-center gap-2 flex-shrink-0">
-        <Badge 
+        <Badge
           variant="outline"
           className={CLASSIFICATION_BG_COLORS[student.classification.classification]}
         >
@@ -147,13 +147,13 @@ export function StudentRankingPanel({
     onSelect?: (value: StudentAnalytics) => void;
   }) => {
     const isCritico = student.classification.classification === 'critico';
-    
+
     return (
       <button
         type="button"
         onClick={() => onSelect?.(student)}
         className="w-full rounded-lg border p-3 text-left transition-colors hover:bg-accent/40"
-        style={{ 
+        style={{
           borderLeftWidth: 4,
           borderLeftColor: CLASSIFICATION_COLORS[student.classification.classification],
         }}
@@ -162,7 +162,7 @@ export function StudentRankingPanel({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <p className="font-medium truncate">{student.student.name}</p>
-              <Badge 
+              <Badge
                 variant="outline"
                 className={CLASSIFICATION_BG_COLORS[student.classification.classification]}
               >
@@ -174,7 +174,7 @@ export function StudentRankingPanel({
             </p>
           </div>
         </div>
-        
+
         {!subjectMode && student.classification.subjectsBelow6.length > 0 && (
           <div className="mt-2 pt-2 border-t">
             <p className="text-xs text-muted-foreground mb-1">
@@ -194,10 +194,10 @@ export function StudentRankingPanel({
             </div>
           </div>
         )}
-        
+
         {!subjectMode && student.incidentCount > 0 && (
           <p className="text-xs text-amber-600 mt-2">
-            ⚠️ {student.incidentCount} ocorrência(s) registrada(s)
+            {student.incidentCount} ocorrência(s) registrada(s)
           </p>
         )}
       </button>
@@ -306,7 +306,7 @@ export function StudentRankingPanel({
               {subjectMode ? `Médias baixas (${criticalTotal})` : `Precisam de Atenção (${criticalTotal})`}
             </TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="top" className="mt-4">
             {topStudents.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
@@ -324,9 +324,9 @@ export function StudentRankingPanel({
                   )}
                 </div>
                 {topStudents.map((student, index) => (
-                  <StudentCard 
-                    key={student.student.id} 
-                    student={student} 
+                  <StudentCard
+                    key={student.student.id}
+                    student={student}
                     rank={index + 1}
                     onSelect={handleOpenStudent}
                   />
@@ -334,7 +334,7 @@ export function StudentRankingPanel({
               </div>
             )}
           </TabsContent>
-          
+
           <TabsContent value="critical" className="mt-4">
             {criticalStudents.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
@@ -361,8 +361,8 @@ export function StudentRankingPanel({
                   )}
                 </div>
                 {criticalStudents.map(student => (
-                  <CriticalStudentCard 
-                    key={student.student.id} 
+                  <CriticalStudentCard
+                    key={student.student.id}
                     student={student}
                     onSelect={handleOpenStudent}
                   />
