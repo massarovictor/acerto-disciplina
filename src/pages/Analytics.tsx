@@ -25,7 +25,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { GraduationCap, Lightbulb, AlertTriangle, AlertCircle, CheckCircle2 } from 'lucide-react';
+import {
+  GraduationCap,
+  Lightbulb,
+  AlertTriangle,
+  AlertCircle,
+  CheckCircle2,
+  LayoutDashboard,
+  BookOpen,
+  Users2,
+  ShieldAlert,
+  BarChart3
+} from 'lucide-react';
 import {
   useClasses,
   useStudents,
@@ -49,7 +60,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useAnalyticsFiltersLogic } from '@/hooks/useAnalyticsFiltersLogic';
 
-// Componente de Insights Inline
+// Componente de Insights Inline (Neutralizado)
 const InlineInsights = ({
   insights,
   title,
@@ -61,59 +72,55 @@ const InlineInsights = ({
 }) => {
   if (insights.length === 0) return null;
 
-  const getInsightStyles = (type: Insight['type']) => {
-    switch (type) {
-      case 'alert': return 'border-l-red-500 bg-red-50/50 dark:bg-red-950/20';
-      case 'warning': return 'border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20';
-      case 'success': return 'border-l-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20';
-      default: return 'border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20';
-    }
-  };
-
-  const InsightIcon = ({ type }: { type: Insight['type'] }) => {
-    const iconClass = 'h-4 w-4';
-    switch (type) {
-      case 'alert': return <AlertTriangle className={`${iconClass} text-red-500`} />;
-      case 'warning': return <AlertCircle className={`${iconClass} text-amber-500`} />;
-      case 'success': return <CheckCircle2 className={`${iconClass} text-emerald-500`} />;
-      default: return <AlertCircle className={`${iconClass} text-blue-500`} />;
-    }
-  };
-
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
+    <Card className="border-border/60 shadow-sm">
+      <CardHeader className="pb-3 border-b bg-muted/20">
+        <CardTitle className="text-sm font-medium flex items-center gap-2 text-foreground/80">
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-4">
         <div className="grid gap-3 md:grid-cols-2">
           {insights.map(insight => (
             <div
               key={insight.id}
-              className={`p-3 rounded-lg border-l-4 ${getInsightStyles(insight.type)}`}
+              className="group flex flex-col gap-2 p-3 rounded-md border border-border/50 hover:border-border transition-colors bg-background"
             >
-              <div className="flex items-start gap-2">
-                <InsightIcon type={insight.type} />
-                <div>
-                  <h4 className="font-medium text-sm">{insight.title}</h4>
-                  <p className="text-xs text-muted-foreground mt-1">
+              <div className="flex items-start gap-3">
+                <div className={`mt-0.5 p-1 rounded-full bg-muted shrink-0 ${insight.type === 'alert' ? 'text-red-600 dark:text-red-400' :
+                  insight.type === 'warning' ? 'text-amber-600 dark:text-amber-400' :
+                    insight.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' :
+                      'text-blue-600 dark:text-blue-400'
+                  }`}>
+                  {insight.type === 'alert' && <AlertTriangle className="h-3.5 w-3.5" />}
+                  {insight.type === 'warning' && <AlertCircle className="h-3.5 w-3.5" />}
+                  {insight.type === 'success' && <CheckCircle2 className="h-3.5 w-3.5" />}
+                  {(!['alert', 'warning', 'success'].includes(insight.type)) && <AlertCircle className="h-3.5 w-3.5" />}
+                </div>
+
+                <div className="flex-1 space-y-1">
+                  <h4 className="text-sm font-semibold text-foreground leading-none">
+                    {insight.title}
+                  </h4>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
                     {insight.description}
                   </p>
-                  {insight.actionLabel && onAction && (
-                    <div className="mt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onAction(insight)}
-                      >
-                        {insight.actionLabel}
-                      </Button>
-                    </div>
-                  )}
                 </div>
               </div>
+
+              {insight.actionLabel && onAction && (
+                <div className="pl-9">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs px-2 -ml-2 text-primary hover:text-primary/80"
+                    onClick={() => onAction(insight)}
+                  >
+                    {insight.actionLabel}
+                    <span className="sr-only">sobre {insight.title}</span>
+                  </Button>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -161,18 +168,20 @@ const SubjectComparisonCard = ({ subjects }: { subjects: SubjectAnalytics[] }) =
   );
 };
 
+// ... imports anteriores
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+// ... (InlineInsights e SubjectComparisonCard mantidos como estavam ou movidos para arquivos separados futuramente)
+
 const Analytics = () => {
   const { classes } = useClasses();
   const { students } = useStudents();
   const { professionalSubjects } = useProfessionalSubjects();
   const { templates } = useProfessionalSubjectTemplates();
-  // ✅ Usando Zustand store para persistir filtros entre navegações
   const { analyticsUI, setAnalyticsFilters } = useUIStore();
   const filters = analyticsUI.filters as AnalyticsFilters;
-
   const { incidents } = useIncidents();
 
-  // Hook unificado para lógica de filtros e preparação de dados
   const {
     grades,
     availableSubjects,
@@ -213,6 +222,9 @@ const Analytics = () => {
   const rankingRef = useRef<HTMLDivElement | null>(null);
   const [rankingFocus, setRankingFocus] = useState<'top' | 'critical' | null>(null);
 
+  // Controle de Tabs Ativa
+  const [activeTab, setActiveTab] = useState('dashboard');
+
   useEffect(() => {
     const nextSubjects = (filters.subjects ?? []).filter((subject) =>
       availableSubjects.includes(subject),
@@ -242,12 +254,17 @@ const Analytics = () => {
     }
 
     if (actionData.filter === 'critico') {
+      setActiveTab('risk'); // Muda para a aba de Risco
       setRankingFocus('critical');
     } else if (actionData.filter === 'excelencia') {
+      setActiveTab('academic'); // Muda para a aba Acadêmica
       setRankingFocus('top');
     }
 
-    rankingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Scroll suave após mudança de aba (timeout para permitir render)
+    setTimeout(() => {
+      rankingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const handleFilterChange = (newFilters: Partial<AnalyticsFilters>) => {
@@ -269,19 +286,55 @@ const Analytics = () => {
     });
   };
 
+  // Helper Contexto Limpo (Sem asteriscos, retorno ReactNode puro)
+  const getContextDescription = () => {
+    const filtersLabel = [];
+
+    // Turma(s)
+    if (filters.classIds.length === 1) {
+      const cls = classes.find(c => c.id === filters.classIds[0]);
+      if (cls) filtersLabel.push(<span key="cls">Turma {cls.name}</span>);
+    } else if (filters.classIds.length > 1) {
+      filtersLabel.push(<span key="cls-multi">{filters.classIds.length} turmas selecionadas</span>);
+    } else if (filters.series.length > 0) {
+      filtersLabel.push(<span key="series">Série(s) {filters.series.join(', ')}</span>);
+    } else {
+      filtersLabel.push(<span key="all">Visão Geral da Escola</span>);
+    }
+
+    // Disciplinas
+    if (filters.subjects && filters.subjects.length > 0) {
+      filtersLabel.push(<span key="subj">em {filters.subjects.length === 1 ? filters.subjects[0] : `${filters.subjects.length} disciplinas`}</span>);
+    }
+
+    // Período
+    if (filters.quarter !== 'all') {
+      filtersLabel.push(<span key="q">referente ao {filters.quarter}</span>);
+    } else {
+      filtersLabel.push(<span key="q-all">no acumulado Anual</span>);
+    }
+
+    // Join with spaces
+    return (
+      <span className="flex flex-wrap gap-1 items-baseline font-normal text-muted-foreground">
+        {filtersLabel.reduce((prev, curr, index) => [prev, <span key={`sep-${index}`}> </span>, curr] as any)}
+      </span>
+    );
+  };
+
   return (
     <PageContainer>
       <PageHeader
         title="Analytics"
-        description="Exploração de dados acadêmicos e comportamentais"
+        description={getContextDescription()}
         actions={
           analyticsLoading && (
-            <Badge variant="secondary">Atualizando...</Badge>
+            <Badge variant="secondary" className="bg-muted text-muted-foreground hover:bg-muted">Atualizando...</Badge>
           )
         }
       />
 
-      {/* Filters */}
+      {/* Filters (Fixo no topo) */}
       <FiltersBar
         classes={classes}
         subjects={availableSubjects}
@@ -292,51 +345,36 @@ const Analytics = () => {
         eligibleClassIds={subjectEligibleClassIds}
       />
 
-      {/* Contexto do recorte */}
-      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground border rounded-lg px-3 py-2">
-        <Badge variant="outline">
-          Modo: {analyticsContext.mode === 'subject' ? 'Disciplina' : 'Geral'}
-        </Badge>
-        <Badge variant="outline">{analyticsContext.classCount} turmas</Badge>
-        <Badge variant="outline">{analyticsContext.studentCount} alunos</Badge>
-        <Badge variant="outline">{analyticsContext.gradeCount} notas</Badge>
-        <Badge variant="outline">Período: {analyticsContext.quarterLabel}</Badge>
-        {analyticsContext.hasSubjectFilter && (
-          <Badge variant="secondary">
-            {analyticsContext.subjectCount} disciplina(s) ativa(s)
-          </Badge>
-        )}
-        {analyticsContext.hasSubjectFilter && subjectEligibleClassIds.length === 0 && (
-          <Badge variant="outline" className="border-amber-500/50 text-amber-600">
-            Nenhuma turma com notas nesse recorte
-          </Badge>
-        )}
-        {analyticsContext.hasSubjectFilter && (
-          <span className="text-[11px] text-muted-foreground/80">
-            Modo disciplina altera a interpretação das métricas gerais.
-          </span>
-        )}
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
+          <TabsTrigger value="dashboard" className="gap-2">
+            <LayoutDashboard className="h-4 w-4" />
+            Visão 360º
+          </TabsTrigger>
+          <TabsTrigger value="academic" className="gap-2">
+            <BookOpen className="h-4 w-4" />
+            Acadêmico
+          </TabsTrigger>
+          <TabsTrigger value="behavior" className="gap-2">
+            <Users2 className="h-4 w-4" />
+            Convivência
+          </TabsTrigger>
+          <TabsTrigger value="risk" className="gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Rankings
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Overview Cards */}
-      <SchoolOverviewCards
-        overview={analytics.overview}
-        showBehavior={!analyticsContext.hasSubjectFilter}
-        showClassification={!analyticsContext.hasSubjectFilter}
-        subjectMode={analyticsContext.hasSubjectFilter}
-        hasGrades={analyticsContext.gradeCount > 0}
-      />
+        {/* ================= ABA 1: DASHBOARD ================= */}
+        <TabsContent value="dashboard" className="space-y-8">
+          <SchoolOverviewCards
+            overview={analytics.overview}
+            showBehavior={!analyticsContext.hasSubjectFilter}
+            showClassification={!analyticsContext.hasSubjectFilter}
+            subjectMode={analyticsContext.hasSubjectFilter}
+            hasGrades={analyticsContext.gradeCount > 0}
+          />
 
-      {/* ============================================ */}
-      {/* SEÇÃO 1: DESEMPENHO ACADÊMICO */}
-      {/* ============================================ */}
-      <div className="space-y-6">
-        <div className="flex items-center gap-2 border-b pb-2">
-          <GraduationCap className="h-5 w-5 text-blue-500" />
-          <h2 className="text-xl font-semibold">Desempenho Acadêmico</h2>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-2">
           {!analyticsContext.hasSubjectFilter ? (
             <ClassificationChart
               classifications={analytics.overview.classifications}
@@ -346,72 +384,104 @@ const Analytics = () => {
             <SubjectComparisonCard subjects={analytics.subjectAnalytics} />
           )}
 
+          <InlineInsights
+            insights={[...analytics.categorizedInsights.academic, ...analytics.categorizedInsights.risk].slice(0, 3)}
+            title="Destaques Importantes"
+            onAction={handleInsightAction}
+          />
+        </TabsContent>
+
+        {/* ================= ABA 2: ACADÊMICO ================= */}
+        <TabsContent value="academic" className="space-y-8">
+          {/* Section Full Width */}
           <SubjectAnalysisPanel
             bestSubjects={analytics.bestSubjects}
             worstSubjects={analytics.worstSubjects}
+            allSubjects={analytics.subjectAnalytics}
             areaAnalytics={analytics.areaAnalytics}
           />
-        </div>
 
-        {/* Class Ranking */}
-        <ClassRankingTable
-          classRanking={analytics.classRanking}
-          onSelectForComparison={handleCompare}
-          subjectMode={analyticsContext.hasSubjectFilter}
-        />
+          {/* Grid for Comparison Card if efficient */}
+          {analyticsContext.hasSubjectFilter && (
+            <div className="max-w-xl">
+              <SubjectComparisonCard subjects={analytics.subjectAnalytics} />
+            </div>
+          )}
 
-        {filters.schoolYear !== 'all' && (
-          <div className="grid gap-6 lg:grid-cols-2">
+          <ClassRankingTable
+            classRanking={analytics.classRanking}
+            onSelectForComparison={handleCompare}
+            subjectMode={analyticsContext.hasSubjectFilter}
+          />
+
+          {filters.schoolYear !== 'all' && (
             <CohortComparisonTable
               cohorts={analytics.cohortAnalytics}
               schoolYear={filters.schoolYear}
             />
+          )}
+
+          <InlineInsights
+            insights={analytics.categorizedInsights.academic}
+            title="Insights Acadêmicos"
+            onAction={handleInsightAction}
+          />
+        </TabsContent>
+
+        {/* ================= ABA 3: DISCIPLINAR ================= */}
+        <TabsContent value="behavior" className="space-y-8">
+          {!analyticsContext.hasSubjectFilter ? (
+            <>
+              <BehaviorAnalyticsPanel
+                behavioralAnalytics={analytics.behavioralAnalytics}
+                behavioralInsights={analytics.categorizedInsights.behavioral}
+              />
+              <InlineInsights
+                insights={analytics.categorizedInsights.behavioral}
+                title="Alertas de Convivência"
+                onAction={handleInsightAction}
+              />
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center p-12 text-center border rounded-lg bg-muted/10">
+              <GraduationCap className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium">Filtro de Disciplina Ativo</h3>
+              <p className="text-muted-foreground max-w-md">
+                Dados comportamentais são globais e não são filtrados por disciplina específica. Remova o filtro de disciplina para visualizar esta aba.
+              </p>
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={() => handleFilterChange({ subjects: [] })}
+              >
+                Limpar Filtro de Disciplina
+              </Button>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ================= ABA 4: RISCO ================= */}
+        <TabsContent value="risk" className="space-y-8">
+          <div ref={rankingRef}>
+            <StudentRankingPanel
+              topStudents={analytics.topStudents}
+              criticalStudents={analytics.criticalStudents}
+              allStudentsRanking={analytics.allStudentsRanking}
+              allCriticalStudents={analytics.allCriticalStudents}
+              focusTab={rankingFocus}
+              subjectMode={analyticsContext.hasSubjectFilter}
+              activeSubjects={filters.subjects ?? []}
+            />
           </div>
-        )}
 
-        {/* Insights Acadêmicos */}
-        <InlineInsights
-          insights={analytics.categorizedInsights.academic}
-          title="Insights Acadêmicos"
-          onAction={handleInsightAction}
-        />
-      </div>
-
-      {/* ============================================ */}
-      {/* SEÇÃO 2: COMPORTAMENTO E DISCIPLINA */}
-      {/* ============================================ */}
-      {!analyticsContext.hasSubjectFilter && (
-        <div className="space-y-6 pt-4">
-          <BehaviorAnalyticsPanel
-            behavioralAnalytics={analytics.behavioralAnalytics}
-            behavioralInsights={analytics.categorizedInsights.behavioral}
+          <InlineInsights
+            insights={analytics.categorizedInsights.risk}
+            title="Alertas e Situações de Risco"
+            onAction={handleInsightAction}
           />
-        </div>
-      )}
+        </TabsContent>
 
-      {/* ============================================ */}
-      {/* SEÇÃO 3: RANKINGS GERAIS */}
-      {/* ============================================ */}
-      <div className="space-y-6 pt-4">
-        <div ref={rankingRef}>
-          <StudentRankingPanel
-            topStudents={analytics.topStudents}
-            criticalStudents={analytics.criticalStudents}
-            allStudentsRanking={analytics.allStudentsRanking}
-            allCriticalStudents={analytics.allCriticalStudents}
-            focusTab={rankingFocus}
-            subjectMode={analyticsContext.hasSubjectFilter}
-            activeSubjects={filters.subjects ?? []}
-          />
-        </div>
-
-        {/* Insights de Risco */}
-        <InlineInsights
-          insights={analytics.categorizedInsights.risk}
-          title="Alertas e Situações de Risco"
-          onAction={handleInsightAction}
-        />
-      </div>
+      </Tabs>
 
       {/* Comparison Dialog */}
       <ClassComparisonDialog
