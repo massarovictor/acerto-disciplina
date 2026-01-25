@@ -632,10 +632,14 @@ export function useAnalyticsFiltersLogic({
             next.useQuarterRange = false;
         }
 
+        // Auto Year: ajusta ano automaticamente ao selecionar 1 turma
+        // DESATIVADO no modo "Histórico Global" para não filtrar dados inesperadamente
+        const isHistoryMode = current.schoolYear === 'all' && current.calendarYear === 'all';
         const shouldAutoYear =
             'classIds' in patch &&
             !('schoolYear' in patch) &&
-            !('calendarYear' in patch);
+            !('calendarYear' in patch) &&
+            !isHistoryMode;
         if (shouldAutoYear && next.classIds.length === 1) {
             const cls = scopedClasses.find((c) => c.id === next.classIds[0]);
             if (cls) {

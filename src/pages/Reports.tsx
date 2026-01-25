@@ -10,11 +10,25 @@ import { useUIStore } from "@/stores/useUIStore";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { PageHeader } from "@/components/layout/PageHeader";
 
+import { useSearchParams } from "react-router-dom";
+import { useEffect } from "react";
+
 const Reports = () => {
   // ✅ Usando Zustand store para persistir tab entre navegações
   const { reportsUI, setReportsUI } = useUIStore();
+  const [searchParams] = useSearchParams();
+
   const activeTab = reportsUI.activeTab;
   const setActiveTab = (value: string) => setReportsUI({ activeTab: value });
+
+  // Sync tab with URL param on mount
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && (tabParam === 'integrated' || tabParam === 'slides')) {
+      setReportsUI({ activeTab: tabParam });
+    }
+  }, [searchParams, setReportsUI]);
+
   const { classes } = useClasses();
   const { students } = useStudents();
   const { incidents } = useIncidents();

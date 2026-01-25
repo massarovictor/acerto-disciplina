@@ -65,7 +65,7 @@ interface TrajectoryUIState {
     gridYear: number;
     gridQuarter: string;
     gridCalendarYear: number;
-    source?: '' | 'analytics';
+    source?: '' | 'analytics' | 'reports';
 }
 
 interface UIState {

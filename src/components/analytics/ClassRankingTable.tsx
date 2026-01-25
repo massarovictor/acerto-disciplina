@@ -16,17 +16,19 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ArrowUpDown, TrendingUp, TrendingDown, Minus, GitCompare, ArrowUpRight } from 'lucide-react';
-import { 
-  ClassAnalytics, 
-  CLASSIFICATION_COLORS, 
+import {
+  ClassAnalytics,
+  CLASSIFICATION_COLORS,
   getTrendColor,
-  formatNumber 
+  formatNumber,
+  AnalyticsFilters
 } from '@/hooks/useSchoolAnalytics';
 
 interface ClassRankingTableProps {
   classRanking: ClassAnalytics[];
   onSelectForComparison: (classIds: string[]) => void;
   subjectMode?: boolean;
+  filters?: AnalyticsFilters;
 }
 
 type SortKey = 'rank' | 'average' | 'frequency' | 'excelencia' | 'critico' | 'growth';
@@ -35,6 +37,7 @@ export function ClassRankingTable({
   classRanking,
   onSelectForComparison,
   subjectMode = false,
+  filters,
 }: ClassRankingTableProps) {
   const navigate = useNavigate();
   const [sortKey, setSortKey] = useState<SortKey>('rank');
@@ -46,7 +49,7 @@ export function ClassRankingTable({
     const validIds = new Set(classRanking.map((cls) => cls.classData.id));
     setSelectedClasses((prev) => prev.filter((id) => validIds.has(id)));
   }, [classRanking]);
-  
+
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortAsc(!sortAsc);
@@ -55,7 +58,49 @@ export function ClassRankingTable({
       setSortAsc(key === 'critico'); // Crescente para críticos (menor é melhor)
     }
   };
-  
+
+  const handleClassClick = (cls: ClassAnalytics) => {
+    const params = new URLSearchParams();
+    params.set('tab', 'slides');
+    params.set('classId', cls.classData.id);
+
+    if (filters) {
+      let targetSchoolYear = filters.schoolYear !== 'all' ? filters.schoolYear : undefined;
+
+      // Se não temos a série explícita, mas temos o ano calendário, calculamos a série da turma naquele ano
+      if (!targetSchoolYear && filters.calendarYear !== 'all') {
+        const calYear = Number(filters.calendarYear);
+        // Tentar obter o ano de início da turma
+        // A lógica é: schoolYear = (calendarYear - startCalendarYear) + 1
+        let startYear: number | undefined;
+
+        if (cls.classData.startCalendarYear) {
+          startYear = cls.classData.startCalendarYear;
+        } else if (cls.classData.startYearDate) {
+          const date = new Date(cls.classData.startYearDate);
+          if (!isNaN(date.getTime())) startYear = date.getFullYear();
+        }
+
+        if (startYear) {
+          const calculatedYear = calYear - startYear + 1;
+          if (calculatedYear >= 1 && calculatedYear <= 3) {
+            targetSchoolYear = calculatedYear as 1 | 2 | 3;
+          }
+        }
+      }
+
+      if (targetSchoolYear) {
+        params.set('year', targetSchoolYear.toString());
+      }
+
+      if (filters.quarter && filters.quarter !== 'all') {
+        params.set('period', filters.quarter);
+      }
+    }
+
+    window.open(`/relatorios?${params.toString()}`, '_blank');
+  };
+
   const sortedData = [...classRanking].sort((a, b) => {
     let comparison = 0;
     switch (sortKey) {
@@ -79,7 +124,7 @@ export function ClassRankingTable({
     }
     return sortAsc ? -comparison : comparison;
   });
-  
+
   const toggleClassSelection = (classId: string) => {
     setSelectedClasses(prev => {
       if (prev.includes(classId)) {
@@ -89,23 +134,23 @@ export function ClassRankingTable({
       return [...prev, classId];
     });
   };
-  
+
   const handleCompare = () => {
     if (selectedClasses.length >= 2) {
       onSelectForComparison(selectedClasses);
     }
   };
-  
+
   const TrendIcon = ({ trend }: { trend: 'up' | 'down' | 'stable' }) => {
     const className = `h-4 w-4 ${getTrendColor(trend)}`;
     if (trend === 'up') return <TrendingUp className={className} />;
     if (trend === 'down') return <TrendingDown className={className} />;
     return <Minus className={className} />;
   };
-  
+
   const SortButton = ({ column, label }: { column: SortKey; label: string }) => (
-    <Button 
-      variant="ghost" 
+    <Button
+      variant="ghost"
       size="sm"
       className="h-auto p-0 font-medium hover:bg-transparent"
       onClick={() => handleSort(column)}
@@ -148,33 +193,23 @@ export function ClassRankingTable({
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Ranking de Turmas</CardTitle>
-            <CardDescription>
-              {subjectMode
-                ? 'Ordenado pela média das disciplinas selecionadas'
-                : 'Ordenado por desempenho geral • Clique nas colunas para reordenar'}
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            {sortedData.length > 8 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAll((prev) => !prev)}
-              >
-                {showAll ? 'Mostrar menos' : `Ver todas (${sortedData.length})`}
-              </Button>
-            )}
-            {selectedClasses.length >= 2 && (
-              <Button size="sm" onClick={handleCompare} className="gap-2">
-                <GitCompare className="h-4 w-4" />
-                Comparar ({selectedClasses.length})
-              </Button>
-            )}
-          </div>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-end gap-2">
+          {sortedData.length > 8 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAll((prev) => !prev)}
+            >
+              {showAll ? 'Mostrar menos' : `Ver todas (${sortedData.length})`}
+            </Button>
+          )}
+          {selectedClasses.length >= 2 && (
+            <Button size="sm" onClick={handleCompare} className="gap-2">
+              <GitCompare className="h-4 w-4" />
+              Comparar ({selectedClasses.length})
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -219,14 +254,14 @@ export function ClassRankingTable({
                 visibleRows.map((cls, index) => {
                   const isSelected = selectedClasses.includes(cls.classData.id);
                   const rank = sortedData.findIndex((item) => item.classData.id === cls.classData.id) + 1;
-                  
+
                   return (
-                    <TableRow 
+                    <TableRow
                       key={cls.classData.id}
                       className={isSelected ? 'bg-muted/50' : ''}
                     >
                       <TableCell className="font-medium">
-                        <Badge 
+                        <Badge
                           variant={rank <= 3 ? 'default' : 'outline'}
                           className={rank === 1 ? 'bg-amber-500' : rank === 2 ? 'bg-slate-400' : rank === 3 ? 'bg-amber-700' : ''}
                         >
@@ -235,8 +270,12 @@ export function ClassRankingTable({
                       </TableCell>
                       <TableCell>
                         <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="font-medium">{cls.classData.name}</p>
+                          <div
+                            className="cursor-pointer hover:underline"
+                            onClick={() => handleClassClick(cls)}
+                            title="Abrir relatório de slides em nova aba"
+                          >
+                            <p className="font-medium text-primary">{cls.classData.name}</p>
                             <p className="text-xs text-muted-foreground">
                               {cls.studentCount} alunos
                             </p>
@@ -265,9 +304,9 @@ export function ClassRankingTable({
                         </TableCell>
                       )}
                       <TableCell className="text-center">
-                        <Badge 
+                        <Badge
                           variant="outline"
-                          style={{ 
+                          style={{
                             borderColor: CLASSIFICATION_COLORS.excelencia,
                             color: CLASSIFICATION_COLORS.excelencia,
                           }}
@@ -276,9 +315,9 @@ export function ClassRankingTable({
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Badge 
+                        <Badge
                           variant="outline"
-                          style={{ 
+                          style={{
                             borderColor: CLASSIFICATION_COLORS.critico,
                             color: CLASSIFICATION_COLORS.critico,
                           }}
@@ -308,7 +347,7 @@ export function ClassRankingTable({
             </TableBody>
           </Table>
         </div>
-        
+
         {selectedClasses.length > 0 && selectedClasses.length < 2 && (
           <p className="text-sm text-muted-foreground mt-2 text-center">
             Selecione pelo menos 2 turmas para comparar

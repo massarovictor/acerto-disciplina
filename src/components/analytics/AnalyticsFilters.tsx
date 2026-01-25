@@ -25,6 +25,7 @@ import { Filter, X, GitCompare } from 'lucide-react';
 import { Class } from '@/types';
 import { AnalyticsFilters as FiltersType } from '@/hooks/useSchoolAnalytics';
 import { QUARTERS } from '@/lib/subjects';
+import { useToast } from '@/hooks/use-toast';
 
 type AutoIndicatorKey =
   | 'classIds'
@@ -46,7 +47,7 @@ interface AnalyticsFiltersProps {
   eligibleClassIds?: string[];
 }
 
-const SERIES_OPTIONS = ['1º', '2º', '3º'];
+const SERIES_OPTIONS = ['1', '2', '3'];
 const SCHOOL_YEAR_OPTIONS: Array<{ value: FiltersType['schoolYear']; label: string }> = [
   { value: 'all', label: 'Todas as Séries' },
   { value: 1, label: '1ª Série' },
@@ -65,6 +66,7 @@ export function AnalyticsFilters({
   autoIndicators = {},
   eligibleClassIds = [],
 }: AnalyticsFiltersProps) {
+  const { toast } = useToast();
   const [selectedForComparison, setSelectedForComparison] = useState<string[]>([]);
   const [classSearch, setClassSearch] = useState('');
   const [subjectSearch, setSubjectSearch] = useState('');
@@ -76,7 +78,7 @@ export function AnalyticsFilters({
     return (
       <Badge
         variant="outline"
-        className="ml-1 border-amber-500/50 bg-amber-500/10 text-[10px] text-amber-700"
+        className="ml-1 border-amber-500/50 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-500"
       >
         Auto
       </Badge>
@@ -289,17 +291,39 @@ export function AnalyticsFilters({
 
   // Handlers para presets
   const handlePresetCurrentYear = () => {
-    // Ao trocar de ano, limpamos as turmas selecionadas pois elas podem não existir no ano destino
+    const hadClasses = filters.classIds.length > 0;
     onFilterChange({ calendarYear: currentYear, schoolYear: 'all', classIds: [] });
+    if (hadClasses) {
+      toast({
+        title: 'Filtros atualizados',
+        description: 'A seleção de turmas foi limpa ao trocar de período.',
+        duration: 3000,
+      });
+    }
   };
 
   const handlePresetLastYear = () => {
-    // Ao trocar de ano, limpamos as turmas selecionadas pois elas podem não existir no ano destino
+    const hadClasses = filters.classIds.length > 0;
     onFilterChange({ calendarYear: lastYear, schoolYear: 'all', classIds: [] });
+    if (hadClasses) {
+      toast({
+        title: 'Filtros atualizados',
+        description: 'A seleção de turmas foi limpa ao trocar de período.',
+        duration: 3000,
+      });
+    }
   };
 
   const handlePresetHistory = () => {
+    const hadClasses = filters.classIds.length > 0 || filters.series.length > 0;
     onFilterChange({ calendarYear: 'all', schoolYear: 'all', series: [], classIds: [] });
+    if (hadClasses) {
+      toast({
+        title: 'Modo Histórico Global ativado',
+        description: 'Filtros de série e turma foram limpos para exibir todos os dados.',
+        duration: 3000,
+      });
+    }
   };
 
   return (
@@ -328,184 +352,193 @@ export function AnalyticsFilters({
             variant={isHistoryActive ? 'secondary' : 'outline'}
             size="sm"
             onClick={() => onFilterChange({ calendarYear: 'all', schoolYear: 'all', series: [], classIds: [] })}
-            className={isHistoryActive ? 'border-amber-500/50 bg-amber-500/10 text-amber-700' : 'text-muted-foreground'}
+            className={isHistoryActive ? 'border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-500' : 'text-muted-foreground'}
           >
             Histórico Global
           </Button>
         </div>
         {isHistoryActive && (
-          <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600">
+          <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600 dark:text-amber-400">
             Modo Histórico Ativado
           </Badge>
         )}
       </div>
 
       {/* Filtros detalhados */}
-      <div className="flex flex-wrap gap-3 items-center p-4 bg-card rounded-lg border">
-        {/* Filtro por Série */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Filter className="h-4 w-4" />
-              Série
-              {filters.series.length > 0 && (
-                <Badge variant="secondary" className="ml-1">
-                  {filters.series.length}
-                </Badge>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-48" align="start">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Filtrar por série</Label>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="series-all"
-                  checked={filters.series.length === 0}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      onFilterChange({ series: [] });
-                    }
-                  }}
-                />
-                <Label htmlFor="series-all" className="text-sm cursor-pointer">
-                  Todas as séries
-                </Label>
-              </div>
-              {SERIES_OPTIONS.map(series => (
-                <div key={series} className="flex items-center space-x-2">
+      <div className="p-4 bg-card rounded-lg border space-y-4">
+        {/* Grid de Filtros Principais */}
+        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4">
+          {/* Filtro por Série */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2 w-full justify-start">
+                <Filter className="h-4 w-4" />
+                <span>Série</span>
+                {filters.series.length > 0 && (
+                  <Badge variant="secondary" className="ml-auto">
+                    {filters.series.length}
+                  </Badge>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72" align="start" side="bottom" sideOffset={8}>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Filtrar por série</Label>
+                <div className="flex items-center space-x-2">
                   <Checkbox
-                    id={`series-${series}`}
-                    checked={filters.series.includes(series)}
-                    onCheckedChange={() => handleSeriesToggle(series)}
+                    id="series-all"
+                    checked={filters.series.length === 0}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        onFilterChange({ series: [] });
+                      }
+                    }}
                   />
-                  <Label htmlFor={`series-${series}`} className="text-sm cursor-pointer">
-                    {series}ª Série
+                  <Label htmlFor="series-all" className="text-sm cursor-pointer">
+                    Todas as séries
                   </Label>
                 </div>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
-
-        {/* Filtro por Turma */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Filter className="h-4 w-4" />
-              Turmas
-              {filters.classIds.length > 0 && (
-                <Badge variant="secondary" className="ml-1">
-                  {filters.classIds.length}
-                </Badge>
-              )}
-              <AutoBadge active={autoIndicators.classIds} />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-64" align="start">
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              <Label className="text-sm font-medium">Filtrar por turma</Label>
-              <Input
-                value={classSearch}
-                onChange={(event) => setClassSearch(event.target.value)}
-                placeholder="Buscar turma..."
-                className="h-8"
-              />
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="class-all"
-                  checked={filters.classIds.length === 0}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      onFilterChange({ classIds: [] });
-                    }
-                  }}
-                />
-                <Label htmlFor="class-all" className="text-sm cursor-pointer">
-                  Todas as turmas
-                </Label>
+                {SERIES_OPTIONS.map(series => (
+                  <div key={series} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`series-${series}`}
+                      checked={filters.series.includes(series)}
+                      onCheckedChange={() => handleSeriesToggle(series)}
+                    />
+                    <Label htmlFor={`series-${series}`} className="text-sm cursor-pointer">
+                      {series}ª Série
+                    </Label>
+                  </div>
+                ))}
               </div>
-              {filteredClassOptions.map(cls => (
-                <div key={cls.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`class-${cls.id}`}
-                    checked={filters.classIds.includes(cls.id)}
-                    onCheckedChange={() => handleClassToggle(cls.id)}
-                  />
-                  <Label htmlFor={`class-${cls.id}`} className="text-sm cursor-pointer">
-                    {cls.name}
-                  </Label>
-                </div>
-              ))}
-              {filteredClassOptions.length === 0 && (
-                <p className="text-sm text-muted-foreground">Nenhuma turma ativa</p>
-              )}
-            </div>
-          </PopoverContent>
-        </Popover>
+            </PopoverContent>
+          </Popover>
 
-        {/* Filtro por Disciplina */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Filter className="h-4 w-4" />
-              Disciplinas
-              {selectedSubjects.length > 0 && (
-                <Badge variant="secondary" className="ml-1">
-                  {selectedSubjects.length}
-                </Badge>
-              )}
-              <AutoBadge active={autoIndicators.subjects} />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-64" align="start">
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              <Label className="text-sm font-medium">Filtrar por disciplina</Label>
-              <Input
-                value={subjectSearch}
-                onChange={(event) => setSubjectSearch(event.target.value)}
-                placeholder="Buscar disciplina..."
-                className="h-8"
-              />
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="subjects-all"
-                  checked={selectedSubjects.length === 0}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      onFilterChange({ subjects: [] });
-                    }
-                  }}
+          {/* Filtro por Turma */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2 w-full justify-start">
+                <Filter className="h-4 w-4" />
+                <span>Turmas</span>
+                {filters.classIds.length > 0 && (
+                  <Badge variant="secondary" className="ml-auto">
+                    {filters.classIds.length}
+                  </Badge>
+                )}
+                <AutoBadge active={autoIndicators.classIds} />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72" align="start" side="bottom" sideOffset={8}>
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-sm font-medium">Filtrar por turma</Label>
+                </div>
+                <Input
+                  value={classSearch}
+                  onChange={(event) => setClassSearch(event.target.value)}
+                  placeholder="Buscar turma..."
+                  className="h-8"
                 />
-                <Label htmlFor="subjects-all" className="text-sm cursor-pointer">
-                  Todas as disciplinas
-                </Label>
-              </div>
-              {filteredSubjectOptions.map((subject) => (
-                <div key={subject} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`subject-${subject}`}
-                    checked={selectedSubjects.includes(subject)}
-                    onCheckedChange={() => handleSubjectToggle(subject)}
-                  />
-                  <Label htmlFor={`subject-${subject}`} className="text-sm cursor-pointer">
-                    {subject}
-                  </Label>
+                <div className="max-h-56 overflow-y-auto space-y-2 pr-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="class-all"
+                      checked={filters.classIds.length === 0}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          onFilterChange({ classIds: [] });
+                        }
+                      }}
+                    />
+                    <Label htmlFor="class-all" className="text-sm cursor-pointer">
+                      Todas as turmas
+                    </Label>
+                  </div>
+                  {filteredClassOptions.map(cls => (
+                    <div key={cls.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`class-${cls.id}`}
+                        checked={filters.classIds.includes(cls.id)}
+                        onCheckedChange={() => handleClassToggle(cls.id)}
+                      />
+                      <Label htmlFor={`class-${cls.id}`} className="text-sm cursor-pointer">
+                        {cls.name}
+                      </Label>
+                    </div>
+                  ))}
+                  {filteredClassOptions.length === 0 && (
+                    <p className="text-sm text-muted-foreground">Nenhuma turma ativa</p>
+                  )}
                 </div>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
+              </div>
+            </PopoverContent>
+          </Popover>
 
-        {/* Filtro por Bimestre */}
-        <div className="flex items-center gap-1">
+          {/* Filtro por Disciplina */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2 w-full justify-start">
+                <Filter className="h-4 w-4" />
+                <span>Disciplinas</span>
+                {selectedSubjects.length > 0 && (
+                  <Badge variant="secondary" className="ml-auto">
+                    {selectedSubjects.length}
+                  </Badge>
+                )}
+                <AutoBadge active={autoIndicators.subjects} />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72" align="start" side="bottom" sideOffset={8}>
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-sm font-medium">Filtrar por disciplina</Label>
+                </div>
+                <Input
+                  value={subjectSearch}
+                  onChange={(event) => setSubjectSearch(event.target.value)}
+                  placeholder="Buscar disciplina..."
+                  className="h-8"
+                />
+                <div className="max-h-80 overflow-y-auto space-y-2 pr-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="subjects-all"
+                      checked={selectedSubjects.length === 0}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          onFilterChange({ subjects: [] });
+                        }
+                      }}
+                    />
+                    <Label htmlFor="subjects-all" className="text-sm cursor-pointer">
+                      Todas as disciplinas
+                    </Label>
+                  </div>
+                  {filteredSubjectOptions.map((subject) => (
+                    <div key={subject} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`subject-${subject}`}
+                        checked={selectedSubjects.includes(subject)}
+                        onCheckedChange={() => handleSubjectToggle(subject)}
+                      />
+                      <Label htmlFor={`subject-${subject}`} className="text-sm cursor-pointer">
+                        {subject}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* Filtro por Bimestre */}
           <Select
             value={filters.quarter}
             onValueChange={(value) => onFilterChange({ quarter: value })}
             disabled={filters.useQuarterRange}
           >
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Bimestre" />
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Período" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Resultado Anual</SelectItem>
@@ -514,161 +547,162 @@ export function AnalyticsFilters({
               ))}
             </SelectContent>
           </Select>
-          <AutoBadge active={autoIndicators.quarter} />
         </div>
 
-        {/* Acumular Ciclo */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Filter className="h-4 w-4" />
-              Acumular Ciclo
-              {filters.useQuarterRange && (
-                <Badge variant="secondary" className="ml-1">
-                  {filters.quarterRangeStart?.replace('º Bimestre', 'º') ?? DEFAULT_RANGE_START} - {filters.quarterRangeEnd?.replace('º Bimestre', 'º') ?? DEFAULT_RANGE_END}
-                </Badge>
-              )}
-              <AutoBadge active={autoIndicators.useQuarterRange} />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-64" align="start">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">Ativar Acúmulo</Label>
-                <Switch
-                  checked={!!filters.useQuarterRange}
-                  onCheckedChange={(checked) => {
-                    onFilterChange({
-                      useQuarterRange: checked,
-                      quarter: checked ? 'all' : filters.quarter,
-                      quarterRangeStart: checked ? (filters.quarterRangeStart ?? DEFAULT_RANGE_START) : filters.quarterRangeStart,
-                      quarterRangeEnd: checked ? (filters.quarterRangeEnd ?? DEFAULT_RANGE_END) : filters.quarterRangeEnd,
-                    });
-                  }}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">De</Label>
-                  <Select
-                    value={filters.quarterRangeStart ?? DEFAULT_RANGE_START}
-                    onValueChange={(value) => onFilterChange({ quarterRangeStart: value })}
-                    disabled={!filters.useQuarterRange}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Início" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {QUARTERS.map(q => (
-                        <SelectItem key={q} value={q}>{q}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+        {/* Linha 2: Opções Avançadas e Ações */}
+        <div className="flex flex-wrap gap-3 items-center pt-2 border-t">
+          {/* Acumular Ciclo */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Filter className="h-4 w-4" />
+                Acumular Ciclo
+                {filters.useQuarterRange && (
+                  <Badge variant="secondary" className="ml-1">
+                    {filters.quarterRangeStart?.replace('º Bimestre', 'º') ?? DEFAULT_RANGE_START} - {filters.quarterRangeEnd?.replace('º Bimestre', 'º') ?? DEFAULT_RANGE_END}
+                  </Badge>
+                )}
+                <AutoBadge active={autoIndicators.useQuarterRange} />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64" align="start">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Ativar Acúmulo</Label>
+                  <Switch
+                    checked={!!filters.useQuarterRange}
+                    onCheckedChange={(checked) => {
+                      onFilterChange({
+                        useQuarterRange: checked,
+                        quarter: checked ? 'all' : filters.quarter,
+                        quarterRangeStart: checked ? (filters.quarterRangeStart ?? DEFAULT_RANGE_START) : filters.quarterRangeStart,
+                        quarterRangeEnd: checked ? (filters.quarterRangeEnd ?? DEFAULT_RANGE_END) : filters.quarterRangeEnd,
+                      });
+                    }}
+                  />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Até</Label>
-                  <Select
-                    value={filters.quarterRangeEnd ?? DEFAULT_RANGE_END}
-                    onValueChange={(value) => onFilterChange({ quarterRangeEnd: value })}
-                    disabled={!filters.useQuarterRange}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Fim" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {QUARTERS.map(q => (
-                        <SelectItem key={q} value={q}>{q}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">De</Label>
+                    <Select
+                      value={filters.quarterRangeStart ?? DEFAULT_RANGE_START}
+                      onValueChange={(value) => onFilterChange({ quarterRangeStart: value })}
+                      disabled={!filters.useQuarterRange}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Início" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {QUARTERS.map(q => (
+                          <SelectItem key={q} value={q}>{q}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Até</Label>
+                    <Select
+                      value={filters.quarterRangeEnd ?? DEFAULT_RANGE_END}
+                      onValueChange={(value) => onFilterChange({ quarterRangeEnd: value })}
+                      disabled={!filters.useQuarterRange}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Fim" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {QUARTERS.map(q => (
+                          <SelectItem key={q} value={q}>{q}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Soma o desempenho do intervalo de bimestres selecionado.
-              </p>
-            </div>
-          </PopoverContent>
-        </Popover>
-
-        <div className="flex-1" />
-
-        {/* Incluir Arquivadas */}
-        <div className="flex items-center gap-2">
-          <Switch
-            checked={filters.includeArchived}
-            onCheckedChange={(checked) => onFilterChange({ includeArchived: checked })}
-          />
-          <span className="text-sm text-muted-foreground">Arquivadas</span>
-        </div>
-
-        {/* Comparação de Turmas */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2">
-              <GitCompare className="h-4 w-4" />
-              Comparar
-              {selectedForComparison.length > 0 && (
-                <Badge variant="secondary" className="ml-1">
-                  {selectedForComparison.length}
-                </Badge>
-              )}
-              <AutoBadge active={autoIndicators.comparisonClassIds} />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-72" align="start">
-            <div className="space-y-3">
-              <div>
-                <Label className="text-sm font-medium">Selecione 2 ou mais turmas para comparar</Label>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Análise lado a lado de desempenho
+                <p className="text-xs text-muted-foreground">
+                  Soma o desempenho do intervalo de bimestres selecionado.
                 </p>
               </div>
-              <Input
-                value={comparisonSearch}
-                onChange={(event) => setComparisonSearch(event.target.value)}
-                placeholder="Buscar turma..."
-                className="h-8"
-              />
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {filteredComparisonOptions.map(cls => (
-                  <div key={cls.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`compare-${cls.id}`}
-                      checked={selectedForComparison.includes(cls.id)}
-                      onCheckedChange={() => handleComparisonToggle(cls.id)}
-                    />
-                    <Label htmlFor={`compare-${cls.id}`} className="text-sm cursor-pointer">
-                      {cls.name}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-              <Button
-                size="sm"
-                className="w-full"
-                disabled={selectedForComparison.length < 2}
-                onClick={handleStartComparison}
-              >
+            </PopoverContent>
+          </Popover>
+
+          {/* Incluir Arquivadas */}
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={filters.includeArchived}
+              onCheckedChange={(checked) => onFilterChange({ includeArchived: checked })}
+            />
+            <span className="text-sm text-muted-foreground">Arquivadas</span>
+          </div>
+
+          {/* Espaço flexível */}
+          <div className="flex-1" />
+
+          {/* Limpar Filtros */}
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="gap-1 text-muted-foreground"
+            >
+              <X className="h-4 w-4" />
+              Limpar
+            </Button>
+          )}
+
+          {/* Comparação de Turmas */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="default" size="sm" className="gap-2">
+                <GitCompare className="h-4 w-4" />
                 Comparar Turmas
+                {selectedForComparison.length > 0 && (
+                  <Badge variant="secondary" className="ml-1">
+                    {selectedForComparison.length}
+                  </Badge>
+                )}
+                <AutoBadge active={autoIndicators.comparisonClassIds} />
               </Button>
-            </div>
-          </PopoverContent>
-        </Popover>
-
-        {/* Limpar Filtros */}
-        {hasActiveFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={clearFilters}
-            className="gap-1 text-muted-foreground"
-          >
-            <X className="h-4 w-4" />
-            Limpar
-          </Button>
-        )}
-
-        <div className="flex-1" />
+            </PopoverTrigger>
+            <PopoverContent className="w-72" align="start">
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-sm font-medium">Selecione 2 ou mais turmas para comparar</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Análise lado a lado de desempenho
+                  </p>
+                </div>
+                <Input
+                  value={comparisonSearch}
+                  onChange={(event) => setComparisonSearch(event.target.value)}
+                  placeholder="Buscar turma..."
+                  className="h-8"
+                />
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {filteredComparisonOptions.map(cls => (
+                    <div key={cls.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`compare-${cls.id}`}
+                        checked={selectedForComparison.includes(cls.id)}
+                        onCheckedChange={() => handleComparisonToggle(cls.id)}
+                      />
+                      <Label htmlFor={`compare-${cls.id}`} className="text-sm cursor-pointer">
+                        {cls.name}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  size="sm"
+                  className="w-full"
+                  disabled={selectedForComparison.length < 2}
+                  onClick={handleStartComparison}
+                >
+                  Comparar Turmas
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
     </div>
   );

@@ -80,9 +80,14 @@ const normalizeSubjectName = (name: string): string => {
         .trim();
 };
 
+import { useSearchParams } from 'react-router-dom';
+
+// ...
+
 const StudentTrajectory = () => {
     const { classes } = useClasses();
     const { students } = useStudents();
+    const [searchParams] = useSearchParams();
 
     // ✅ Usando Zustand store para persistir seleções entre navegações
     const { trajectoryUI, setTrajectoryUI } = useUIStore();
@@ -94,6 +99,29 @@ const StudentTrajectory = () => {
     const gridQuarter = trajectoryUI.gridQuarter;
     const gridCalendarYear = trajectoryUI.gridCalendarYear;
     const source = trajectoryUI.source;
+
+    // Sync with URL params on mount for deep linking support
+    useEffect(() => {
+        const classIdParam = searchParams.get('classId');
+        const studentIdParam = searchParams.get('studentId');
+
+        let updateRequired = false;
+        const updates: Partial<typeof trajectoryUI> = {};
+
+        if (classIdParam && classes.some(c => c.id === classIdParam) && classIdParam !== selectedClass) {
+            updates.selectedClassId = classIdParam;
+            updateRequired = true;
+        }
+
+        if (studentIdParam && students.some(s => s.id === studentIdParam) && studentIdParam !== selectedStudent) {
+            updates.selectedStudentId = studentIdParam;
+            updateRequired = true;
+        }
+
+        if (updateRequired) {
+            setTrajectoryUI(updates);
+        }
+    }, [searchParams, classes, students, selectedClass, selectedStudent, setTrajectoryUI]);
 
     const { grades: regularGrades } = useGradesAnalytics({ studentId: selectedStudent || undefined });
     const { historicalGrades, addHistoricalGrade, deleteHistoricalGrade } = useHistoricalGrades();
@@ -1501,93 +1529,93 @@ const StudentTrajectory = () => {
                                             ) : (
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <ComposedChart data={showSimulation ? simulationData : subjectTimeline} margin={{ top: 20, right: 80, left: 10, bottom: 20 }}>
-                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" strokeOpacity={0.1} />
-                                                    <XAxis
-                                                        dataKey="label"
-                                                        tick={{ fontSize: 9 }}
-                                                        height={70}
-                                                        interval="preserveStartEnd"
-                                                        angle={-35}
-                                                        textAnchor="end"
-                                                        padding={{ left: 10, right: 30 }}
-                                                    />
-                                                    <YAxis domain={[0, 10]} tick={{ fontSize: 11 }} />
-                                                    <Tooltip
-                                                        contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '8px', border: '1px solid hsl(var(--border))', color: 'hsl(var(--foreground))' }}
-                                                        itemStyle={{ color: 'hsl(var(--foreground))' }}
-                                                        formatter={(value: number, name: string) => [value?.toFixed(1), name]}
-                                                    />
-                                                    <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                                    <ReferenceLine y={6} stroke="#e74c3c" strokeDasharray="3 3" />
-
-                                                    {/* Linha do Fundamental - Roxa */}
-                                                    <Line
-                                                        type="monotone"
-                                                        dataKey="fundGrade"
-                                                        stroke="#8e44ad"
-                                                        strokeWidth={3}
-                                                        name="Fundamental"
-                                                        dot={{ r: 5, fill: '#8e44ad', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
-                                                        activeDot={{ r: 7 }}
-                                                        connectNulls
-                                                    >
-                                                        <LabelList
-                                                            dataKey="fundGrade"
-                                                            position="top"
-                                                            offset={8}
-                                                            formatter={(val: number) => val?.toFixed(1)}
-                                                            style={{ fontSize: '10px', fontWeight: 'bold', fill: '#8e44ad' }}
+                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" strokeOpacity={0.1} />
+                                                        <XAxis
+                                                            dataKey="label"
+                                                            tick={{ fontSize: 9 }}
+                                                            height={70}
+                                                            interval="preserveStartEnd"
+                                                            angle={-35}
+                                                            textAnchor="end"
+                                                            padding={{ left: 10, right: 30 }}
                                                         />
-                                                    </Line>
-
-                                                    {/* Linha do Ensino Médio - Azul */}
-                                                    <Line
-                                                        type="monotone"
-                                                        dataKey="emGrade"
-                                                        stroke="#3498db"
-                                                        strokeWidth={3}
-                                                        name="Ensino Médio"
-                                                        dot={{ r: 5, fill: '#3498db', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
-                                                        activeDot={{ r: 7 }}
-                                                        connectNulls
-                                                    >
-                                                        <LabelList
-                                                            dataKey="emGrade"
-                                                            position="top"
-                                                            offset={8}
-                                                            formatter={(val: number) => val?.toFixed(1)}
-                                                            style={{ fontSize: '10px', fontWeight: 'bold', fill: '#3498db' }}
+                                                        <YAxis domain={[0, 10]} tick={{ fontSize: 11 }} />
+                                                        <Tooltip
+                                                            contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '8px', border: '1px solid hsl(var(--border))', color: 'hsl(var(--foreground))' }}
+                                                            itemStyle={{ color: 'hsl(var(--foreground))' }}
+                                                            formatter={(value: number, name: string) => [value?.toFixed(1), name]}
                                                         />
-                                                    </Line>
+                                                        <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                                                        <ReferenceLine y={6} stroke="#e74c3c" strokeDasharray="3 3" />
 
-                                                    {/* Avaliações Externas - Laranja */}
-                                                    <Scatter dataKey="external" fill="#f39c12" name="Aval. Externa" />
-
-                                                    {/* Ocorrências - Vermelho */}
-                                                    <Scatter dataKey="incident" fill="#e74c3c" name="Ocorrências" shape="triangle" />
-
-                                                    {/* Linha de Projeção/Simulação - Laranja tracejada */}
-                                                    {showSimulation && (
+                                                        {/* Linha do Fundamental - Roxa */}
                                                         <Line
                                                             type="monotone"
-                                                            dataKey="simulatedGrade"
-                                                            stroke="#f97316"
+                                                            dataKey="fundGrade"
+                                                            stroke="#8e44ad"
                                                             strokeWidth={3}
-                                                            strokeDasharray="5 5"
-                                                            name="Projeção"
-                                                            dot={{ r: 6, fill: '#f97316', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
-                                                            activeDot={{ r: 8, fill: '#f97316' }}
+                                                            name="Fundamental"
+                                                            dot={{ r: 5, fill: '#8e44ad', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+                                                            activeDot={{ r: 7 }}
                                                             connectNulls
                                                         >
                                                             <LabelList
-                                                                dataKey="simulatedGrade"
+                                                                dataKey="fundGrade"
                                                                 position="top"
                                                                 offset={8}
                                                                 formatter={(val: number) => val?.toFixed(1)}
-                                                                style={{ fontSize: '10px', fontWeight: 'bold', fill: '#f97316' }}
+                                                                style={{ fontSize: '10px', fontWeight: 'bold', fill: '#8e44ad' }}
                                                             />
                                                         </Line>
-                                                    )}
+
+                                                        {/* Linha do Ensino Médio - Azul */}
+                                                        <Line
+                                                            type="monotone"
+                                                            dataKey="emGrade"
+                                                            stroke="#3498db"
+                                                            strokeWidth={3}
+                                                            name="Ensino Médio"
+                                                            dot={{ r: 5, fill: '#3498db', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+                                                            activeDot={{ r: 7 }}
+                                                            connectNulls
+                                                        >
+                                                            <LabelList
+                                                                dataKey="emGrade"
+                                                                position="top"
+                                                                offset={8}
+                                                                formatter={(val: number) => val?.toFixed(1)}
+                                                                style={{ fontSize: '10px', fontWeight: 'bold', fill: '#3498db' }}
+                                                            />
+                                                        </Line>
+
+                                                        {/* Avaliações Externas - Laranja */}
+                                                        <Scatter dataKey="external" fill="#f39c12" name="Aval. Externa" />
+
+                                                        {/* Ocorrências - Vermelho */}
+                                                        <Scatter dataKey="incident" fill="#e74c3c" name="Ocorrências" shape="triangle" />
+
+                                                        {/* Linha de Projeção/Simulação - Laranja tracejada */}
+                                                        {showSimulation && (
+                                                            <Line
+                                                                type="monotone"
+                                                                dataKey="simulatedGrade"
+                                                                stroke="#f97316"
+                                                                strokeWidth={3}
+                                                                strokeDasharray="5 5"
+                                                                name="Projeção"
+                                                                dot={{ r: 6, fill: '#f97316', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+                                                                activeDot={{ r: 8, fill: '#f97316' }}
+                                                                connectNulls
+                                                            >
+                                                                <LabelList
+                                                                    dataKey="simulatedGrade"
+                                                                    position="top"
+                                                                    offset={8}
+                                                                    formatter={(val: number) => val?.toFixed(1)}
+                                                                    style={{ fontSize: '10px', fontWeight: 'bold', fill: '#f97316' }}
+                                                                />
+                                                            </Line>
+                                                        )}
                                                     </ComposedChart>
                                                 </ResponsiveContainer>
                                             )}
@@ -1614,70 +1642,70 @@ const StudentTrajectory = () => {
                                             ) : (
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <ComposedChart data={showSimulation ? simulationData : subjectTimeline} margin={{ top: 20, right: 80, left: 10, bottom: 20 }}>
-                                                    <defs>
-                                                        <linearGradient id="pulseGradient2" x1="0" y1="0" x2="0" y2="1">
-                                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
-                                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                                                        </linearGradient>
-                                                    </defs>
-                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" strokeOpacity={0.1} />
-                                                    <XAxis
-                                                        dataKey="label"
-                                                        tick={{ fontSize: 9 }}
-                                                        height={70}
-                                                        interval="preserveStartEnd"
-                                                        angle={-35}
-                                                        textAnchor="end"
-                                                        padding={{ left: 10, right: 30 }}
-                                                    />
-                                                    <YAxis domain={[0, 10]} tick={{ fontSize: 11 }} />
-                                                    <Tooltip
-                                                        contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '8px', border: '1px solid hsl(var(--border))', color: 'hsl(var(--foreground))' }}
-                                                        itemStyle={{ color: 'hsl(var(--foreground))' }}
-                                                        formatter={(val: number, name: string) => [val?.toFixed(1), name]}
-                                                    />
-                                                    <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                                    <ReferenceLine y={6} stroke="#e74c3c" strokeDasharray="3 3" />
-
-                                                    <Line
-                                                        type="monotone"
-                                                        dataKey="continuousValue"
-                                                        stroke="#10b981"
-                                                        strokeWidth={3}
-                                                        name="Performance"
-                                                        dot={{ r: 5, fill: '#10b981', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
-                                                        activeDot={{ r: 7 }}
-                                                    >
-                                                        <LabelList
-                                                            dataKey="continuousValue"
-                                                            position="top"
-                                                            offset={10}
-                                                            formatter={(val: number) => val?.toFixed(1)}
-                                                            style={{ fontSize: '10px', fontWeight: 'bold', fill: '#10b981' }}
+                                                        <defs>
+                                                            <linearGradient id="pulseGradient2" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
+                                                                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" strokeOpacity={0.1} />
+                                                        <XAxis
+                                                            dataKey="label"
+                                                            tick={{ fontSize: 9 }}
+                                                            height={70}
+                                                            interval="preserveStartEnd"
+                                                            angle={-35}
+                                                            textAnchor="end"
+                                                            padding={{ left: 10, right: 30 }}
                                                         />
-                                                    </Line>
+                                                        <YAxis domain={[0, 10]} tick={{ fontSize: 11 }} />
+                                                        <Tooltip
+                                                            contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '8px', border: '1px solid hsl(var(--border))', color: 'hsl(var(--foreground))' }}
+                                                            itemStyle={{ color: 'hsl(var(--foreground))' }}
+                                                            formatter={(val: number, name: string) => [val?.toFixed(1), name]}
+                                                        />
+                                                        <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                                                        <ReferenceLine y={6} stroke="#e74c3c" strokeDasharray="3 3" />
 
-                                                    {showSimulation && (
                                                         <Line
                                                             type="monotone"
-                                                            dataKey="simulatedGrade"
-                                                            stroke="#f97316"
+                                                            dataKey="continuousValue"
+                                                            stroke="#10b981"
                                                             strokeWidth={3}
-                                                            strokeDasharray="5 5"
-                                                            name="Projeção"
-                                                            dot={{ r: 6, fill: '#f97316', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
-                                                            activeDot={{ r: 8, fill: '#f97316' }}
-                                                            connectNulls
+                                                            name="Performance"
+                                                            dot={{ r: 5, fill: '#10b981', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+                                                            activeDot={{ r: 7 }}
                                                         >
                                                             <LabelList
-                                                                dataKey="simulatedGrade"
+                                                                dataKey="continuousValue"
                                                                 position="top"
                                                                 offset={10}
                                                                 formatter={(val: number) => val?.toFixed(1)}
-                                                                style={{ fontSize: '10px', fontWeight: 'bold', fill: '#f97316' }}
+                                                                style={{ fontSize: '10px', fontWeight: 'bold', fill: '#10b981' }}
                                                             />
                                                         </Line>
-                                                    )}
+
+                                                        {showSimulation && (
+                                                            <Line
+                                                                type="monotone"
+                                                                dataKey="simulatedGrade"
+                                                                stroke="#f97316"
+                                                                strokeWidth={3}
+                                                                strokeDasharray="5 5"
+                                                                name="Projeção"
+                                                                dot={{ r: 6, fill: '#f97316', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+                                                                activeDot={{ r: 8, fill: '#f97316' }}
+                                                                connectNulls
+                                                            >
+                                                                <LabelList
+                                                                    dataKey="simulatedGrade"
+                                                                    position="top"
+                                                                    offset={10}
+                                                                    formatter={(val: number) => val?.toFixed(1)}
+                                                                    style={{ fontSize: '10px', fontWeight: 'bold', fill: '#f97316' }}
+                                                                />
+                                                            </Line>
+                                                        )}
                                                     </ComposedChart>
                                                 </ResponsiveContainer>
                                             )}

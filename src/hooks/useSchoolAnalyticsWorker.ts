@@ -56,7 +56,6 @@ export function useSchoolAnalyticsWorker(
   const lastAppliedKeyRef = useRef("");
   const lastRequestKeyRef = useRef("");
   const lastDataSignatureRef = useRef("");
-  const skipNextFiltersComputeRef = useRef(false);
   const filtersRef = useRef(filters);
 
   useEffect(() => {
@@ -177,15 +176,12 @@ export function useSchoolAnalyticsWorker(
     };
     workerRef.current.postMessage(payload);
     requestCompute(filtersRef.current);
-    skipNextFiltersComputeRef.current = true;
+    // REMOVIDO: skipNextFiltersComputeRef causava race condition onde a atualização 
+    // de filtros (ex: normalização após novos dados) era ignorada.
   }, [dataSignature, hasData, students, classes, grades, attendance, incidents]);
 
   useEffect(() => {
     if (!workerRef.current || !hasData) return;
-    if (skipNextFiltersComputeRef.current) {
-      skipNextFiltersComputeRef.current = false;
-      return;
-    }
     requestCompute(filters);
   }, [filters, hasData]);
 

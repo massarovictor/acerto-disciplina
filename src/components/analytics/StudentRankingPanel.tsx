@@ -17,9 +17,18 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Trophy, AlertCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { ArrowUpDown } from 'lucide-react';
+import {
+  AnalyticsFilters,
   StudentAnalytics,
   CLASSIFICATION_COLORS,
   CLASSIFICATION_LABELS,
@@ -28,6 +37,7 @@ import {
   formatNumber
 } from '@/hooks/useSchoolAnalytics';
 import { useUIStore } from '@/stores/useUIStore';
+import { useToast } from '@/hooks/use-toast';
 
 interface StudentRankingPanelProps {
   topStudents: StudentAnalytics[];
@@ -37,6 +47,7 @@ interface StudentRankingPanelProps {
   focusTab?: 'top' | 'critical' | null;
   subjectMode?: boolean;
   activeSubjects?: string[];
+  filters?: AnalyticsFilters;
 }
 
 export function StudentRankingPanel({
@@ -47,8 +58,10 @@ export function StudentRankingPanel({
   focusTab,
   subjectMode = false,
   activeSubjects = [],
+  filters,
 }: StudentRankingPanelProps) {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { setTrajectoryUI } = useUIStore();
   const [openTopRanking, setOpenTopRanking] = useState(false);
   const [openCriticalRanking, setOpenCriticalRanking] = useState(false);
@@ -59,7 +72,7 @@ export function StudentRankingPanel({
   const [topPage, setTopPage] = useState(1);
   const [criticalSearch, setCriticalSearch] = useState('');
   const [criticalClassFilter, setCriticalClassFilter] = useState('all');
-  const [criticalSort, setCriticalSort] = useState<'risk' | 'average-asc' | 'average-desc' | 'name-asc'>('risk');
+  const [criticalSort, setCriticalSort] = useState<'risk' | 'average-asc' | 'average-desc' | 'name-asc' | 'name-desc'>('risk');
   const [criticalPage, setCriticalPage] = useState(1);
   const pageSize = 20;
 
@@ -70,25 +83,35 @@ export function StudentRankingPanel({
   }, [focusTab]);
 
   const handleOpenStudent = useCallback(
-    (student: StudentAnalytics) => {
-      const normalizedSubjects = (activeSubjects || []).filter(Boolean);
-      const resolvedSubject =
-        normalizedSubjects.length === 1
-          ? normalizedSubjects[0]
-          : normalizedSubjects.length > 1
-            ? 'all'
-            : '';
-      setTrajectoryUI({
-        viewMode: 'individual',
-        selectedClassId: student.student.classId,
-        selectedStudentId: student.student.id,
-        selectedSubject: resolvedSubject,
-        activeTab: 'summary',
-        source: 'analytics',
-      });
-      navigate('/trajetoria');
+    (studentAnalytics: StudentAnalytics) => {
+      const student = studentAnalytics.student;
+      const params = new URLSearchParams();
+      params.set('tab', 'slides');
+      params.set('view', 'individual');
+      params.set('classId', student.classId);
+      params.set('studentId', student.id);
+
+      if (filters) {
+        if (filters.schoolYear && filters.schoolYear !== 'all') {
+          params.set('year', filters.schoolYear.toString());
+        }
+        // Fallback ano calendario se schoolYear nao tiver setado
+        else if (filters.calendarYear !== 'all') {
+          // Tente estimar o ano escolar se possível, ou deixe o reports tentar
+          // Mas aqui studentAnalytics não tem info da turma completa (calendarYearStart), só nome da turma
+          // Vamos passar o calendarYear, mas o relatorio espera 'year' (serie).
+          // O ideal seria tentar converter se tivessemos os dados da turma aqui.
+          // Como fallback, não passamos nada e deixamos o relatário usar o atual da turma.
+        }
+
+        if (filters.quarter && filters.quarter !== 'all') {
+          params.set('period', filters.quarter);
+        }
+      }
+
+      window.open(`/relatorios?${params.toString()}`, '_blank');
     },
-    [activeSubjects, navigate, setTrajectoryUI],
+    [filters],
   );
 
   const TrendIcon = ({ trend }: { trend: 'up' | 'down' | 'stable' }) => {
@@ -110,7 +133,7 @@ export function StudentRankingPanel({
     <button
       type="button"
       onClick={() => onSelect?.(student)}
-      className="flex w-full items-center gap-3 rounded-lg border bg-card p-3 text-left transition-colors hover:bg-accent/50"
+      className="group flex w-full items-center gap-3 rounded-md border border-border/50 bg-background p-3 text-left transition-colors hover:border-border hover:bg-accent/5"
     >
       {rank && (
         <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center">
@@ -152,7 +175,7 @@ export function StudentRankingPanel({
       <button
         type="button"
         onClick={() => onSelect?.(student)}
-        className="w-full rounded-lg border p-3 text-left transition-colors hover:bg-accent/40"
+        className="group w-full rounded-md border border-border/50 bg-background p-3 text-left transition-colors hover:border-border hover:bg-accent/5"
         style={{
           borderLeftWidth: 4,
           borderLeftColor: CLASSIFICATION_COLORS[student.classification.classification],
@@ -284,89 +307,253 @@ export function StudentRankingPanel({
     setCriticalPage(1);
   };
 
+  const SortButton = ({ label, field, isActive }: { label: string; field: 'average' | 'name'; isActive: boolean }) => {
+    const handleClick = () => {
+      if (tabValue === 'top') {
+        // Para top students: alterna entre asc e desc no campo selecionado
+        if (topSort === `${field}-asc`) {
+          setTopSort(`${field}-desc` as any);
+        } else {
+          setTopSort(`${field}-asc` as any);
+        }
+      } else {
+        // Para critical students: 
+        if (field === 'average') {
+          // Cicla entre: risk -> average-asc -> average-desc -> risk
+          if (criticalSort === 'risk') {
+            setCriticalSort('average-asc');
+          } else if (criticalSort === 'average-asc') {
+            setCriticalSort('average-desc');
+          } else {
+            setCriticalSort('risk');
+          }
+        } else if (field === 'name') {
+          // Para nome em críticos: alterna entre asc e desc
+          if (criticalSort === 'name-asc') {
+            setCriticalSort('name-desc');
+          } else {
+            setCriticalSort('name-asc');
+          }
+        }
+      }
+    };
+
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-auto p-0 font-medium hover:bg-transparent"
+        onClick={handleClick}
+      >
+        {label}
+        <ArrowUpDown className={`ml-1 h-3 w-3 ${isActive ? 'text-amber-600 dark:text-amber-400' : ''}`} />
+      </Button>
+    );
+  };
+
+  // Reordenar dados baseado em topSort
+  const sortedTopStudents = [...topStudents].sort((a, b) => {
+    switch (topSort) {
+      case 'name-asc':
+        return a.student.name.localeCompare(b.student.name, 'pt-BR');
+      case 'name-desc':
+        return b.student.name.localeCompare(a.student.name, 'pt-BR');
+      case 'average-asc':
+        return a.classification.average - b.classification.average;
+      case 'average-desc':
+        return b.classification.average - a.classification.average;
+      default:
+        return b.classification.average - a.classification.average;
+    }
+  });
+
+  // Reordenar dados críticos baseado em criticalSort
+  const sortedCriticalStudents = [...criticalStudents].sort((a, b) => {
+    switch (criticalSort) {
+      case 'risk':
+        if (a.classification.classification !== b.classification.classification) {
+          return a.classification.classification === 'critico' ? -1 : 1;
+        }
+        return a.classification.average - b.classification.average;
+      case 'average-asc':
+        return a.classification.average - b.classification.average;
+      case 'average-desc':
+        return b.classification.average - a.classification.average;
+      case 'name-asc':
+        return a.student.name.localeCompare(b.student.name, 'pt-BR');
+      case 'name-desc':
+        return b.student.name.localeCompare(a.student.name, 'pt-BR');
+      default:
+        return a.classification.classification === 'critico' ? -1 : 1;
+    }
+  });
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Ranking de Alunos</CardTitle>
-        <CardDescription>
-          {subjectMode
-            ? 'Desempenho por média nas disciplinas selecionadas'
-            : 'Destaques e alunos que precisam de atenção'}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+      <CardContent className="pt-6">
         <Tabs value={tabValue} onValueChange={(value) => setTabValue(value as 'top' | 'critical')} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="top" className="gap-2">
               <Trophy className="h-4 w-4" />
-              {subjectMode ? 'Maiores médias' : 'Top 10 Destaques'}
+              {subjectMode ? 'Maiores médias' : 'Destaques'}
             </TabsTrigger>
             <TabsTrigger value="critical" className="gap-2">
               <AlertCircle className="h-4 w-4" />
-              {subjectMode ? `Médias baixas (${criticalTotal})` : `Precisam de Atenção (${criticalTotal})`}
+              {subjectMode ? `Médias baixas (${criticalTotal})` : `Atenção (${criticalTotal})`}
             </TabsTrigger>
           </TabsList>
 
+          {/* TAB: TOP ALUNOS */}
           <TabsContent value="top" className="mt-4">
-            {topStudents.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Trophy className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>Nenhum aluno encontrado</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{topTotal} alunos no ranking</span>
-                  {topTotal > topStudents.length && (
-                    <Button variant="ghost" size="sm" onClick={() => setOpenTopRanking(true)}>
-                      Ver ranking completo
-                    </Button>
+            <div className="rounded-md border border-border/50 dark:border-border/30">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">#</TableHead>
+                    <TableHead>
+                      <SortButton label="Aluno" field="name" isActive={topSort.includes('name')} />
+                    </TableHead>
+                    <TableHead>Turma</TableHead>
+                    <TableHead className="text-center">
+                      <SortButton label="Média" field="average" isActive={topSort.includes('average')} />
+                    </TableHead>
+                    <TableHead className="text-center">Tendência</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedTopStudents.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        Nenhum aluno encontrado
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    sortedTopStudents.map((student, index) => (
+                      <TableRow
+                        key={student.student.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => handleOpenStudent(student)}
+                      >
+                        <TableCell className="font-medium">
+                          <Badge
+                            variant={index < 3 ? 'default' : 'outline'}
+                            className={index === 0 ? 'bg-amber-500' : index === 1 ? 'bg-slate-400' : index === 2 ? 'bg-amber-700' : ''}
+                          >
+                            {index + 1}º
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{student.student.name}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {student.className}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className={student.classification.average >= 6 ? 'text-emerald-600 font-semibold' : 'text-red-600 font-semibold'}>
+                            {formatNumber(student.classification.average)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <TrendIcon trend={student.trend} />
+                        </TableCell>
+                      </TableRow>
+                    ))
                   )}
-                </div>
-                {topStudents.map((student, index) => (
-                  <StudentCard
-                    key={student.student.id}
-                    student={student}
-                    rank={index + 1}
-                    onSelect={handleOpenStudent}
-                  />
-                ))}
+                </TableBody>
+              </Table>
+            </div>
+            {topTotal > topStudents.length && (
+              <div className="mt-4 flex justify-center">
+                <Button variant="ghost" size="sm" onClick={() => setOpenTopRanking(true)}>
+                  Ver ranking completo ({topTotal} alunos)
+                </Button>
               </div>
             )}
           </TabsContent>
 
+          {/* TAB: ALUNOS CRÍTICOS */}
           <TabsContent value="critical" className="mt-4">
-            {criticalStudents.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>
-                  {subjectMode
-                    ? 'Nenhum aluno abaixo do esperado nas disciplinas selecionadas'
-                    : 'Nenhum aluno em situação crítica ou de atenção'}
-                </p>
-                <p className="text-sm">
-                  🎉 Excelente! Todos os alunos estão com bom desempenho.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>
-                    {subjectMode ? `${criticalTotal} alunos abaixo da média` : `${criticalTotal} alunos em risco`}
-                  </span>
-                  {criticalTotal > criticalStudents.length && (
-                    <Button variant="ghost" size="sm" onClick={() => setOpenCriticalRanking(true)}>
-                      Ver todos
-                    </Button>
+            <div className="rounded-md border border-border/50 dark:border-border/30">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">Risco</TableHead>
+                    <TableHead>
+                      <SortButton label="Aluno" field="name" isActive={criticalSort.includes('name')} />
+                    </TableHead>
+                    <TableHead>Turma</TableHead>
+                    <TableHead className="text-center">
+                      <SortButton label="Média" field="average" isActive={criticalSort.includes('average')} />
+                    </TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {criticalStudents.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8">
+                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                          <AlertCircle className="h-8 w-8 opacity-50" />
+                          <p>Nenhum aluno em risco ou atenção 🎉</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    sortedCriticalStudents.map((student) => {
+                      const isCritico = student.classification.classification === 'critico';
+                      return (
+                        <TableRow
+                          key={student.student.id}
+                          className={`cursor-pointer ${isCritico ? 'bg-red-50/30 dark:bg-red-900/10 hover:bg-red-50/50 dark:hover:bg-red-900/20' : 'hover:bg-muted/50'}`}
+                          onClick={() => handleOpenStudent(student)}
+                        >
+                          <TableCell>
+                            {isCritico ? (
+                              <Badge variant="destructive" className="w-full justify-center">
+                                Crítico
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="w-full justify-center">
+                                Atenção
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{student.student.name}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {student.className}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="text-red-600 font-semibold">
+                              {formatNumber(student.classification.average)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {student.incidentCount > 0 ? (
+                              <Badge variant="outline" className="text-xs">
+                                {student.incidentCount} ocorrência(s)
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">--</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
-                </div>
-                {criticalStudents.map(student => (
-                  <CriticalStudentCard
-                    key={student.student.id}
-                    student={student}
-                    onSelect={handleOpenStudent}
-                  />
-                ))}
+                </TableBody>
+              </Table>
+            </div>
+            {criticalTotal > criticalStudents.length && (
+              <div className="mt-4 flex justify-center">
+                <Button variant="ghost" size="sm" onClick={() => setOpenCriticalRanking(true)}>
+                  Ver todos ({criticalTotal} alunos)
+                </Button>
               </div>
             )}
           </TabsContent>
@@ -374,7 +561,7 @@ export function StudentRankingPanel({
       </CardContent>
 
       <Dialog open={openTopRanking} onOpenChange={setOpenTopRanking}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Ranking completo</DialogTitle>
             <DialogDescription>
@@ -383,12 +570,11 @@ export function StudentRankingPanel({
                 : 'Lista completa de alunos ordenados por média no recorte atual.'}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 shrink-0">
             <Input
               value={topSearch}
               onChange={(event) => {
                 setTopSearch(event.target.value);
-                setTopPage(1);
               }}
               placeholder="Buscar aluno..."
               className="h-9 w-full md:w-56"
@@ -397,7 +583,6 @@ export function StudentRankingPanel({
               value={topClassFilter}
               onValueChange={(value) => {
                 setTopClassFilter(value);
-                setTopPage(1);
               }}
             >
               <SelectTrigger className="h-9 w-full md:w-56">
@@ -416,7 +601,6 @@ export function StudentRankingPanel({
               value={topSort}
               onValueChange={(value) => {
                 setTopSort(value as typeof topSort);
-                setTopPage(1);
               }}
             >
               <SelectTrigger className="h-9 w-full md:w-52">
@@ -429,51 +613,29 @@ export function StudentRankingPanel({
                 <SelectItem value="name-desc">Nome (Z-A)</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="ghost" size="sm" onClick={resetTopFilters}>
-              Limpar
-            </Button>
           </div>
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="flex items-center justify-between text-xs text-muted-foreground shrink-0">
             <span>{filteredTopRanking.length} alunos</span>
-            <span>
-              Página {topPage} de {topPageCount}
-            </span>
           </div>
-          <ScrollArea className="max-h-[60vh] pr-4">
-            <div className="space-y-2">
-              {pagedTopRanking.map((student, index) => (
-                <StudentCard
-                  key={student.student.id}
-                  student={student}
-                  rank={(topPage - 1) * pageSize + index + 1}
-                  onSelect={handleOpenStudent}
-                />
-              ))}
+          <div className="flex-1 my-4 border rounded-md overflow-hidden flex flex-col min-h-0">
+            <div className="overflow-y-auto flex-1 p-2">
+              <div className="space-y-2">
+                {filteredTopRanking.map((student, index) => (
+                  <StudentCard
+                    key={student.student.id}
+                    student={student}
+                    rank={index + 1}
+                    onSelect={handleOpenStudent}
+                  />
+                ))}
+              </div>
             </div>
-          </ScrollArea>
-          <div className="flex items-center justify-between">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={topPage <= 1}
-              onClick={() => setTopPage((prev) => Math.max(1, prev - 1))}
-            >
-              Anterior
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={topPage >= topPageCount}
-              onClick={() => setTopPage((prev) => Math.min(topPageCount, prev + 1))}
-            >
-              Próxima
-            </Button>
           </div>
         </DialogContent>
       </Dialog>
 
       <Dialog open={openCriticalRanking} onOpenChange={setOpenCriticalRanking}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>
               {subjectMode ? 'Alunos com médias baixas' : 'Alunos em atenção ou críticos'}
@@ -484,12 +646,11 @@ export function StudentRankingPanel({
                 : 'Lista completa de alunos com desempenho abaixo do esperado.'}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 shrink-0">
             <Input
               value={criticalSearch}
               onChange={(event) => {
                 setCriticalSearch(event.target.value);
-                setCriticalPage(1);
               }}
               placeholder="Buscar aluno..."
               className="h-9 w-full md:w-56"
@@ -498,7 +659,6 @@ export function StudentRankingPanel({
               value={criticalClassFilter}
               onValueChange={(value) => {
                 setCriticalClassFilter(value);
-                setCriticalPage(1);
               }}
             >
               <SelectTrigger className="h-9 w-full md:w-56">
@@ -517,7 +677,6 @@ export function StudentRankingPanel({
               value={criticalSort}
               onValueChange={(value) => {
                 setCriticalSort(value as typeof criticalSort);
-                setCriticalPage(1);
               }}
             >
               <SelectTrigger className="h-9 w-full md:w-52">
@@ -530,44 +689,22 @@ export function StudentRankingPanel({
                 <SelectItem value="name-asc">Nome (A-Z)</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="ghost" size="sm" onClick={resetCriticalFilters}>
-              Limpar
-            </Button>
           </div>
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="flex items-center justify-between text-xs text-muted-foreground shrink-0">
             <span>{filteredCriticalRanking.length} alunos</span>
-            <span>
-              Página {criticalPage} de {criticalPageCount}
-            </span>
           </div>
-          <ScrollArea className="max-h-[60vh] pr-4">
-            <div className="space-y-3">
-              {pagedCriticalRanking.map((student) => (
-                <CriticalStudentCard
-                  key={student.student.id}
-                  student={student}
-                  onSelect={handleOpenStudent}
-                />
-              ))}
+          <div className="flex-1 my-4 border rounded-md overflow-hidden flex flex-col min-h-0">
+            <div className="overflow-y-auto flex-1 p-2">
+              <div className="space-y-3">
+                {filteredCriticalRanking.map((student) => (
+                  <CriticalStudentCard
+                    key={student.student.id}
+                    student={student}
+                    onSelect={handleOpenStudent}
+                  />
+                ))}
+              </div>
             </div>
-          </ScrollArea>
-          <div className="flex items-center justify-between">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={criticalPage <= 1}
-              onClick={() => setCriticalPage((prev) => Math.max(1, prev - 1))}
-            >
-              Anterior
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={criticalPage >= criticalPageCount}
-              onClick={() => setCriticalPage((prev) => Math.min(criticalPageCount, prev + 1))}
-            >
-              Próxima
-            </Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -904,14 +904,16 @@ export function computeSchoolAnalytics(
       const classRanges = new Map<string, { start: Date; end: Date } | null>();
       comparisonClasses.forEach((cls) => {
         if (filters.calendarYear !== 'all') {
-          const startYear = getStartCalendarYear(cls);
-          if (startYear) {
-            const specificYear = startYear + (targetSchoolYear - 1);
-            if (specificYear !== filters.calendarYear) {
-              classRanges.set(cls.id, null);
-              return;
-            }
-          }
+          // CORREÇÃO: Permitir comparação mesmo se a turma for de outro ano calendário
+          // O modo "Comparação" deve priorizar as turmas selecionadas explicitamente
+          // const startYear = getStartCalendarYear(cls);
+          // if (startYear) {
+          //   const specificYear = startYear + (targetSchoolYear - 1);
+          //   if (specificYear !== filters.calendarYear) {
+          //     classRanges.set(cls.id, null);
+          //     return;
+          //   }
+          // }
         }
 
         const startYearDate = resolveStartYearDate(cls);

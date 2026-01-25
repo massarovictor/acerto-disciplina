@@ -27,8 +27,8 @@ export function SchoolOverviewCards({
       value: overview.totalStudents.toString(),
       icon: Users,
       description: `${overview.totalClasses} turmas ativas`,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100',
+      color: 'text-blue-600 dark:text-blue-400',
+      bgColor: 'bg-blue-100 dark:bg-blue-900/30',
     },
     {
       title: subjectMode ? 'Média do Recorte' : 'Média Geral',
@@ -40,10 +40,10 @@ export function SchoolOverviewCards({
           : overview.overallAverage >= 6 ? 'Acima da média' : 'Abaixo da média'
         : 'Sem notas lançadas no recorte',
       color: hasGrades
-        ? overview.overallAverage >= 6 ? 'text-emerald-600' : 'text-red-600'
+        ? overview.overallAverage >= 6 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
         : 'text-muted-foreground',
       bgColor: hasGrades
-        ? overview.overallAverage >= 6 ? 'bg-emerald-100' : 'bg-red-100'
+        ? overview.overallAverage >= 6 ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-red-100 dark:bg-red-900/30'
         : 'bg-muted',
     },
     // DISABLED: Frequência removida temporariamente
@@ -52,8 +52,8 @@ export function SchoolOverviewCards({
     //   value: `${overview.overallFrequency.toFixed(0)}%`,
     //   icon: Clock,
     //   description: overview.overallFrequency >= 75 ? 'Adequada' : 'Atenção necessária',
-    //   color: overview.overallFrequency >= 75 ? 'text-emerald-600' : 'text-amber-600',
-    //   bgColor: overview.overallFrequency >= 75 ? 'bg-emerald-100' : 'bg-amber-100',
+    //   color: overview.overallFrequency >= 75 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400',
+    //   bgColor: overview.overallFrequency >= 75 ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-amber-100 dark:bg-amber-900/30',
     // },
     ...(showBehavior
       ? [
@@ -62,15 +62,15 @@ export function SchoolOverviewCards({
           value: overview.totalIncidents.toString(),
           icon: AlertTriangle,
           description: 'Total registrado',
-          color: 'text-amber-600',
-          bgColor: 'bg-amber-100',
+          color: 'text-amber-600 dark:text-amber-400',
+          bgColor: 'bg-amber-100 dark:bg-amber-900/30',
         },
       ]
       : []),
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(250px,1fr))]">
       {cards.map((card) => (
         <Card key={card.title}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

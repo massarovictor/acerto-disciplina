@@ -78,17 +78,7 @@ export function BehaviorAnalyticsPanel({
 
     return (
         <Card className="border-none shadow-none">
-            <CardHeader className="px-0 pt-0">
-                <div className="flex items-center gap-2">
-                    <div className="p-2 bg-amber-100 dark:bg-amber-900/20 rounded-full">
-                        <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                    </div>
-                    <div>
-                        <CardTitle>Comportamento e Disciplina</CardTitle>
-                        <CardDescription>Visão geral de ocorrências e convivência escolar</CardDescription>
-                    </div>
-                </div>
-            </CardHeader>
+
             <CardContent className="px-0 space-y-6">
                 {/* Overview Cards */}
                 <div className="grid gap-4 md:grid-cols-4">

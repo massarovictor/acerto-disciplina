@@ -19,6 +19,7 @@ import {
   Presentation,
   ZoomIn,
   ZoomOut,
+  Activity,
 } from "lucide-react";
 import { Class, Student, Incident } from "@/types";
 import { CoverSlide } from "./slides/CoverSlide";
@@ -56,16 +57,70 @@ interface ClassSlidesProps {
   // attendance: AttendanceRecord[];
 }
 
+import { useSearchParams } from "react-router-dom";
+
+// ...
+
 export const ClassSlides = ({
   classes,
   students,
   incidents,
   enabled = true,
 }: ClassSlidesProps) => {
+  const [searchParams] = useSearchParams();
   const [selectedClass, setSelectedClass] = useState("");
   const [selectedStudent, setSelectedStudent] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState("all");
   const [selectedSchoolYear, setSelectedSchoolYear] = useState<1 | 2 | 3>(1);
+
+  // Sync with URL params on mount
+  const isInitialUrlSync = useRef(false);
+
+  useEffect(() => {
+    const classIdParam = searchParams.get('classId');
+    const studentIdParam = searchParams.get('studentId');
+    const viewParam = searchParams.get('view');
+    const periodParam = searchParams.get('period');
+    const yearParam = searchParams.get('year');
+
+    let hasUrlParams = false;
+
+    if (classIdParam && classes.some(c => c.id === classIdParam)) {
+      setSelectedClass(classIdParam);
+      hasUrlParams = true;
+    }
+
+    if (studentIdParam && students.some(s => s.id === studentIdParam)) {
+      setSelectedStudent(studentIdParam);
+      hasUrlParams = true;
+    }
+
+    if (viewParam && ['class', 'individual', 'situation', 'school'].includes(viewParam)) {
+      setViewMode(viewParam as any);
+      hasUrlParams = true;
+    }
+
+    if (periodParam && (['all', ...QUARTERS].includes(periodParam))) {
+      setSelectedPeriod(periodParam);
+    }
+
+    if (yearParam) {
+      const parsedYear = parseInt(yearParam, 10) as 1 | 2 | 3;
+      if ([1, 2, 3].includes(parsedYear)) {
+        setSelectedSchoolYear(parsedYear);
+        hasUrlParams = true; // Mark as having vital params
+      }
+    }
+
+    if (hasUrlParams) {
+      isInitialUrlSync.current = true;
+      // Reset flag after a delay to allow normal interaction
+      setTimeout(() => {
+        isInitialUrlSync.current = false;
+      }, 1000);
+    }
+  }, [searchParams, classes, students]);
+
   const [currentSlide, setCurrentSlide] = useState(1);
   const [viewMode, setViewMode] = useState<"class" | "individual" | "situation" | "school">("class");
   const [selectedSituation, setSelectedSituation] = useState<SituationType | "">("");
@@ -116,6 +171,13 @@ export const ClassSlides = ({
       setSelectedSchoolYear(1);
       return;
     }
+
+    // Se a mudança de turma foi causada pela sincronização inicial da URL e já definimos o ano,
+    // ignoramos o recálculo automático para preservar o ano histórico vindo da URL.
+    if (isInitialUrlSync.current) {
+      return;
+    }
+
     // Calcular dinamicamente o ano atual da turma baseado no ano calendário de início
     const classInfo = classes.find((c) => c.id === selectedClass);
     if (!classInfo) {
@@ -753,6 +815,22 @@ export const ClassSlides = ({
     container.addEventListener("wheel", handleWheel, { passive: false });
     return () => container.removeEventListener("wheel", handleWheel);
   }, []);
+  const handleOpenTrajectory = () => {
+    if (!classData || !studentData) return;
+
+    const params = new URLSearchParams();
+    params.set('classId', classData.id);
+    params.set('studentId', studentData.id);
+
+    toast({
+      title: "Abrindo trajetória em nova aba...",
+      description: `Analisando ${studentData.name}`,
+      duration: 1500,
+    });
+
+    window.open(`/trajetoria?${params.toString()}`, '_blank');
+  };
+
   const handleExportPDF = async () => {
     if (isExporting || !activeSlides.length) return;
 
@@ -798,10 +876,10 @@ export const ClassSlides = ({
         description: `A apresentação foi gerada com sucesso.`,
       });
     } catch (error) {
-      console.error("Export error:", error);
+      console.error(error);
       toast({
-        title: "Erro ao exportar",
-        description: "Ocorreu um erro ao processar os slides sequencialmente.",
+        title: "Erro na exportação",
+        description: "Ocorreu um erro ao gerar o PDF.",
         variant: "destructive",
       });
     } finally {
@@ -1188,6 +1266,17 @@ export const ClassSlides = ({
                     ? "Processando..."
                     : "Exportar Apresentação (PDF)"}
                 </Button>
+
+                {/* Atalho para Trajetória */}
+                {viewMode === "individual" && selectedStudent && (
+                  <Button
+                    variant="outline"
+                    onClick={handleOpenTrajectory}
+                  >
+                    <Activity className="h-4 w-4 mr-2" />
+                    Ver Trajetória
+                  </Button>
+                )}
 
                 <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-md border">
                   <Button

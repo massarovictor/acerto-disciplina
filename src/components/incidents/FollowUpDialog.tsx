@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Incident, FollowUpType } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -146,12 +147,13 @@ export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Registrar Acompanhamento</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <ScrollArea className="flex-1 pr-4">
+          <div className="space-y-4">
           <div className="space-y-2">
             <Label>Tipo de Acompanhamento</Label>
             <Select value={type} onValueChange={(v) => setType(v as FollowUpType)}>
@@ -277,7 +279,10 @@ export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: 
             </>
           )}
 
-          <div className="flex justify-end gap-2">
+          </div>
+        </ScrollArea>
+
+        <div className="flex justify-end gap-2 pt-4 border-t">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>

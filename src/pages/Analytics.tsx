@@ -56,6 +56,7 @@ import { ClassComparisonDialog } from '@/components/analytics/ClassComparisonDia
 import { BehaviorAnalyticsPanel } from '@/components/analytics/BehaviorAnalyticsPanel';
 import { CohortComparisonTable } from '@/components/analytics/CohortComparisonTable';
 import { useUIStore } from '@/stores/useUIStore';
+import { useToast } from '@/hooks/use-toast';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useAnalyticsFiltersLogic } from '@/hooks/useAnalyticsFiltersLogic';
@@ -74,7 +75,7 @@ const InlineInsights = ({
 
   return (
     <Card className="border-border/60 shadow-sm">
-      <CardHeader className="pb-3 border-b bg-muted/20">
+      <CardHeader className="pb-3 border-b border-border/50 dark:border-border/30 bg-muted/20">
         <CardTitle className="text-sm font-medium flex items-center gap-2 text-foreground/80">
           {title}
         </CardTitle>
@@ -174,6 +175,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 // ... (InlineInsights e SubjectComparisonCard mantidos como estavam ou movidos para arquivos separados futuramente)
 
 const Analytics = () => {
+  const { toast } = useToast();
   const { classes } = useClasses();
   const { students } = useStudents();
   const { professionalSubjects } = useProfessionalSubjects();
@@ -206,6 +208,16 @@ const Analytics = () => {
     incidents,
     filters
   );
+
+  useEffect(() => {
+    // DEBUG: imprimir quantas disciplinas o worker retornou
+    try {
+      // eslint-disable-next-line no-console
+      console.info('[DEBUG] analytics.subjectAnalytics.length =', analytics?.subjectAnalytics?.length);
+    } catch (e) {
+      // ignore
+    }
+  }, [analytics?.subjectAnalytics?.length]);
 
   const analyticsContext = analytics.context ?? {
     mode: 'general' as const,
@@ -247,24 +259,44 @@ const Analytics = () => {
 
     if (actionData.classId) {
       applyFilters({ classIds: [actionData.classId] });
+      toast({
+        title: "Filtro aplicado",
+        description: "Exibindo dados da turma selecionada",
+        duration: 2000,
+      });
     }
 
     if (actionData.subject) {
       applyFilters({ subjects: [actionData.subject] });
+      toast({
+        title: "Filtro aplicado",
+        description: `Analisando ${actionData.subject}`,
+        duration: 2000,
+      });
     }
 
     if (actionData.filter === 'critico') {
-      setActiveTab('risk'); // Muda para a aba de Risco
+      setActiveTab('ranking-alunos');
       setRankingFocus('critical');
+      toast({
+        title: "Navegando...",
+        description: "Exibindo alunos em situação crítica",
+        duration: 2000,
+      });
     } else if (actionData.filter === 'excelencia') {
-      setActiveTab('academic'); // Muda para a aba Acadêmica
+      setActiveTab('ranking-alunos');
       setRankingFocus('top');
+      toast({
+        title: "Navegando...",
+        description: "Exibindo alunos em destaque",
+        duration: 2000,
+      });
     }
 
     // Scroll suave após mudança de aba (timeout para permitir render)
     setTimeout(() => {
-      rankingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
+      rankingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 300);
   };
 
   const handleFilterChange = (newFilters: Partial<AnalyticsFilters>) => {
@@ -316,7 +348,7 @@ const Analytics = () => {
 
     // Join with spaces
     return (
-      <span className="flex flex-wrap gap-1 items-baseline font-normal text-muted-foreground">
+      <span className="flex flex-wrap gap-1 items-baseline font-normal text-muted-foreground dark:text-muted-foreground/80 dark:opacity-90">
         {filtersLabel.reduce((prev, curr, index) => [prev, <span key={`sep-${index}`}> </span>, curr] as any)}
       </span>
     );
@@ -346,27 +378,41 @@ const Analytics = () => {
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
           <TabsTrigger value="dashboard" className="gap-2">
             <LayoutDashboard className="h-4 w-4" />
             Visão 360º
           </TabsTrigger>
-          <TabsTrigger value="academic" className="gap-2">
+          <TabsTrigger value="subjects" className="gap-2">
             <BookOpen className="h-4 w-4" />
-            Acadêmico
+            Disciplinas
+          </TabsTrigger>
+          <TabsTrigger value="classes" className="gap-2">
+            <GraduationCap className="h-4 w-4" />
+            Ranking de Turma
+          </TabsTrigger>
+          <TabsTrigger value="ranking-alunos" className="gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Ranking de Alunos
           </TabsTrigger>
           <TabsTrigger value="behavior" className="gap-2">
             <Users2 className="h-4 w-4" />
             Convivência
           </TabsTrigger>
-          <TabsTrigger value="risk" className="gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Rankings
-          </TabsTrigger>
         </TabsList>
 
         {/* ================= ABA 1: DASHBOARD ================= */}
         <TabsContent value="dashboard" className="space-y-8">
+          {analyticsContext.gradeCount === 0 && analyticsContext.studentCount === 0 && !analyticsLoading && (
+            <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4 text-center">
+              <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                Nenhum dado encontrado para os filtros selecionados.
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Tente ajustar os filtros de período, série ou turma.
+              </p>
+            </div>
+          )}
           <SchoolOverviewCards
             overview={analytics.overview}
             showBehavior={!analyticsContext.hasSubjectFilter}
@@ -391,27 +437,36 @@ const Analytics = () => {
           />
         </TabsContent>
 
-        {/* ================= ABA 2: ACADÊMICO ================= */}
-        <TabsContent value="academic" className="space-y-8">
-          {/* Section Full Width */}
+        {/* ================= ABA 2: DISCIPLINAS ================= */}
+        <TabsContent value="subjects" className="space-y-8">
           <SubjectAnalysisPanel
-            bestSubjects={analytics.bestSubjects}
-            worstSubjects={analytics.worstSubjects}
             allSubjects={analytics.subjectAnalytics}
             areaAnalytics={analytics.areaAnalytics}
           />
 
-          {/* Grid for Comparison Card if efficient */}
+          <div className="text-xs text-muted-foreground">DEBUG: disciplinas retornadas: {analytics.subjectAnalytics.length}</div>
+
+          {/* Comparativo de Disciplinas */}
           {analyticsContext.hasSubjectFilter && (
             <div className="max-w-xl">
               <SubjectComparisonCard subjects={analytics.subjectAnalytics} />
             </div>
           )}
 
+          <InlineInsights
+            insights={analytics.categorizedInsights.academic.filter(i => i.type !== 'alert')}
+            title="Insights de Disciplinas"
+            onAction={handleInsightAction}
+          />
+        </TabsContent>
+
+        {/* ================= ABA 3: RANKING DE TURMA ================= */}
+        <TabsContent value="classes" className="space-y-8">
           <ClassRankingTable
             classRanking={analytics.classRanking}
             onSelectForComparison={handleCompare}
             subjectMode={analyticsContext.hasSubjectFilter}
+            filters={filters}
           />
 
           {filters.schoolYear !== 'all' && (
@@ -423,12 +478,34 @@ const Analytics = () => {
 
           <InlineInsights
             insights={analytics.categorizedInsights.academic}
-            title="Insights Acadêmicos"
+            title="Insights Gerais"
             onAction={handleInsightAction}
           />
         </TabsContent>
 
-        {/* ================= ABA 3: DISCIPLINAR ================= */}
+        {/* ================= ABA 4: RANKING DE ALUNOS ================= */}
+        <TabsContent value="ranking-alunos" className="space-y-8">
+          <div ref={rankingRef}>
+            <StudentRankingPanel
+              topStudents={analytics.topStudents}
+              criticalStudents={analytics.criticalStudents}
+              allStudentsRanking={analytics.allStudentsRanking}
+              allCriticalStudents={analytics.allCriticalStudents}
+              focusTab={rankingFocus}
+              subjectMode={analyticsContext.hasSubjectFilter}
+              activeSubjects={filters.subjects ?? []}
+              filters={filters}
+            />
+          </div>
+
+          <InlineInsights
+            insights={analytics.categorizedInsights.risk}
+            title="Alertas e Situações de Risco"
+            onAction={handleInsightAction}
+          />
+        </TabsContent>
+
+        {/* ================= ABA 5: CONVIVÊNCIA ================= */}
         <TabsContent value="behavior" className="space-y-8">
           {!analyticsContext.hasSubjectFilter ? (
             <>
@@ -458,27 +535,6 @@ const Analytics = () => {
               </Button>
             </div>
           )}
-        </TabsContent>
-
-        {/* ================= ABA 4: RISCO ================= */}
-        <TabsContent value="risk" className="space-y-8">
-          <div ref={rankingRef}>
-            <StudentRankingPanel
-              topStudents={analytics.topStudents}
-              criticalStudents={analytics.criticalStudents}
-              allStudentsRanking={analytics.allStudentsRanking}
-              allCriticalStudents={analytics.allCriticalStudents}
-              focusTab={rankingFocus}
-              subjectMode={analyticsContext.hasSubjectFilter}
-              activeSubjects={filters.subjects ?? []}
-            />
-          </div>
-
-          <InlineInsights
-            insights={analytics.categorizedInsights.risk}
-            title="Alertas e Situações de Risco"
-            onAction={handleInsightAction}
-          />
         </TabsContent>
 
       </Tabs>
