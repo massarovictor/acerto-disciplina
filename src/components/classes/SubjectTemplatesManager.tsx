@@ -268,79 +268,112 @@ export const SubjectTemplatesManager = () => {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3 border-b bg-muted/20">
           <div className="flex items-center justify-between">
-            <CardTitle>Templates de Disciplinas Profissionais</CardTitle>
+            <div className="space-y-1">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Save className="h-4 w-4" />
+                Templates de Disciplinas Profissionais
+              </CardTitle>
+            </div>
+
             <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
               <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
+                <Button size="sm" className="gap-2 shadow-sm">
+                  <Plus className="h-4 w-4" />
                   Novo Template
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Criar Template de Disciplinas</DialogTitle>
+                <DialogHeader className="border-b pb-4 mb-4">
+                  <DialogTitle className="flex items-center gap-2 text-xl">
+                    <div className="p-2 rounded-full bg-primary/10">
+                      <Plus className="h-5 w-5 text-primary" />
+                    </div>
+                    Criar Template de Disciplinas
+                  </DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="template-name">Nome do Template *</Label>
-                    <Input
-                      id="template-name"
-                      placeholder="Ex: Técnico em Informática - Padrão"
-                      value={createFormData.name}
-                      onChange={(e) => setCreateFormData({ ...createFormData, name: e.target.value })}
-                    />
+                <div className="space-y-6">
+                  {/* Informações Básicas */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2 md:col-span-1 space-y-2">
+                      <Label htmlFor="template-name" className="text-xs font-semibold uppercase text-muted-foreground">Nome do Template *</Label>
+                      <Input
+                        id="template-name"
+                        placeholder="Ex: Técnico em Informática - Padrão"
+                        value={createFormData.name}
+                        onChange={(e) => setCreateFormData({ ...createFormData, name: e.target.value })}
+                        className="font-medium"
+                      />
+                    </div>
+                    <div className="col-span-2 md:col-span-1 space-y-2">
+                      <Label htmlFor="template-course" className="text-xs font-semibold uppercase text-muted-foreground">Curso *</Label>
+                      <Input
+                        id="template-course"
+                        placeholder="Ex: Técnico em Informática"
+                        value={createFormData.course}
+                        onChange={(e) => setCreateFormData({ ...createFormData, course: e.target.value })}
+                      />
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="template-course">Curso *</Label>
-                    <Input
-                      id="template-course"
-                      placeholder="Ex: Técnico em Informática"
-                      value={createFormData.course}
-                      onChange={(e) => setCreateFormData({ ...createFormData, course: e.target.value })}
-                    />
+                  {/* Grade Curricular */}
+                  <div className="space-y-4 pt-2">
+                    <div className="flex items-center gap-2 pb-2 border-b">
+                      <Label className="text-sm font-semibold text-foreground">Grade Curricular Profissional</Label>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="space-y-2 p-3 bg-muted/20 rounded-lg border border-border/50">
+                        <Label htmlFor="year1" className="flex items-center gap-2">
+                          <Badge variant="outline" className="bg-background">1º Ano</Badge>
+                          <span className="text-xs text-muted-foreground font-normal">Disciplinas separadas por vírgula</span>
+                        </Label>
+                        <Input
+                          id="year1"
+                          placeholder="Ex: Algoritmos, Lógica de Programação, Fundamentos de TI"
+                          value={createFormData.year1Subjects}
+                          onChange={(e) => setCreateFormData({ ...createFormData, year1Subjects: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="space-y-2 p-3 bg-muted/20 rounded-lg border border-border/50">
+                        <Label htmlFor="year2" className="flex items-center gap-2">
+                          <Badge variant="outline" className="bg-background">2º Ano</Badge>
+                          <span className="text-xs text-muted-foreground font-normal">Disciplinas separadas por vírgula</span>
+                        </Label>
+                        <Input
+                          id="year2"
+                          placeholder="Ex: Banco de Dados, Programação Web, Redes"
+                          value={createFormData.year2Subjects}
+                          onChange={(e) => setCreateFormData({ ...createFormData, year2Subjects: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="space-y-2 p-3 bg-muted/20 rounded-lg border border-border/50">
+                        <Label htmlFor="year3" className="flex items-center gap-2">
+                          <Badge variant="outline" className="bg-background">3º Ano</Badge>
+                          <span className="text-xs text-muted-foreground font-normal">Disciplinas separadas por vírgula</span>
+                        </Label>
+                        <Input
+                          id="year3"
+                          placeholder="Ex: Projeto Integrador, Gestão de Projetos, Mobile"
+                          value={createFormData.year3Subjects}
+                          onChange={(e) => setCreateFormData({ ...createFormData, year3Subjects: e.target.value })}
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="year1">Disciplinas do 1º Ano</Label>
-                    <Input
-                      id="year1"
-                      placeholder="Separadas por vírgula (ex: Algoritmos, Lógica de Programação)"
-                      value={createFormData.year1Subjects}
-                      onChange={(e) => setCreateFormData({ ...createFormData, year1Subjects: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="year2">Disciplinas do 2º Ano</Label>
-                    <Input
-                      id="year2"
-                      placeholder="Separadas por vírgula"
-                      value={createFormData.year2Subjects}
-                      onChange={(e) => setCreateFormData({ ...createFormData, year2Subjects: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="year3">Disciplinas do 3º Ano</Label>
-                    <Input
-                      id="year3"
-                      placeholder="Separadas por vírgula"
-                      value={createFormData.year3Subjects}
-                      onChange={(e) => setCreateFormData({ ...createFormData, year3Subjects: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="flex gap-3">
-                    <Button onClick={handleCreate} className="flex-1">
-                      <Save className="h-4 w-4 mr-2" />
+                  <div className="flex gap-3 pt-4 border-t">
+                    <Button onClick={handleCreate} className="flex-1 gap-2 shadow-sm" size="lg">
+                      <Save className="h-4 w-4" />
                       Criar Template
                     </Button>
                     <Button
                       type="button"
                       variant="outline"
+                      size="lg"
                       onClick={() => setShowCreateDialog(false)}
                     >
                       Cancelar
@@ -351,75 +384,122 @@ export const SubjectTemplatesManager = () => {
             </Dialog>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {templates.length === 0 ? (
-            <div className="text-center py-12">
-              <Save className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">Nenhum template criado</h3>
-              <p className="text-muted-foreground">
-                Crie templates para reutilizar configurações de disciplinas.
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="p-4 rounded-full bg-muted/30 mb-4">
+                <Save className="h-8 w-8 text-muted-foreground opacity-50" />
+              </div>
+              <h3 className="text-lg font-medium text-foreground mb-1">Nenhum template criado</h3>
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                Crie templates para padronizar a grade curricular e reutilizar configurações em novas turmas.
               </p>
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={() => setShowCreateDialog(true)}
+              >
+                Criar Primeiro Template
+              </Button>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Curso</TableHead>
-                  <TableHead>Total de Disciplinas</TableHead>
-                  <TableHead>Anos Configurados</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {templates.map((template) => {
-                  const totalSubjects = template.subjectsByYear.reduce(
-                    (sum, year) => sum + year.subjects.length,
-                    0
-                  );
-                  const usageCount = getTemplateUsageCount(template.id);
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-[250px]">Nome</TableHead>
+                    <TableHead>Curso</TableHead>
+                    <TableHead>Configuração</TableHead>
+                    <TableHead>Grade Curricular</TableHead>
+                    <TableHead className="text-right pr-6">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {templates.map((template) => {
+                    const totalSubjects = template.subjectsByYear.reduce(
+                      (sum, year) => sum + year.subjects.length,
+                      0
+                    );
+                    const usageCount = getTemplateUsageCount(template.id);
+                    const yearsConfigured = template.subjectsByYear.map(y => y.year).sort().join(', ');
 
-                  return (
-                    <TableRow key={template.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          {template.name}
-                          {usageCount > 0 && (
-                            <Badge variant="outline" className="text-xs">
-                              {usageCount} turma(s)
+                    return (
+                      <TableRow key={template.id} className="group transition-colors hover:bg-muted/40">
+                        <TableCell className="font-medium">
+                          <div className="flex flex-col gap-1">
+                            <span className="font-semibold text-foreground">{template.name}</span>
+                            {usageCount > 0 && (
+                              <Badge variant="secondary" className="w-fit text-[10px] px-1.5 h-5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                {usageCount} turma(s) em uso
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-muted-foreground">{template.course}</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Badge variant="outline" className="font-normal">
+                              {totalSubjects} disc.
                             </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{template.course}</TableCell>
-                      <TableCell>{totalSubjects} disciplina(s)</TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          {template.subjectsByYear.map((yearData) => (
-                            <Badge key={yearData.year} variant="outline">
-                              {yearData.year}º ano ({yearData.subjects.length})
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex gap-2 justify-end">
-                          <Button variant="ghost" size="icon" onClick={() => setViewingTemplate(template)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => openEditDialog(template)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => setDeletingTemplate(template)}>
-                            <Trash2 className="h-4 w-4 text-severity-critical" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                            {yearsConfigured && (
+                              <span className="text-xs">
+                                Anos: {yearsConfigured}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1 flex-wrap max-w-[300px]">
+                            {template.subjectsByYear.map((yearData) => (
+                              <Badge
+                                key={yearData.year}
+                                variant="outline"
+                                className="bg-muted/50 text-muted-foreground border-border text-[10px]"
+                              >
+                                {yearData.year}º ano ({yearData.subjects.length})
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right pr-4">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                              onClick={() => setViewingTemplate(template)}
+                              title="Visualizar Detalhes"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                              onClick={() => openEditDialog(template)}
+                              title="Editar Template"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              onClick={() => setDeletingTemplate(template)}
+                              title="Excluir Template"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -467,68 +547,95 @@ export const SubjectTemplatesManager = () => {
       {editingTemplate && (
         <Dialog open={!!editingTemplate} onOpenChange={(open) => !open && setEditingTemplate(null)}>
           <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Editar Template</DialogTitle>
+            <DialogHeader className="border-b pb-4 mb-4">
+              <DialogTitle className="flex items-center gap-2 text-xl">
+                <div className="p-2 rounded-full bg-blue-100 dark:bg-blue-900/30">
+                  <Edit className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                Editar Template
+              </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-template-name">Nome do Template *</Label>
-                <Input
-                  id="edit-template-name"
-                  placeholder="Ex: Técnico em Informática - Padrão"
-                  value={editFormData.name}
-                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                />
+            <div className="space-y-6">
+              {/* Informações Básicas */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2 md:col-span-1 space-y-2">
+                  <Label htmlFor="edit-template-name" className="text-xs font-semibold uppercase text-muted-foreground">Nome do Template *</Label>
+                  <Input
+                    id="edit-template-name"
+                    placeholder="Ex: Técnico em Informática - Padrão"
+                    value={editFormData.name}
+                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                    className="font-medium"
+                  />
+                </div>
+                <div className="col-span-2 md:col-span-1 space-y-2">
+                  <Label htmlFor="edit-template-course" className="text-xs font-semibold uppercase text-muted-foreground">Curso *</Label>
+                  <Input
+                    id="edit-template-course"
+                    placeholder="Ex: Técnico em Informática"
+                    value={editFormData.course}
+                    onChange={(e) => setEditFormData({ ...editFormData, course: e.target.value })}
+                  />
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="edit-template-course">Curso *</Label>
-                <Input
-                  id="edit-template-course"
-                  placeholder="Ex: Técnico em Informática"
-                  value={editFormData.course}
-                  onChange={(e) => setEditFormData({ ...editFormData, course: e.target.value })}
-                />
+              {/* Grade Curricular */}
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center gap-2 pb-2 border-b">
+                  <Label className="text-sm font-semibold text-foreground">Grade Curricular Profissional</Label>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2 p-3 bg-muted/20 rounded-lg border border-border/50">
+                    <Label htmlFor="edit-year1" className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-background">1º Ano</Badge>
+                      <span className="text-xs text-muted-foreground font-normal">Disciplinas separadas por vírgula</span>
+                    </Label>
+                    <Input
+                      id="edit-year1"
+                      placeholder="Ex: Algoritmos, Lógica de Programação"
+                      value={editFormData.year1Subjects}
+                      onChange={(e) => setEditFormData({ ...editFormData, year1Subjects: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2 p-3 bg-muted/20 rounded-lg border border-border/50">
+                    <Label htmlFor="edit-year2" className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-background">2º Ano</Badge>
+                      <span className="text-xs text-muted-foreground font-normal">Disciplinas separadas por vírgula</span>
+                    </Label>
+                    <Input
+                      id="edit-year2"
+                      placeholder="Ex: Banco de Dados, Programação Web"
+                      value={editFormData.year2Subjects}
+                      onChange={(e) => setEditFormData({ ...editFormData, year2Subjects: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2 p-3 bg-muted/20 rounded-lg border border-border/50">
+                    <Label htmlFor="edit-year3" className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-background">3º Ano</Badge>
+                      <span className="text-xs text-muted-foreground font-normal">Disciplinas separadas por vírgula</span>
+                    </Label>
+                    <Input
+                      id="edit-year3"
+                      placeholder="Ex: Projeto Integrador, Mobile"
+                      value={editFormData.year3Subjects}
+                      onChange={(e) => setEditFormData({ ...editFormData, year3Subjects: e.target.value })}
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="edit-year1">Disciplinas do 1º Ano</Label>
-                <Input
-                  id="edit-year1"
-                  placeholder="Separadas por vírgula (ex: Algoritmos, Lógica de Programação)"
-                  value={editFormData.year1Subjects}
-                  onChange={(e) => setEditFormData({ ...editFormData, year1Subjects: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-year2">Disciplinas do 2º Ano</Label>
-                <Input
-                  id="edit-year2"
-                  placeholder="Separadas por vírgula"
-                  value={editFormData.year2Subjects}
-                  onChange={(e) => setEditFormData({ ...editFormData, year2Subjects: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-year3">Disciplinas do 3º Ano</Label>
-                <Input
-                  id="edit-year3"
-                  placeholder="Separadas por vírgula"
-                  value={editFormData.year3Subjects}
-                  onChange={(e) => setEditFormData({ ...editFormData, year3Subjects: e.target.value })}
-                />
-              </div>
-
-              <div className="flex gap-3">
-                <Button onClick={handleEdit} className="flex-1">
-                  <Save className="h-4 w-4 mr-2" />
+              <div className="flex gap-3 pt-4 border-t">
+                <Button onClick={handleEdit} className="flex-1 gap-2 shadow-sm" size="lg">
+                  <Save className="h-4 w-4" />
                   Salvar Alterações
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
+                  size="lg"
                   onClick={() => setEditingTemplate(null)}
                 >
                   Cancelar

@@ -34,10 +34,10 @@ const Students = () => {
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3 bg-muted/20 p-1">
-          <TabsTrigger value="manage">Gerenciar Alunos</TabsTrigger>
-          <TabsTrigger value="register">Cadastrar</TabsTrigger>
-          <TabsTrigger value="approval">Aprovações</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 bg-muted p-1">
+          <TabsTrigger value="manage" className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">Gerenciar Alunos</TabsTrigger>
+          <TabsTrigger value="register" className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">Cadastrar</TabsTrigger>
+          <TabsTrigger value="approval" className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">Aprovações</TabsTrigger>
         </TabsList>
 
         <TabsContent value="manage" className="space-y-6 mt-6">

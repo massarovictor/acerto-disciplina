@@ -463,7 +463,15 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
     <div className="space-y-6">
       {/* Filters */}
       <Card>
-        <CardContent className="pt-6">
+        <CardHeader className="pb-3 border-b bg-muted/20">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              Filtrar e Buscar
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
@@ -481,24 +489,24 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                 variant={filterStatus === "all" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setFilterStatus("all")}
+                className={filterStatus === "all" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}
               >
                 Todas
               </Button>
               <Button
-                variant={
-                  filterStatus === "without-director" ? "default" : "outline"
-                }
+                variant={filterStatus === "without-director" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setFilterStatus("without-director")}
+                className={filterStatus === "without-director" ? "bg-amber-600 hover:bg-amber-700 text-white" : "text-muted-foreground"}
               >
+                <AlertTriangle className="h-3.5 w-3.5 mr-1" />
                 Sem Diretor
               </Button>
               <Button
-                variant={
-                  filterStatus === "with-director" ? "default" : "outline"
-                }
+                variant={filterStatus === "with-director" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setFilterStatus("with-director")}
+                className={filterStatus === "with-director" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "text-muted-foreground"}
               >
                 Com Diretor
               </Button>
@@ -509,32 +517,42 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
 
       {/* Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Turmas ({filteredClasses.length})</CardTitle>
+        <CardHeader className="pb-3 border-b bg-muted/20">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <School className="h-4 w-4" />
+              Turmas Cadastradas
+            </CardTitle>
+            <Badge variant="secondary" className="font-normal">
+              {filteredClasses.length} turmas encontradas
+            </Badge>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {filteredClasses.length === 0 ? (
-            <div className="text-center py-12">
-              <School className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="p-4 rounded-full bg-muted/30 mb-4">
+                <School className="h-8 w-8 text-muted-foreground opacity-50" />
+              </div>
+              <h3 className="text-lg font-medium text-foreground mb-1">
                 Nenhuma turma encontrada
               </h3>
-              <p className="text-muted-foreground">
-                Tente ajustar os filtros de busca ou crie uma nova turma.
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                Não encontramos turmas com os filtros atuais. Tente buscar por outros termos ou status.
               </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Turma</TableHead>
-                    <TableHead>Período</TableHead>
-                    <TableHead>Série Atual</TableHead>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-[300px]">Turma</TableHead>
+                    <TableHead>Ciclo</TableHead>
+                    <TableHead>Ano Atual</TableHead>
                     <TableHead>Diretor</TableHead>
                     <TableHead>Alunos</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
+                    <TableHead className="text-right pr-6">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -554,21 +572,22 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                     return (
                       <TableRow
                         key={cls.id}
-                        className={isHighlighted ? "bg-primary/10 animate-pulse ring-2 ring-primary/50" : ""}
+                        className={`group transition-colors hover:bg-muted/40 ${isHighlighted ? "bg-primary/5 shadow-[inset_4px_0_0_0_theme(colors.primary.DEFAULT)]" : ""}`}
                       >
                         <TableCell className="font-medium">
-                          <div>
-                            <div className="font-semibold">{cls.name}</div>
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-foreground">{cls.name}</span>
                             {cls.course && (
-                              <div className="text-sm text-muted-foreground">{cls.course}</div>
+                              <span className="text-xs text-muted-foreground font-normal">{cls.course}</span>
                             )}
                           </div>
                         </TableCell>
                         <TableCell>
                           {cls.startCalendarYear && cls.endCalendarYear ? (
-                            <Badge variant="outline">
-                              {cls.startCalendarYear} - {cls.endCalendarYear}
-                            </Badge>
+                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                              <Calendar className="h-3.5 w-3.5 opacity-70" />
+                              <span>{cls.startCalendarYear}-{cls.endCalendarYear}</span>
+                            </div>
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}
@@ -577,60 +596,70 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                           <Badge
                             variant="outline"
                             className={cycleComplete
-                              ? "bg-amber-500/10 text-amber-700 border-amber-500/30"
-                              : "bg-blue-500/10 text-blue-700 border-blue-500/30"
+                              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200"
+                              : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200"
                             }
                           >
-                            <Calendar className="h-3 w-3 mr-1" />
                             {cycleComplete ? "Concluído" : `${computedSeries}º ano`}
                           </Badge>
                         </TableCell>
                         <TableCell>
                           {(cls.directorId || cls.directorEmail) ? (
-                            <div>
-                              <p className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              <span className="text-sm font-medium truncate max-w-[120px]" title={getDirectorName(cls) || ''}>
                                 {getDirectorName(cls)}
-                              </p>
+                              </span>
                             </div>
                           ) : (
                             <Badge
                               variant="outline"
-                              className="bg-severity-critical-bg text-severity-critical border-severity-critical"
+                              className="bg-red-50 text-red-700 border-red-200 dark:bg-red-900/10 dark:text-red-400 dark:border-red-900/30"
                             >
                               Sem diretor
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell>{getStudentCount(cls.id)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-medium">{getStudentCount(cls.id)}</span>
+                            <span className="text-xs text-muted-foreground">alunos</span>
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <Badge
                             variant="outline"
                             className={
                               cls.active
-                                ? "bg-severity-light-bg text-severity-light border-severity-light"
-                                : "bg-muted text-muted-foreground border-muted"
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/10 dark:text-emerald-400 dark:border-emerald-900/30"
+                                : "bg-muted text-muted-foreground border-border"
                             }
                           >
                             {cls.active ? "Ativa" : "Inativa"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex gap-2 justify-end">
+                        <TableCell className="text-right pr-4">
+                          <div className="flex items-center justify-end gap-1">
                             <Button
                               variant="ghost"
                               size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
                               onClick={() => setViewingClass(cls)}
+                              title="Visualizar Detalhes"
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                               onClick={() => handleEditClick(cls)}
+                              title="Editar Turma"
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            {/* Botão de arquivamento - pisca quando ciclo completo */}
+
+                            {/* Botão de arquivamento */}
                             {(() => {
                               const currentYear = new Date().getFullYear();
                               const cycleComplete = cls.endCalendarYear && currentYear > cls.endCalendarYear;
@@ -638,17 +667,16 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                               if (cycleComplete) {
                                 return (
                                   <Button
-                                    variant="outline"
-                                    size="sm"
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={() => {
                                       setArchiveReason("Conclusão do curso - ciclo completo");
                                       setArchivingClass(cls);
                                     }}
                                     title="⚠️ Ciclo concluído - ARQUIVAR TURMA"
-                                    className="animate-pulse bg-amber-500/20 border-amber-500 text-amber-700 hover:bg-amber-500/30"
+                                    className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 animate-pulse"
                                   >
-                                    <Archive className="h-4 w-4 mr-1" />
-                                    Arquivar
+                                    <Archive className="h-4 w-4" />
                                   </Button>
                                 );
                               }
@@ -662,17 +690,21 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                                     setArchivingClass(cls);
                                   }}
                                   title="Arquivar turma"
+                                  className="text-muted-foreground hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                                 >
-                                  <Archive className="h-4 w-4 text-amber-600" />
+                                  <Archive className="h-4 w-4" />
                                 </Button>
                               );
                             })()}
+
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => handleDeleteClick(cls)}
+                              className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              title="Excluir Turma"
                             >
-                              <Trash2 className="h-4 w-4 text-severity-critical" />
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>

@@ -427,8 +427,17 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
   return (
     <div className="space-y-6">
       {/* Filters */}
+      {/* Filters */}
       <Card>
-        <CardContent className="pt-6">
+        <CardHeader className="pb-3 border-b bg-muted/20">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              Filtrar e Buscar
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
@@ -466,10 +475,18 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
 
       {/* Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Alunos ({filteredStudents.length})</CardTitle>
+        <CardHeader className="pb-3 border-b bg-muted/20">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Eye className="h-4 w-4" />
+              Alunos Cadastrados
+            </CardTitle>
+            <Badge variant="secondary" className="font-normal">
+              {filteredStudents.length} alunos encontrados
+            </Badge>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {filteredStudents.length === 0 ? (
             <div className="text-center py-12">
               <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -503,21 +520,21 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                     return (
                       <TableRow
                         key={student.id}
-                        className={isHighlighted ? "bg-primary/10 animate-pulse ring-2 ring-primary/50" : ""}
+                        className={`group transition-colors hover:bg-muted/40 ${isHighlighted ? "bg-primary/5 shadow-[inset_4px_0_0_0_theme(colors.primary.DEFAULT)]" : ""}`}
                       >
-                        <TableCell>
-                          <Avatar className="h-10 w-10">
-                            {student.photoUrl ? (
-                              <AvatarImage src={student.photoUrl} alt={student.name} />
-                            ) : (
-                              <AvatarFallback className="bg-primary/10 text-primary">
-                                {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                              </AvatarFallback>
-                            )}
-                          </Avatar>
-                        </TableCell>
-                        <TableCell>
-                          <span className="font-medium">{student.name}</span>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-9 w-9 border">
+                              {student.photoUrl ? (
+                                <AvatarImage src={student.photoUrl} alt={student.name} />
+                              ) : (
+                                <AvatarFallback className="bg-muted text-muted-foreground text-xs">
+                                  {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                              )}
+                            </Avatar>
+                            <span className="font-semibold text-foreground">{student.name}</span>
+                          </div>
                         </TableCell>
                         <TableCell>{student.enrollment || '-'}</TableCell>
                         <TableCell>{student.censusId || '-'}</TableCell>
@@ -533,8 +550,8 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                         <TableCell>
                           <Badge variant="outline" className={
                             student.status === 'active'
-                              ? 'bg-severity-light-bg text-severity-light border-severity-light'
-                              : 'bg-muted text-muted-foreground border-muted'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/10 dark:text-emerald-400 dark:border-emerald-900/30'
+                              : 'bg-muted text-muted-foreground border-border'
                           }>
                             {student.status === 'active' ? 'Ativo' : 'Inativo'}
                           </Badge>

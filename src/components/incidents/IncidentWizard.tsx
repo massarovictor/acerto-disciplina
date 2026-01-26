@@ -195,29 +195,26 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
             <div key={step.id} className="flex items-center flex-1">
               <div className="flex items-center">
                 <div
-                  className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${
-                    currentStep >= step.id
+                  className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${currentStep >= step.id
                       ? "border-primary bg-primary text-primary-foreground"
                       : "border-border bg-background text-muted-foreground"
-                  }`}
+                    }`}
                 >
                   {step.id}
                 </div>
                 <span
-                  className={`ml-2 text-sm font-medium ${
-                    currentStep >= step.id
+                  className={`ml-2 text-sm font-medium ${currentStep >= step.id
                       ? "text-foreground"
                       : "text-muted-foreground"
-                  }`}
+                    }`}
                 >
                   {step.name}
                 </span>
               </div>
               {index < steps.length - 1 && (
                 <div
-                  className={`mx-4 h-0.5 flex-1 ${
-                    currentStep > step.id ? "bg-primary" : "bg-border"
-                  }`}
+                  className={`mx-4 h-0.5 flex-1 ${currentStep > step.id ? "bg-primary" : "bg-border"
+                    }`}
                 />
               )}
             </div>
@@ -242,15 +239,15 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
       </div>
 
       {/* Step content */}
-      <Card className="p-6">
+      <div className="border rounded-lg p-6 bg-background/50">
         <CurrentStepComponent
           formData={formData}
           updateFormData={updateFormData}
         />
-      </Card>
+      </div>
 
       {/* Navigation buttons */}
-      <div className="flex justify-between">
+      <div className="flex justify-between pt-2">
         <Button
           variant="outline"
           onClick={handleBack}

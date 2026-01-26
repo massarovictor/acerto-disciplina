@@ -175,42 +175,42 @@ export function StudentRankingPanel({
       <button
         type="button"
         onClick={() => onSelect?.(student)}
-        className="group w-full rounded-md border border-border/50 bg-background p-3 text-left transition-colors hover:border-border hover:bg-accent/5"
-        style={{
-          borderLeftWidth: 4,
-          borderLeftColor: CLASSIFICATION_COLORS[student.classification.classification],
-        }}
+        className="group w-full rounded-lg border bg-card p-4 text-left transition-all hover:bg-muted/30 hover:border-primary/30 shadow-sm"
       >
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="font-medium truncate">{student.student.name}</p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0 space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-foreground truncate">{student.student.name}</span>
               <Badge
-                variant="outline"
-                className={CLASSIFICATION_BG_COLORS[student.classification.classification]}
+                variant={isCritico ? 'destructive' : 'outline'}
+                className={!isCritico ? 'bg-amber-50 text-amber-700 border-amber-200' : ''}
               >
                 {CLASSIFICATION_LABELS[student.classification.classification]}
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {student.className} • Média: {formatNumber(student.classification.average)}
-            </p>
+
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground/80">{student.className}</span>
+              <span>•</span>
+              <span>Média: <span className={isCritico ? "text-red-600 font-semibold" : "text-amber-600 font-semibold"}>{formatNumber(student.classification.average)}</span></span>
+            </div>
           </div>
         </div>
 
         {!subjectMode && student.classification.subjectsBelow6.length > 0 && (
-          <div className="mt-2 pt-2 border-t">
-            <p className="text-xs text-muted-foreground mb-1">
-              Disciplinas em recuperação ({student.classification.subjectsBelow6Count}):
+          <div className="mt-3 pt-3 border-t border-dashed">
+            <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              Disciplinas com atenção ({student.classification.subjectsBelow6Count}):
             </p>
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1.5">
               {student.classification.subjectsBelow6.slice(0, 5).map((s, i) => (
-                <Badge key={i} variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
+                <Badge key={i} variant="outline" className="text-[10px] px-1.5 h-5 bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/30">
                   {s.subject.length > 15 ? s.subject.substring(0, 12) + '...' : s.subject}: {formatNumber(s.average)}
                 </Badge>
               ))}
               {student.classification.subjectsBelow6.length > 5 && (
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="outline" className="text-[10px] px-1.5 h-5">
                   +{student.classification.subjectsBelow6.length - 5}
                 </Badge>
               )}
@@ -219,9 +219,10 @@ export function StudentRankingPanel({
         )}
 
         {!subjectMode && student.incidentCount > 0 && (
-          <p className="text-xs text-amber-600 mt-2">
+          <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-600 font-medium bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded w-fit">
+            <AlertCircle className="h-3 w-3" />
             {student.incidentCount} ocorrência(s) registrada(s)
-          </p>
+          </div>
         )}
       </button>
     );
@@ -562,8 +563,13 @@ export function StudentRankingPanel({
 
       <Dialog open={openTopRanking} onOpenChange={setOpenTopRanking}>
         <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Ranking completo</DialogTitle>
+          <DialogHeader className="border-b pb-4 mb-4">
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <div className="p-2 rounded-full bg-amber-100 dark:bg-amber-900/30">
+                <Trophy className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              Ranking completo
+            </DialogTitle>
             <DialogDescription>
               {subjectMode
                 ? 'Lista completa de alunos ordenados pela média nas disciplinas selecionadas.'
@@ -636,8 +642,11 @@ export function StudentRankingPanel({
 
       <Dialog open={openCriticalRanking} onOpenChange={setOpenCriticalRanking}>
         <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>
+          <DialogHeader className="border-b pb-4 mb-4">
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
+                <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              </div>
               {subjectMode ? 'Alunos com médias baixas' : 'Alunos em atenção ou críticos'}
             </DialogTitle>
             <DialogDescription>

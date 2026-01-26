@@ -221,233 +221,275 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
   const directors = authorizedEmails?.filter(director => director.role === 'professor' || director.role === 'diretor') || [];
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Calendar className="h-5 w-5" />
-          Criar Nova Turma
-        </CardTitle>
+      <CardHeader className="pb-3 border-b bg-muted/20">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            Configurar Nova Turma
+          </CardTitle>
+        </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Preview do nome */}
           {generatedName && (
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertTitle>Nome da turma</AlertTitle>
-              <AlertDescription className="font-medium text-lg">
-                {generatedName}
-              </AlertDescription>
-            </Alert>
+            <div className="flex items-center gap-4 p-4 border rounded-lg bg-muted/40 border-l-4 border-l-primary/60">
+              <div className="p-2 rounded-full bg-background border shadow-sm">
+                <Info className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Nome Gerado (Preview)</Label>
+                <p className="text-lg font-bold text-foreground mt-0.5">
+                  {generatedName}
+                </p>
+              </div>
+            </div>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2">
-            {/* Template */}
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="templateId">Template de Disciplinas</Label>
-              <Select
-                value={formData.templateId || 'none'}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, templateId: value === 'none' ? '' : value })
-                }
-              >
-                <SelectTrigger id="templateId">
-                  <SelectValue placeholder="Selecione um template (opcional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sem template</SelectItem>
-                  {templates.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.name} - {t.course}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Ano de Início */}
-            <div className="space-y-2">
-              <Label htmlFor="startCalendarYear">Ano de Início *</Label>
-              <Select
-                value={formData.startCalendarYear?.toString() || ''}
-                onValueChange={(value) =>
-                  setFormData({
-                    ...formData,
-                    startCalendarYear: parseInt(value),
-                    endCalendarYear: parseInt(value) + 2,
-                    startYearDate: formData.startYearDate || `${parseInt(value)}-02-01`,
-                  })
-                }
-              >
-                <SelectTrigger id="startCalendarYear">
-                  <SelectValue placeholder="Selecione o ano" />
-                </SelectTrigger>
-                <SelectContent>
-                  {yearOptions.map((year) => (
-                    <SelectItem key={year} value={year.toString()}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-sm text-muted-foreground">
-                Ano em que a turma iniciou o 1º ano.
-              </p>
-            </div>
-
-            {/* Ano de Fim */}
-            <div className="space-y-2">
-              <Label htmlFor="endCalendarYear">Ano de Término *</Label>
-              <Select
-                value={formData.endCalendarYear?.toString() || ''}
-                onValueChange={(value) => {
-                  const nextEnd = parseInt(value);
-                  if (formData.startCalendarYear && nextEnd < formData.startCalendarYear) {
-                    setFormData({ endCalendarYear: formData.startCalendarYear + 2 });
-                  } else {
-                    setFormData({ endCalendarYear: nextEnd });
-                  }
-                }}
-              >
-                <SelectTrigger id="endCalendarYear">
-                  <SelectValue placeholder="Selecione o ano" />
-                </SelectTrigger>
-                <SelectContent>
-                  {yearOptions.map((year) => (
-                    <SelectItem key={year} value={year.toString()}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-sm text-muted-foreground">
-                Ano em que a turma termina o 3º ano.
-              </p>
-            </div>
-
-            {/* Data de Início do 1º Ano */}
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="startYearDate">Data de Início do 1º Ano</Label>
-              <Input
-                id="startYearDate"
-                type="date"
-                value={formData.startYearDate}
-                onChange={(e) =>
-                  setFormData({ ...formData, startYearDate: e.target.value })
-                }
-              />
-              <p className="text-sm text-muted-foreground">
-                Usada para organizar bimestres e relatórios por ano letivo.
-              </p>
-            </div>
-
-            {/* Série Atual (calculada automaticamente) */}
-            <div className="space-y-2">
-              <Label>Série Atual</Label>
-              <div className="flex items-center gap-2 h-10">
-                <Badge variant="secondary" className="text-base">
-                  {formData.currentSeries}º ano
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Seção 1: Configuração Base */}
+            <div className="md:col-span-2 space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400">
+                  Passo 1
                 </Badge>
-                <span className="text-sm text-muted-foreground">
-                  (calculado automaticamente)
-                </span>
+                <h3 className="text-sm font-medium text-muted-foreground">Configuração Base</h3>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="templateId">Template de Disciplinas</Label>
+                  <Select
+                    value={formData.templateId || 'none'}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, templateId: value === 'none' ? '' : value })
+                    }
+                  >
+                    <SelectTrigger id="templateId">
+                      <SelectValue placeholder="Selecione um template (opcional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sem template (Personalizado)</SelectItem>
+                      {templates.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name} - {t.course}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Templates preenchem automaticamente o curso e grade curricular.
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Letra */}
-            <div className="space-y-2">
-              <Label htmlFor="letter">Letra da Turma *</Label>
-              <Input
-                id="letter"
-                placeholder="Ex: A, B, C"
-                value={formData.letter}
-                onChange={(e) => setFormData({ ...formData, letter: e.target.value.toUpperCase() })}
-                maxLength={1}
-              />
+            {/* Seção 2: Período e Cronograma */}
+            <div className="md:col-span-2 space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b mt-2">
+                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400">
+                  Passo 2
+                </Badge>
+                <h3 className="text-sm font-medium text-muted-foreground">Período e Cronograma</h3>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="startCalendarYear">Ano de Início *</Label>
+                  <Select
+                    value={formData.startCalendarYear?.toString() || ''}
+                    onValueChange={(value) =>
+                      setFormData({
+                        ...formData,
+                        startCalendarYear: parseInt(value),
+                        endCalendarYear: parseInt(value) + 2,
+                        startYearDate: formData.startYearDate || `${parseInt(value)}-02-01`,
+                      })
+                    }
+                  >
+                    <SelectTrigger id="startCalendarYear">
+                      <SelectValue placeholder="Selecione o ano" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {yearOptions.map((year) => (
+                        <SelectItem key={year} value={year.toString()}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="endCalendarYear">Ano de Término *</Label>
+                  <Select
+                    value={formData.endCalendarYear?.toString() || ''}
+                    onValueChange={(value) => {
+                      const nextEnd = parseInt(value);
+                      if (formData.startCalendarYear && nextEnd < formData.startCalendarYear) {
+                        setFormData({ endCalendarYear: formData.startCalendarYear + 2 });
+                      } else {
+                        setFormData({ endCalendarYear: nextEnd });
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="endCalendarYear">
+                      <SelectValue placeholder="Selecione o ano" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {yearOptions.map((year) => (
+                        <SelectItem key={year} value={year.toString()}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="startYearDate">Data de Início do 1º Ano</Label>
+                  <Input
+                    id="startYearDate"
+                    type="date"
+                    value={formData.startYearDate}
+                    onChange={(e) =>
+                      setFormData({ ...formData, startYearDate: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Série Atual</Label>
+                  <div className="flex items-center h-10 px-3 border rounded-md bg-muted/30 text-sm gap-2">
+                    <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                      {formData.currentSeries}º ano
+                    </Badge>
+                    <span className="text-muted-foreground text-xs">
+                      (calculado automaticamente)
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Curso */}
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="course">Curso *</Label>
-              <Input
-                id="course"
-                placeholder={hasTemplate ? "Preenchido automaticamente pelo template" : "Ex: Informática, Redes de Computadores"}
-                value={formData.course}
-                onChange={(e) => setFormData({ ...formData, course: e.target.value })}
-                disabled={hasTemplate}
-              />
-              {hasTemplate && (
-                <p className="text-sm text-muted-foreground">
-                  O curso é definido pelo template selecionado.
-                </p>
-              )}
-            </div>
+            {/* Seção 3: Detalhes da Turma */}
+            <div className="md:col-span-2 space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b mt-2">
+                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400">
+                  Passo 3
+                </Badge>
+                <h3 className="text-sm font-medium text-muted-foreground">Detalhes da Turma</h3>
+              </div>
 
-            {/* Disciplinas do Template */}
-            {hasTemplate && templateSubjectsByYear.length > 0 && (
-              <div className="space-y-3 md:col-span-2">
-                <Label>Disciplinas Profissionais por Ano</Label>
-                {templateSubjectsByYear.map((yearData) => (
-                  <div key={yearData.year} className="space-y-2">
-                    <p className="text-sm font-medium text-muted-foreground">
-                      {yearData.year}º Ano
-                    </p>
-                    <div className="flex flex-wrap gap-2 p-3 border rounded-md bg-muted/50">
-                      {yearData.subjects.map((subject, index) => (
-                        <Badge key={`${yearData.year}-${index}`} variant="secondary">
-                          {subject}
-                        </Badge>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="letter">Letra da Turma *</Label>
+                  <Input
+                    id="letter"
+                    placeholder="Ex: A, B, C"
+                    value={formData.letter}
+                    onChange={(e) => setFormData({ ...formData, letter: e.target.value.toUpperCase() })}
+                    maxLength={1}
+                    className="font-medium"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="course">Curso *</Label>
+                  <Input
+                    id="course"
+                    placeholder={hasTemplate ? "Preenchido automaticamente" : "Ex: Informática"}
+                    value={formData.course}
+                    onChange={(e) => setFormData({ ...formData, course: e.target.value })}
+                    disabled={hasTemplate}
+                    className={hasTemplate ? "bg-muted text-muted-foreground" : ""}
+                  />
+                </div>
+
+                {hasTemplate && templateSubjectsByYear.length > 0 && (
+                  <div className="space-y-3 md:col-span-2 pt-2">
+                    <Label className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Preview da Grade Curricular do Template</Label>
+                    <div className="grid gap-3 md:grid-cols-3">
+                      {templateSubjectsByYear.map((yearData) => (
+                        <div key={yearData.year} className="p-3 border rounded-md bg-muted/10 text-sm">
+                          <p className="font-semibold mb-2 flex items-center gap-2">
+                            <span className="w-5 h-5 flex items-center justify-center rounded-full bg-muted text-xs">{yearData.year}º</span>
+                            Ano
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {yearData.subjects.map((subject, index) => (
+                              <Badge key={`${yearData.year}-${index}`} variant="outline" className="text-[10px] font-normal">
+                                {subject}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </div>
-                ))}
+                )}
+
+                <div className="space-y-2 md:col-span-2 pt-2">
+                  <Label htmlFor="directorEmail">Diretor de Turma</Label>
+                  <Select
+                    value={formData.directorEmail || 'none'}
+                    onValueChange={(value) => {
+                      const newEmail = value === 'none' ? '' : value;
+                      setFormData({ ...formData, directorEmail: newEmail });
+
+                      // Verificar warning imediatamente ao trocar
+                      if (newEmail) {
+                        const load = getDirectorLoad(newEmail);
+                        if (load >= 5) {
+                          toast({
+                            title: "Atenção: Alta Carga",
+                            description: `Este diretor já possui ${load} turmas.`,
+                            variant: "destructive",
+                          });
+                        }
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="directorEmail">
+                      <SelectValue placeholder="Selecione um diretor (opcional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sem diretor atribuído</SelectItem>
+                      {directors.map((d) => (
+                        <SelectItem key={d.email} value={d.email}>
+                          {d.email} ({getDirectorLoad(d.email)} turmas)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {showOverloadWarning && (
+                    <div className="flex items-center gap-2 p-3 mt-2 rounded-md bg-red-50 text-red-900 border border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-900/50">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      <p className="text-xs">
+                        <strong>Atenção:</strong> Diretor com {selectedDirectorLoad} turmas. Considere redistribuir.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-2 pt-4">
+                  <Switch
+                    id="active"
+                    checked={formData.active}
+                    onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
+                  />
+                  <Label htmlFor="active" className="cursor-pointer">Turma Ativa</Label>
+                </div>
               </div>
-            )}
-
-            {/* Diretor de Turma */}
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="directorEmail">Diretor de Turma</Label>
-              <Select
-                value={formData.directorEmail || 'none'}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, directorEmail: value === 'none' ? '' : value })
-                }
-              >
-                <SelectTrigger id="directorEmail">
-                  <SelectValue placeholder="Selecione um diretor (opcional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sem diretor atribuído</SelectItem>
-                  {directors.map((d) => (
-                    <SelectItem key={d.email} value={d.email}>
-                      {d.email} ({getDirectorLoad(d.email)} turmas)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {showOverloadWarning && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    Este diretor já possui {selectedDirectorLoad} turmas. Considere distribuir melhor a carga.
-                  </AlertDescription>
-                </Alert>
-              )}
-            </div>
-
-            {/* Turma Ativa */}
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="active"
-                checked={formData.active}
-                onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
-              />
-              <Label htmlFor="active">Turma Ativa</Label>
             </div>
           </div>
 
-          <Button type="submit" className="w-full">
-            Criar Turma
-          </Button>
+          <div className="pt-4 border-t flex justify-end">
+            <Button type="submit" size="lg" className="min-w-[200px] shadow-sm">
+              Criar Turma
+            </Button>
+          </div>
         </form>
       </CardContent>
     </Card>

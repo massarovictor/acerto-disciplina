@@ -11,6 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useClasses } from '@/hooks/useData';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 const ArchivedClasses = () => {
   const { archivedClasses } = useArchivedClasses();
@@ -63,30 +65,37 @@ const ArchivedClasses = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+    <PageContainer>
+      <PageHeader
+        title="Turmas Arquivadas"
+        description="Visualize e gerencie turmas que foram arquivadas"
+        actions={
           <Button
-            variant="ghost"
-            size="sm"
+            variant="outline"
             onClick={() => navigate('/turmas')}
-            className="mb-4"
+            className="gap-2"
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft className="h-4 w-4" />
             Voltar para Turmas
           </Button>
-          <h1 className="text-3xl font-bold tracking-tight">Turmas Arquivadas</h1>
-          <p className="text-muted-foreground mt-1">
-            Visualize e gerencie turmas que foram arquivadas
-          </p>
-        </div>
-      </div>
+        }
+      />
 
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3 border-b bg-muted/20">
           <div className="flex items-center justify-between">
-            <CardTitle>Turmas Arquivadas ({archivedClasses.length})</CardTitle>
-            <div className="relative w-[300px]">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Archive className="h-4 w-4" />
+              Histórico de Arquivamento
+            </CardTitle>
+            <Badge variant="secondary" className="font-normal">
+              {filteredClasses.length} turmas arquivadas
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="p-4 border-b">
+            <div className="relative max-w-md">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar por nome, curso ou motivo..."
@@ -96,68 +105,88 @@ const ArchivedClasses = () => {
               />
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
+
           {filteredClasses.length === 0 ? (
-            <div className="text-center py-12">
-              <Archive className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">Nenhuma turma arquivada</h3>
-              <p className="text-muted-foreground">
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="p-4 rounded-full bg-muted/30 mb-4">
+                <Archive className="h-8 w-8 text-muted-foreground opacity-50" />
+              </div>
+              <h3 className="text-lg font-medium text-foreground mb-1">Nenhuma turma arquivada</h3>
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
                 {searchTerm
-                  ? 'Tente ajustar os filtros de busca.'
-                  : 'Não há turmas arquivadas no momento.'}
+                  ? 'Não encontramos turmas com os filtros atuais.'
+                  : 'Turmas antigas aparecerão aqui quando forem arquivadas.'}
               </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Curso</TableHead>
-                  <TableHead>Alunos</TableHead>
-                  <TableHead>Data de Arquivamento</TableHead>
-                  <TableHead>Motivo</TableHead>
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredClasses.map((cls) => (
-                  <TableRow key={cls.id}>
-                    <TableCell>{cls.name}</TableCell>
-                    <TableCell>{cls.course || '-'}</TableCell>
-                    <TableCell>{getClassStudentsCount(cls.id)}</TableCell>
-                    <TableCell>
-                      {cls.archivedAt
-                        ? new Date(cls.archivedAt).toLocaleDateString('pt-BR')
-                        : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{cls.archivedReason || 'Não informado'}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setViewingClass(cls.id)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          Ver
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setUnarchivingClass(cls.id)}
-                        >
-                          <RotateCcw className="h-4 w-4 mr-1" />
-                          Desarquivar
-                        </Button>
-                      </div>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Curso</TableHead>
+                    <TableHead>Alunos</TableHead>
+                    <TableHead>Arquivado em</TableHead>
+                    <TableHead>Motivo</TableHead>
+                    <TableHead className="text-right pr-6">Ações</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredClasses.map((cls) => (
+                    <TableRow key={cls.id} className="group transition-colors hover:bg-muted/40">
+                      <TableCell className="font-medium">
+                        <span className="text-foreground">{cls.name}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-muted-foreground">{cls.course || '-'}</span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-medium">{getClassStudentsCount(cls.id)}</span>
+                          <span className="text-xs text-muted-foreground">alunos</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {cls.archivedAt ? (
+                          <Badge variant="outline" className="font-normal">
+                            {new Date(cls.archivedAt).toLocaleDateString('pt-BR')}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 font-normal">
+                          {cls.archivedReason || 'Motivo não informado'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right pr-4">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                            onClick={() => setViewingClass(cls.id)}
+                            title="Visualizar Detalhes"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                            onClick={() => setUnarchivingClass(cls.id)}
+                            title="Desarquivar (Restaurar)"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -177,24 +206,24 @@ const ArchivedClasses = () => {
 
               return (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/10">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Nome</p>
-                      <p className="text-lg">{cls.name}</p>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Nome</p>
+                      <p className="text-base font-semibold">{cls.name}</p>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Curso</p>
-                      <p className="text-lg">{cls.course || '-'}</p>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Curso</p>
+                      <p className="text-base">{cls.course || '-'}</p>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Série</p>
-                      <p className="text-lg">{cls.series}</p>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Série</p>
+                      <p className="text-base">{cls.series}</p>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Data de Arquivamento
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Arquivado Em
                       </p>
-                      <p className="text-lg">
+                      <p className="text-base">
                         {cls.archivedAt
                           ? new Date(cls.archivedAt).toLocaleDateString('pt-BR', {
                             day: '2-digit',
@@ -206,23 +235,27 @@ const ArchivedClasses = () => {
                           : '-'}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Motivo</p>
-                      <p className="text-lg">{cls.archivedReason || 'Não informado'}</p>
+                    <div className="col-span-2">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Motivo do Arquivamento</p>
+                      <div className="p-2 bg-amber-50 border border-amber-100 rounded-md text-amber-800 text-sm">
+                        {cls.archivedReason || 'Não informado'}
+                      </div>
                     </div>
                   </div>
 
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-2">Alunos</p>
-                    <div className="border rounded-md p-4 max-h-[300px] overflow-y-auto">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-medium text-muted-foreground">Alunos ({classStudents.length})</p>
+                    </div>
+                    <div className="border rounded-md p-0 max-h-[300px] overflow-y-auto bg-card">
                       {classStudents.length === 0 ? (
-                        <p className="text-muted-foreground">Nenhum aluno cadastrado</p>
+                        <div className="p-8 text-center text-muted-foreground text-sm">Nenhum aluno cadastrado nesta turma</div>
                       ) : (
-                        <div className="space-y-2">
+                        <div className="divide-y">
                           {classStudents.map((student) => (
-                            <div key={student.id} className="flex items-center justify-between">
-                              <span>{student.name}</span>
-                              <Badge variant="outline">{student.status}</Badge>
+                            <div key={student.id} className="flex items-center justify-between p-3 hover:bg-muted/30">
+                              <span className="text-sm font-medium">{student.name}</span>
+                              <Badge variant="outline" className="text-xs font-normal opacity-70">{student.status}</Badge>
                             </div>
                           ))}
                         </div>
@@ -245,17 +278,20 @@ const ArchivedClasses = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Desarquivamento</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja desarquivar esta turma? Ela voltará a aparecer na lista de
-              turmas ativas.
+              Tem certeza que deseja desarquivar esta turma?
+              <br /><br />
+              Ela voltará a aparecer na lista de <strong>turmas ativas</strong> e os alunos vinculados serão reativados.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleUnarchive}>Desarquivar</AlertDialogAction>
+            <AlertDialogAction onClick={handleUnarchive} className="bg-blue-600 hover:bg-blue-700">
+              Desarquivar Turma
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageContainer>
   );
 };
 

@@ -24,6 +24,24 @@ import {
     BehavioralAnalytics,
     Insight,
 } from '@/hooks/useSchoolAnalytics';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { List } from 'lucide-react';
 import {
     ResponsiveContainer,
     AreaChart,
@@ -60,10 +78,17 @@ const InsightIcon = ({ type }: { type: Insight['type'] }) => {
     }
 };
 
+const formatNumber = (num: number, decimals: number = 1): string => {
+    return num.toFixed(decimals);
+};
+
 export function BehaviorAnalyticsPanel({
     behavioralAnalytics,
     behavioralInsights
 }: BehaviorAnalyticsPanelProps) {
+    const [isClassRankingOpen, setIsClassRankingOpen] = useState(false);
+    const [isStudentRankingOpen, setIsStudentRankingOpen] = useState(false);
+
     const {
         incidentsBySeverity,
         classIncidentRanking,
@@ -255,6 +280,19 @@ export function BehaviorAnalyticsPanel({
                                     ))}
                                 </div>
                             )}
+
+                            {classIncidentRanking.length > 5 && (
+                                <div className="mt-4 flex justify-center">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setIsClassRankingOpen(true)}
+                                        className="text-xs"
+                                    >
+                                        Ver ranking completo
+                                    </Button>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -303,6 +341,19 @@ export function BehaviorAnalyticsPanel({
                                     ))}
                                 </div>
                             )}
+
+                            {topStudentsByIncidents.length > 5 && (
+                                <div className="mt-4 flex justify-center">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setIsStudentRankingOpen(true)}
+                                        className="text-xs"
+                                    >
+                                        Ver ranking completo
+                                    </Button>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
@@ -343,6 +394,156 @@ export function BehaviorAnalyticsPanel({
                     </Card>
                 )}
             </CardContent>
+
+            <Dialog open={isClassRankingOpen} onOpenChange={setIsClassRankingOpen}>
+                <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+                    <DialogHeader className="border-b pb-4 mb-4">
+                        <DialogTitle className="flex items-center gap-2 text-xl">
+                            <div className="p-2 rounded-full bg-primary/10">
+                                <List className="h-5 w-5 text-primary" />
+                            </div>
+                            Ranking de Turmas por Ocorrências
+                        </DialogTitle>
+                        <DialogDescription>
+                            Listagem completa de turmas ordenada por volume de ocorrências
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="flex items-center justify-between text-xs text-muted-foreground shrink-0 pb-2">
+                        <span>{classIncidentRanking.length} turmas com registros</span>
+                    </div>
+
+                    <div className="flex-1 border rounded-md overflow-hidden flex flex-col min-h-0">
+                        <div className="overflow-y-auto flex-1">
+                            <Table>
+                                <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
+                                    <TableRow>
+                                        <TableHead className="w-16 text-center">Posição</TableHead>
+                                        <TableHead>Turma</TableHead>
+                                        <TableHead className="text-center">Total</TableHead>
+                                        <TableHead className="text-center text-green-600">Leve</TableHead>
+                                        <TableHead className="text-center text-amber-600">Intermed.</TableHead>
+                                        <TableHead className="text-center text-red-600">Grave</TableHead>
+                                        <TableHead className="text-center text-red-900">Gravíssima</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {classIncidentRanking.map((item, index) => (
+                                        <TableRow key={item.classData.id}>
+                                            <TableCell className="text-center font-medium">
+                                                <Badge
+                                                    variant={index < 3 ? 'default' : 'outline'}
+                                                    className={index === 0 ? 'bg-amber-500' : index === 1 ? 'bg-slate-400' : index === 2 ? 'bg-amber-700' : ''}
+                                                >
+                                                    {index + 1}º
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="font-medium">
+                                                <div>
+                                                    <p>{item.classData.name}</p>
+                                                    <p className="text-xs text-muted-foreground">{item.studentCount} alunos</p>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-center font-bold text-lg">{item.incidentCount}</TableCell>
+                                            <TableCell className="text-center text-muted-foreground">{item.severities.leve || '-'}</TableCell>
+                                            <TableCell className="text-center text-muted-foreground">{item.severities.intermediaria || '-'}</TableCell>
+                                            <TableCell className="text-center font-medium text-red-600">
+                                                {item.severities.grave > 0 ? (
+                                                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                                        {item.severities.grave}
+                                                    </Badge>
+                                                ) : '-'}
+                                            </TableCell>
+                                            <TableCell className="text-center font-medium text-red-900">
+                                                {item.severities.gravissima > 0 ? (
+                                                    <Badge variant="outline" className="bg-red-900/10 text-red-900 border-red-900/20">
+                                                        {item.severities.gravissima}
+                                                    </Badge>
+                                                ) : '-'}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isStudentRankingOpen} onOpenChange={setIsStudentRankingOpen}>
+                <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+                    <DialogHeader className="border-b pb-4 mb-4">
+                        <DialogTitle className="flex items-center gap-2 text-xl">
+                            <div className="p-2 rounded-full bg-primary/10">
+                                <List className="h-5 w-5 text-primary" />
+                            </div>
+                            Ranking de Alunos por Ocorrências
+                        </DialogTitle>
+                        <DialogDescription>
+                            Listagem completa de alunos ordenada por volume de ocorrências
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="flex items-center justify-between text-xs text-muted-foreground shrink-0 pb-2">
+                        <span>{topStudentsByIncidents.length} alunos com registros</span>
+                    </div>
+
+                    <div className="flex-1 border rounded-md overflow-hidden flex flex-col min-h-0">
+                        <div className="overflow-y-auto flex-1">
+                            <Table>
+                                <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
+                                    <TableRow>
+                                        <TableHead className="w-16 text-center">Posição</TableHead>
+                                        <TableHead>Aluno</TableHead>
+                                        <TableHead className="text-center">Total</TableHead>
+                                        <TableHead className="text-center text-green-600">Leve</TableHead>
+                                        <TableHead className="text-center text-amber-600">Intermed.</TableHead>
+                                        <TableHead className="text-center text-red-600">Grave</TableHead>
+                                        <TableHead className="text-center text-red-900">Gravíssima</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {topStudentsByIncidents.map((item, index) => (
+                                        <TableRow key={item.student.id}>
+                                            <TableCell className="text-center font-medium">
+                                                <Badge
+                                                    variant={index < 3 ? 'default' : 'outline'}
+                                                    className={index === 0 ? 'bg-amber-500' : index === 1 ? 'bg-slate-400' : index === 2 ? 'bg-amber-700' : ''}
+                                                >
+                                                    {index + 1}º
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="font-medium">
+                                                <div>
+                                                    <p>{item.student.name}</p>
+                                                    <p className="text-xs text-muted-foreground">{item.className}</p>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-center font-bold text-lg">{item.incidentCount}</TableCell>
+                                            <TableCell className="text-center text-muted-foreground">{item.severities.leve || '-'}</TableCell>
+                                            <TableCell className="text-center text-muted-foreground">{item.severities.intermediaria || '-'}</TableCell>
+                                            <TableCell className="text-center font-medium text-red-600">
+                                                {item.severities.grave > 0 ? (
+                                                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                                        {item.severities.grave}
+                                                    </Badge>
+                                                ) : '-'}
+                                            </TableCell>
+                                            <TableCell className="text-center font-medium text-red-900">
+                                                {item.severities.gravissima > 0 ? (
+                                                    <Badge variant="outline" className="bg-red-900/10 text-red-900 border-red-900/20">
+                                                        {item.severities.gravissima}
+                                                    </Badge>
+                                                ) : '-'}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 }

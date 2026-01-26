@@ -93,11 +93,11 @@ const Incidents = () => {
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case 'leve': return 'bg-severity-light-bg text-severity-light border-severity-light';
-      case 'intermediaria': return 'bg-severity-intermediate-bg text-severity-intermediate border-severity-intermediate';
-      case 'grave': return 'bg-severity-serious-bg text-severity-serious border-severity-serious';
-      case 'gravissima': return 'bg-severity-critical-bg text-severity-critical border-severity-critical';
-      default: return '';
+      case 'leve': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800';
+      case 'intermediaria': return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800';
+      case 'grave': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800';
+      case 'gravissima': return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800';
+      default: return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -113,10 +113,10 @@ const Incidents = () => {
 
   const getUrgencyDot = (severity: string) => {
     switch (severity) {
-      case 'leve': return 'bg-severity-light';
-      case 'intermediaria': return 'bg-severity-intermediate';
-      case 'grave': return 'bg-severity-serious';
-      case 'gravissima': return 'bg-severity-critical';
+      case 'leve': return 'bg-blue-500';
+      case 'intermediaria': return 'bg-amber-500';
+      case 'grave': return 'bg-orange-500';
+      case 'gravissima': return 'bg-red-500';
       default: return 'bg-muted';
     }
   };
@@ -125,9 +125,9 @@ const Incidents = () => {
     if (incidentsList.length === 0) {
       return (
         <div className="text-center py-12">
-          <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium mb-2">Nenhuma ocorrência encontrada</h3>
-          <p className="text-muted-foreground">
+          <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+          <h3 className="text-lg font-medium mb-1">Nenhuma ocorrência encontrada</h3>
+          <p className="text-sm text-muted-foreground">
             {searchTerm ? 'Tente ajustar os filtros de busca.' : 'Não há ocorrências neste status.'}
           </p>
         </div>
@@ -143,34 +143,38 @@ const Incidents = () => {
           return (
             <div
               key={incident.id}
-              className="flex items-center gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors bg-white shadow-sm"
+              className="flex items-start gap-4 p-4 border rounded-lg hover:border-primary/30 hover:bg-muted/30 transition-all bg-card shadow-sm"
             >
-              <div className={`w-3 h-3 rounded-full ${getUrgencyDot(incident.finalSeverity)}`} />
+              <div className={`mt-1.5 w-2.5 h-2.5 rounded-full ${getUrgencyDot(incident.finalSeverity)} shadow-sm`} />
 
-              <div className="flex-1 min-w-0 space-y-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="outline" className={getSeverityColor(incident.finalSeverity)}>
+              <div className="flex-1 min-w-0 space-y-1">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <span className="font-medium text-foreground">{incidentStudents.map(s => s.name).join(', ') || 'Aluno não identificado'}</span>
+                  <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-5 ${getSeverityColor(incident.finalSeverity)}`}>
                     {getSeverityLabel(incident.finalSeverity)}
                   </Badge>
-                  <span className="text-sm font-medium">{incidentClass?.name || 'Turma não encontrada'}</span>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {incidentStudents.map(s => s.name).join(', ')} • {incident.episodes.length} episódio(s)
-                </p>
+
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground/80">{incidentClass?.name || 'Turma N/A'}</span>
+                  <span>•</span>
+                  <span>{incident.episodes.length} registro(s)</span>
+                  <span>•</span>
+                  <span>{new Date(incident.createdAt).toLocaleDateString('pt-BR')}</span>
+                </div>
+
                 {incident.description && (
-                  <p className="text-sm text-muted-foreground line-clamp-2">
+                  <p className="text-sm text-muted-foreground/90 line-clamp-2 mt-1.5 leading-relaxed">
                     {incident.description}
                   </p>
                 )}
-                <p className="text-xs text-muted-foreground">
-                  {new Date(incident.createdAt).toLocaleDateString('pt-BR')} às {new Date(incident.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                </p>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 self-center ml-2">
                 <Button
-                  variant="default"
+                  variant="ghost"
                   size="sm"
+                  className="h-8 w-8 p-0"
                   onClick={() => {
                     if (incident.status === 'resolvida') {
                       setViewingIncident(incident);
@@ -184,30 +188,22 @@ const Incidents = () => {
                     setManagingIncident(incident);
                   }}
                 >
-                  {incident.status === 'aberta' ? (
-                    <>
-                      <Edit className="h-4 w-4 mr-1" />
-                      Gerenciar
-                    </>
-                  ) : incident.status === 'acompanhamento' ? (
-                    <>
-                      <Edit className="h-4 w-4 mr-1" />
-                      Editar
-                    </>
+                  {incident.status === 'resolvida' ? (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
                   ) : (
-                    <>
-                      <Eye className="h-4 w-4 mr-1" />
-                      Visualizar
-                    </>
+                    <Edit className="h-4 w-4 text-muted-foreground" />
                   )}
+                  <span className="sr-only">Ação</span>
                 </Button>
                 {incident.status === 'aberta' && (
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
+                    className="h-8 w-8 p-0 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                     onClick={() => setDeletingIncident(incident)}
                   >
                     <Trash2 className="h-4 w-4" />
+                    <span className="sr-only">Excluir</span>
                   </Button>
                 )}
               </div>
@@ -222,42 +218,53 @@ const Incidents = () => {
     <PageContainer>
       <PageHeader
         title="Ocorrências"
-        description="Acompanhe e gerencie as ocorrências da escola"
+        description="Gestão e acompanhamento comportamental"
         actions={
-          <Button size="lg" onClick={() => setShowNewIncidentDialog(true)}>
-            <Plus className="h-5 w-5 mr-2" />
-            Registrar Ocorrência
+          <Button onClick={() => setShowNewIncidentDialog(true)} className="gap-2 shadow-sm">
+            <Plus className="h-4 w-4" />
+            Nova Ocorrência
           </Button>
         }
       />
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 grid-cols-3">
+      {/* Stats Cards - Design System Analytics */}
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Abertas</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-status-open" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Em Aberto</CardTitle>
+            <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
+              <AlertTriangle className="h-4 w-4" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{openIncidents.length}</div>
+            <div className="text-2xl font-bold text-red-600 dark:text-red-400">{openIncidents.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">Requerem atenção imediata</p>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Em Acompanhamento</CardTitle>
-            <Clock className="h-4 w-4 text-status-analysis" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Acompanhamento</CardTitle>
+            <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">
+              <Clock className="h-4 w-4" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{followUpIncidents.length}</div>
+            <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{followUpIncidents.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">Casos em monitoramento</p>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Resolvidas</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-status-resolved" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Resolvidas</CardTitle>
+            <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{resolvedIncidents.length}</div>
+            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{resolvedIncidents.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">Casos fechados com sucesso</p>
           </CardContent>
         </Card>
       </div>
@@ -407,8 +414,13 @@ const Incidents = () => {
       {/* New Incident Dialog */}
       <Dialog open={showNewIncidentDialog} onOpenChange={setShowNewIncidentDialog}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Registrar Nova Ocorrência</DialogTitle>
+          <DialogHeader className="border-b pb-4 mb-4">
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
+                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              </div>
+              Registrar Nova Ocorrência
+            </DialogTitle>
           </DialogHeader>
           <IncidentWizard onComplete={() => setShowNewIncidentDialog(false)} />
         </DialogContent>

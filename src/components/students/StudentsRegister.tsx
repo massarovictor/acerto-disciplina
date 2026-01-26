@@ -378,10 +378,14 @@ export const StudentsRegister = () => {
   return (
     <div className="space-y-6">
       {/* Individual Registration */}
+      {/* Individual Registration */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3 border-b bg-muted/20">
           <div className="flex items-center justify-between">
-            <CardTitle>Cadastro Individual</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <UserPlus className="h-4 w-4" />
+              Cadastro Individual
+            </CardTitle>
             <div className="text-sm text-muted-foreground">
               {todayRegistered} alunos cadastrados hoje
             </div>
@@ -431,64 +435,103 @@ export const StudentsRegister = () => {
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="name">Nome Completo *</Label>
-                <Input
-                  id="name"
-                  placeholder="Digite o nome completo do aluno"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                />
+
+              {/* Seção 1: Identificação */}
+              <div className="md:col-span-2 space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b">
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400">
+                    Passo 1
+                  </Badge>
+                  <h3 className="text-sm font-medium text-muted-foreground">Identificação Básica</h3>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nome Completo *</Label>
+                  <Input
+                    id="name"
+                    placeholder="Digite o nome completo do aluno"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  />
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="class">Turma *</Label>
-                <Select value={formData.classId} onValueChange={(value) => setFormData({ ...formData, classId: value })}>
-                  <SelectTrigger id="class">
-                    <SelectValue placeholder="Selecione a turma" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {classes.filter(c => c.active && !c.archived).map(cls => (
-                      <SelectItem key={cls.id} value={cls.id}>
-                        {cls.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* Seção 2: Dados Acadêmicos */}
+              <div className="md:col-span-2 space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b mt-2">
+                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400">
+                    Passo 2
+                  </Badge>
+                  <h3 className="text-sm font-medium text-muted-foreground">Dados Acadêmicos</h3>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="class">Turma *</Label>
+                  <Select value={formData.classId} onValueChange={(value) => setFormData({ ...formData, classId: value })}>
+                    <SelectTrigger id="class">
+                      <SelectValue placeholder="Selecione a turma" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {classes.filter(c => c.active && !c.archived).map(cls => (
+                        <SelectItem key={cls.id} value={cls.id}>
+                          {cls.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="birthDate">Data de Nascimento *</Label>
-                <Input
-                  id="birthDate"
-                  type="date"
-                  value={formData.birthDate}
-                  onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
-                />
+              {/* Seção 3: Dados Pessoais */}
+              <div className="md:col-span-2 space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b mt-2">
+                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400">
+                    Passo 3
+                  </Badge>
+                  <h3 className="text-sm font-medium text-muted-foreground">Dados Pessoais</h3>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="birthDate">Data de Nascimento *</Label>
+                    <Input
+                      id="birthDate"
+                      type="date"
+                      value={formData.birthDate}
+                      onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="gender">Sexo *</Label>
+                    <Select value={formData.gender} onValueChange={(value) => setFormData({ ...formData, gender: value })}>
+                      <SelectTrigger id="gender">
+                        <SelectValue placeholder="Selecione o sexo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="M">Masculino</SelectItem>
+                        <SelectItem value="F">Feminino</SelectItem>
+                        <SelectItem value="O">Outro</SelectItem>
+                        <SelectItem value="N">Prefiro não informar</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="gender">Sexo *</Label>
-                <Select value={formData.gender} onValueChange={(value) => setFormData({ ...formData, gender: value })}>
-                  <SelectTrigger id="gender">
-                    <SelectValue placeholder="Selecione o sexo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="M">Masculino</SelectItem>
-                    <SelectItem value="F">Feminino</SelectItem>
-                    <SelectItem value="O">Outro</SelectItem>
-                    <SelectItem value="N">Prefiro não informar</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="md:col-span-2">
+              <div className="md:col-span-2 space-y-4">
                 <Collapsible open={isOfficialDataOpen} onOpenChange={setIsOfficialDataOpen}>
-                  <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium mb-2">
-                    <ChevronDown className={`h-4 w-4 transition-transform ${isOfficialDataOpen ? 'rotate-180' : ''}`} />
-                    Dados Oficiais (Opcional)
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b mt-2">
+                    <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400">
+                      Passo 4
+                    </Badge>
+                    <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+                      <ChevronDown className={`h-4 w-4 transition-transform ${isOfficialDataOpen ? 'rotate-180' : ''}`} />
+                      Dados Oficiais (Opcional)
+                    </CollapsibleTrigger>
+                  </div>
+
+                  <CollapsibleContent>
                     <Separator className="my-4" />
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2">
@@ -566,13 +609,15 @@ export const StudentsRegister = () => {
 
       {/* Bulk Import */}
       <Card>
-        <CardHeader>
-          <CardTitle>Importação em Lote</CardTitle>
+        <CardHeader className="pb-3 border-b bg-muted/20">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <Upload className="h-4 w-4" />
+            Importação em Lote
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Seletor de Turma */}
           <div className="space-y-2">
-            <Label htmlFor="import-class">Selecione a Turma *</Label>
             <Select
               value={selectedClassForImport}
               onValueChange={setSelectedClassForImport}

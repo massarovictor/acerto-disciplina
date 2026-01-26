@@ -301,45 +301,56 @@ export const StudentApprovalManager = () => {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Acompanhamento Acadêmico</CardTitle>
+        <CardHeader className="pb-3 border-b bg-muted/20">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <BookOpen className="h-4 w-4" />
+              Acompanhamento Acadêmico
+            </CardTitle>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6 pt-6">
           {/* Seletor de Turma */}
-          <div className="flex gap-4">
-            <Select value={selectedClass} onValueChange={handleSelectClass}>
-              <SelectTrigger className="w-[300px]">
-                <SelectValue placeholder="Selecione uma turma" />
-              </SelectTrigger>
-              <SelectContent>
-                {classes
-                  .filter((c) => !c.archived && c.active)
-                  .map((cls) => (
-                    <SelectItem key={cls.id} value={cls.id}>
-                      {cls.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={selectedSchoolYear.toString()}
-              onValueChange={(value) => {
-                setSelectedSchoolYear(Number(value) as 1 | 2 | 3);
-                setQuarterResults([]);
-                setPendingQuarterResults([]);
-                setAcademicStatuses({});
-              }}
-              disabled={!selectedClass}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Ano da turma" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">1º Ano</SelectItem>
-                <SelectItem value="2">2º Ano</SelectItem>
-                <SelectItem value="3">3º Ano</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="p-4 bg-muted/10 border rounded-lg space-y-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="w-full md:w-[300px]">
+                <Select value={selectedClass} onValueChange={handleSelectClass}>
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Selecione uma turma" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {classes
+                      .filter((c) => !c.archived && c.active)
+                      .map((cls) => (
+                        <SelectItem key={cls.id} value={cls.id}>
+                          {cls.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-full md:w-[200px]">
+                <Select
+                  value={selectedSchoolYear.toString()}
+                  onValueChange={(value) => {
+                    setSelectedSchoolYear(Number(value) as 1 | 2 | 3);
+                    setQuarterResults([]);
+                    setPendingQuarterResults([]);
+                    setAcademicStatuses({});
+                  }}
+                  disabled={!selectedClass}
+                >
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Ano da turma" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1º Ano</SelectItem>
+                    <SelectItem value="2">2º Ano</SelectItem>
+                    <SelectItem value="3">3º Ano</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
 
           {selectedClassData && (
@@ -355,12 +366,12 @@ export const StudentApprovalManager = () => {
 
           {/* Abas */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="quarter">
+            <TabsList className="grid w-full grid-cols-2 bg-muted p-1">
+              <TabsTrigger value="quarter" className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
                 <BookOpen className="h-4 w-4 mr-2" />
                 Por Bimestre
               </TabsTrigger>
-              <TabsTrigger value="final">
+              <TabsTrigger value="final" className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
                 <Users className="h-4 w-4 mr-2" />
                 Final do Ano
               </TabsTrigger>
@@ -400,99 +411,105 @@ export const StudentApprovalManager = () => {
               </div>
 
               {quarterResults.length > 0 && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-amber-600" />
-                    <h3 className="text-lg font-semibold">
-                      Alunos com Baixo Rendimento no {selectedQuarter}
-                    </h3>
-                    <Badge variant="destructive">{quarterResults.length}</Badge>
-                  </div>
-
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Aluno</TableHead>
-                        <TableHead>Disciplinas Abaixo de 6</TableHead>
-                        <TableHead>Notas</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {quarterResults.map((result) => (
-                        <TableRow key={result.studentId}>
-                          <TableCell className="font-medium">{result.studentName}</TableCell>
-                          <TableCell>
-                            <Badge variant="destructive">
-                              {result.subjectsBelowAverage.length} disciplina(s)
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {result.subjectsBelowAverage.map((subject) => (
-                                <Badge
-                                  key={subject}
-                                  variant="outline"
-                                  className="bg-red-500/10 text-red-700 border-red-500/30 text-xs"
-                                >
-                                  {subject}: {result.subjectGrades[subject]?.toFixed(1)}
-                                </Badge>
-                              ))}
-                            </div>
-                          </TableCell>
+                <Card>
+                  <CardHeader className="pb-3 border-b bg-muted/20">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        Alunos com Baixo Rendimento ({selectedQuarter})
+                      </CardTitle>
+                      <Badge variant="destructive">{quarterResults.length}</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="pl-4">Aluno</TableHead>
+                          <TableHead>Disciplinas Abaixo de 6</TableHead>
+                          <TableHead>Notas</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {quarterResults.map((result) => (
+                          <TableRow key={result.studentId} className="hover:bg-muted/40 transition-colors">
+                            <TableCell className="font-medium pl-4">{result.studentName}</TableCell>
+                            <TableCell>
+                              <Badge variant="destructive">
+                                {result.subjectsBelowAverage.length} disciplina(s)
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {result.subjectsBelowAverage.map((subject) => (
+                                  <Badge
+                                    key={subject}
+                                    variant="outline"
+                                    className="bg-red-500/10 text-red-700 border-red-500/30 text-xs"
+                                  >
+                                    {subject}: {result.subjectGrades[subject]?.toFixed(1)}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
               )}
 
               {pendingQuarterResults.length > 0 && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-gray-600" />
-                    <h3 className="text-lg font-semibold">
-                      Pendências de Notas no {selectedQuarter}
-                    </h3>
-                    <Badge variant="outline">{pendingQuarterResults.length}</Badge>
-                  </div>
-
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Aluno</TableHead>
-                        <TableHead>Disciplinas Pendentes</TableHead>
-                        <TableHead>Lista</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {pendingQuarterResults.map((result) => (
-                        <TableRow key={result.studentId}>
-                          <TableCell className="font-medium">
-                            {result.studentName}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">
-                              {result.missingSubjects.length} disciplina(s)
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {result.missingSubjects.map((subject) => (
-                                <Badge
-                                  key={subject}
-                                  variant="outline"
-                                  className="bg-gray-500/10 text-gray-700 border-gray-500/30 text-xs"
-                                >
-                                  {subject}
-                                </Badge>
-                              ))}
-                            </div>
-                          </TableCell>
+                <Card>
+                  <CardHeader className="pb-3 border-b bg-muted/20">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-gray-600" />
+                        Pendências de Notas ({selectedQuarter})
+                      </CardTitle>
+                      <Badge variant="outline">{pendingQuarterResults.length}</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="pl-4">Aluno</TableHead>
+                          <TableHead>Disciplinas Pendentes</TableHead>
+                          <TableHead>Lista</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {pendingQuarterResults.map((result) => (
+                          <TableRow key={result.studentId} className="hover:bg-muted/40 transition-colors">
+                            <TableCell className="font-medium pl-4">
+                              {result.studentName}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {result.missingSubjects.length} disciplina(s)
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {result.missingSubjects.map((subject) => (
+                                  <Badge
+                                    key={subject}
+                                    variant="outline"
+                                    className="bg-gray-500/10 text-gray-700 border-gray-500/30 text-xs"
+                                  >
+                                    {subject}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
               )}
             </TabsContent>
 
@@ -506,76 +523,85 @@ export const StudentApprovalManager = () => {
               )}
 
               {Object.keys(academicStatuses).length > 0 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Status Final dos Alunos</h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Aluno</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Disciplinas Abaixo da Média</TableHead>
-                        <TableHead>Notas Pendentes</TableHead>
-                        <TableHead>Média Geral</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {classStudents.map((student) => {
-                        const status = academicStatuses[student.id];
-                        if (!status) return null;
+                <Card>
+                  <CardHeader className="pb-3 border-b bg-muted/20">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Status Final dos Alunos
+                      </CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="pl-4">Aluno</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Disciplinas Abaixo da Média</TableHead>
+                          <TableHead>Notas Pendentes</TableHead>
+                          <TableHead>Média Geral</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {classStudents.map((student) => {
+                          const status = academicStatuses[student.id];
+                          if (!status) return null;
 
-                        const averageGrades = Object.values(status.finalGrades) as number[];
-                        const overallAverage =
-                          averageGrades.length > 0
-                            ? averageGrades.reduce((a, b) => a + b, 0) / averageGrades.length
-                            : 0;
+                          const averageGrades = Object.values(status.finalGrades) as number[];
+                          const overallAverage =
+                            averageGrades.length > 0
+                              ? averageGrades.reduce((a, b) => a + b, 0) / averageGrades.length
+                              : 0;
 
-                        return (
-                          <TableRow key={student.id}>
-                            <TableCell className="font-medium">{student.name}</TableCell>
-                            <TableCell>{getStatusBadge(status.status, status.isPending)}</TableCell>
-                            <TableCell>
-                              {status.subjectsBelowAverage.length > 0 ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {status.subjectsBelowAverage.map((subject: string) => (
-                                    <Badge
-                                      key={subject}
-                                      variant="outline"
-                                      className="bg-red-500/10 text-red-700 border-red-500/30"
-                                    >
-                                      {subject}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground">Nenhuma</span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {status.pendingSubjects ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {Object.entries(status.pendingSubjects).map(([subject, quarters]) => (
-                                    <Badge
-                                      key={subject}
-                                      variant="outline"
-                                      className="bg-gray-500/10 text-gray-700 border-gray-500/30 text-xs"
-                                    >
-                                      {subject}: {(quarters as string[]).join(', ')}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground">Completo</span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <strong>{overallAverage.toFixed(1)}</strong>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
+                          return (
+                            <TableRow key={student.id} className="hover:bg-muted/40 transition-colors">
+                              <TableCell className="font-medium pl-4">{student.name}</TableCell>
+                              <TableCell>{getStatusBadge(status.status, status.isPending)}</TableCell>
+                              <TableCell>
+                                {status.subjectsBelowAverage.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {status.subjectsBelowAverage.map((subject: string) => (
+                                      <Badge
+                                        key={subject}
+                                        variant="outline"
+                                        className="bg-red-500/10 text-red-700 border-red-500/30"
+                                      >
+                                        {subject}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground">Nenhuma</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {status.pendingSubjects ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {Object.entries(status.pendingSubjects).map(([subject, quarters]) => (
+                                      <Badge
+                                        key={subject}
+                                        variant="outline"
+                                        className="bg-gray-500/10 text-gray-700 border-gray-500/30 text-xs"
+                                      >
+                                        {subject}: {(quarters as string[]).join(', ')}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground">Completo</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <strong>{overallAverage.toFixed(1)}</strong>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
               )}
             </TabsContent>
           </Tabs>

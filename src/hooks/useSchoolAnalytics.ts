@@ -132,6 +132,12 @@ export interface ClassIncidentRanking {
   studentCount: number;
   incidentsPerStudent: number;
   openIncidents: number;
+  severities: {
+    leve: number;
+    intermediaria: number;
+    grave: number;
+    gravissima: number;
+  };
 }
 
 export interface StudentIncidentRanking {
@@ -1675,12 +1681,22 @@ export function computeSchoolAnalytics(
   const classIncidentRanking: ClassIncidentRanking[] = filteredClasses.map(cls => {
     const classIncidents = incidentsByClassId.get(cls.id) ?? [];
     const classStudentCount = filteredStudentsByClassId.get(cls.id)?.length ?? 0;
+
+    // Count severities
+    const severities = {
+      leve: classIncidents.filter(i => i.finalSeverity === 'leve').length,
+      intermediaria: classIncidents.filter(i => i.finalSeverity === 'intermediaria').length,
+      grave: classIncidents.filter(i => i.finalSeverity === 'grave').length,
+      gravissima: classIncidents.filter(i => i.finalSeverity === 'gravissima').length,
+    };
+
     return {
       classData: cls,
       incidentCount: classIncidents.length,
       studentCount: classStudentCount,
       incidentsPerStudent: classStudentCount > 0 ? classIncidents.length / classStudentCount : 0,
       openIncidents: classIncidents.filter(i => i.status !== 'resolvida').length,
+      severities,
     };
   }).sort((a, b) => b.incidentCount - a.incidentCount);
 

@@ -3,11 +3,22 @@
  * Shows incidents by severity and classes ranked by incident count
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Class, Incident } from '@/types';
 import { SlideLayout } from './SlideLayout';
 import { REPORT_COLORS } from '@/lib/reportDesignSystem';
-import { AlertTriangle, AlertOctagon, AlertCircle, Info, Building2 } from 'lucide-react';
+import { AlertTriangle, AlertOctagon, AlertCircle, Info, Building2, List } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 
 interface SchoolIncidentsSlideProps {
     schoolName: string;
@@ -29,6 +40,8 @@ export const SchoolIncidentsSlide = ({
     incidents,
     period,
 }: SchoolIncidentsSlideProps) => {
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+
     const incidentData = useMemo(() => {
         // Filter by period if needed (incidents have date, we'd need quarter mapping)
         // For simplicity, using all incidents for now
@@ -74,181 +87,271 @@ export const SchoolIncidentsSlide = ({
         };
     }, [classes, incidents, period]);
 
-    return (
-        <SlideLayout
-            title={`${schoolName} — Análise de Ocorrências`}
-            subtitle={`${period === 'all' ? 'Ano Letivo Completo' : period} • ${incidentData.total} ocorrências registradas`}
-            footer="MAVIC - Sistema de Acompanhamento Escolar"
-        >
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 32, height: '100%' }}>
-                {/* Left: Severity Cards + Status */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    {/* Severity cards */}
-                    {Object.entries(SEVERITY_CONFIG).map(([key, config]) => {
-                        const Icon = config.icon;
-                        const count = incidentData.bySeverity[key as keyof typeof incidentData.bySeverity];
-                        const percentage = incidentData.total > 0 ? (count / incidentData.total) * 100 : 0;
+    // Mostrar apenas top 5 no slide para caber o botão
+    const displayClasses = incidentData.byClass.slice(0, 5);
+    const hasMore = incidentData.byClass.length > 5;
 
-                        return (
-                            <div
-                                key={key}
-                                style={{
-                                    background: REPORT_COLORS.background.card,
-                                    borderRadius: 16,
-                                    border: `1px solid ${REPORT_COLORS.border}`,
-                                    padding: 20,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 20,
-                                }}
-                            >
+    return (
+        <>
+            <SlideLayout
+                title={`${schoolName} — Análise de Ocorrências`}
+                subtitle={`${period === 'all' ? 'Ano Letivo Completo' : period} • ${incidentData.total} ocorrências registradas`}
+                footer="MAVIC - Sistema de Acompanhamento Escolar"
+            >
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 32, height: '100%' }}>
+                    {/* Left: Severity Cards + Status */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        {/* Severity cards */}
+                        {Object.entries(SEVERITY_CONFIG).map(([key, config]) => {
+                            const Icon = config.icon;
+                            const count = incidentData.bySeverity[key as keyof typeof incidentData.bySeverity];
+                            const percentage = incidentData.total > 0 ? (count / incidentData.total) * 100 : 0;
+
+                            return (
                                 <div
+                                    key={key}
                                     style={{
-                                        width: 56,
-                                        height: 56,
-                                        borderRadius: 14,
-                                        background: `${config.color}15`,
+                                        background: REPORT_COLORS.background.card,
+                                        borderRadius: 16,
+                                        border: `1px solid ${REPORT_COLORS.border}`,
+                                        padding: 20,
                                         display: 'flex',
                                         alignItems: 'center',
-                                        justifyContent: 'center',
+                                        gap: 20,
                                     }}
                                 >
-                                    <Icon size={28} color={config.color} />
-                                </div>
-                                <div style={{ flex: 1 }}>
-                                    <p style={{ margin: 0, fontSize: 16, fontWeight: 600, color: REPORT_COLORS.text.primary }}>
-                                        {config.label}
-                                    </p>
-                                    <div style={{
-                                        marginTop: 8,
-                                        height: 8,
-                                        background: REPORT_COLORS.background.muted,
-                                        borderRadius: 4,
-                                        overflow: 'hidden',
-                                    }}>
+                                    <div
+                                        style={{
+                                            width: 56,
+                                            height: 56,
+                                            borderRadius: 14,
+                                            background: `${config.color}15`,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                        }}
+                                    >
+                                        <Icon size={28} color={config.color} />
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <p style={{ margin: 0, fontSize: 16, fontWeight: 600, color: REPORT_COLORS.text.primary }}>
+                                            {config.label}
+                                        </p>
                                         <div style={{
-                                            height: '100%',
-                                            width: `${percentage}%`,
-                                            background: config.color,
+                                            marginTop: 8,
+                                            height: 8,
+                                            background: REPORT_COLORS.background.muted,
                                             borderRadius: 4,
-                                        }} />
+                                            overflow: 'hidden',
+                                        }}>
+                                            <div style={{
+                                                height: '100%',
+                                                width: `${percentage}%`,
+                                                background: config.color,
+                                                borderRadius: 4,
+                                            }} />
+                                        </div>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <p style={{ margin: 0, fontSize: 32, fontWeight: 800, color: config.color }}>
+                                            {count}
+                                        </p>
+                                        <p style={{ margin: 0, fontSize: 12, color: REPORT_COLORS.text.tertiary }}>
+                                            {percentage.toFixed(0)}%
+                                        </p>
                                     </div>
                                 </div>
-                                <div style={{ textAlign: 'right' }}>
-                                    <p style={{ margin: 0, fontSize: 32, fontWeight: 800, color: config.color }}>
-                                        {count}
-                                    </p>
-                                    <p style={{ margin: 0, fontSize: 12, color: REPORT_COLORS.text.tertiary }}>
-                                        {percentage.toFixed(0)}%
-                                    </p>
+                            );
+                        })}
+
+                        {/* Status summary */}
+                        <div style={{
+                            background: REPORT_COLORS.background.card,
+                            borderRadius: 16,
+                            border: `1px solid ${REPORT_COLORS.border}`,
+                            padding: 20,
+                        }}>
+                            <p style={{ margin: '0 0 12px 0', fontSize: 14, fontWeight: 600, color: REPORT_COLORS.text.secondary, textTransform: 'uppercase' }}>
+                                Status das Ocorrências
+                            </p>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                                <div style={{ textAlign: 'center', padding: 12, background: '#EF444415', borderRadius: 8 }}>
+                                    <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: '#EF4444' }}>{incidentData.byStatus.aberta}</p>
+                                    <p style={{ margin: '4px 0 0', fontSize: 11, color: REPORT_COLORS.text.secondary }}>Abertas</p>
+                                </div>
+                                <div style={{ textAlign: 'center', padding: 12, background: '#F59E0B15', borderRadius: 8 }}>
+                                    <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: '#F59E0B' }}>{incidentData.byStatus.acompanhamento}</p>
+                                    <p style={{ margin: '4px 0 0', fontSize: 11, color: REPORT_COLORS.text.secondary }}>Acompanhamento</p>
+                                </div>
+                                <div style={{ textAlign: 'center', padding: 12, background: '#22C55E15', borderRadius: 8 }}>
+                                    <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: '#22C55E' }}>{incidentData.byStatus.resolvida}</p>
+                                    <p style={{ margin: '4px 0 0', fontSize: 11, color: REPORT_COLORS.text.secondary }}>Resolvidas</p>
                                 </div>
                             </div>
-                        );
-                    })}
+                        </div>
+                    </div>
 
-                    {/* Status summary */}
+                    {/* Right: Classes ranking by incidents */}
                     <div style={{
                         background: REPORT_COLORS.background.card,
                         borderRadius: 16,
                         border: `1px solid ${REPORT_COLORS.border}`,
-                        padding: 20,
+                        overflow: 'hidden',
+                        display: 'flex',
+                        flexDirection: 'column',
                     }}>
-                        <p style={{ margin: '0 0 12px 0', fontSize: 14, fontWeight: 600, color: REPORT_COLORS.text.secondary, textTransform: 'uppercase' }}>
-                            Status das Ocorrências
-                        </p>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-                            <div style={{ textAlign: 'center', padding: 12, background: '#EF444415', borderRadius: 8 }}>
-                                <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: '#EF4444' }}>{incidentData.byStatus.aberta}</p>
-                                <p style={{ margin: '4px 0 0', fontSize: 11, color: REPORT_COLORS.text.secondary }}>Abertas</p>
-                            </div>
-                            <div style={{ textAlign: 'center', padding: 12, background: '#F59E0B15', borderRadius: 8 }}>
-                                <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: '#F59E0B' }}>{incidentData.byStatus.acompanhamento}</p>
-                                <p style={{ margin: '4px 0 0', fontSize: 11, color: REPORT_COLORS.text.secondary }}>Acompanhamento</p>
-                            </div>
-                            <div style={{ textAlign: 'center', padding: 12, background: '#22C55E15', borderRadius: 8 }}>
-                                <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: '#22C55E' }}>{incidentData.byStatus.resolvida}</p>
-                                <p style={{ margin: '4px 0 0', fontSize: 11, color: REPORT_COLORS.text.secondary }}>Resolvidas</p>
-                            </div>
+                        <div style={{
+                            padding: '16px 24px',
+                            background: REPORT_COLORS.background.surface,
+                            borderBottom: `1px solid ${REPORT_COLORS.border}`,
+                        }}>
+                            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Turmas por Número de Ocorrências</h3>
+                            <p style={{ margin: '4px 0 0', fontSize: 13, color: REPORT_COLORS.text.secondary }}>
+                                Ordenadas da maior para menor quantidade
+                            </p>
+                        </div>
+
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 0' }}>
+                            {displayClasses.map((cls, index) => (
+                                <div
+                                    key={cls.classId}
+                                    style={{
+                                        padding: '12px 24px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 16,
+                                        borderBottom: `1px solid ${REPORT_COLORS.border}20`,
+                                    }}
+                                >
+                                    <div style={{
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: 8,
+                                        background: index < 3 ? '#EF4444' : REPORT_COLORS.primary,
+                                        color: 'white',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: 14,
+                                        fontWeight: 700,
+                                    }}>
+                                        {index + 1}
+                                    </div>
+                                    <Building2 size={20} color={REPORT_COLORS.text.secondary} />
+                                    <div style={{ flex: 1 }}>
+                                        <p style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>{cls.className}</p>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 8 }}>
+                                        {cls.gravissima > 0 && (
+                                            <span style={{ padding: '4px 8px', borderRadius: 4, background: '#7C2D1215', color: '#7C2D12', fontSize: 12, fontWeight: 600 }}>
+                                                {cls.gravissima} gravíss.
+                                            </span>
+                                        )}
+                                        {cls.grave > 0 && (
+                                            <span style={{ padding: '4px 8px', borderRadius: 4, background: '#EF444415', color: '#EF4444', fontSize: 12, fontWeight: 600 }}>
+                                                {cls.grave} graves
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: REPORT_COLORS.text.primary }}>
+                                        {cls.total}
+                                    </p>
+                                </div>
+                            ))}
+
+                            {incidentData.byClass.length === 0 && (
+                                <div style={{ padding: 40, textAlign: 'center', color: REPORT_COLORS.text.tertiary }}>
+                                    Nenhuma ocorrência registrada.
+                                </div>
+                            )}
+
+                            {hasMore && (
+                                <div style={{ padding: '16px 24px', textAlign: 'center' }}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setIsDialogOpen(true)}
+                                        className="w-full gap-2"
+                                    >
+                                        <Building2 className="h-4 w-4" />
+                                        Ver todas as {incidentData.byClass.length} turmas
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
+            </SlideLayout>
 
-                {/* Right: Classes ranking by incidents */}
-                <div style={{
-                    background: REPORT_COLORS.background.card,
-                    borderRadius: 16,
-                    border: `1px solid ${REPORT_COLORS.border}`,
-                    overflow: 'hidden',
-                    display: 'flex',
-                    flexDirection: 'column',
-                }}>
-                    <div style={{
-                        padding: '16px 24px',
-                        background: REPORT_COLORS.background.surface,
-                        borderBottom: `1px solid ${REPORT_COLORS.border}`,
-                    }}>
-                        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Turmas por Número de Ocorrências</h3>
-                        <p style={{ margin: '4px 0 0', fontSize: 13, color: REPORT_COLORS.text.secondary }}>
-                            Ordenadas da maior para menor quantidade
-                        </p>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+                    <DialogHeader className="border-b pb-4 mb-4">
+                        <DialogTitle className="flex items-center gap-2 text-xl">
+                            <div className="p-2 rounded-full bg-primary/10">
+                                <List className="h-5 w-5 text-primary" />
+                            </div>
+                            Ranking Completo de Turmas por Ocorrências
+                        </DialogTitle>
+                        <DialogDescription>
+                            Listagem completa de turmas ordenada por volume de ocorrências
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="flex items-center justify-between text-xs text-muted-foreground shrink-0 pb-2">
+                        <span>{incidentData.byClass.length} turmas com registros</span>
                     </div>
 
-                    <div style={{ flex: 1, overflowY: 'auto', padding: '12px 0' }}>
-                        {incidentData.byClass.map((cls, index) => (
-                            <div
-                                key={cls.classId}
-                                style={{
-                                    padding: '12px 24px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 16,
-                                    borderBottom: `1px solid ${REPORT_COLORS.border}20`,
-                                }}
-                            >
-                                <div style={{
-                                    width: 36,
-                                    height: 36,
-                                    borderRadius: 8,
-                                    background: index < 3 ? '#EF4444' : REPORT_COLORS.primary,
-                                    color: 'white',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: 14,
-                                    fontWeight: 700,
-                                }}>
-                                    {index + 1}
-                                </div>
-                                <Building2 size={20} color={REPORT_COLORS.text.secondary} />
-                                <div style={{ flex: 1 }}>
-                                    <p style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>{cls.className}</p>
-                                </div>
-                                <div style={{ display: 'flex', gap: 8 }}>
-                                    {cls.gravissima > 0 && (
-                                        <span style={{ padding: '4px 8px', borderRadius: 4, background: '#7C2D1215', color: '#7C2D12', fontSize: 12, fontWeight: 600 }}>
-                                            {cls.gravissima} gravíss.
-                                        </span>
-                                    )}
-                                    {cls.grave > 0 && (
-                                        <span style={{ padding: '4px 8px', borderRadius: 4, background: '#EF444415', color: '#EF4444', fontSize: 12, fontWeight: 600 }}>
-                                            {cls.grave} graves
-                                        </span>
-                                    )}
-                                </div>
-                                <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: REPORT_COLORS.text.primary }}>
-                                    {cls.total}
-                                </p>
-                            </div>
-                        ))}
-
-                        {incidentData.byClass.length === 0 && (
-                            <div style={{ padding: 40, textAlign: 'center', color: REPORT_COLORS.text.tertiary }}>
-                                Nenhuma ocorrência registrada.
-                            </div>
-                        )}
+                    <div className="flex-1 border rounded-md overflow-hidden flex flex-col min-h-0">
+                        <div className="overflow-y-auto flex-1">
+                            <Table>
+                                <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
+                                    <TableRow>
+                                        <TableHead className="w-16 text-center">Posição</TableHead>
+                                        <TableHead>Turma</TableHead>
+                                        <TableHead className="text-center">Total</TableHead>
+                                        <TableHead className="text-center text-green-600">Leve</TableHead>
+                                        <TableHead className="text-center text-amber-600">Intermed.</TableHead>
+                                        <TableHead className="text-center text-red-600">Grave</TableHead>
+                                        <TableHead className="text-center text-red-900">Gravíssima</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {incidentData.byClass.map((cls, index) => (
+                                        <TableRow key={cls.classId}>
+                                            <TableCell className="text-center font-medium">
+                                                <Badge
+                                                    variant={index < 3 ? 'default' : 'outline'}
+                                                    className={index === 0 ? 'bg-red-600' : index === 1 ? 'bg-red-500' : index === 2 ? 'bg-orange-500' : ''}
+                                                >
+                                                    {index + 1}º
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="font-medium">{cls.className}</TableCell>
+                                            <TableCell className="text-center font-bold text-lg">{cls.total}</TableCell>
+                                            <TableCell className="text-center text-muted-foreground">{cls.leve || '-'}</TableCell>
+                                            <TableCell className="text-center text-muted-foreground">{cls.intermediaria || '-'}</TableCell>
+                                            <TableCell className="text-center font-medium text-red-600">
+                                                {cls.grave > 0 ? (
+                                                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                                        {cls.grave}
+                                                    </Badge>
+                                                ) : '-'}
+                                            </TableCell>
+                                            <TableCell className="text-center font-medium text-red-900">
+                                                {cls.gravissima > 0 ? (
+                                                    <Badge variant="outline" className="bg-red-900/10 text-red-900 border-red-900/20">
+                                                        {cls.gravissima}
+                                                    </Badge>
+                                                ) : '-'}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
                     </div>
-                </div>
-            </div>
-        </SlideLayout>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 };

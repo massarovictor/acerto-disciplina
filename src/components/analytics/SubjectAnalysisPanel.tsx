@@ -268,8 +268,13 @@ export function SubjectAnalysisPanel({
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Ranking Completo de Disciplinas</DialogTitle>
+          <DialogHeader className="border-b pb-4 mb-4">
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <div className="p-2 rounded-full bg-primary/10">
+                <List className="h-5 w-5 text-primary" />
+              </div>
+              Ranking Completo de Disciplinas
+            </DialogTitle>
             <DialogDescription>
               {sortOrder === 'best'
                 ? 'Lista ordenada pelas maiores médias'

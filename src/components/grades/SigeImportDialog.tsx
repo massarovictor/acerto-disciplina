@@ -18,11 +18,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import {
-    Upload,
-    FileText,
     CheckCircle2,
     AlertTriangle,
-    Loader2
+    Loader2,
+    Settings,
+    Users,
+    BookOpen,
+    ArrowRight,
+    Upload,
+    FileText
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useClasses, useStudents, useGradesScoped, useProfessionalSubjects, useProfessionalSubjectTemplates } from '@/hooks/useData';
@@ -769,9 +773,9 @@ export const SigeImportDialog = ({
 
             // Reset e fechar
             handleClose();
-                if (onRefresh) {
-                    await onRefresh();
-                }
+            if (onRefresh) {
+                await onRefresh();
+            }
 
         } catch (error) {
             console.error(error);
@@ -816,16 +820,54 @@ export const SigeImportDialog = ({
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+                <div className="px-6 py-4 bg-muted/20 border-b">
+                    <div className="flex items-center justify-between relative max-w-2xl mx-auto">
+                        {/* Linhas de conexão */}
+                        <div className="absolute left-0 top-1/2 w-full h-0.5 bg-muted-foreground/20 -z-10" />
+
+                        {/* Passo 1: Configuração */}
+                        <div className={`flex flex-col items-center gap-2 bg-background p-2 rounded-lg border-2 z-10 w-32 ${step === 'configure' || step === 'upload' ? 'border-primary' : 'border-muted-foreground/20'}`}>
+                            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'configure' || step === 'upload' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                                <Settings className="h-4 w-4" />
+                            </div>
+                            <span className={`text-xs font-medium ${step === 'configure' || step === 'upload' ? 'text-primary' : 'text-muted-foreground'}`}>Configuração</span>
+                        </div>
+
+                        {/* Passo 2: Alunos */}
+                        <div className={`flex flex-col items-center gap-2 bg-background p-2 rounded-lg border-2 z-10 w-32 ${step === 'match-students' ? 'border-primary' : (['match-students', 'map-subjects', 'review-subjects', 'preview'].includes(step) ? 'border-green-500/50' : 'border-muted-foreground/20')}`}>
+                            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'match-students' ? 'bg-primary text-primary-foreground' : (['match-students', 'map-subjects', 'review-subjects', 'preview'].includes(step) ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground')}`}>
+                                <Users className="h-4 w-4" />
+                            </div>
+                            <span className={`text-xs font-medium ${step === 'match-students' ? 'text-primary' : 'text-muted-foreground'}`}>Validação</span>
+                        </div>
+
+                        {/* Passo 3: Disciplinas */}
+                        <div className={`flex flex-col items-center gap-2 bg-background p-2 rounded-lg border-2 z-10 w-32 ${step === 'map-subjects' || step === 'review-subjects' ? 'border-primary' : (['map-subjects', 'review-subjects', 'preview'].includes(step) ? 'border-green-500/50' : 'border-muted-foreground/20')}`}>
+                            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'map-subjects' || step === 'review-subjects' ? 'bg-primary text-primary-foreground' : (['map-subjects', 'review-subjects', 'preview'].includes(step) ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground')}`}>
+                                <BookOpen className="h-4 w-4" />
+                            </div>
+                            <span className={`text-xs font-medium ${step === 'map-subjects' || step === 'review-subjects' ? 'text-primary' : 'text-muted-foreground'}`}>Mapeamento</span>
+                        </div>
+
+                        {/* Passo 4: Preview */}
+                        <div className={`flex flex-col items-center gap-2 bg-background p-2 rounded-lg border-2 z-10 w-32 ${step === 'preview' ? 'border-primary' : 'border-muted-foreground/20'}`}>
+                            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'preview' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                                <CheckCircle2 className="h-4 w-4" />
+                            </div>
+                            <span className={`text-xs font-medium ${step === 'preview' ? 'text-primary' : 'text-muted-foreground'}`}>Finalizar</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex-1 min-h-0 overflow-y-auto p-6">
                     {/* Step 1: Configure - AGORA É O PRIMEIRO PASSO */}
                     {step === 'configure' && (
                         <div className="space-y-6">
-                            {/* Seleção de Turma e Bimestre */}
-                            <div className="space-y-4">
+                            {/* Seleção de Turma e Bimestre - GRID */}
+                            <div className="grid gap-4 md:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label>Turma *</Label>
                                     <Select value={selectedClass} onValueChange={setSelectedClass}>
-                                        <SelectTrigger>
+                                        <SelectTrigger className="bg-background">
                                             <SelectValue placeholder="Selecione a turma" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -839,12 +881,11 @@ export const SigeImportDialog = ({
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label>Ano da turma *</Label>
                                     <Select
                                         value={String(selectedSchoolYear)}
                                         onValueChange={(value) => setSelectedSchoolYear(Number(value) as 1 | 2 | 3)}
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger className="bg-background">
                                             <SelectValue placeholder="Selecione o ano" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -857,10 +898,9 @@ export const SigeImportDialog = ({
                                     </Select>
                                 </div>
 
-                                <div className="space-y-2">
-                                    <Label>Bimestre *</Label>
+                                <div className="space-y-2 md:col-span-2">
                                     <Select value={selectedQuarter} onValueChange={setSelectedQuarter}>
-                                        <SelectTrigger>
+                                        <SelectTrigger className="bg-background">
                                             <SelectValue placeholder="Selecione o bimestre" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -870,57 +910,74 @@ export const SigeImportDialog = ({
                                         </SelectContent>
                                     </Select>
                                 </div>
+                            </div>
 
-                                {selectedClass && selectedClassData?.templateId && templateSubjectsForSelectedClass.length === 0 && (
-                                    <Alert>
-                                        <AlertTriangle className="h-4 w-4" />
-                                        <AlertDescription>
-                                            Nenhuma disciplina profissional cadastrada para o {selectedSchoolYear}º ano neste template.
-                                            Apenas disciplinas da base comum serão consideradas.
-                                        </AlertDescription>
-                                    </Alert>
-                                )}
+                            {selectedClass && selectedClassData?.templateId && templateSubjectsForSelectedClass.length === 0 && (
+                                <Alert className="bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-800">
+                                    <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                    <AlertDescription>
+                                        Nenhuma disciplina profissional cadastrada para o {selectedSchoolYear}º ano neste template.
+                                        Apenas disciplinas da base comum serão consideradas.
+                                    </AlertDescription>
+                                </Alert>
+                            )}
 
-                                {/* Opção de substituir notas */}
-                                <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
-                                    <div className="space-y-1 flex-1 pr-4">
-                                        <Label className="text-base font-medium">
-                                            Substituir notas existentes
-                                        </Label>
-                                        <p className="text-sm text-muted-foreground">
-                                            {replaceExisting
-                                                ? `Todas as notas antigas deste bimestre no ${selectedSchoolYear}º ano serão deletadas e substituídas pelas novas`
-                                                : `As notas do arquivo serão adicionadas/atualizadas sem deletar as existentes do ${selectedSchoolYear}º ano`
-                                            }
-                                        </p>
-                                    </div>
-                                    <Checkbox
-                                        checked={replaceExisting}
-                                        onCheckedChange={(checked) => setReplaceExisting(!!checked)}
-                                    />
+                            {/* Opção de substituir notas */}
+                            <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors cursor-pointer" onClick={() => setReplaceExisting(!replaceExisting)}>
+                                <div className="space-y-1 flex-1 pr-4">
+                                    <Label className="text-base font-medium cursor-pointer">
+                                        Substituir notas existentes
+                                    </Label>
+                                    <p className="text-sm text-muted-foreground">
+                                        {replaceExisting
+                                            ? `Todas as notas antigas deste bimestre no ${selectedSchoolYear}º ano serão deletadas e substituídas pelas novas`
+                                            : `As notas do arquivo serão adicionadas/atualizadas sem deletar as existentes do ${selectedSchoolYear}º ano`
+                                        }
+                                    </p>
                                 </div>
+                                <Checkbox
+                                    checked={replaceExisting}
+                                    onCheckedChange={(checked) => setReplaceExisting(!!checked)}
+                                />
                             </div>
 
                             {/* Upload após selecionar turma */}
                             {selectedClass && (
-                                <div className="space-y-4">
+                                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
                                     <div
-                                        className="border-2 border-dashed rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer"
+                                        className="border-2 border-dashed rounded-xl p-10 text-center hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 cursor-pointer group bg-muted/20"
                                         onClick={() => document.getElementById('sige-upload')?.click()}
                                     >
                                         {isProcessing ? (
-                                            <div className="flex flex-col items-center gap-2">
-                                                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                                                <p>Processando arquivo...</p>
+                                            <div className="flex flex-col items-center gap-4">
+                                                <div className="relative">
+                                                    <div className="absolute inset-0 bg-blue-500/20 rounded-full animate-ping" />
+                                                    <div className="bg-background rounded-full p-4 relative shadow-sm border">
+                                                        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <p className="font-medium text-lg text-foreground">Processando arquivo...</p>
+                                                    <p className="text-sm text-muted-foreground">Isso pode levar alguns segundos</p>
+                                                </div>
                                             </div>
                                         ) : (
-                                            <>
-                                                <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                                                <p className="text-lg font-medium">Clique para selecionar o arquivo Excel</p>
-                                                <p className="text-sm text-muted-foreground">
-                                                    XLS ou XLSX do SIGE
-                                                </p>
-                                            </>
+                                            <div className="flex flex-col items-center gap-4">
+                                                <div className="bg-background rounded-full p-4 shadow-sm border group-hover:scale-110 transition-transform duration-300 group-hover:border-primary/30">
+                                                    <Upload className="h-8 w-8 text-muted-foreground group-hover:text-primary transition-colors" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <p className="text-lg font-medium text-foreground group-hover:text-primary transition-colors">
+                                                        Clique para selecionar o arquivo Excel
+                                                    </p>
+                                                    <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                                                        Suporte para arquivos .XLS ou .XLSX exportados do SIGE ("Mapa de Notas")
+                                                    </p>
+                                                </div>
+                                                <Button variant="outline" size="sm" className="mt-2 pointer-events-none">
+                                                    Selecionar Arquivo
+                                                </Button>
+                                            </div>
                                         )}
                                         <Input
                                             id="sige-upload"
@@ -931,21 +988,19 @@ export const SigeImportDialog = ({
                                             disabled={isProcessing}
                                         />
                                     </div>
-
-                                    <Alert>
-                                        <AlertDescription>
-                                            <strong>Dica:</strong> Use o arquivo "Mapa de Notas" exportado do SIGE em Excel (XLS/XLSX).
-                                        </AlertDescription>
-                                    </Alert>
                                 </div>
                             )}
 
                             {!selectedClass && (
-                                <Alert>
-                                    <AlertDescription>
-                                        Selecione uma turma para continuar
-                                    </AlertDescription>
-                                </Alert>
+                                <div className="flex flex-col items-center justify-center p-8 border rounded-lg bg-muted/10 text-center space-y-3 opacity-60">
+                                    <div className="bg-muted p-3 rounded-full">
+                                        <FileText className="h-6 w-6 text-muted-foreground" />
+                                    </div>
+                                    <div>
+                                        <p className="font-medium">Aguardando seleção de turma</p>
+                                        <p className="text-sm text-muted-foreground">Selecione uma turma acima para habilitar o upload.</p>
+                                    </div>
+                                </div>
                             )}
                         </div>
                     )}
@@ -980,30 +1035,45 @@ export const SigeImportDialog = ({
                                 </Alert>
                             )}
 
-                            <ScrollArea className="h-[400px] border rounded-lg">
+                            <ScrollArea className="h-[400px] border rounded-lg bg-background">
                                 <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="w-[40%]">Nome no Arquivo</TableHead>
-                                            <TableHead className="w-[40%]">Nome no Sistema</TableHead>
-                                            <TableHead className="w-[20%]">Status</TableHead>
+                                    <TableHeader className="bg-muted/40 sticky top-0 z-10">
+                                        <TableRow className="hover:bg-transparent">
+                                            <TableHead className="w-[40%] font-semibold">Nome no Arquivo</TableHead>
+                                            <TableHead className="w-[40%] font-semibold">Nome no Sistema</TableHead>
+                                            <TableHead className="w-[20%] font-semibold">Status</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {studentMatches.map((match, index) => (
-                                            <TableRow key={index} className={!match.systemStudentId ? 'opacity-60 bg-muted/40' : ''}>
-                                                <TableCell className="font-medium">
-                                                    {match.fileStudentName}
+                                            <TableRow key={index} className={!match.systemStudentId ? 'opacity-50 hover:opacity-100 transition-opacity' : ''}>
+                                                <TableCell className="py-3">
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <span className="font-medium text-sm">{match.fileStudentName}</span>
+                                                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Original do Excel</span>
+                                                    </div>
                                                 </TableCell>
-                                                <TableCell>
+                                                <TableCell className="py-3">
                                                     <Select
                                                         value={match.systemStudentId || 'ignore'}
                                                         onValueChange={(val) => updateMatch(index, val === 'ignore' ? null : val)}
                                                     >
-                                                        <SelectTrigger className="w-full h-8">
-                                                            <SelectValue placeholder="Selecione..." />
+                                                        <SelectTrigger className={`w-full h-9 border-0 bg-transparent hover:bg-muted/50 focus:bg-muted/50 transition-colors ${!match.systemStudentId ? 'text-muted-foreground italic' : ''}`}>
+                                                            <div className="flex items-center gap-2 overflow-hidden">
+                                                                {match.systemStudentId ? (
+                                                                    <>
+                                                                        {/* Mini avatar simulation */}
+                                                                        <div className="h-5 w-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] uppercase shrink-0">
+                                                                            {students.find(s => s.id === match.systemStudentId)?.name.substring(0, 2)}
+                                                                        </div>
+                                                                        <SelectValue placeholder="Selecione..." />
+                                                                    </>
+                                                                ) : (
+                                                                    <SelectValue placeholder="Ignorar (Não importar)" />
+                                                                )}
+                                                            </div>
                                                         </SelectTrigger>
-                                                        <SelectContent>
+                                                        <SelectContent align="start" className="w-[300px]">
                                                             <SelectItem value="ignore" className="text-muted-foreground italic">
                                                                 -- Ignorar (Não importar) --
                                                             </SelectItem>
@@ -1019,16 +1089,23 @@ export const SigeImportDialog = ({
                                                         </SelectContent>
                                                     </Select>
                                                 </TableCell>
-                                                <TableCell>
+                                                <TableCell className="py-3">
                                                     {match.systemStudentId ? (
-                                                        <Badge
-                                                            variant={match.isManual ? 'outline' : (match.similarity >= 0.9 ? 'default' : 'secondary')}
-                                                            className={!match.isManual && match.similarity >= 0.9 ? 'bg-green-500 hover:bg-green-600' : ''}
-                                                        >
-                                                            {match.isManual ? 'Manual' : `${Math.round(match.similarity * 100)}% Match`}
-                                                        </Badge>
+                                                        <div className="flex items-center gap-2">
+                                                            <Badge
+                                                                variant="outline"
+                                                                className={`h-6 ${match.isManual
+                                                                    ? 'text-blue-600 border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400'
+                                                                    : (match.similarity >= 0.9
+                                                                        ? 'text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-400'
+                                                                        : 'text-amber-600 border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400')
+                                                                    }`}
+                                                            >
+                                                                {match.isManual ? 'Manual' : `${Math.round(match.similarity * 100)}% Match`}
+                                                            </Badge>
+                                                        </div>
                                                     ) : (
-                                                        <Badge variant="outline" className="text-muted-foreground border-dashed">
+                                                        <Badge variant="secondary" className="bg-muted text-muted-foreground">
                                                             Ignorado
                                                         </Badge>
                                                     )}
@@ -1052,13 +1129,13 @@ export const SigeImportDialog = ({
                                 </AlertDescription>
                             </Alert>
 
-                            <ScrollArea className="h-[400px] border rounded-lg">
+                            <ScrollArea className="h-[400px] border rounded-lg bg-background">
                                 <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="w-[45%]">Disciplina no SIGE</TableHead>
-                                            <TableHead className="w-[45%]">Disciplina no Sistema</TableHead>
-                                            <TableHead className="w-[10%]">Status</TableHead>
+                                    <TableHeader className="bg-muted/40 sticky top-0 z-10">
+                                        <TableRow className="hover:bg-transparent">
+                                            <TableHead className="w-[45%] font-semibold">Disciplina no SIGE</TableHead>
+                                            <TableHead className="w-10"></TableHead>
+                                            <TableHead className="w-[45%] font-semibold">Disciplina no Sistema</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -1067,12 +1144,15 @@ export const SigeImportDialog = ({
                                             return (
                                                 <TableRow
                                                     key={mapping.excelSubject}
-                                                    className={!mapping.systemSubject ? 'opacity-60 bg-muted/40' : ''}
+                                                    className={!mapping.systemSubject ? 'opacity-50 hover:opacity-100 transition-opacity' : ''}
                                                 >
-                                                    <TableCell className="font-medium">
+                                                    <TableCell className="py-3 font-medium text-sm">
                                                         {mapping.excelSubject}
                                                     </TableCell>
-                                                    <TableCell>
+                                                    <TableCell className="py-3 text-center">
+                                                        <ArrowRight className="h-4 w-4 text-muted-foreground mx-auto opacity-50" />
+                                                    </TableCell>
+                                                    <TableCell className="py-3">
                                                         <Select
                                                             value={mapping.systemSubject || 'ignore'}
                                                             onValueChange={(val) => updateSubjectMapping(
@@ -1080,10 +1160,10 @@ export const SigeImportDialog = ({
                                                                 val === 'ignore' ? null : val
                                                             )}
                                                         >
-                                                            <SelectTrigger className="w-full h-8">
+                                                            <SelectTrigger className={`w-full h-9 border-0 bg-transparent hover:bg-muted/50 focus:bg-muted/50 transition-colors ${!mapping.systemSubject ? 'text-muted-foreground italic' : ''}`}>
                                                                 <SelectValue placeholder="Selecione..." />
                                                             </SelectTrigger>
-                                                            <SelectContent>
+                                                            <SelectContent className="max-h-[300px]">
                                                                 <SelectItem value="ignore" className="text-muted-foreground italic">
                                                                     -- Ignorar (Não importar) --
                                                                 </SelectItem>
@@ -1103,19 +1183,18 @@ export const SigeImportDialog = ({
                                                                 )}
                                                             </SelectContent>
                                                         </Select>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {mapping.systemSubject ? (
-                                                            <Badge
-                                                                variant={mapping.autoMatched ? 'default' : 'outline'}
-                                                                className={mapping.autoMatched ? 'bg-green-500 hover:bg-green-600' : ''}
-                                                            >
-                                                                {mapping.autoMatched ? 'Auto' : 'Manual'}
-                                                            </Badge>
-                                                        ) : (
-                                                            <Badge variant="outline" className="text-muted-foreground border-dashed">
-                                                                Ignorado
-                                                            </Badge>
+                                                        {mapping.systemSubject && (
+                                                            <div className="mt-1">
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className={`text-[10px] h-5 ${mapping.autoMatched
+                                                                        ? 'text-emerald-600 border-emerald-100 bg-emerald-50'
+                                                                        : 'text-blue-600 border-blue-100 bg-blue-50'
+                                                                        }`}
+                                                                >
+                                                                    {mapping.autoMatched ? 'Auto Match' : 'Manual'}
+                                                                </Badge>
+                                                            </div>
                                                         )}
                                                     </TableCell>
                                                 </TableRow>
@@ -1173,25 +1252,22 @@ export const SigeImportDialog = ({
                                         {/* Disciplinas Válidas */}
                                         <div className="border rounded-lg p-4 bg-green-50 dark:bg-green-950/20">
                                             <div className="flex items-center gap-2 mb-3">
-                                                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                                <ArrowRight className="h-5 w-5 text-green-600" />
                                                 <h3 className="font-semibold text-green-900 dark:text-green-100">
                                                     Disciplinas que serão importadas ({mappedSubjects.length})
                                                 </h3>
                                             </div>
                                             {mappedSubjects.length > 0 ? (
-                                                <div className="space-y-1">
+                                                <div className="grid gap-2 grid-cols-1 md:grid-cols-2">
                                                     {mappedSubjects.map(m => (
-                                                        <div key={m.excelSubject} className="flex items-center gap-2 text-sm">
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/30"
-                                                            >
-                                                                ✓ {m.excelSubject}
-                                                            </Badge>
-                                                            <span className="text-muted-foreground">→</span>
-                                                            <span className="font-medium">{m.systemSubject}</span>
+                                                        <div key={m.excelSubject} className="flex items-center justify-between p-2 rounded border bg-background/50">
+                                                            <div className="flex items-center gap-2 text-sm overflow-hidden">
+                                                                <span className="font-medium truncate max-w-[120px]" title={m.excelSubject}>{m.excelSubject}</span>
+                                                                <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                                                                <span className="truncate max-w-[120px] text-green-700 dark:text-green-400" title={m.systemSubject!}>{m.systemSubject}</span>
+                                                            </div>
                                                             {!m.autoMatched && (
-                                                                <Badge variant="outline" className="text-xs">Manual</Badge>
+                                                                <Badge variant="secondary" className="text-[10px] h-5 px-1 ml-1">Manual</Badge>
                                                             )}
                                                         </div>
                                                     ))}
@@ -1214,13 +1290,9 @@ export const SigeImportDialog = ({
                                                 </div>
                                                 <div className="flex flex-wrap gap-2">
                                                     {unmappedSubjects.map(m => (
-                                                        <Badge
-                                                            key={m.excelSubject}
-                                                            variant="outline"
-                                                            className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30"
-                                                        >
-                                                            ⚠ {m.excelSubject}
-                                                        </Badge>
+                                                        <div key={m.excelSubject} className="flex items-center gap-1.5 px-2 py-1 rounded border bg-background/50 text-xs text-muted-foreground">
+                                                            <span>{m.excelSubject}</span>
+                                                        </div>
                                                     ))}
                                                 </div>
                                                 <p className="text-sm text-muted-foreground mt-2">
@@ -1294,66 +1366,53 @@ export const SigeImportDialog = ({
                     {step === 'preview' && parseResult && (
                         <div className="space-y-4">
                             {/* Estatísticas da Importação */}
-                            <Alert>
-                                <CheckCircle2 className="h-4 w-4" />
-                                <AlertDescription>
-                                    <div className="space-y-3">
-                                        <p className="text-sm font-medium">
-                                            📊 Resumo da Importação
-                                        </p>
-                                        <div className="grid grid-cols-2 gap-2 text-xs">
-                                            <div className="bg-blue-50 dark:bg-blue-950/30 p-2 rounded">
-                                                <span className="text-muted-foreground">Alunos no arquivo:</span>
-                                                <span className="ml-2 font-semibold">{parseResult.rows.length}</span>
-                                            </div>
-                                            <div className="bg-blue-50 dark:bg-blue-950/30 p-2 rounded">
-                                                <span className="text-muted-foreground">Alunos identificados:</span>
-                                                <span className="ml-2 font-semibold">{studentMatches.filter(m => m.systemStudentId).length}</span>
-                                            </div>
-                                            <div className="bg-green-50 dark:bg-green-950/30 p-2 rounded">
-                                                <span className="text-muted-foreground">Notas válidas:</span>
-                                                <span className="ml-2 font-semibold text-green-700 dark:text-green-400">{importableGrades.length}</span>
-                                            </div>
-                                            <div className="bg-purple-50 dark:bg-purple-950/30 p-2 rounded">
-                                                <span className="text-muted-foreground">Disciplinas:</span>
-                                                <span className="ml-2 font-semibold">{new Set(importableGrades.map(g => g.subject)).size}</span>
-                                            </div>
-                                        </div>
-
-                                        {/* Disciplinas */}
-                                        <div>
-                                            <p className="text-xs text-muted-foreground mb-1">Disciplinas validadas:</p>
-                                            <div className="flex flex-wrap gap-1">
-                                                {Array.from(new Set(importableGrades.map(g => g.subject))).map(subject => (
-                                                    <Badge key={subject} variant="outline" className="text-xs">
-                                                        {subject}
-                                                    </Badge>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </AlertDescription>
-                            </Alert>
+                            {/* Estatísticas da Importação - Cards */}
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="bg-blue-50/50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-800 flex flex-col items-center justify-center text-center">
+                                    <span className="text-3xl font-bold text-blue-700 dark:text-blue-400 mb-1">
+                                        {parseResult.rows.length}
+                                    </span>
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Alunos (Arq)</span>
+                                </div>
+                                <div className="bg-indigo-50/50 dark:bg-indigo-900/10 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800 flex flex-col items-center justify-center text-center">
+                                    <span className="text-3xl font-bold text-indigo-700 dark:text-indigo-400 mb-1">
+                                        {studentMatches.filter(m => m.systemStudentId).length}
+                                    </span>
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Identificados</span>
+                                </div>
+                                <div className="bg-emerald-50/50 dark:bg-emerald-900/10 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800 flex flex-col items-center justify-center text-center">
+                                    <span className="text-3xl font-bold text-emerald-700 dark:text-emerald-400 mb-1">
+                                        {importableGrades.length}
+                                    </span>
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notas Válidas</span>
+                                </div>
+                                <div className="bg-purple-50/50 dark:bg-purple-900/10 p-4 rounded-xl border border-purple-100 dark:border-purple-800 flex flex-col items-center justify-center text-center">
+                                    <span className="text-3xl font-bold text-purple-700 dark:text-purple-400 mb-1">
+                                        {new Set(importableGrades.map(g => g.subject)).size}
+                                    </span>
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Disciplinas</span>
+                                </div>
+                            </div>
 
                             {isImporting && (
-                                <Alert>
-                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                <Alert className="bg-primary/5 border-primary/20">
+                                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
                                     <AlertDescription>
                                         <div className="space-y-2">
                                             <div className="flex justify-between text-sm">
-                                                <span>
+                                                <span className="font-medium text-primary">
                                                     {importPhase === 'deleting'
                                                         ? '🗑️ Removendo notas antigas...'
                                                         : '📝 Importando novas notas...'
                                                     }
                                                 </span>
                                                 <span className="font-medium">
-                                                    {importProgress.current} / {importProgress.total}
+                                                    {Math.round((importProgress.current / importProgress.total) * 100)}%
                                                 </span>
                                             </div>
                                             <Progress
                                                 value={importProgress.total > 0 ? (importProgress.current / importProgress.total) * 100 : 0}
-                                                className="h-2"
+                                                className="h-2 bg-primary/20"
                                             />
                                             {importPhase === 'deleting' && (
                                                 <p className="text-xs text-muted-foreground">
@@ -1365,60 +1424,73 @@ export const SigeImportDialog = ({
                                 </Alert>
                             )}
 
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between pt-2">
                                 <div className="flex items-center gap-2">
                                     <Checkbox
                                         checked={selectedGradesCount === importableGrades.length}
                                         onCheckedChange={(checked) => handleSelectAll(!!checked)}
                                         disabled={isImporting}
                                     />
-                                    <span className="text-sm">
-                                        Selecionar todas ({selectedGradesCount}/{importableGrades.length})
+                                    <span className="text-sm font-medium">
+                                        Selecionar todas para importação
                                     </span>
                                 </div>
-                                <Badge variant={selectedGradesCount > 0 ? 'default' : 'secondary'}>
+                                <Badge variant={selectedGradesCount > 0 ? 'default' : 'secondary'} className="px-3 py-1 text-sm bg-primary/10 text-primary border-primary/20 hover:bg-primary/20">
                                     {selectedGradesCount} notas selecionadas
                                 </Badge>
                             </div>
 
-                            <ScrollArea className="h-[400px] border rounded-lg">
+                            <ScrollArea className="h-[400px] border rounded-lg bg-background">
                                 <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="w-12"></TableHead>
-                                            <TableHead>Aluno (Sistema)</TableHead>
-                                            <TableHead>Aluno (Arquivo)</TableHead>
-                                            <TableHead>Match</TableHead>
-                                            <TableHead>Disciplina</TableHead>
-                                            <TableHead>Nota</TableHead>
+                                    <TableHeader className="bg-muted/40 sticky top-0 z-10">
+                                        <TableRow className="hover:bg-transparent">
+                                            <TableHead className="w-12 text-center">
+                                                <Checkbox
+                                                    checked={selectedGradesCount === importableGrades.length}
+                                                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                                                    disabled={isImporting}
+                                                    className="translate-y-[2px]"
+                                                />
+                                            </TableHead>
+                                            <TableHead className="font-semibold">Aluno (Sistema)</TableHead>
+                                            <TableHead className="font-semibold">Match Info</TableHead>
+                                            <TableHead className="font-semibold">Disciplina</TableHead>
+                                            <TableHead className="font-semibold">Nota</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {importableGrades.map((grade, index) => (
-                                            <TableRow key={index}>
-                                                <TableCell>
+                                            <TableRow key={index} className="hover:bg-muted/30 transition-colors">
+                                                <TableCell className="text-center py-2">
                                                     <Checkbox
                                                         checked={grade.selected}
                                                         onCheckedChange={() => handleToggleGrade(index)}
                                                     />
                                                 </TableCell>
-                                                <TableCell className="font-medium">
+                                                <TableCell className="font-medium py-2">
                                                     {grade.studentName}
                                                 </TableCell>
-                                                <TableCell className="text-muted-foreground text-sm">
-                                                    {grade.extractedName}
+                                                <TableCell className="py-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={`text-[10px] h-5 ${grade.similarity >= 0.9
+                                                                ? 'text-emerald-600 border-emerald-200 bg-emerald-50'
+                                                                : 'text-amber-600 border-amber-200 bg-amber-50'
+                                                                }`}
+                                                        >
+                                                            {Math.round(grade.similarity * 100)}%
+                                                        </Badge>
+                                                        <span className="text-xs text-muted-foreground truncate max-w-[100px]" title={grade.extractedName}>
+                                                            {grade.extractedName}
+                                                        </span>
+                                                    </div>
                                                 </TableCell>
-                                                <TableCell>
-                                                    <Badge
-                                                        variant={grade.similarity >= 0.9 ? 'default' : 'secondary'}
-                                                        className={grade.similarity >= 0.9 ? 'bg-green-500' : 'bg-yellow-500'}
-                                                    >
-                                                        {Math.round(grade.similarity * 100)}%
+                                                <TableCell className="py-2 text-sm text-muted-foreground">{grade.subject}</TableCell>
+                                                <TableCell className="py-2">
+                                                    <Badge variant="outline" className={`font-mono text-sm ${grade.grade < 6 ? 'text-red-500 border-red-200 bg-red-50' : 'text-slate-700 bg-slate-50'}`}>
+                                                        {grade.grade.toFixed(1)}
                                                     </Badge>
-                                                </TableCell>
-                                                <TableCell>{grade.subject}</TableCell>
-                                                <TableCell>
-                                                    <Badge variant="outline">{grade.grade.toFixed(1)}</Badge>
                                                 </TableCell>
                                             </TableRow>
                                         ))}

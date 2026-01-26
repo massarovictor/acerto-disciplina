@@ -424,11 +424,19 @@ export const GradesManager = () => {
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <Card className="bg-primary/5 border-primary/20">
-        <CardContent className="pt-6">
+      {/* Filters */}
+      <Card>
+        <CardHeader className="pb-3 border-b bg-muted/20">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <FileUp className="h-4 w-4" />
+              Filtros e Seleção
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-4">
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
-              <Label>Turma *</Label>
               <Select value={selectedClass} onValueChange={setSelectedClass}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione a turma" />
@@ -450,7 +458,6 @@ export const GradesManager = () => {
             </div>
 
             <div className="space-y-2">
-              <Label>Ano da turma *</Label>
               <Select
                 value={String(selectedSchoolYear)}
                 onValueChange={(value) => setSelectedSchoolYear(Number(value) as 1 | 2 | 3)}
@@ -469,7 +476,6 @@ export const GradesManager = () => {
             </div>
 
             <div className="space-y-2">
-              <Label>Bimestre *</Label>
               <Select value={selectedQuarter} onValueChange={setSelectedQuarter}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o bimestre" />
@@ -495,13 +501,14 @@ export const GradesManager = () => {
           )}
 
           {selectedClass && selectedQuarter && !isClassLocked && (
-            <Alert className="mt-4">
-              <AlertDescription>
+            <div className="mt-4 p-3 bg-blue-50 text-blue-800 border border-blue-200 rounded-md text-sm dark:bg-blue-900/10 dark:text-blue-300 dark:border-blue-800/30 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              <span>
                 Lançando notas do <strong>{selectedQuarter}</strong> para o <strong>{selectedSchoolYear}º ano</strong>{' '}
                 da turma <strong>{classes.find(c => c.id === selectedClass)?.name}</strong>{' '}
                 ({classStudents.length} alunos)
-              </AlertDescription>
-            </Alert>
+              </span>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -519,10 +526,13 @@ export const GradesManager = () => {
       {/* Students List */}
       {selectedClass && classStudents.length > 0 && !isClassLocked && (
         <Card>
-          <CardHeader>
-            <CardTitle>Alunos - Clique para Lançar Notas</CardTitle>
+          <CardHeader className="pb-3 border-b bg-muted/20">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <FileUp className="h-4 w-4" />
+              Alunos - Clique para Lançar Notas
+            </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
               {classStudents.map((student) => {
                 const studentGrade = studentGrades.find(sg => sg.studentId === student.id);
@@ -593,9 +603,12 @@ export const GradesManager = () => {
       {/* Student Grades Dialog */}
       <Dialog open={!!selectedStudent} onOpenChange={(open) => !open && setSelectedStudent(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              Lançar Notas - {students.find(s => s.id === selectedStudent)?.name}
+          <DialogHeader className="pb-4 border-b">
+            <DialogTitle className="flex items-center gap-2">
+              <FileUp className="h-5 w-5 text-primary" />
+              <span>
+                Lançar Notas - <span className="text-muted-foreground font-normal">{students.find(s => s.id === selectedStudent)?.name}</span>
+              </span>
             </DialogTitle>
           </DialogHeader>
 
