@@ -594,6 +594,57 @@ export function useAnalyticsFiltersLogic({
             ),
         };
 
+        // =====================================================================
+        // 1. AUTO-CORRECÃO DE CONTEXTO (Prioridade: Turma > Ano)
+        // Se o usuário selecionou uma turma específica, garantimos que o contexto
+        // temporal (Ano Letivo/Calendário) seja compatível com ela ANTES de validar.
+        // =====================================================================
+        if (next.classIds.length === 1) {
+            // Buscamos a turma na lista completa (sem restrições de filtro ainda)
+            const targetClass = classes.find(c => c.id === next.classIds[0]);
+
+            if (targetClass) {
+                const startYear = getStartCalendarYear(targetClass);
+                const classSchoolYear =
+                    targetClass.currentYear && [1, 2, 3].includes(targetClass.currentYear)
+                        ? (targetClass.currentYear as 1 | 2 | 3)
+                        : undefined;
+
+                if (classSchoolYear) {
+                    const isSchoolYearSet = next.schoolYear !== 'all';
+                    const isCalendarYearSet = next.calendarYear !== 'all';
+
+                    const isYearIncompatible = isSchoolYearSet && next.schoolYear !== classSchoolYear;
+
+                    let isCalendarIncompatible = false;
+                    if (startYear && isCalendarYearSet) {
+                        const calYear = Number(next.calendarYear);
+                        if (calYear < startYear || calYear > startYear + 2) {
+                            isCalendarIncompatible = true;
+                        }
+                    }
+
+                    // Se houve alteração explícita de turma (patch) E o contexto atual é incompatível
+                    // Forçamos o ajuste do contexto para mostrar a turma.
+                    // Se não houve patch (apenas re-render), mantemos a lógica de correção apenas para evitar estado inválido.
+                    if (isYearIncompatible || isCalendarIncompatible) {
+                        next.schoolYear = classSchoolYear;
+
+                        if (startYear) {
+                            const targetCalendar = startYear + (classSchoolYear - 1);
+                            if (next.calendarYear !== 'all' || isCalendarIncompatible) {
+                                next.calendarYear = targetCalendar;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // =====================================================================
+        // 2. VALIDAÇÃO DE ESCOPO
+        // Agora que o contexto (anos) está ajustado, filtramos o que é válido.
+        // =====================================================================
         const baseClasses = next.includeArchived
             ? classes
             : classes.filter((c) => !c.archived);
@@ -610,7 +661,21 @@ export function useAnalyticsFiltersLogic({
             validClassIds.has(id),
         );
 
-        const eligibleClassIds = computeEligibleClassIdsForSubjects(next);
+        // Detect Subject Conflict when changing Classes
+        const classIdsChanged = 'classIds' in patch;
+        let eligibleClassIds = computeEligibleClassIdsForSubjects(next);
+
+        if (classIdsChanged && eligibleClassIds && eligibleClassIds.size > 0 && next.classIds.length > 0) {
+            const incompatibleClasses = next.classIds.filter(id => !eligibleClassIds!.has(id));
+            if (incompatibleClasses.length > 0) {
+                // User selected a class incompatible with current subjects.
+                // Priority: User Selection (Class) > Old State (Subjects).
+                next.subjects = [];
+                // Re-evaluate eligibility (empty subjects -> null/all allowed)
+                eligibleClassIds = computeEligibleClassIdsForSubjects(next);
+            }
+        }
+
         if (eligibleClassIds && eligibleClassIds.size > 0) {
             if (next.classIds.length > 0) {
                 next.classIds = next.classIds.filter((id) => eligibleClassIds.has(id));
@@ -621,8 +686,10 @@ export function useAnalyticsFiltersLogic({
                 eligibleClassIds.has(id),
             );
         } else if ((next.subjects ?? []).length > 0) {
-            next.classIds = [];
-            next.comparisonClassIds = [];
+            if (!classIdsChanged) {
+                next.classIds = [];
+                next.comparisonClassIds = [];
+            }
         }
 
         if ('useQuarterRange' in patch && next.useQuarterRange) {
@@ -632,32 +699,7 @@ export function useAnalyticsFiltersLogic({
             next.useQuarterRange = false;
         }
 
-        // Auto Year: ajusta ano automaticamente ao selecionar 1 turma
-        // DESATIVADO no modo "Histórico Global" para não filtrar dados inesperadamente
-        const isHistoryMode = current.schoolYear === 'all' && current.calendarYear === 'all';
-        const shouldAutoYear =
-            'classIds' in patch &&
-            !('schoolYear' in patch) &&
-            !('calendarYear' in patch) &&
-            !isHistoryMode;
-        if (shouldAutoYear && next.classIds.length === 1) {
-            const cls = scopedClasses.find((c) => c.id === next.classIds[0]);
-            if (cls) {
-                const startYear = getStartCalendarYear(cls);
-                const currentYear =
-                    cls.currentYear && [1, 2, 3].includes(cls.currentYear)
-                        ? (cls.currentYear as 1 | 2 | 3)
-                        : undefined;
-                if (currentYear) {
-                    next.schoolYear = currentYear;
-                    if (startYear) {
-                        next.calendarYear = startYear + (currentYear - 1);
-                    }
-                } else if (typeof next.schoolYear === 'number' && startYear) {
-                    next.calendarYear = startYear + (next.schoolYear - 1);
-                }
-            }
-        }
+
 
         if (next.schoolYear !== 'all' && next.calendarYear !== 'all') {
             const calendarScope =

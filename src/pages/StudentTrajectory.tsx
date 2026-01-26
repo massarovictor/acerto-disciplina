@@ -629,7 +629,7 @@ const StudentTrajectory = () => {
                             data.push({
                                 idx: idx++,
                                 label: `${year}º - AE ${qNum}B`,
-                                emGrade: undefined,
+                                emGrade: undefined, // Separate from EM Line
                                 external: val,
                                 externalName: ext.assessmentName,
                                 type: 'Externa',
@@ -1764,8 +1764,25 @@ const StudentTrajectory = () => {
                                                             />
                                                         </Line>
 
-                                                        {/* Avaliações Externas - Laranja */}
-                                                        <Scatter dataKey="external" fill="#f39c12" name="Aval. Externa" />
+                                                        {/* Avaliações Externas - Linha Laranja Independente */}
+                                                        <Line
+                                                            type="monotone"
+                                                            dataKey="external"
+                                                            stroke="#f39c12"
+                                                            strokeWidth={3}
+                                                            name="Aval. Externa"
+                                                            dot={{ r: 5, fill: '#f39c12', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+                                                            activeDot={{ r: 7 }}
+                                                            connectNulls
+                                                        >
+                                                            <LabelList
+                                                                dataKey="external"
+                                                                position="top"
+                                                                offset={8}
+                                                                formatter={(val: number) => val?.toFixed(1)}
+                                                                style={{ fontSize: '10px', fontWeight: 'bold', fill: '#f39c12' }}
+                                                            />
+                                                        </Line>
 
                                                         {/* Ocorrências - Vermelho */}
                                                         <Scatter dataKey="incident" fill="#e74c3c" name="Ocorrências" shape="triangle" />
