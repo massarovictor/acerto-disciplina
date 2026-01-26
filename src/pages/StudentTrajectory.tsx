@@ -90,10 +90,9 @@ import { useSearchParams } from 'react-router-dom';
 const StudentTrajectory = () => {
     const { classes } = useClasses();
     const { students } = useStudents();
-    const [searchParams] = useSearchParams();
-
-    // ✅ Usando Zustand store para persistir seleções entre navegações
     const { trajectoryUI, setTrajectoryUI } = useUIStore();
+    const [searchParams, setSearchParams] = useSearchParams();
+
     const selectedClass = trajectoryUI.selectedClassId;
     const selectedStudent = trajectoryUI.selectedStudentId;
     const selectedSubject = trajectoryUI.selectedSubject;
@@ -103,29 +102,7 @@ const StudentTrajectory = () => {
     const gridCalendarYear = trajectoryUI.gridCalendarYear;
     const source = trajectoryUI.source;
 
-    // Sync with URL params on mount for deep linking support
-    useEffect(() => {
-        const classIdParam = searchParams.get('classId');
-        const studentIdParam = searchParams.get('studentId');
-
-        let updateRequired = false;
-        const updates: Partial<typeof trajectoryUI> = {};
-
-        if (classIdParam && classes.some(c => c.id === classIdParam) && classIdParam !== selectedClass) {
-            updates.selectedClassId = classIdParam;
-            updateRequired = true;
-        }
-
-        if (studentIdParam && students.some(s => s.id === studentIdParam) && studentIdParam !== selectedStudent) {
-            updates.selectedStudentId = studentIdParam;
-            updateRequired = true;
-        }
-
-        if (updateRequired) {
-            setTrajectoryUI(updates);
-        }
-    }, [searchParams, classes, students, selectedClass, selectedStudent, setTrajectoryUI]);
-
+    // Hooks de Dados
     const { grades: regularGrades } = useGradesAnalytics({ studentId: selectedStudent || undefined });
     const { historicalGrades, addHistoricalGrade, deleteHistoricalGrade } = useHistoricalGrades();
     const { externalAssessments, deleteExternalAssessment, updateExternalAssessment } = useExternalAssessments();
@@ -134,13 +111,51 @@ const StudentTrajectory = () => {
     const { getTemplate, getTemplatesByCourse } = useProfessionalSubjectTemplates();
     const { toast } = useToast();
 
-    const setSelectedClass = (value: string) => setTrajectoryUI({ selectedClassId: value, selectedStudentId: '' });
-    const setSelectedStudent = (value: string) => setTrajectoryUI({ selectedStudentId: value });
-    const setSelectedSubject = (value: string) =>
+    // Sync with URL params on mount for deep linking support
+    useEffect(() => {
+        const classIdParam = searchParams.get('classId');
+        const studentIdParam = searchParams.get('studentId');
+
+        const updates: Partial<typeof trajectoryUI> = {};
+        let needsUpdate = false;
+
+        if (classIdParam && classIdParam !== selectedClass) {
+            updates.selectedClassId = classIdParam;
+            needsUpdate = true;
+        }
+        if (studentIdParam && studentIdParam !== selectedStudent) {
+            updates.selectedStudentId = studentIdParam;
+            needsUpdate = true;
+        }
+
+        if (needsUpdate) {
+            setTrajectoryUI(updates);
+        }
+    }, [searchParams, selectedClass, selectedStudent, setTrajectoryUI]);
+
+    const setSelectedClass = (value: string) => {
+        const nextParams = new URLSearchParams(searchParams);
+        if (value) nextParams.set('classId', value);
+        else nextParams.delete('classId');
+        nextParams.delete('studentId'); // Reset student on class change
+        setTrajectoryUI({ selectedClassId: value, selectedStudentId: '' });
+        setSearchParams(nextParams);
+    };
+
+    const setSelectedStudent = (value: string) => {
+        const nextParams = new URLSearchParams(searchParams);
+        if (value) nextParams.set('studentId', value);
+        else nextParams.delete('studentId');
+        setTrajectoryUI({ selectedStudentId: value });
+        setSearchParams(nextParams);
+    };
+
+    const setSelectedSubject = (value: string) => {
         setTrajectoryUI({
             selectedSubject: value,
             source: source === 'analytics' ? '' : source,
         });
+    };
     const setActiveTab = (value: string) => setTrajectoryUI({ activeTab: value });
     const setGridYear = (value: number) => setTrajectoryUI({ gridYear: value });
     const setGridQuarter = (value: string) => setTrajectoryUI({ gridQuarter: value });
@@ -462,7 +477,13 @@ const StudentTrajectory = () => {
                                 e.schoolLevel === level &&
                                 e.gradeYear === year &&
                                 e.quarter === q &&
-                                (e.subject === selectedSubject || e.subject === 'geral' || !e.subject)
+                                (
+                                    !selectedSubject ||
+                                    selectedSubject === 'all' ||
+                                    normalizeSubjectName(e.subject || '') === normalizeSubjectName(selectedSubject) ||
+                                    e.subject === 'geral' ||
+                                    !e.subject
+                                )
                             );
 
                             if (g || ext) {
@@ -507,10 +528,10 @@ const StudentTrajectory = () => {
                                     if (!eNum && e.appliedDate) {
                                         try {
                                             const month = new Date(e.appliedDate).getMonth() + 1;
-                                            if (month >= 2 && month <= 4) eNum = '1';
-                                            else if (month >= 5 && month <= 7) eNum = '2';
-                                            else if (month >= 8 && month <= 9) eNum = '3';
-                                            else if (month >= 10 || month === 12) eNum = '4';
+                                            if (month >= 1 && month <= 4) eNum = '1'; // Jan a Abr
+                                            else if (month >= 5 && month <= 7) eNum = '2'; // Mai a Jul
+                                            else if (month >= 8 && month <= 10) eNum = '3'; // Ago a Out
+                                            else if (month >= 11 || month === 12) eNum = '4'; // Nov e Dez
                                         } catch { /* ignore */ }
                                     }
 
@@ -571,7 +592,12 @@ const StudentTrajectory = () => {
                             if (e.gradeYear != year) return false;
 
                             // 2. Subject Match (Safe check)
-                            const isSubjectMatch = e.subject === selectedSubject || e.subject === 'geral' || !e.subject;
+                            const isSubjectMatch =
+                                selectedSubject === 'all' ||
+                                !selectedSubject ||
+                                normalizeSubjectName(e.subject || '') === normalizeSubjectName(selectedSubject) ||
+                                e.subject === 'geral' ||
+                                !e.subject;
                             if (!isSubjectMatch) return false;
 
                             // 3. Quarter Match (Robust with Date Fallback)
@@ -588,10 +614,10 @@ const StudentTrajectory = () => {
                             if (!eNum && e.appliedDate) {
                                 try {
                                     const month = new Date(e.appliedDate).getMonth() + 1;
-                                    if (month >= 2 && month <= 4) eNum = '1';
+                                    if (month >= 1 && month <= 4) eNum = '1';
                                     else if (month >= 5 && month <= 7) eNum = '2';
-                                    else if (month >= 8 && month <= 9) eNum = '3';
-                                    else if (month >= 10 || month === 12) eNum = '4';
+                                    else if (month >= 8 && month <= 10) eNum = '3';
+                                    else if (month >= 11 || month === 12) eNum = '4';
                                 } catch { /* ignore */ }
                             }
 
