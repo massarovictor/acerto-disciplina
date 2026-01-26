@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -58,6 +58,7 @@ import {
     Edit3,
     Save,
     Lock,
+    UploadCloud,
     Users
 } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
@@ -896,9 +897,9 @@ const StudentTrajectory = () => {
             />
 
             {source === 'analytics' && (
-                <Alert className="mb-4">
-                    <AlertTitle>Filtro recebido do Analytics</AlertTitle>
-                    <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+                <div className="mb-4 px-4 py-3 rounded-lg border border-blue-200 bg-blue-50/50 dark:bg-blue-900/10 dark:border-blue-800">
+                    <p className="font-semibold text-sm mb-1 text-blue-700 dark:text-blue-300">Filtro recebido do Analytics</p>
+                    <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-blue-700/80 dark:text-blue-300/80">
                         <span>
                             Abrindo trajetória com disciplina{' '}
                             <strong>
@@ -913,116 +914,110 @@ const StudentTrajectory = () => {
                         <Button
                             variant="ghost"
                             size="sm"
+                            className="h-8 text-blue-700 hover:text-blue-800 hover:bg-blue-100 dark:text-blue-300 dark:hover:bg-blue-900/50"
                             onClick={() => setTrajectoryUI({ source: '', selectedSubject: '' })}
                         >
                             Limpar filtro
                         </Button>
-                    </AlertDescription>
-                </Alert>
+                    </div>
+                </div>
             )}
 
             {subjectFallbackNotice && (
-                <Alert className="mb-4">
-                    <AlertTitle>Sem notas registradas</AlertTitle>
-                    <AlertDescription>{subjectFallbackNotice}</AlertDescription>
-                </Alert>
+                <div className="mb-4 px-4 py-3 rounded-lg border border-amber-200 bg-amber-50/50 dark:bg-amber-900/10 dark:border-amber-800">
+                    <p className="font-semibold text-sm mb-1 text-amber-700 dark:text-amber-300">Sem notas registradas</p>
+                    <p className="text-sm text-amber-700/80 dark:text-amber-300/80">{subjectFallbackNotice}</p>
+                </div>
             )}
 
-            {/* Main Filters Card */}
-            <Card className="bg-slate-50 border-none shadow-none rounded-xl">
-                <CardContent className="pt-6">
-                    <div className="grid gap-6 md:grid-cols-3">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Turma</Label>
-                            <Select value={selectedClass} onValueChange={setSelectedClass}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Selecione a turma" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {classes.length === 0 ? (
-                                        <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                                            Nenhuma turma cadastrada
-                                        </div>
-                                    ) : (
-                                        classes
-                                            .filter(cls => cls.active && !cls.archived)
-                                            .map(cls => (
-                                                <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
-                                            ))
-                                    )}
-                                </SelectContent>
-                            </Select>
-                        </div>
+            {/* Main Filters - Clean Design (No Labels) */}
+            <div className="grid gap-4 md:grid-cols-3 mb-6">
+                <div className="space-y-1">
+                    <Select value={selectedClass} onValueChange={setSelectedClass}>
+                        <SelectTrigger className="h-10 bg-background">
+                            <SelectValue placeholder="Selecione a turma" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {classes.length === 0 ? (
+                                <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                                    Nenhuma turma cadastrada
+                                </div>
+                            ) : (
+                                classes
+                                    .filter(cls => cls.active && !cls.archived)
+                                    .map(cls => (
+                                        <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+                                    ))
+                            )}
+                        </SelectContent>
+                    </Select>
+                </div>
 
-                        <div className="space-y-2">
-                            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Aluno</Label>
-                            <Select value={selectedStudent} onValueChange={setSelectedStudent} disabled={!selectedClass}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Selecione o aluno" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {filteredStudents.length === 0 ? (
-                                        <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                                            {selectedClass ? 'Nenhum aluno nesta turma' : 'Selecione uma turma primeiro'}
-                                        </div>
-                                    ) : (
-                                        filteredStudents.map(s => (
-                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                        ))
-                                    )}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                <div className="space-y-1">
+                    <Select value={selectedStudent} onValueChange={setSelectedStudent} disabled={!selectedClass}>
+                        <SelectTrigger className="h-10 bg-background">
+                            <SelectValue placeholder="Selecione o aluno" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {filteredStudents.length === 0 ? (
+                                <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                                    {selectedClass ? 'Nenhum aluno nesta turma' : 'Selecione uma turma primeiro'}
+                                </div>
+                            ) : (
+                                filteredStudents.map(s => (
+                                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                ))
+                            )}
+                        </SelectContent>
+                    </Select>
+                </div>
 
-                        <div className="space-y-2">
-                            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Disciplina</Label>
-                            <Select value={selectedSubject} onValueChange={setSelectedSubject} disabled={!selectedStudent}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Escolha a disciplina" />
-                                </SelectTrigger>
-                                <SelectContent className="max-h-80">
-                                    <SelectItem value="all">Todas as disciplinas</SelectItem>
-                                    {/* Áreas conforme o nível do aluno */}
-                                    {(isStudentFundamental ? FUNDAMENTAL_SUBJECT_AREAS : SUBJECT_AREAS).map(area => (
-                                        <SelectGroup key={area.name}>
-                                            <SelectLabel className="px-2 py-1.5 text-xs font-bold text-primary bg-primary/5 uppercase tracking-wider">
-                                                {area.name.replace(', Códigos e suas Tecnologias', '').replace(' e suas Tecnologias', '')}
-                                            </SelectLabel>
-                                            {area.subjects.map(s => (
-                                                <SelectItem key={s} value={s}>{s}</SelectItem>
-                                            ))}
-                                        </SelectGroup>
+                <div className="space-y-1">
+                    <Select value={selectedSubject} onValueChange={setSelectedSubject} disabled={!selectedStudent}>
+                        <SelectTrigger className="h-10 bg-background">
+                            <SelectValue placeholder="Escolha a disciplina" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-80">
+                            <SelectItem value="all">Todas as disciplinas</SelectItem>
+                            {/* Áreas conforme o nível do aluno */}
+                            {(isStudentFundamental ? FUNDAMENTAL_SUBJECT_AREAS : SUBJECT_AREAS).map(area => (
+                                <SelectGroup key={area.name}>
+                                    <SelectLabel className="px-2 py-1.5 text-xs font-bold text-primary bg-primary/5 uppercase tracking-wider">
+                                        {area.name.replace(', Códigos e suas Tecnologias', '').replace(' e suas Tecnologias', '')}
+                                    </SelectLabel>
+                                    {area.subjects.map(s => (
+                                        <SelectItem key={s} value={s}>{s}</SelectItem>
                                     ))}
-                                    {professionalSubjectsForSelect.length > 0 && (
-                                        <SelectGroup>
-                                            <SelectLabel className="px-2 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-500/10 uppercase tracking-wider">
-                                                Profissionais
-                                            </SelectLabel>
-                                            {professionalSubjectsForSelect.map(subject => (
-                                                <SelectItem key={subject} value={subject}>{subject}</SelectItem>
-                                            ))}
-                                        </SelectGroup>
-                                    )}
-                                    {/* Mostrar Histórico Fundamental se estiver no Ensino Médio, caso tenha dados */}
-                                    {!isStudentFundamental && (
-                                        <SelectGroup>
-                                            <SelectLabel className="px-2 py-1.5 text-xs font-bold text-amber-600 bg-amber-500/10 uppercase tracking-wider">
-                                                Histórico Fundamental
-                                            </SelectLabel>
-                                            <SelectItem value="Ciências">
-                                                Ciências <span className="text-muted-foreground text-[10px]">(+ Natureza)</span>
-                                            </SelectItem>
-                                            <SelectItem value="Língua Inglesa">
-                                                Língua Inglesa <span className="text-muted-foreground text-[10px]">(+ Linguagens)</span>
-                                            </SelectItem>
-                                        </SelectGroup>
-                                    )}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+                                </SelectGroup>
+                            ))}
+                            {professionalSubjectsForSelect.length > 0 && (
+                                <SelectGroup>
+                                    <SelectLabel className="px-2 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-500/10 uppercase tracking-wider">
+                                        Profissionais
+                                    </SelectLabel>
+                                    {professionalSubjectsForSelect.map(subject => (
+                                        <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                                    ))}
+                                </SelectGroup>
+                            )}
+                            {/* Mostrar Histórico Fundamental se estiver no Ensino Médio, caso tenha dados */}
+                            {!isStudentFundamental && (
+                                <SelectGroup>
+                                    <SelectLabel className="px-2 py-1.5 text-xs font-bold text-amber-600 bg-amber-500/10 uppercase tracking-wider">
+                                        Histórico Fundamental
+                                    </SelectLabel>
+                                    <SelectItem value="Ciências">
+                                        Ciências <span className="text-muted-foreground text-[10px]">(+ Natureza)</span>
+                                    </SelectItem>
+                                    <SelectItem value="Língua Inglesa">
+                                        Língua Inglesa <span className="text-muted-foreground text-[10px]">(+ Linguagens)</span>
+                                    </SelectItem>
+                                </SelectGroup>
+                            )}
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
 
             {
                 !selectedStudent ? (
@@ -1042,42 +1037,64 @@ const StudentTrajectory = () => {
                         <TabsContent value="summary" className="space-y-6">
                             {holisticSummary && (
                                 <>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                        <Card className="border-none shadow-sm bg-blue-50/50 rounded-xl border-l-4 border-blue-500">
-                                            <CardHeader className="py-2 pb-0">
-                                                <CardTitle className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Média Fundamental</CardTitle>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                        {/* Média Fundamental */}
+                                        <Card>
+                                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                                <CardTitle className="text-sm font-medium text-muted-foreground">Média Fundamental</CardTitle>
+                                                <div className="p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                                                    <GraduationCap className="h-4 w-4" />
+                                                </div>
                                             </CardHeader>
-                                            <CardContent className="pt-1">
-                                                <div className="text-3xl font-black text-blue-600">{holisticSummary.fundAvg.toFixed(1)}</div>
+                                            <CardContent>
+                                                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{holisticSummary.fundAvg.toFixed(1)}</div>
+                                                <p className="text-xs text-muted-foreground mt-1">Média geral do ciclo básico</p>
                                             </CardContent>
                                         </Card>
-                                        <Card className="border-none shadow-sm bg-violet-50/50 rounded-xl border-l-4 border-violet-500">
-                                            <CardHeader className="py-2 pb-0">
-                                                <CardTitle className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Média Médio</CardTitle>
+
+                                        {/* Média Médio */}
+                                        <Card>
+                                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                                <CardTitle className="text-sm font-medium text-muted-foreground">Média Ensino Médio</CardTitle>
+                                                <div className="p-2 rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
+                                                    <School className="h-4 w-4" />
+                                                </div>
                                             </CardHeader>
-                                            <CardContent className="pt-1">
-                                                <div className="text-3xl font-black text-violet-600">{holisticSummary.emAvg.toFixed(1)}</div>
+                                            <CardContent>
+                                                <div className="text-2xl font-bold text-violet-600 dark:text-violet-400">{holisticSummary.emAvg.toFixed(1)}</div>
+                                                <p className="text-xs text-muted-foreground mt-1">Média geral do ciclo avançado</p>
                                             </CardContent>
                                         </Card>
-                                        <Card className="border-none shadow-sm bg-amber-50/50 rounded-xl border-l-4 border-amber-500">
-                                            <CardHeader className="py-2 pb-0">
-                                                <CardTitle className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Aval. Externas</CardTitle>
+
+                                        {/* Avaliações Externas */}
+                                        <Card>
+                                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                                <CardTitle className="text-sm font-medium text-muted-foreground">Avaliações Externas</CardTitle>
+                                                <div className="p-2 rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                                                    <Target className="h-4 w-4" />
+                                                </div>
                                             </CardHeader>
-                                            <CardContent className="pt-1">
-                                                <div className="text-3xl font-black text-amber-600">{holisticSummary.extAvg.toFixed(1)}</div>
+                                            <CardContent>
+                                                <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{holisticSummary.extAvg.toFixed(1)}</div>
+                                                <p className="text-xs text-muted-foreground mt-1">Média de simulados e provas</p>
                                             </CardContent>
                                         </Card>
-                                        <Card className="border-none shadow-sm bg-red-50/50 rounded-xl border-l-4 border-red-500">
-                                            <CardHeader className="py-2 pb-0">
-                                                <CardTitle className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">Ocorrências</CardTitle>
+
+                                        {/* Ocorrências */}
+                                        <Card>
+                                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                                <CardTitle className="text-sm font-medium text-muted-foreground">Ocorrências</CardTitle>
+                                                <div className="p-2 rounded-lg bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                                                    <AlertTriangle className="h-4 w-4" />
+                                                </div>
                                             </CardHeader>
-                                            <CardContent className="pt-1 flex items-center justify-between">
-                                                <div className="text-3xl font-black text-red-600">{holisticSummary.incidentCount}</div>
-                                                {holisticSummary.criticalIncidents > 0 && (
-                                                    <Badge variant="destructive" className="h-5 px-1.5 animate-pulse text-[10px] font-bold">
-                                                        {holisticSummary.criticalIncidents} CRÍTICAS
-                                                    </Badge>
-                                                )}
+                                            <CardContent>
+                                                <div className="text-2xl font-bold text-red-600 dark:text-red-400">{holisticSummary.incidentCount}</div>
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                    {holisticSummary.criticalIncidents > 0
+                                                        ? `${holisticSummary.criticalIncidents} registros críticos`
+                                                        : 'Registros comportamentais'}
+                                                </p>
                                             </CardContent>
                                         </Card>
                                     </div>
@@ -1085,48 +1102,71 @@ const StudentTrajectory = () => {
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         {/* Potencialidades */}
-                                        <Card className="border-none shadow-sm bg-card overflow-hidden">
-                                            <div className="h-1 bg-emerald-500 w-full" />
-                                            <CardHeader className="pb-3">
-                                                <CardTitle className="text-emerald-600 dark:text-emerald-500 flex items-center gap-2 text-base">
-                                                    <Zap className="h-4 w-4" /> Potencialidades
-                                                </CardTitle>
-                                                <CardDescription className="text-xs italic">Destaques históricos de excelência</CardDescription>
+                                        <Card className="border-none shadow-none bg-emerald-50/30 dark:bg-emerald-900/5 border border-emerald-100 dark:border-emerald-800/50">
+                                            <CardHeader className="pb-2 border-b border-emerald-100 dark:border-emerald-800/50">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-8 w-8 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
+                                                        <Zap className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                                    </div>
+                                                    <div>
+                                                        <CardTitle className="text-base text-emerald-900 dark:text-emerald-300">Potencialidades</CardTitle>
+                                                        <CardDescription className="text-xs text-emerald-700/70 dark:text-emerald-400/70">Áreas de destaque e alto desempenho</CardDescription>
+                                                    </div>
+                                                </div>
                                             </CardHeader>
-                                            <CardContent>
+                                            <CardContent className="pt-4">
                                                 {holisticSummary.strengths.length > 0 ? (
-                                                    <div className="grid gap-2">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                         {holisticSummary.strengths.map(s => (
-                                                            <div key={s.name} className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                                                                <span className="text-sm font-medium text-emerald-900 dark:text-emerald-400">{s.name}</span>
-                                                                <Badge className="bg-emerald-600 hover:bg-emerald-700">{s.avg.toFixed(1)}</Badge>
+                                                            <div key={s.name} className="flex flex-col gap-1 p-3 rounded-lg bg-white dark:bg-gray-800/50 shadow-sm border border-emerald-100/50 dark:border-emerald-800/30">
+                                                                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{s.name}</span>
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Média Geral</span>
+                                                                    <span className="font-bold text-emerald-600 dark:text-emerald-400 text-lg">{s.avg.toFixed(1)}</span>
+                                                                </div>
+                                                                <div className="h-1 w-full bg-emerald-100 dark:bg-emerald-900/30 rounded-full overflow-hidden mt-1">
+                                                                    <div className="h-full bg-emerald-500" style={{ width: `${(s.avg / 10) * 100}%` }} />
+                                                                </div>
                                                             </div>
                                                         ))}
                                                     </div>
-                                                ) : <p className="text-sm text-muted-foreground">O deserto de excelência aguarda seu oásis...</p>}
+                                                ) : <p className="text-sm text-muted-foreground text-center py-8">Ainda não foram identificadas áreas de destaque significativo.</p>}
                                             </CardContent>
                                         </Card>
 
                                         {/* Dificuldades */}
-                                        <Card className="border-none shadow-sm bg-card overflow-hidden">
-                                            <div className="h-1 bg-red-500 w-full" />
-                                            <CardHeader className="pb-3">
-                                                <CardTitle className="text-red-600 dark:text-red-500 flex items-center gap-2 text-base">
-                                                    <AlertTriangle className="h-4 w-4" /> Áreas de Atenção
-                                                </CardTitle>
-                                                <CardDescription className="text-xs italic">Disciplinas requerendo maior suporte</CardDescription>
+                                        <Card className="border-none shadow-none bg-red-50/30 dark:bg-red-900/5 border border-red-100 dark:border-red-800/50">
+                                            <CardHeader className="pb-2 border-b border-red-100 dark:border-red-800/50">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-8 w-8 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center">
+                                                        <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                                    </div>
+                                                    <div>
+                                                        <CardTitle className="text-base text-red-900 dark:text-red-300">Pontos de Atenção</CardTitle>
+                                                        <CardDescription className="text-xs text-red-700/70 dark:text-red-400/70">Disciplinas que requerem suporte prioritário</CardDescription>
+                                                    </div>
+                                                </div>
                                             </CardHeader>
-                                            <CardContent>
+                                            <CardContent className="pt-4">
                                                 {holisticSummary.difficulties.length > 0 ? (
-                                                    <div className="grid gap-2">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                         {holisticSummary.difficulties.map(d => (
-                                                            <div key={d.name} className="flex items-center justify-between p-2 rounded-lg bg-red-500/10 border border-red-500/20">
-                                                                <span className="text-sm font-medium text-red-900 dark:text-red-400">{d.name}</span>
-                                                                <Badge variant="destructive" className="font-bold">{d.avg.toFixed(1)}</Badge>
+                                                            <div key={d.name} className="flex flex-col gap-1 p-3 rounded-lg bg-white dark:bg-gray-800/50 shadow-sm border border-red-100/50 dark:border-red-800/30">
+                                                                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{d.name}</span>
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Média Geral</span>
+                                                                    <span className="font-bold text-red-600 dark:text-red-400 text-lg">{d.avg.toFixed(1)}</span>
+                                                                </div>
+                                                                <div className="h-1 w-full bg-red-100 dark:bg-red-900/30 rounded-full overflow-hidden mt-1">
+                                                                    <div className="h-full bg-red-500" style={{ width: `${(d.avg / 10) * 100}%` }} />
+                                                                </div>
                                                             </div>
                                                         ))}
                                                     </div>
-                                                ) : <p className="text-sm text-muted-foreground">O mar da tranquilidade acadêmica prevalece...</p>}
+                                                ) : <p className="text-sm text-green-600 dark:text-green-400 font-medium text-center py-8 flex flex-col items-center gap-2">
+                                                    <CheckCircle2 className="h-8 w-8 opacity-50" />
+                                                    Nenhum ponto de atenção identificado.
+                                                </p>}
                                             </CardContent>
                                         </Card>
                                     </div>
@@ -1153,28 +1193,36 @@ const StudentTrajectory = () => {
                                     </div>
                                 </CardHeader>
                                 <CardContent className="space-y-6">
-                                    <Alert className="bg-blue-500/10 border-blue-500/20">
-                                        <Activity className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                        <AlertTitle>Importante</AlertTitle>
-                                        <AlertDescription>
-                                            As notas do Ensino Médio (1º ao 3º ano) são sincronizadas automaticamente da gestão de notas regular. Utilize esta aba apenas para registros do Fundamental II.
-                                        </AlertDescription>
-                                    </Alert>
+                                    <div className="px-4 py-3 rounded-lg border flex items-start gap-3 bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800">
+                                        <div className="mt-0.5 text-blue-600 dark:text-blue-400">
+                                            <Activity className="h-4 w-4" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-semibold text-foreground mb-1">Importante</p>
+                                            <p className="text-sm text-foreground/90 dark:text-foreground/80">
+                                                As notas do Ensino Médio (1º ao 3º ano) são sincronizadas automaticamente da gestão de notas regular. Utilize esta aba apenas para registros do Fundamental II.
+                                            </p>
+                                        </div>
+                                    </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-muted/30 p-4 rounded-xl">
-                                        <div className="space-y-2">
-                                            <Label>Série / Ano Fundamental</Label>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                        <div className="space-y-1">
+                                            <Label className="text-xs font-semibold text-muted-foreground pl-1">Série do Fundamental</Label>
                                             <Select value={String(gridYear)} onValueChange={v => setGridYear(parseInt(v))}>
-                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectTrigger className="bg-background h-10">
+                                                    <SelectValue placeholder="Selecione a série" />
+                                                </SelectTrigger>
                                                 <SelectContent>
                                                     {FUNDAMENTAL_YEARS.map(y => <SelectItem key={y} value={String(y)}>{y}º ano</SelectItem>)}
                                                 </SelectContent>
                                             </Select>
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label>Ano Calendário *</Label>
+                                        <div className="space-y-1">
+                                            <Label className="text-xs font-semibold text-muted-foreground pl-1">Ano Letivo</Label>
                                             <Select value={String(gridCalendarYear)} onValueChange={v => setGridCalendarYear(parseInt(v))}>
-                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectTrigger className="bg-background h-10">
+                                                    <SelectValue placeholder="Ano de registro" />
+                                                </SelectTrigger>
                                                 <SelectContent>
                                                     {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map(y => (
                                                         <SelectItem key={y} value={String(y)}>{y}</SelectItem>
@@ -1193,10 +1241,12 @@ const StudentTrajectory = () => {
                                                 </div>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                                     {area.subjects.map(subject => (
-                                                        <div key={subject} className="space-y-1 p-3 border rounded-lg hover:border-primary transition-colors bg-card shadow-sm">
-                                                            <Label className="text-[10px] uppercase font-bold text-muted-foreground truncate block">{subject}</Label>
+                                                        <div key={subject} className="space-y-1 p-3 border rounded-lg hover:border-primary/50 transition-colors bg-card shadow-sm group focus-within:ring-1 focus-within:ring-primary">
+                                                            <div className="flex items-center justify-between pointer-events-none">
+                                                                <Label className="text-[10px] uppercase font-bold text-muted-foreground group-focus-within:text-primary transition-colors truncate block">{subject}</Label>
+                                                            </div>
                                                             <Input
-                                                                className="h-8 font-bold border-none shadow-none focus-visible:ring-1 focus-visible:ring-primary text-lg px-px bg-transparent"
+                                                                className="h-8 font-bold border-none shadow-none focus-visible:ring-0 text-lg px-px bg-transparent p-0"
                                                                 placeholder="0.0"
                                                                 value={gridValues[subject] || ''}
                                                                 onChange={e => setGridValues({ ...gridValues, [subject]: e.target.value })}
@@ -1272,237 +1322,311 @@ const StudentTrajectory = () => {
                                         </div>
                                     )}
 
-                                    <div className="mt-10 space-y-4">
-                                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-t pt-6">
-                                            <div className="flex items-center gap-2">
-                                                <Target className="h-5 w-5 text-muted-foreground" />
-                                                <h3 className="font-bold">Avaliações Externas</h3>
-                                            </div>
-                                            <Button variant="outline" className="gap-2" onClick={() => setShowBatchAssessment(true)}>
-                                                <Target className="h-4 w-4" />
-                                                Lançar Avaliações
-                                            </Button>
-                                        </div>
-
-                                        {studentExternalSorted.length === 0 ? (
-                                            <div className="border rounded-lg p-6 text-center text-muted-foreground bg-muted/20">
-                                                Nenhuma avaliação externa registrada para este aluno.
-                                            </div>
-                                        ) : (
-                                            <div className="border rounded-lg overflow-hidden bg-card">
-                                                <Table>
-                                                    <TableHeader className="bg-muted/50">
-                                                        <TableRow>
-                                                            <TableHead>Data</TableHead>
-                                                            <TableHead>Tipo</TableHead>
-                                                            <TableHead>Avaliação</TableHead>
-                                                            <TableHead>Disciplina</TableHead>
-                                                            <TableHead className="text-right">Nota</TableHead>
-                                                            <TableHead>Ano</TableHead>
-                                                            <TableHead>Bimestre</TableHead>
-                                                            <TableHead className="w-20">Ações</TableHead>
-                                                        </TableRow>
-                                                    </TableHeader>
-                                                    <TableBody>
-                                                        {studentExternalSorted.map((assessment) => {
-                                                            const appliedLabel = formatDateInput(assessment.appliedDate);
-                                                            return (
-                                                                <TableRow key={assessment.id} className="hover:bg-muted/30">
-                                                                    <TableCell className="text-xs">{appliedLabel || '-'}</TableCell>
-                                                                    <TableCell className="text-xs">{assessment.assessmentType}</TableCell>
-                                                                    <TableCell className="text-xs">{assessment.assessmentName}</TableCell>
-                                                                    <TableCell className="text-xs">{assessment.subject || 'Geral'}</TableCell>
-                                                                    <TableCell className="text-right font-bold text-xs">
-                                                                        {assessment.score}/{assessment.maxScore}
-                                                                    </TableCell>
-                                                                    <TableCell className="text-xs">
-                                                                        {assessment.schoolLevel === 'fundamental'
-                                                                            ? `${assessment.gradeYear}º Fund`
-                                                                            : `${assessment.gradeYear}º EM`}
-                                                                    </TableCell>
-                                                                    <TableCell className="text-xs">{assessment.quarter || '-'}</TableCell>
-                                                                    <TableCell className="flex gap-1">
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-500/10"
-                                                                            onClick={() => openExternalEdit(assessment)}
-                                                                        >
-                                                                            <Edit3 className="h-4 w-4" />
-                                                                        </Button>
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                                                                            onClick={() => deleteExternalAssessment(assessment.id)}
-                                                                        >
-                                                                            <Trash2 className="h-4 w-4" />
-                                                                        </Button>
-                                                                    </TableCell>
+                                    {/* Avaliações Externas Section - Refactored to Card */}
+                                    <div className="mt-6">
+                                        <Card>
+                                            <CardHeader>
+                                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                                    <div>
+                                                        <CardTitle className="flex items-center gap-2">
+                                                            <Target className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                                            Avaliações Externas
+                                                        </CardTitle>
+                                                        <CardDescription>Gerencie notas de simulados e avaliações diagnósticas</CardDescription>
+                                                    </div>
+                                                    <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowBatchAssessment(true)}>
+                                                        <UploadCloud className="h-4 w-4" />
+                                                        Lançamento em Lote
+                                                    </Button>
+                                                </div>
+                                            </CardHeader>
+                                            <CardContent>
+                                                {studentExternalSorted.length === 0 ? (
+                                                    <div className="flex flex-col items-center justify-center p-8 border rounded-lg border-dashed bg-muted/10 text-center">
+                                                        <Target className="h-10 w-10 text-muted-foreground/30 mb-2" />
+                                                        <p className="text-sm font-medium text-muted-foreground">Nenhuma avaliação externa registrada</p>
+                                                        <p className="text-xs text-muted-foreground/70 mt-1 max-w-xs">
+                                                            Clique em "Lançamento em Lote" para adicionar resultados de simulados ou provas externas.
+                                                        </p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="border rounded-lg overflow-hidden">
+                                                        <Table>
+                                                            <TableHeader className="bg-muted/30">
+                                                                <TableRow>
+                                                                    <TableHead className="text-xs uppercase font-semibold">Data</TableHead>
+                                                                    <TableHead className="text-xs uppercase font-semibold">Tipo</TableHead>
+                                                                    <TableHead className="text-xs uppercase font-semibold">Avaliação</TableHead>
+                                                                    <TableHead className="text-xs uppercase font-semibold">Disciplina</TableHead>
+                                                                    <TableHead className="text-right text-xs uppercase font-semibold">Nota</TableHead>
+                                                                    <TableHead className="text-xs uppercase font-semibold">Nível</TableHead>
+                                                                    <TableHead className="text-xs uppercase font-semibold">Bimestre</TableHead>
+                                                                    <TableHead className="w-20 text-xs uppercase font-semibold">Ações</TableHead>
                                                                 </TableRow>
-                                                            );
-                                                        })}
-                                                    </TableBody>
-                                                </Table>
-                                            </div>
-                                        )}
+                                                            </TableHeader>
+                                                            <TableBody>
+                                                                {studentExternalSorted.map((assessment) => {
+                                                                    const appliedLabel = formatDateInput(assessment.appliedDate);
+                                                                    return (
+                                                                        <TableRow key={assessment.id} className="hover:bg-muted/50 transition-colors">
+                                                                            <TableCell className="text-xs font-medium">{appliedLabel || '-'}</TableCell>
+                                                                            <TableCell>
+                                                                                <Badge variant="secondary" className="text-[10px] font-normal">{assessment.assessmentType}</Badge>
+                                                                            </TableCell>
+                                                                            <TableCell className="text-xs">{assessment.assessmentName}</TableCell>
+                                                                            <TableCell className="text-xs text-muted-foreground">{assessment.subject || 'Geral'}</TableCell>
+                                                                            <TableCell className="text-right">
+                                                                                <span className={`font-bold text-xs px-2 py-0.5 rounded ${assessment.score >= 6 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                                                                                    {assessment.score.toFixed(1)} <span className="text-[10px] opacity-70">/{assessment.maxScore}</span>
+                                                                                </span>
+                                                                            </TableCell>
+                                                                            <TableCell className="text-xs text-muted-foreground">
+                                                                                {assessment.schoolLevel === 'fundamental'
+                                                                                    ? `${assessment.gradeYear}º Fund`
+                                                                                    : `${assessment.gradeYear}º EM`}
+                                                                            </TableCell>
+                                                                            <TableCell className="text-xs text-muted-foreground">{assessment.quarter || '-'}</TableCell>
+                                                                            <TableCell>
+                                                                                <div className="flex items-center gap-1">
+                                                                                    <Button
+                                                                                        variant="ghost"
+                                                                                        size="icon"
+                                                                                        className="h-7 w-7 text-muted-foreground hover:text-blue-600 hover:bg-blue-50"
+                                                                                        onClick={() => openExternalEdit(assessment)}
+                                                                                    >
+                                                                                        <Edit3 className="h-3.5 w-3.5" />
+                                                                                    </Button>
+                                                                                    <Button
+                                                                                        variant="ghost"
+                                                                                        size="icon"
+                                                                                        className="h-7 w-7 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                                                                                        onClick={() => deleteExternalAssessment(assessment.id)}
+                                                                                    >
+                                                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                                                    </Button>
+                                                                                </div>
+                                                                            </TableCell>
+                                                                        </TableRow>
+                                                                    );
+                                                                })}
+                                                            </TableBody>
+                                                        </Table>
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
                                     </div>
                                 </CardContent>
                             </Card>
                         </TabsContent>
-
                         {/* TAB: TRAJECTORY & SIMULATION */}
                         <TabsContent value="trajectory" className="space-y-6">
                             {/* Controles de Seleção e Simulação */}
-                            <Card className="bg-slate-50 border-none shadow-none rounded-xl">
-                                <CardContent className="pt-6">
-                                    <div className="grid gap-4 md:grid-cols-3">
-                                        {/* Removido o seletor de disciplina daqui pois foi movido para o topo */}
-
-                                        <div className="space-y-2">
-                                            <Label>Cenário</Label>
-                                            <Select value={simulationScenario} onValueChange={(v) => setSimulationScenario(v as typeof simulationScenario)}>
-                                                <SelectTrigger>
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="optimistic">🚀 Otimista (+10%)</SelectItem>
-                                                    <SelectItem value="realistic">📊 Realista</SelectItem>
-                                                    <SelectItem value="pessimistic">⚠️ Pessimista (-10%)</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <Label>Projeção (bimestres)</Label>
-                                            <div className="flex items-center gap-3">
-                                                <input
-                                                    type="range"
-                                                    min="1"
-                                                    max="4"
-                                                    value={simulationPoints}
-                                                    onChange={(e) => setSimulationPoints(parseInt(e.target.value))}
-                                                    className="flex-1 h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
-                                                />
-                                                <span className="w-6 text-center font-bold text-primary">{simulationPoints}</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-end gap-2">
-                                            <Button
-                                                variant={showSimulation ? "default" : "outline"}
-                                                onClick={() => setShowSimulation(!showSimulation)}
-                                                disabled={!selectedSubject || subjectTimeline.length < 2}
-                                                className="flex-1"
-                                            >
-                                                <Target className="h-4 w-4 mr-2" />
-                                                {showSimulation ? "Parar" : "Simular"}
-                                            </Button>
-                                        </div>
+                            {/* Controles de Seleção e Simulação - Clean */}
+                            <div className="mb-6">
+                                <div className="grid gap-4 md:grid-cols-3 items-center">
+                                    <div className="space-y-1">
+                                        <Select value={simulationScenario} onValueChange={(v) => setSimulationScenario(v as typeof simulationScenario)}>
+                                            <SelectTrigger className="h-10 bg-background">
+                                                <SelectValue placeholder="Selecione o cenário" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="optimistic">
+                                                    <div className="flex items-center gap-2">
+                                                        <TrendingUp className="h-4 w-4 text-emerald-500" />
+                                                        <span>Otimista (+10%)</span>
+                                                    </div>
+                                                </SelectItem>
+                                                <SelectItem value="realistic">
+                                                    <div className="flex items-center gap-2">
+                                                        <Activity className="h-4 w-4 text-blue-500" />
+                                                        <span>Realista (Tendência Atual)</span>
+                                                    </div>
+                                                </SelectItem>
+                                                <SelectItem value="pessimistic">
+                                                    <div className="flex items-center gap-2">
+                                                        <TrendingUp className="h-4 w-4 text-red-500 rotate-180" />
+                                                        <span>Pessimista (-10%)</span>
+                                                    </div>
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                     </div>
-                                </CardContent>
-                            </Card>
+
+                                    <div className="flex items-center gap-3 px-3 py-2 border rounded-md bg-background h-10">
+                                        <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Extensão:</span>
+                                        <input
+                                            type="range"
+                                            min="1"
+                                            max="4"
+                                            value={simulationPoints}
+                                            onChange={(e) => setSimulationPoints(parseInt(e.target.value))}
+                                            className="flex-1 h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                                        />
+                                        <span className="w-6 text-center font-bold text-primary text-sm">{simulationPoints}</span>
+                                        <span className="text-[10px] text-muted-foreground uppercase">bim</span>
+                                    </div>
+
+                                    <div className="flex items-center">
+                                        <Button
+                                            variant={showSimulation ? "default" : "outline"}
+                                            onClick={() => setShowSimulation(!showSimulation)}
+                                            disabled={!selectedSubject || subjectTimeline.length < 2}
+                                            className="w-full h-10 gap-2"
+                                        >
+                                            <Target className="h-4 w-4" />
+                                            {showSimulation ? "Parar Simulação" : "Simular Cenário"}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
 
                             {selectedSubject ? (
                                 <>
                                     {/* Cards de Métricas Enriquecidas */}
+                                    {/* Cards de Métricas Enriquecidas - Design System Premium */}
                                     {enrichedMetrics && trendAnalysis && (
-                                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                                        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                                             {/* Tendência */}
-                                            <Card className="border-none shadow-sm">
-                                                <CardContent className="pt-4 text-center">
-                                                    <div className={`text-4xl font-black ${trendAnalysis.trendColor}`}>
-                                                        {trendAnalysis.trendIcon}
+                                            <Card>
+                                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                                    <CardTitle className="text-sm font-medium text-muted-foreground">Tendência</CardTitle>
+                                                    <div className={`p-2 rounded-lg ${trendAnalysis.trend === 'ascending' ? 'bg-emerald-100 text-emerald-600' :
+                                                        trendAnalysis.trend === 'descending' ? 'bg-red-100 text-red-600' :
+                                                            'bg-amber-100 text-amber-600'
+                                                        }`}>
+                                                        {trendAnalysis.trend === 'ascending' ? <TrendingUp className="h-4 w-4" /> :
+                                                            trendAnalysis.trend === 'descending' ? <TrendingUp className="h-4 w-4 rotate-180" /> :
+                                                                <Minus className="h-4 w-4" />}
                                                     </div>
-                                                    <p className="text-xs font-bold mt-1">{trendAnalysis.trendLabel}</p>
-                                                    <p className="text-[10px] text-muted-foreground">
-                                                        {trendAnalysis.variationPercent >= 0 ? '+' : ''}{trendAnalysis.variationPercent.toFixed(0)}% variação
-                                                    </p>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <div className={`text-2xl font-bold ${trendAnalysis.trendColor}`}>
+                                                        {trendAnalysis.variationPercent >= 0 ? '+' : ''}{trendAnalysis.variationPercent.toFixed(0)}%
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground mt-1">vs. bimestre anterior</p>
                                                 </CardContent>
                                             </Card>
 
                                             {/* Média Histórica */}
-                                            <Card className="border-none shadow-sm">
-                                                <CardContent className="pt-4 text-center">
-                                                    <div className={`text-3xl font-black ${enrichedMetrics.average >= 6 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                            <Card>
+                                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                                    <CardTitle className="text-sm font-medium text-muted-foreground">Média Geral</CardTitle>
+                                                    <div className="p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                                                        <Activity className="h-4 w-4" />
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <div className={`text-2xl font-bold ${enrichedMetrics.average >= 6 ? 'text-emerald-600' : 'text-red-600'}`}>
                                                         {enrichedMetrics.average.toFixed(1)}
                                                     </div>
-                                                    <p className="text-xs font-bold mt-1">Média Histórica</p>
-                                                    <p className="text-[10px] text-muted-foreground">{enrichedMetrics.totalGrades} registros</p>
+                                                    <p className="text-xs text-muted-foreground mt-1">Média acumulada</p>
                                                 </CardContent>
                                             </Card>
 
                                             {/* Melhor Nota */}
-                                            <Card className="border-none shadow-sm bg-emerald-500/10">
-                                                <CardContent className="pt-4 text-center">
-                                                    <div className="text-3xl font-black text-emerald-600 dark:text-emerald-500">
+                                            <Card>
+                                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                                    <CardTitle className="text-sm font-medium text-muted-foreground">Melhor Nota</CardTitle>
+                                                    <div className="p-2 rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                                        <ArrowUpRight className="h-4 w-4" />
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                                                         {enrichedMetrics.maxGrade.toFixed(1)}
                                                     </div>
-                                                    <p className="text-xs font-bold mt-1 text-emerald-900 dark:text-emerald-100">Melhor Nota</p>
-                                                    <p className="text-[10px] text-muted-foreground truncate">{enrichedMetrics.bestPeriod}</p>
+                                                    <p className="text-xs text-muted-foreground mt-1 truncate" title={enrichedMetrics.bestPeriod}>
+                                                        {enrichedMetrics.bestPeriod}
+                                                    </p>
                                                 </CardContent>
                                             </Card>
 
                                             {/* Pior Nota */}
-                                            <Card className="border-none shadow-sm bg-red-500/10">
-                                                <CardContent className="pt-4 text-center">
-                                                    <div className="text-3xl font-black text-red-600 dark:text-red-500">
+                                            <Card>
+                                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                                    <CardTitle className="text-sm font-medium text-muted-foreground">Pior Nota</CardTitle>
+                                                    <div className="p-2 rounded-lg bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                                                        <ArrowDownRight className="h-4 w-4" />
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <div className="text-2xl font-bold text-red-600 dark:text-red-400">
                                                         {enrichedMetrics.minGrade.toFixed(1)}
                                                     </div>
-                                                    <p className="text-xs font-bold mt-1 text-red-900 dark:text-red-100">Pior Nota</p>
-                                                    <p className="text-[10px] text-muted-foreground truncate">{enrichedMetrics.worstPeriod}</p>
+                                                    <p className="text-xs text-muted-foreground mt-1 truncate" title={enrichedMetrics.worstPeriod}>
+                                                        {enrichedMetrics.worstPeriod}
+                                                    </p>
                                                 </CardContent>
                                             </Card>
 
                                             {/* Consistência */}
-                                            <Card className="border-none shadow-sm">
-                                                <CardContent className="pt-4 text-center">
-                                                    <div className={`text-2xl font-black ${enrichedMetrics.consistency === 'alta' ? 'text-emerald-600' : enrichedMetrics.consistency === 'baixa' ? 'text-amber-600' : 'text-blue-600'}`}>
-                                                        {enrichedMetrics.consistencyLabel.split(' ')[0]}
+                                            <Card>
+                                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                                    <CardTitle className="text-sm font-medium text-muted-foreground">Consistência</CardTitle>
+                                                    <div className={`p-2 rounded-lg ${enrichedMetrics.consistency === 'alta' ? 'bg-emerald-100 text-emerald-600' :
+                                                        enrichedMetrics.consistency === 'baixa' ? 'bg-amber-100 text-amber-600' :
+                                                            'bg-blue-100 text-blue-600'
+                                                        }`}>
+                                                        <Target className="h-4 w-4" />
                                                     </div>
-                                                    <p className="text-xs font-bold mt-1">Consistência</p>
-                                                    <p className="text-[10px] text-muted-foreground">CV: {enrichedMetrics.cv.toFixed(0)}%</p>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <div className={`text-2xl font-bold ${enrichedMetrics.consistency === 'alta' ? 'text-emerald-600' :
+                                                        enrichedMetrics.consistency === 'baixa' ? 'text-amber-600' :
+                                                            'text-blue-600'
+                                                        }`}>
+                                                        {enrichedMetrics.consistencyLabel}
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground mt-1">Estabilidade</p>
                                                 </CardContent>
                                             </Card>
 
                                             {/* Projeção */}
-                                            <Card className="border-none shadow-sm bg-primary/5">
-                                                <CardContent className="pt-4 text-center">
-                                                    {showSimulation ? (
-                                                        <div className="text-3xl font-black text-primary">
-                                                            {simulationData[simulationData.length - 1]?.emGrade?.toFixed(1) || '-'}
-                                                        </div>
-                                                    ) : (
-                                                        <div className="text-3xl font-black text-muted-foreground/30">-</div>
-                                                    )}
-                                                    <p className="text-xs font-bold mt-1">Projeção</p>
-                                                    <p className="text-[10px] text-muted-foreground">{showSimulation ? `+${simulationPoints} bim` : 'ativar simulação'}</p>
+                                            <Card className={showSimulation ? 'bg-orange-50/30 hover:border-orange-200' : 'opacity-70 bg-muted/20'}>
+                                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                                    <CardTitle className="text-sm font-medium text-muted-foreground">Projeção</CardTitle>
+                                                    <div className={`p-2 rounded-lg ${showSimulation ? 'bg-orange-100 text-orange-600' : 'bg-muted text-muted-foreground'}`}>
+                                                        <Target className="h-4 w-4" />
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <div className={`text-2xl font-bold ${showSimulation ? 'text-orange-600' : 'text-muted-foreground/30'}`}>
+                                                        {showSimulation ? (simulationData[simulationData.length - 1]?.emGrade?.toFixed(1) || simulationData[simulationData.length - 1]?.simulatedGrade?.toFixed(1) || '-') : '-'}
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground mt-1">Nota final estimada</p>
                                                 </CardContent>
                                             </Card>
                                         </div>
                                     )}
 
                                     {/* Insights Inteligentes */}
+                                    {/* Insights Inteligentes - Clean/Professional */}
                                     {insights.length > 0 && (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             {insights.map((insight, idx) => (
-                                                <Alert
+                                                <div
                                                     key={idx}
-                                                    className={`${insight.type === 'positive' ? 'bg-emerald-500/10 border-emerald-500/20' :
-                                                        insight.type === 'negative' ? 'bg-red-500/10 border-red-500/20' :
-                                                            insight.type === 'warning' ? 'bg-amber-500/10 border-amber-500/20' :
-                                                                'bg-blue-500/10 border-blue-500/20'
-                                                        }`}
+                                                    className={`
+                                                        px-4 py-3 rounded-lg border flex items-start gap-3 
+                                                        ${insight.type === 'positive' ? 'bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800' :
+                                                            insight.type === 'negative' ? 'bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-800' :
+                                                                insight.type === 'warning' ? 'bg-amber-50/50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800' :
+                                                                    'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800'
+                                                        }
+                                                    `}
                                                 >
-                                                    <Lightbulb className={`h-4 w-4 ${insight.type === 'positive' ? 'text-emerald-600' :
-                                                        insight.type === 'negative' ? 'text-red-600' :
-                                                            insight.type === 'warning' ? 'text-amber-600' :
-                                                                'text-blue-600'
-                                                        }`} />
-                                                    <AlertDescription className="text-xs">
+                                                    <div className={`mt-0.5 ${insight.type === 'positive' ? 'text-emerald-600 dark:text-emerald-400' :
+                                                        insight.type === 'negative' ? 'text-red-600 dark:text-red-400' :
+                                                            insight.type === 'warning' ? 'text-amber-600 dark:text-amber-400' :
+                                                                'text-blue-600 dark:text-blue-400'
+                                                        }`}>
+                                                        <Lightbulb className="h-4 w-4" />
+                                                    </div>
+                                                    <div className="text-sm font-medium text-foreground/90 dark:text-foreground">
                                                         {insight.message}
-                                                    </AlertDescription>
-                                                </Alert>
+                                                    </div>
+                                                </div>
                                             ))}
                                         </div>
                                     )}
@@ -1548,14 +1672,14 @@ const StudentTrajectory = () => {
                                                         <Legend wrapperStyle={{ paddingTop: '10px' }} />
                                                         <ReferenceLine y={6} stroke="#e74c3c" strokeDasharray="3 3" />
 
-                                                        {/* Linha do Fundamental - Roxa */}
+                                                        {/* Linha do Fundamental - Azul (Coerente com Resumo) */}
                                                         <Line
                                                             type="monotone"
                                                             dataKey="fundGrade"
-                                                            stroke="#8e44ad"
+                                                            stroke="#2563eb"
                                                             strokeWidth={3}
                                                             name="Fundamental"
-                                                            dot={{ r: 5, fill: '#8e44ad', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+                                                            dot={{ r: 5, fill: '#2563eb', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
                                                             activeDot={{ r: 7 }}
                                                             connectNulls
                                                         >
@@ -1564,18 +1688,18 @@ const StudentTrajectory = () => {
                                                                 position="top"
                                                                 offset={8}
                                                                 formatter={(val: number) => val?.toFixed(1)}
-                                                                style={{ fontSize: '10px', fontWeight: 'bold', fill: '#8e44ad' }}
+                                                                style={{ fontSize: '10px', fontWeight: 'bold', fill: '#2563eb' }}
                                                             />
                                                         </Line>
 
-                                                        {/* Linha do Ensino Médio - Azul */}
+                                                        {/* Linha do Ensino Médio - Violeta (Coerente com Resumo) */}
                                                         <Line
                                                             type="monotone"
                                                             dataKey="emGrade"
-                                                            stroke="#3498db"
+                                                            stroke="#7c3aed"
                                                             strokeWidth={3}
                                                             name="Ensino Médio"
-                                                            dot={{ r: 5, fill: '#3498db', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+                                                            dot={{ r: 5, fill: '#7c3aed', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
                                                             activeDot={{ r: 7 }}
                                                             connectNulls
                                                         >
@@ -1584,7 +1708,7 @@ const StudentTrajectory = () => {
                                                                 position="top"
                                                                 offset={8}
                                                                 formatter={(val: number) => val?.toFixed(1)}
-                                                                style={{ fontSize: '10px', fontWeight: 'bold', fill: '#3498db' }}
+                                                                style={{ fontSize: '10px', fontWeight: 'bold', fill: '#7c3aed' }}
                                                             />
                                                         </Line>
 
