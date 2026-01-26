@@ -59,7 +59,9 @@ import {
     Save,
     Lock,
     UploadCloud,
-    Users
+    Users,
+    Info,
+    RefreshCw
 } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -147,6 +149,8 @@ const StudentTrajectory = () => {
     const [showBatchAssessment, setShowBatchAssessment] = useState(false);
     const [showImport, setShowImport] = useState(false);
     const [subjectFallbackNotice, setSubjectFallbackNotice] = useState('');
+    const [editingHistoryYear, setEditingHistoryYear] = useState<number | null>(null);
+    const [editingExternalYear, setEditingExternalYear] = useState<{ year: number, level: 'fundamental' | 'medio' } | null>(null);
 
     // Grid Entry State
     const [gridValues, setGridValues] = useState<Record<string, string>>({});
@@ -484,7 +488,35 @@ const StudentTrajectory = () => {
                             const gradeAvg = average(periodGrades.map(r => r.grade));
 
                             const externalScores = studentExternal
-                                .filter(e => e.schoolLevel === level && e.gradeYear === year && e.quarter === q)
+                                .filter(e => {
+                                    // 1. Year & Level Match (Strict)
+                                    if (e.schoolLevel !== level) return false;
+                                    // eslint-disable-next-line eqeqeq
+                                    if (e.gradeYear != year) return false;
+
+                                    // 2. Quarter Match (Robust with Date Fallback)
+                                    const getNumber = (s: string | undefined | null) => {
+                                        if (!s) return '';
+                                        const val = s.match(/\d/);
+                                        return val ? val[0] : '';
+                                    };
+
+                                    let eNum = getNumber(e.quarter);
+
+                                    // Fallback to appliedDate if no quarter
+                                    if (!eNum && e.appliedDate) {
+                                        try {
+                                            const month = new Date(e.appliedDate).getMonth() + 1;
+                                            if (month >= 2 && month <= 4) eNum = '1';
+                                            else if (month >= 5 && month <= 7) eNum = '2';
+                                            else if (month >= 8 && month <= 9) eNum = '3';
+                                            else if (month >= 10 || month === 12) eNum = '4';
+                                        } catch { /* ignore */ }
+                                    }
+
+                                    const qNum = getNumber(q);
+                                    return eNum && qNum && eNum === qNum;
+                                })
                                 .map(e => (e.maxScore ? (e.score / e.maxScore) * 10 : NaN));
                             const externalAvg = average(externalScores);
 
@@ -496,17 +528,31 @@ const StudentTrajectory = () => {
                                 return quarterStr === q;
                             });
 
-                            if (gradeAvg !== null || externalAvg !== null || (periodIncidents.length > 0 && data.length > 0)) {
+                            // Push School Grade Point
+                            if (gradeAvg !== null || (periodIncidents.length > 0 && data.length > 0)) {
                                 data.push({
                                     idx: idx++,
                                     label: `${year}º EM - ${q.replace(' Bimestre', 'B')}`,
                                     emGrade: gradeAvg ?? undefined,
-                                    external: externalAvg ?? undefined,
-                                    externalName: externalScores.length > 1 ? 'Avaliações' : undefined,
+                                    external: undefined, // Separate point
                                     incident: periodIncidents.length > 0 ? periodIncidents.length * 2 : undefined,
                                     incidentCount: periodIncidents.length,
-                                    type: gradeAvg !== null ? 'Escolar' : externalAvg !== null ? 'Externa' : 'Ocorrência',
-                                    continuousValue: gradeAvg ?? externalAvg ?? undefined
+                                    type: 'Escolar',
+                                    continuousValue: gradeAvg ?? undefined
+                                });
+                            }
+
+                            // Push External Assessment Point (Side-by-side)
+                            if (externalAvg !== null) {
+                                const qNum = q.replace(/[^0-9]/g, '');
+                                data.push({
+                                    idx: idx++,
+                                    label: `${year}º - AE ${qNum}B`,
+                                    emGrade: undefined,
+                                    external: externalAvg,
+                                    externalName: externalScores.length > 1 ? 'Avaliações' : undefined,
+                                    type: 'Externa',
+                                    continuousValue: externalAvg
                                 });
                             }
                             return;
@@ -518,12 +564,40 @@ const StudentTrajectory = () => {
                             normalizeSubjectName(r.subject) === normalizeSubjectName(selectedSubject)
                         );
 
-                        const ext = studentExternal.find(e =>
-                            e.schoolLevel === level &&
-                            e.gradeYear === year &&
-                            e.quarter === q &&
-                            (e.subject === selectedSubject || e.subject === 'geral' || !e.subject)
-                        );
+                        const ext = studentExternal.find(e => {
+                            // 1. Year & Level Match (Strict)
+                            if (e.schoolLevel !== level) return false;
+                            // eslint-disable-next-line eqeqeq
+                            if (e.gradeYear != year) return false;
+
+                            // 2. Subject Match (Safe check)
+                            const isSubjectMatch = e.subject === selectedSubject || e.subject === 'geral' || !e.subject;
+                            if (!isSubjectMatch) return false;
+
+                            // 3. Quarter Match (Robust with Date Fallback)
+                            // Helper to extract digit
+                            const getNumber = (s: string | undefined | null) => {
+                                if (!s) return '';
+                                const val = s.match(/\d/);
+                                return val ? val[0] : '';
+                            };
+
+                            let eNum = getNumber(e.quarter);
+
+                            // Fallback to appliedDate if no quarter
+                            if (!eNum && e.appliedDate) {
+                                try {
+                                    const month = new Date(e.appliedDate).getMonth() + 1;
+                                    if (month >= 2 && month <= 4) eNum = '1';
+                                    else if (month >= 5 && month <= 7) eNum = '2';
+                                    else if (month >= 8 && month <= 9) eNum = '3';
+                                    else if (month >= 10 || month === 12) eNum = '4';
+                                } catch { /* ignore */ }
+                            }
+
+                            const qNum = getNumber(q);
+                            return eNum && qNum && eNum === qNum;
+                        });
 
                         // Incidents for this specific period
                         const periodIncidents = studentIncidents.filter(i => {
@@ -534,17 +608,32 @@ const StudentTrajectory = () => {
                             return quarterStr === q;
                         });
 
-                        if (g || ext || (periodIncidents.length > 0 && data.length > 0)) {
+                        // Push School Grade Point
+                        if (g || (periodIncidents.length > 0 && data.length > 0)) {
                             data.push({
                                 idx: idx++,
                                 label: `${year}º EM - ${q.replace(' Bimestre', 'B')}`,
                                 emGrade: g?.grade,
-                                external: ext ? (ext.score / ext.maxScore) * 10 : undefined,
-                                externalName: ext?.assessmentName,
+                                external: undefined,
                                 incident: periodIncidents.length > 0 ? periodIncidents.length * 2 : undefined,
                                 incidentCount: periodIncidents.length,
-                                type: g ? 'Escolar' : ext ? 'Externa' : 'Ocorrência',
-                                continuousValue: g?.grade || (ext ? (ext.score / ext.maxScore) * 10 : undefined)
+                                type: 'Escolar',
+                                continuousValue: g?.grade
+                            });
+                        }
+
+                        // Push External Point (Side-by-side)
+                        if (ext) {
+                            const qNum = q.replace(/[^0-9]/g, '');
+                            const val = (ext.score / ext.maxScore) * 10;
+                            data.push({
+                                idx: idx++,
+                                label: `${year}º - AE ${qNum}B`,
+                                emGrade: undefined,
+                                external: val,
+                                externalName: ext.assessmentName,
+                                type: 'Externa',
+                                continuousValue: val
                             });
                         }
                     });
@@ -1174,250 +1263,213 @@ const StudentTrajectory = () => {
                             )}
                         </TabsContent>
 
-                        {/* TAB: ENTRY (GRID DE LANÇAMENTO) */}
+                        {/* TAB: ENTRY (LANÇAMENTO RÁPIDO) */}
                         <TabsContent value="entry" className="space-y-6">
-                            <Card>
-                                <CardHeader>
-                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                        <div>
-                                            <CardTitle className="flex items-center gap-2">
-                                                <History className="h-5 w-5 text-amber-600" />
-                                                Histórico Fundamental (6º-9º Ano)
-                                            </CardTitle>
-                                            <CardDescription>Lance as notas do período fundamental para composição histórica</CardDescription>
-                                        </div>
-                                        <Badge variant="outline" className="text-amber-600 bg-amber-500/10 border-amber-500/20 gap-1.5 py-1 px-3">
-                                            <Lock className="h-3 w-3" />
-                                            Ensino Médio: Bloqueado
-                                        </Badge>
+                            <Tabs defaultValue="school_history" className="w-full">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+                                    <TabsList>
+                                        <TabsTrigger value="school_history" className="gap-2">
+                                            <History className="h-4 w-4" />
+                                            Histórico Escolar
+                                        </TabsTrigger>
+                                        <TabsTrigger value="external_assessments" className="gap-2">
+                                            <Target className="h-4 w-4" />
+                                            Avaliações Externas
+                                        </TabsTrigger>
+                                    </TabsList>
+
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 px-3 py-1.5 rounded-full border">
+                                        <Info className="h-3 w-3 text-blue-500" />
+                                        <span>Use esta área apenas para dados anteriores à entrada no Ensino Médio.</span>
                                     </div>
-                                </CardHeader>
-                                <CardContent className="space-y-6">
-                                    <div className="px-4 py-3 rounded-lg border flex items-start gap-3 bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800">
-                                        <div className="mt-0.5 text-blue-600 dark:text-blue-400">
-                                            <Activity className="h-4 w-4" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-semibold text-foreground mb-1">Importante</p>
-                                            <p className="text-sm text-foreground/90 dark:text-foreground/80">
-                                                As notas do Ensino Médio (1º ao 3º ano) são sincronizadas automaticamente da gestão de notas regular. Utilize esta aba apenas para registros do Fundamental II.
+                                </div>
+
+                                {/* SUB-TAB: HISTÓRICO ESCOLAR */}
+                                <TabsContent value="school_history" className="space-y-6 animate-in slide-in-from-left-2 fade-in duration-300">
+                                    <div className="grid gap-6">
+                                        <div className="flex flex-col gap-2">
+                                            <h3 className="text-lg font-semibold flex items-center gap-2">
+                                                <History className="h-5 w-5 text-primary" />
+                                                Histórico Escolar Fundamental
+                                            </h3>
+                                            <p className="text-sm text-muted-foreground">
+                                                Selecione um ano para visualizar ou editar as notas anuais.
                                             </p>
                                         </div>
-                                    </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                                        <div className="space-y-1">
-                                            <Label className="text-xs font-semibold text-muted-foreground pl-1">Série do Fundamental</Label>
-                                            <Select value={String(gridYear)} onValueChange={v => setGridYear(parseInt(v))}>
-                                                <SelectTrigger className="bg-background h-10">
-                                                    <SelectValue placeholder="Selecione a série" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {FUNDAMENTAL_YEARS.map(y => <SelectItem key={y} value={String(y)}>{y}º ano</SelectItem>)}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-xs font-semibold text-muted-foreground pl-1">Ano Letivo</Label>
-                                            <Select value={String(gridCalendarYear)} onValueChange={v => setGridCalendarYear(parseInt(v))}>
-                                                <SelectTrigger className="bg-background h-10">
-                                                    <SelectValue placeholder="Ano de registro" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map(y => (
-                                                        <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                            {FUNDAMENTAL_YEARS.map(year => {
+                                                // Calculate stats for this year
+                                                const yearGrades = studentHistorical.filter(h => h.gradeYear === year && h.quarter === 'Anual');
+                                                const totalSubjects = yearGrades.length;
+                                                const avgGrade = totalSubjects > 0
+                                                    ? yearGrades.reduce((acc, curr) => acc + curr.grade, 0) / totalSubjects
+                                                    : 0;
+                                                const hasGrades = totalSubjects > 0;
 
-                                    <div className="space-y-6">
-                                        {FUNDAMENTAL_SUBJECT_AREAS.map(area => (
-                                            <div key={area.name} className="space-y-3">
-                                                <div className="flex items-center gap-2">
-                                                    <div className={`h-3 w-1 rounded-full ${area.color.split(' ')[0]}`} />
-                                                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{area.name}</h3>
-                                                </div>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                                    {area.subjects.map(subject => (
-                                                        <div key={subject} className="space-y-1 p-3 border rounded-lg hover:border-primary/50 transition-colors bg-card shadow-sm group focus-within:ring-1 focus-within:ring-primary">
-                                                            <div className="flex items-center justify-between pointer-events-none">
-                                                                <Label className="text-[10px] uppercase font-bold text-muted-foreground group-focus-within:text-primary transition-colors truncate block">{subject}</Label>
+                                                return (
+                                                    <Card
+                                                        key={year}
+                                                        className={`cursor-pointer transition-all hover:shadow-md border-2 ${hasGrades ? 'border-primary/20 bg-primary/5' : 'border-dashed hover:border-primary/50'
+                                                            }`}
+                                                        onClick={() => setEditingHistoryYear(year)}
+                                                    >
+                                                        <CardHeader className="pb-2">
+                                                            <CardTitle className="text-lg font-bold flex justify-between items-center">
+                                                                {year}º Ano
+                                                                {hasGrades && (
+                                                                    <Badge variant={avgGrade >= 6 ? "default" : "destructive"}>
+                                                                        Média: {avgGrade.toFixed(1)}
+                                                                    </Badge>
+                                                                )}
+                                                            </CardTitle>
+                                                        </CardHeader>
+                                                        <CardContent>
+                                                            <div className="space-y-3">
+                                                                <div className="flex items-center justify-between text-sm">
+                                                                    <span className="text-muted-foreground">Disciplinas:</span>
+                                                                    <span className="font-medium">{totalSubjects} lançadas</span>
+                                                                </div>
+
+                                                                {hasGrades ? (
+                                                                    <div className="w-full bg-background rounded-full h-2 overflow-hidden border">
+                                                                        <div
+                                                                            className={`h-full ${avgGrade >= 6 ? 'bg-primary' : 'bg-destructive'}`}
+                                                                            style={{ width: `${Math.min(100, (avgGrade / 10) * 100)}%` }}
+                                                                        />
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex items-center justify-center py-2 text-muted-foreground text-sm italic">
+                                                                        Clique para lançar
+                                                                    </div>
+                                                                )}
+
+                                                                <Button variant="ghost" className="w-full gap-2 mt-2" size="sm">
+                                                                    <Edit3 className="h-4 w-4" />
+                                                                    {hasGrades ? 'Editar Notas' : 'Lançar Notas'}
+                                                                </Button>
                                                             </div>
-                                                            <Input
-                                                                className="h-8 font-bold border-none shadow-none focus-visible:ring-0 text-lg px-px bg-transparent p-0"
-                                                                placeholder="0.0"
-                                                                value={gridValues[subject] || ''}
-                                                                onChange={e => setGridValues({ ...gridValues, [subject]: e.target.value })}
-                                                            />
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    <div className="flex justify-end">
-                                        <Button onClick={handleSaveGrid} className="gap-2">
-                                            <Save className="h-4 w-4" /> Salvar / Atualizar Notas
-                                        </Button>
-                                    </div>
-
-                                    {/* Historical Records Table */}
-                                    {studentHistorical.length > 0 && (
-                                        <div className="mt-8 space-y-4">
-                                            <div className="flex items-center gap-2 border-t pt-6">
-                                                <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
-                                                <h3 className="font-bold">Registros Salvos (Fundamental II)</h3>
-                                            </div>
-                                            <div className="border rounded-lg overflow-hidden bg-card">
-                                                <Table>
-                                                    <TableHeader className="bg-muted/50">
-                                                        <TableRow>
-                                                            <TableHead>Ano</TableHead>
-                                                            <TableHead>Bimestre</TableHead>
-                                                            <TableHead>Disciplina</TableHead>
-                                                            <TableHead className="text-right">Nota</TableHead>
-                                                            <TableHead className="w-20">Ações</TableHead>
-                                                        </TableRow>
-                                                    </TableHeader>
-                                                    <TableBody>
-                                                        {studentHistorical
-                                                            .sort((a, b) => b.gradeYear - a.gradeYear || b.quarter.localeCompare(a.quarter))
-                                                            .map(record => (
-                                                                <TableRow key={record.id} className="hover:bg-muted/30">
-                                                                    <TableCell className="font-medium text-xs">{record.gradeYear}º ano</TableCell>
-                                                                    <TableCell className="text-xs">{record.quarter}</TableCell>
-                                                                    <TableCell className="text-xs">{record.subject}</TableCell>
-                                                                    <TableCell className={`text-right font-bold ${record.grade >= 6 ? 'text-green-600' : 'text-red-600'}`}>
-                                                                        {record.grade.toFixed(1)}
-                                                                    </TableCell>
-                                                                    <TableCell className="flex gap-1">
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-500/10"
-                                                                            onClick={() => {
-                                                                                setEditingRecord(record);
-                                                                                setEditGradeValue(String(record.grade).replace('.', ','));
-                                                                            }}
-                                                                        >
-                                                                            <Edit3 className="h-4 w-4" />
-                                                                        </Button>
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                                                                            onClick={() => deleteHistoricalGrade(record.id)}
-                                                                        >
-                                                                            <Trash2 className="h-4 w-4" />
-                                                                        </Button>
-                                                                    </TableCell>
-                                                                </TableRow>
-                                                            ))}
-                                                    </TableBody>
-                                                </Table>
-                                            </div>
+                                                        </CardContent>
+                                                    </Card>
+                                                );
+                                            })}
                                         </div>
-                                    )}
+                                    </div>
+                                </TabsContent>
 
-                                    {/* Avaliações Externas Section - Refactored to Card */}
-                                    <div className="mt-6">
-                                        <Card>
-                                            <CardHeader>
-                                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                                    <div>
-                                                        <CardTitle className="flex items-center gap-2">
-                                                            <Target className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                                                            Avaliações Externas
-                                                        </CardTitle>
-                                                        <CardDescription>Gerencie notas de simulados e avaliações diagnósticas</CardDescription>
+                                {/* SUB-TAB: AVALIAÇÕES EXTERNAS */}
+                                <TabsContent value="external_assessments" className="space-y-6 animate-in slide-in-from-right-2 fade-in duration-300">
+                                    <Card>
+                                        <CardHeader>
+                                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                                <div>
+                                                    <CardTitle className="flex items-center gap-2">
+                                                        <Target className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                                        Gestão de Avaliações Externas
+                                                    </CardTitle>
+                                                    <CardDescription>
+                                                        Centralize aqui os resultados de simulados, SAEB, e provas diagnósticas.
+                                                    </CardDescription>
+                                                </div>
+                                                <Button variant="default" size="sm" className="gap-2 shadow-sm" onClick={() => setShowBatchAssessment(true)}>
+                                                    <UploadCloud className="h-4 w-4" />
+                                                    Lançar em Lote (Turma)
+                                                </Button>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent className="p-0">
+                                            {studentExternalSorted.length === 0 ? (
+                                                <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                                                    <div className="h-16 w-16 bg-muted/30 rounded-full flex items-center justify-center mb-4">
+                                                        <Target className="h-8 w-8 text-muted-foreground/30" />
                                                     </div>
-                                                    <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowBatchAssessment(true)}>
-                                                        <UploadCloud className="h-4 w-4" />
-                                                        Lançamento em Lote
+                                                    <h3 className="text-lg font-medium text-foreground">Nenhuma avaliação registrada</h3>
+                                                    <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+                                                        Registre simulados e provas para acompanhar a evolução do aluno em comparação com métricas externas.
+                                                    </p>
+                                                    <Button variant="outline" className="mt-6" onClick={() => setShowBatchAssessment(true)}>
+                                                        Começar Lançamento
                                                     </Button>
                                                 </div>
-                                            </CardHeader>
-                                            <CardContent>
-                                                {studentExternalSorted.length === 0 ? (
-                                                    <div className="flex flex-col items-center justify-center p-8 border rounded-lg border-dashed bg-muted/10 text-center">
-                                                        <Target className="h-10 w-10 text-muted-foreground/30 mb-2" />
-                                                        <p className="text-sm font-medium text-muted-foreground">Nenhuma avaliação externa registrada</p>
-                                                        <p className="text-xs text-muted-foreground/70 mt-1 max-w-xs">
-                                                            Clique em "Lançamento em Lote" para adicionar resultados de simulados ou provas externas.
-                                                        </p>
-                                                    </div>
-                                                ) : (
-                                                    <div className="border rounded-lg overflow-hidden">
-                                                        <Table>
-                                                            <TableHeader className="bg-muted/30">
-                                                                <TableRow>
-                                                                    <TableHead className="text-xs uppercase font-semibold">Data</TableHead>
-                                                                    <TableHead className="text-xs uppercase font-semibold">Tipo</TableHead>
-                                                                    <TableHead className="text-xs uppercase font-semibold">Avaliação</TableHead>
-                                                                    <TableHead className="text-xs uppercase font-semibold">Disciplina</TableHead>
-                                                                    <TableHead className="text-right text-xs uppercase font-semibold">Nota</TableHead>
-                                                                    <TableHead className="text-xs uppercase font-semibold">Nível</TableHead>
-                                                                    <TableHead className="text-xs uppercase font-semibold">Bimestre</TableHead>
-                                                                    <TableHead className="w-20 text-xs uppercase font-semibold">Ações</TableHead>
-                                                                </TableRow>
-                                                            </TableHeader>
-                                                            <TableBody>
-                                                                {studentExternalSorted.map((assessment) => {
-                                                                    const appliedLabel = formatDateInput(assessment.appliedDate);
-                                                                    return (
-                                                                        <TableRow key={assessment.id} className="hover:bg-muted/50 transition-colors">
-                                                                            <TableCell className="text-xs font-medium">{appliedLabel || '-'}</TableCell>
-                                                                            <TableCell>
-                                                                                <Badge variant="secondary" className="text-[10px] font-normal">{assessment.assessmentType}</Badge>
-                                                                            </TableCell>
-                                                                            <TableCell className="text-xs">{assessment.assessmentName}</TableCell>
-                                                                            <TableCell className="text-xs text-muted-foreground">{assessment.subject || 'Geral'}</TableCell>
-                                                                            <TableCell className="text-right">
-                                                                                <span className={`font-bold text-xs px-2 py-0.5 rounded ${assessment.score >= 6 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
-                                                                                    {assessment.score.toFixed(1)} <span className="text-[10px] opacity-70">/{assessment.maxScore}</span>
+                                            ) : (
+                                                <div className="border-t">
+                                                    <Table>
+                                                        <TableHeader className="bg-muted/30">
+                                                            <TableRow>
+                                                                <TableHead className="text-xs uppercase font-semibold pl-6">Data</TableHead>
+                                                                <TableHead className="text-xs uppercase font-semibold">Avaliação</TableHead>
+                                                                <TableHead className="text-xs uppercase font-semibold">Disciplina</TableHead>
+                                                                <TableHead className="text-center text-xs uppercase font-semibold">Desempenho</TableHead>
+                                                                <TableHead className="text-xs uppercase font-semibold">Nível</TableHead>
+                                                                <TableHead className="w-20 text-xs uppercase font-semibold text-right pr-6">Ações</TableHead>
+                                                            </TableRow>
+                                                        </TableHeader>
+                                                        <TableBody>
+                                                            {studentExternalSorted.map((assessment) => {
+                                                                const appliedLabel = formatDateInput(assessment.appliedDate);
+                                                                const percentage = (assessment.score / assessment.maxScore) * 100;
+
+                                                                return (
+                                                                    <TableRow
+                                                                        key={assessment.id}
+                                                                        className="hover:bg-muted/50 transition-colors cursor-pointer group"
+                                                                        onClick={() => openExternalEdit(assessment)}
+                                                                    >
+                                                                        <TableCell className="text-xs font-medium pl-6 text-muted-foreground">{appliedLabel || '-'}</TableCell>
+                                                                        <TableCell>
+                                                                            <div className="flex flex-col">
+                                                                                <span className="font-medium text-sm">{assessment.assessmentName}</span>
+                                                                                <span className="text-[10px] text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded w-fit mt-0.5">
+                                                                                    {assessment.assessmentType}
                                                                                 </span>
-                                                                            </TableCell>
-                                                                            <TableCell className="text-xs text-muted-foreground">
-                                                                                {assessment.schoolLevel === 'fundamental'
-                                                                                    ? `${assessment.gradeYear}º Fund`
-                                                                                    : `${assessment.gradeYear}º EM`}
-                                                                            </TableCell>
-                                                                            <TableCell className="text-xs text-muted-foreground">{assessment.quarter || '-'}</TableCell>
-                                                                            <TableCell>
-                                                                                <div className="flex items-center gap-1">
-                                                                                    <Button
-                                                                                        variant="ghost"
-                                                                                        size="icon"
-                                                                                        className="h-7 w-7 text-muted-foreground hover:text-blue-600 hover:bg-blue-50"
-                                                                                        onClick={() => openExternalEdit(assessment)}
-                                                                                    >
-                                                                                        <Edit3 className="h-3.5 w-3.5" />
-                                                                                    </Button>
-                                                                                    <Button
-                                                                                        variant="ghost"
-                                                                                        size="icon"
-                                                                                        className="h-7 w-7 text-muted-foreground hover:text-red-600 hover:bg-red-50"
-                                                                                        onClick={() => deleteExternalAssessment(assessment.id)}
-                                                                                    >
-                                                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                                                    </Button>
-                                                                                </div>
-                                                                            </TableCell>
-                                                                        </TableRow>
-                                                                    );
-                                                                })}
-                                                            </TableBody>
-                                                        </Table>
-                                                    </div>
-                                                )}
-                                            </CardContent>
-                                        </Card>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                                                                            </div>
+                                                                        </TableCell>
+                                                                        <TableCell className="text-xs text-muted-foreground">{assessment.subject || 'Geral (Multidisciplinar)'}</TableCell>
+                                                                        <TableCell className="text-center">
+                                                                            <div className="flex flex-col items-center gap-1">
+                                                                                <span className={`font-bold text-sm px-2 py-0.5 rounded border ${assessment.score >= 6 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+                                                                                    {assessment.score.toFixed(1)}
+                                                                                </span>
+                                                                                <span className="text-[10px] text-muted-foreground">{percentage.toFixed(0)}% de {assessment.maxScore}</span>
+                                                                            </div>
+                                                                        </TableCell>
+                                                                        <TableCell className="text-xs text-muted-foreground">
+                                                                            {assessment.schoolLevel === 'fundamental'
+                                                                                ? `${assessment.gradeYear}º Fund`
+                                                                                : `${assessment.gradeYear}º EM`}
+                                                                            {assessment.quarter && <span className="ml-1 opacity-50">• {assessment.quarter.replace(' Bimestre', 'B')}</span>}
+                                                                        </TableCell>
+                                                                        <TableCell className="text-right pr-6">
+                                                                            <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="icon"
+                                                                                    className="h-8 w-8 hover:text-blue-600 hover:bg-blue-50"
+                                                                                    onClick={() => openExternalEdit(assessment)}
+                                                                                >
+                                                                                    <Edit3 className="h-4 w-4" />
+                                                                                </Button>
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="icon"
+                                                                                    className="h-8 w-8 hover:text-red-600 hover:bg-red-50"
+                                                                                    onClick={() => deleteExternalAssessment(assessment.id)}
+                                                                                >
+                                                                                    <Trash2 className="h-4 w-4" />
+                                                                                </Button>
+                                                                            </div>
+                                                                        </TableCell>
+                                                                    </TableRow>
+                                                                );
+                                                            })}
+                                                        </TableBody>
+                                                    </Table>
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                </TabsContent>
+                            </Tabs>
                         </TabsContent>
                         {/* TAB: TRAJECTORY & SIMULATION */}
                         <TabsContent value="trajectory" className="space-y-6">
@@ -1799,6 +1851,7 @@ const StudentTrajectory = () => {
                                                             name="Performance"
                                                             dot={{ r: 5, fill: '#10b981', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
                                                             activeDot={{ r: 7 }}
+                                                            connectNulls
                                                         >
                                                             <LabelList
                                                                 dataKey="continuousValue"
@@ -2065,7 +2118,254 @@ const StudentTrajectory = () => {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* School History Bulk Edit Dialog - Synced with GradesManager UX */}
+            <Dialog open={!!editingHistoryYear} onOpenChange={(open) => !open && setEditingHistoryYear(null)}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader className="pb-4 border-b">
+                        <DialogTitle className="flex items-center gap-2">
+                            <History className="h-5 w-5 text-primary" />
+                            <span>
+                                Lançar Histórico - <span className="text-muted-foreground font-normal">{editingHistoryYear}º Ano do Fundamental</span>
+                            </span>
+                        </DialogTitle>
+                        <DialogDescription>
+                            Lance notas anuais para compor o histórico escolar.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {editingHistoryYear && (() => {
+                        // Current Grades for this year
+                        const currentGrades = studentHistorical.filter(h => h.gradeYear === editingHistoryYear && h.quarter === 'Anual');
+                        const gradeMap: Record<string, string> = {};
+                        currentGrades.forEach(g => {
+                            if (g.subject) gradeMap[normalizeSubjectName(g.subject)] = String(g.grade);
+                        });
+
+                        // Local state handler helper (managed by parent refresh/re-render for now, 
+                        // in a real refactor we might want a local state form, but here let's use direct edit via a wrapper or assume stateless for simplicity initially
+                        // Actually, for a dialog form, we need local state to gather inputs THEN save. 
+                        // Let's create a wrapper component inside the dialog for state? No, let's use a simple map in state or just controlled inputs created on fly.
+                        // Better: Use a dedicated internal component for the form logic or refs. 
+                        // For simplicity in this large file: I'll assume we can use the `gridValues` state I removed? No, let's restore a specific `historyForm` state.
+                        return (
+                            <HistoryForm
+                                year={editingHistoryYear}
+                                initialGrades={gradeMap}
+                                onSave={async (grades) => {
+                                    if (!selectedStudent) return;
+
+                                    const promises = Object.entries(grades).map(async ([subject, value]) => {
+                                        const grade = parseFloat(value);
+                                        if (isNaN(grade)) return null;
+
+                                        // Find existing to delete if re-saving?
+                                        // The backend addHistoricalGrade usually appends or updates. The simplified hook `addHistoricalGrade` 
+                                        // in `useData` context (mock) might just push. 
+                                        // To be safe and clean, we might want to delete existing for this year/subject first.
+                                        // But for now let's just add/update functionality.
+
+                                        // Find logic to update:
+                                        const existing = currentGrades.find(g => normalizeSubjectName(g.subject) === normalizeSubjectName(subject));
+                                        if (existing) {
+                                            await deleteHistoricalGrade(existing.id);
+                                        }
+
+                                        return addHistoricalGrade({
+                                            studentId: selectedStudent,
+                                            gradeYear: editingHistoryYear,
+                                            calendarYear: new Date().getFullYear(), // Default current year for history entry
+                                            quarter: 'Anual',
+                                            subject: subject,
+                                            grade: grade,
+                                            schoolLevel: 'fundamental'
+                                        });
+                                    });
+
+                                    await Promise.all(promises.filter(p => p !== null));
+                                    toast({ title: "Histórico Atualizado", description: `Notas do ${editingHistoryYear}º ano salvas com sucesso.` });
+                                    setEditingHistoryYear(null);
+                                }}
+                                onCancel={() => setEditingHistoryYear(null)}
+                            />
+                        );
+                    })()}
+                </DialogContent>
+            </Dialog>
+
+            {/* External Assessment Year Management Dialog */}
+            <Dialog open={!!editingExternalYear} onOpenChange={(open) => !open && setEditingExternalYear(null)}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader className="pb-4 border-b">
+                        <DialogTitle className="flex items-center gap-2">
+                            <Target className="h-5 w-5 text-primary" />
+                            <span>
+                                Avaliações Externas - <span className="text-muted-foreground font-normal">
+                                    {editingExternalYear?.year}º {editingExternalYear?.level === 'fundamental' ? 'Ano' : 'Série EM'}
+                                </span>
+                            </span>
+                        </DialogTitle>
+                        <DialogDescription>
+                            Gerencie as provas externas e simulados deste ano letivo.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {editingExternalYear && (() => {
+                        const currentAssessments = studentExternal.filter(e =>
+                            e.schoolLevel === editingExternalYear.level &&
+                            e.gradeYear === editingExternalYear.year
+                        ).sort((a, b) => new Date(b.appliedDate).getTime() - new Date(a.appliedDate).getTime());
+
+                        return (
+                            <div className="space-y-6">
+                                {/* Lista de Avaliações Existentes */}
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Registros ({currentAssessments.length})</h4>
+                                        <Button variant="outline" size="sm" onClick={() => openExternalEdit({
+                                            id: '',
+                                            studentId: selectedStudent!,
+                                            assessmentType: 'Simulado',
+                                            assessmentName: '',
+                                            score: 0,
+                                            maxScore: 10,
+                                            appliedDate: new Date().toISOString().split('T')[0],
+                                            schoolLevel: editingExternalYear.level,
+                                            gradeYear: editingExternalYear.year,
+                                            createdAt: '',
+                                            updatedAt: ''
+                                        } as any)}>
+                                            <FileSpreadsheet className="h-3.5 w-3.5 mr-2" />
+                                            Adicionar Avaliação
+                                        </Button>
+                                    </div>
+
+                                    {currentAssessments.length === 0 ? (
+                                        <div className="text-center py-8 border-2 border-dashed rounded-xl bg-muted/10">
+                                            <Target className="h-10 w-10 text-muted-foreground/20 mx-auto mb-2" />
+                                            <p className="text-muted-foreground text-sm">Nenhuma avaliação registrada neste ano.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid gap-3">
+                                            {currentAssessments.map(assessment => (
+                                                <div key={assessment.id} className="flex items-center justify-between p-3 bg-card border rounded-lg hover:shadow-sm transition-all group">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`p-2 rounded-full ${assessment.assessmentType === 'SAEB' ? 'bg-blue-100 text-blue-600' : 'bg-muted text-muted-foreground'}`}>
+                                                            {assessment.assessmentType === 'SAEB' ? <Target className="h-4 w-4" /> : <FileSpreadsheet className="h-4 w-4" />}
+                                                        </div>
+                                                        <div>
+                                                            <div className="font-medium text-sm">{assessment.assessmentName}</div>
+                                                            <div className="text-xs text-muted-foreground flex gap-2">
+                                                                <span>{formatDateInput(assessment.appliedDate)}</span>
+                                                                <span>•</span>
+                                                                <span>{assessment.subject || 'Geral'}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="text-right">
+                                                            <div className="font-bold text-sm">
+                                                                {assessment.score.toFixed(1)} <span className="text-muted-foreground font-normal">/ {assessment.maxScore}</span>
+                                                            </div>
+                                                            {assessment.quarter && (
+                                                                <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal">
+                                                                    {assessment.quarter.replace(' Bimestre', 'B')}
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => openExternalEdit(assessment)}>
+                                                                <Edit3 className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => {
+                                                                if (confirm('Excluir esta avaliação?')) deleteExternalAssessment(assessment.id);
+                                                            }}>
+                                                                <Lock className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })()}
+                </DialogContent>
+            </Dialog>
         </PageContainer>
+    );
+};
+
+// Internal Form Component for History Dialog to handle local input state
+const HistoryForm = ({ year, initialGrades, onSave, onCancel }: { year: number, initialGrades: Record<string, string>, onSave: (grades: Record<string, string>) => void, onCancel: () => void }) => {
+    const [grades, setGrades] = useState<Record<string, string>>(initialGrades);
+    const [saving, setSaving] = useState(false);
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            await onSave(grades);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="space-y-6 py-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {FUNDAMENTAL_SUBJECT_AREAS.map(area => (
+                    <Card key={area.name} className="overflow-hidden h-fit">
+                        <CardHeader className="py-2 px-3 bg-muted/10 border-b">
+                            <h4 className={`text-xs font-bold uppercase tracking-wider ${area.color}`}>{area.name}</h4>
+                        </CardHeader>
+                        <CardContent className="p-3 space-y-3">
+                            {area.subjects.map(subject => {
+                                const normSub = normalizeSubjectName(subject);
+                                // Find key in initialGrades that matches normalized
+                                const initialKey = Object.keys(initialGrades).find(k => k === normSub);
+                                const val = grades[normSub] ?? (initialKey ? initialGrades[initialKey] : '');
+
+                                const numVal = parseFloat(val);
+                                const isLow = !isNaN(numVal) && numVal < 6;
+
+                                return (
+                                    <div key={subject} className="space-y-1">
+                                        <div className="flex justify-between items-center px-1">
+                                            <Label className="text-xs text-muted-foreground" title={subject}>{subject}</Label>
+                                            {val && !isNaN(numVal) && (
+                                                <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                                            )}
+                                        </div>
+                                        <Input
+                                            className={`h-9 font-mono text-center transition-all ${val ? (isLow ? 'bg-red-50 text-red-700 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200') : ''
+                                                }`}
+                                            placeholder="-"
+                                            value={val}
+                                            onChange={e => setGrades(prev => ({ ...prev, [normSub]: e.target.value }))}
+                                            type="number"
+                                            min="0"
+                                            max="10"
+                                            step="0.1"
+                                        />
+                                    </div>
+                                );
+                            })}
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="ghost" onClick={onCancel} disabled={saving}>Cancelar</Button>
+                <Button onClick={handleSave} disabled={saving} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+                    {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Salvar Histórico ({year}º Ano)
+                </Button>
+            </DialogFooter>
+        </div>
     );
 };
 

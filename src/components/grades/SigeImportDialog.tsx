@@ -1058,18 +1058,18 @@ export const SigeImportDialog = ({
                                                         value={match.systemStudentId || 'ignore'}
                                                         onValueChange={(val) => updateMatch(index, val === 'ignore' ? null : val)}
                                                     >
-                                                        <SelectTrigger className={`w-full h-9 border-0 bg-transparent hover:bg-muted/50 focus:bg-muted/50 transition-colors ${!match.systemStudentId ? 'text-muted-foreground italic' : ''}`}>
-                                                            <div className="flex items-center gap-2 overflow-hidden">
+                                                        <SelectTrigger className={`w-full h-9 border-0 bg-transparent hover:bg-muted/50 focus:bg-muted/50 transition-colors justify-start text-left ${!match.systemStudentId ? 'text-muted-foreground italic' : ''}`}>
+                                                            <div className="flex items-center gap-2 overflow-hidden w-full">
                                                                 {match.systemStudentId ? (
                                                                     <>
                                                                         {/* Mini avatar simulation */}
                                                                         <div className="h-5 w-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] uppercase shrink-0">
                                                                             {students.find(s => s.id === match.systemStudentId)?.name.substring(0, 2)}
                                                                         </div>
-                                                                        <SelectValue placeholder="Selecione..." />
+                                                                        <span className="truncate">{students.find(s => s.id === match.systemStudentId)?.name}</span>
                                                                     </>
                                                                 ) : (
-                                                                    <SelectValue placeholder="Ignorar (Não importar)" />
+                                                                    <span className="truncate">Ignorar (Não importar)</span>
                                                                 )}
                                                             </div>
                                                         </SelectTrigger>

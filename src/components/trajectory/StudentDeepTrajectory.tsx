@@ -40,24 +40,38 @@ export const StudentDeepTrajectory = ({ studentId }: StudentDeepTrajectoryProps)
         const points = [];
         for (let year = 6; year <= 9; year++) {
             const yearGrades = historicalGrades.filter(g => g.gradeYear === year && g.schoolLevel === 'fundamental');
-            if (yearGrades.length === 0) continue;
+
+            // Find external assessments for this year
+            const yearAssessments = externalAssessments.filter(a =>
+                a.schoolLevel === 'fundamental' &&
+                a.gradeYear === year
+            );
+
+            // Calculate average external score (normalized 0-10) if any
+            let extScore: number | null = null;
+            if (yearAssessments.length > 0) {
+                const totalExt = yearAssessments.reduce((sum, a) => sum + ((a.score / a.maxScore) * 10), 0);
+                extScore = Number((totalExt / yearAssessments.length).toFixed(1));
+            }
+
+            if (yearGrades.length === 0 && yearAssessments.length === 0) continue;
 
             const total = yearGrades.reduce((sum, g) => sum + g.grade, 0);
-            const avg = total / yearGrades.length;
+            const avg = yearGrades.length > 0 ? total / yearGrades.length : null;
 
             points.push({
                 year,
                 level: 'Fundamental',
                 shortLabel: `${year}º Ano`,
                 index: year, // Simple index for sorting
-                avgLegacy: Number(avg.toFixed(1)),
+                avgLegacy: avg ? Number(avg.toFixed(1)) : null,
                 avgCurrent: null,
-                externalScore: null,
+                externalScore: extScore,
                 type: 'fundamental'
             });
         }
         return points;
-    }, [historicalGrades]);
+    }, [historicalGrades, externalAssessments]);
 
     // B. Process High School Data (1-3)
     const highSchoolData = useMemo(() => {
@@ -68,6 +82,48 @@ export const StudentDeepTrajectory = ({ studentId }: StudentDeepTrajectoryProps)
             const stats = studentStats?.get(point.key);
             const avg = stats && stats.count > 0 ? (stats.total / stats.count) : null;
 
+            // Find external assessments for this specific point (Year + Quarter)
+            // Note: point.quarter comes as "1º Bimestre" etc.
+            const pointAssessments = externalAssessments.filter(a => {
+                // 1. Year Match (Loose equality to handle string/number diffs)
+                // eslint-disable-next-line eqeqeq
+                if (a.gradeYear != point.year) return false;
+
+                // 2. Quarter Match
+                // Normalize both sides to simple numbers string "1", "2", "3", "4"
+                const getNumber = (s: string | undefined | null) => {
+                    if (!s) return '';
+                    // Extract first digit found
+                    const match = s.match(/\d/);
+                    return match ? match[0] : '';
+                };
+
+                // If explicit quarter exists, prioritize it
+                let aNum = getNumber(a.quarter);
+
+                // Fallback to date if no quarter number found
+                if (!aNum && a.appliedDate) {
+                    try {
+                        const month = new Date(a.appliedDate).getMonth() + 1;
+                        if (month >= 2 && month <= 4) aNum = '1';
+                        else if (month >= 5 && month <= 7) aNum = '2';
+                        else if (month >= 8 && month <= 9) aNum = '3';
+                        else if (month >= 10 || month === 12) aNum = '4';
+                    } catch { /* ignore */ }
+                }
+
+                const pNum = getNumber(point.quarter);
+
+                // Final match check
+                return aNum && pNum && aNum === pNum;
+            });
+
+            let extScore: number | null = null;
+            if (pointAssessments.length > 0) {
+                const totalExt = pointAssessments.reduce((sum, a) => sum + ((a.score / a.maxScore) * 10), 0);
+                extScore = Number((totalExt / pointAssessments.length).toFixed(1));
+            }
+
             return {
                 year: point.year,
                 level: 'Médio',
@@ -75,11 +131,11 @@ export const StudentDeepTrajectory = ({ studentId }: StudentDeepTrajectoryProps)
                 index: 10 + point.index, // Offset to place after fundamental
                 avgLegacy: null,
                 avgCurrent: avg ? Number(avg.toFixed(1)) : null,
-                externalScore: null,
+                externalScore: extScore,
                 type: 'medio'
             };
-        }).filter(p => p.avgCurrent !== null); // Only show existing points
-    }, [highSchoolPoints, highSchoolTotals, studentId]);
+        }).filter(p => p.avgCurrent !== null || p.externalScore !== null); // Show if has grade OR external assessment
+    }, [highSchoolPoints, highSchoolTotals, studentId, externalAssessments]);
 
     // C. Process External Assessments
     const assessmentData = useMemo(() => {
@@ -130,6 +186,17 @@ export const StudentDeepTrajectory = ({ studentId }: StudentDeepTrajectoryProps)
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
+            {/* DEBUG PANEL - TEMPORARY */}
+            <div className="bg-yellow-50 p-4 rounded-md border border-yellow-200 text-xs font-mono text-yellow-900 overflow-auto max-h-40">
+                <p className="font-bold">DEBUG INFO:</p>
+                <p>StudentID: {studentId}</p>
+                <p>Total External Assessments Loaded: {externalAssessments.length}</p>
+                <p>Assessments Sample:</p>
+                <pre>{JSON.stringify(externalAssessments.map(a => ({ year: a.gradeYear, q: a.quarter, type: a.assessmentType, score: a.score, date: a.appliedDate })), null, 2)}</pre>
+                <p>HighSchool Points Match Count (Sample):</p>
+                <pre>{JSON.stringify(highSchoolData.filter(p => p.externalScore !== null).map(p => ({ label: p.shortLabel, extScore: p.externalScore })), null, 2)}</pre>
+            </div>
+
             {/* KPI Summary */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card className={`border-none shadow-sm rounded-xl border-l-4 ${stats.bucket ? stats.bucket.tone.replace('text-', 'border-') : 'border-slate-200'}`}>
@@ -214,6 +281,13 @@ export const StudentDeepTrajectory = ({ studentId }: StudentDeepTrajectoryProps)
                                         strokeWidth={3}
                                         dot={{ r: 4, fill: "#7C3AED", strokeWidth: 2, stroke: '#fff' }}
                                         connectNulls
+                                    />
+                                    <Scatter
+                                        dataKey="externalScore"
+                                        name="Avaliações Externas"
+                                        fill="#10B981"
+                                        shape="star"
+                                        legendType="star"
                                     />
                                 </ComposedChart>
                             </ResponsiveContainer>

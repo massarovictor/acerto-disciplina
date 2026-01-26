@@ -14,11 +14,25 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Target, Users, Save, Loader2, AlertCircle, Trash2 } from 'lucide-react';
+import {
+    Target,
+    Save,
+    Loader2,
+    Trash2,
+    Settings,
+    LayoutList,
+    CheckCircle2,
+    ArrowRight,
+    Calendar,
+    GraduationCap,
+    BookOpen,
+    AlertTriangle
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useExternalAssessments, useStudents } from '@/hooks/useData';
 import { QUARTERS } from '@/lib/subjects';
 import { ExternalAssessmentType } from '@/types';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 interface ExternalAssessmentBatchDialogProps {
     open: boolean;
@@ -34,6 +48,9 @@ export const ExternalAssessmentBatchDialog = ({ open, onOpenChange, classId, sub
     const [isSaving, setIsSaving] = useState(false);
     const NO_QUARTER_VALUE = 'sem_bimestre';
 
+    // Steps: 'config' (select/create) -> 'launch' (enter grades)
+    const [step, setStep] = useState<'config' | 'launch'>('config');
+
     const [form, setForm] = useState({
         assessmentType: 'Diagnóstica' as ExternalAssessmentType,
         assessmentName: '',
@@ -47,6 +64,7 @@ export const ExternalAssessmentBatchDialog = ({ open, onOpenChange, classId, sub
 
     const [scores, setScores] = useState<Record<string, { score: string, proficiency: string }>>({});
     const [selectedGroupKey, setSelectedGroupKey] = useState<string>('');
+    const [mode, setMode] = useState<'new' | 'existing'>('new');
 
     const classStudents = useMemo(() =>
         students.filter(s => s.classId === classId).sort((a, b) => a.name.localeCompare(b.name)),
@@ -114,16 +132,6 @@ export const ExternalAssessmentBatchDialog = ({ open, onOpenChange, classId, sub
         return Array.from(groups.values()).sort((a, b) => a.label.localeCompare(b.label));
     }, [externalAssessments, classStudentIds]);
 
-    const selectedGroup = useMemo(() => {
-        if (!selectedGroupKey) return null;
-        return assessmentGroups.find(group => group.key === selectedGroupKey) || null;
-    }, [assessmentGroups, selectedGroupKey]);
-
-    const updateForm = (next: Partial<typeof form>) => {
-        setForm((prev) => ({ ...prev, ...next }));
-        if (selectedGroupKey) setSelectedGroupKey('');
-    };
-
     const matchingAssessments = useMemo(() => {
         const maxScoreValue = Number(form.maxScore);
         return externalAssessments.filter(e =>
@@ -154,9 +162,14 @@ export const ExternalAssessmentBatchDialog = ({ open, onOpenChange, classId, sub
         ? externalAssessments.filter(a => classStudentIds.has(a.studentId) && buildGroupKey(a) === selectedGroupKey)
         : matchingAssessments;
 
-    // Sincronizar notas existentes quando o formulário mudar
+    // Sincronizar notas existentes
     useEffect(() => {
         if (!open) return;
+        // Se estamos creando nueva, reset. Se carregando existente, sync.
+        if (mode === 'new') {
+            // Check if unintentionally matches
+            // Keep logic simple: if switching steps, fetch data
+        }
 
         const newScores: Record<string, { score: string, proficiency: string }> = {};
 
@@ -167,7 +180,6 @@ export const ExternalAssessmentBatchDialog = ({ open, onOpenChange, classId, sub
             };
         });
 
-        // Preencher com '' para os alunos que não tem nota
         classStudents.forEach(s => {
             if (!newScores[s.id]) {
                 newScores[s.id] = { score: '', proficiency: '' };
@@ -175,7 +187,19 @@ export const ExternalAssessmentBatchDialog = ({ open, onOpenChange, classId, sub
         });
 
         setScores(newScores);
-    }, [open, matchingAssessments, classStudents]);
+    }, [open, matchingAssessments, classStudents, mode]);
+
+    const handleContinue = () => {
+        if (mode === 'new' && !form.assessmentName) {
+            toast({ title: "Nome obrigatório", description: "Informe o nome da avaliação para continuar.", variant: "destructive" });
+            return;
+        }
+        if (mode === 'existing' && !selectedGroupKey) {
+            toast({ title: "Seleção obrigatória", description: "Selecione uma avaliação existente.", variant: "destructive" });
+            return;
+        }
+        setStep('launch');
+    }
 
     const handleSave = async () => {
         if (!form.assessmentName) {
@@ -187,7 +211,7 @@ export const ExternalAssessmentBatchDialog = ({ open, onOpenChange, classId, sub
         const entries = Object.entries(scores).filter(([_, data]) => data.score !== '');
 
         if (entries.length === 0) {
-            toast({ title: "Aviso", description: "Nenhuma nota preenchida." });
+            toast({ title: "Aviso", description: "Nenhuma nota preenchida para salvar." });
             setIsSaving(false);
             return;
         }
@@ -218,6 +242,7 @@ export const ExternalAssessmentBatchDialog = ({ open, onOpenChange, classId, sub
             await Promise.all(promises);
             toast({ title: "Sucesso", description: `${entries.length} avaliações salvas/atualizadas.` });
             onOpenChange(false);
+            setStep('config');
         } catch (e) {
             toast({ title: "Erro", description: "Falha ao salvar avaliações.", variant: "destructive" });
         } finally {
@@ -226,17 +251,17 @@ export const ExternalAssessmentBatchDialog = ({ open, onOpenChange, classId, sub
     };
 
     const handleDeleteAll = async () => {
-        if (deleteTargets.length === 0) {
-            toast({ title: "Aviso", description: "Não há avaliações para excluir com essa seleção." });
-            return;
-        }
-        const confirmed = window.confirm(`Excluir ${deleteTargets.length} avaliações dessa turma? Essa ação não pode ser desfeita.`);
+        if (deleteTargets.length === 0) return;
+
+        const confirmed = window.confirm(`ATENÇÃO: Isso excluirá todas as ${deleteTargets.length} notas lançadas para esta avaliação. Confirmar?`);
         if (!confirmed) return;
 
         setIsSaving(true);
         try {
             await Promise.all(deleteTargets.map(a => deleteExternalAssessment(a.id)));
-            toast({ title: "Excluídas", description: "Avaliações removidas com sucesso." });
+            toast({ title: "Excluídas", description: "Todas as notas foram removidas." });
+            onOpenChange(false);
+            setStep('config');
         } catch (e) {
             toast({ title: "Erro", description: "Falha ao excluir avaliações.", variant: "destructive" });
         } finally {
@@ -244,276 +269,362 @@ export const ExternalAssessmentBatchDialog = ({ open, onOpenChange, classId, sub
         }
     };
 
+    // Calculate Completion
+    const completionStats = useMemo(() => {
+        const total = classStudents.length;
+        const filled = Object.values(scores).filter(s => s.score !== '').length;
+        return { total, filled, percent: total > 0 ? (filled / total) * 100 : 0 };
+    }, [scores, classStudents]);
+
+    const updateForm = (next: Partial<typeof form>) => {
+        setForm((prev) => ({ ...prev, ...next }));
+        // Se mudar campos críticos no modo 'new', não faz nada de especial além de atualizar form
+    };
+
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-                <DialogHeader>
-                    <div className="flex items-center gap-2">
+        <Dialog open={open} onOpenChange={(v) => {
+            if (!v) setStep('config');
+            onOpenChange(v);
+        }}>
+            <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
+                <DialogHeader className="p-6 pb-4 border-b">
+                    <DialogTitle className="flex items-center gap-2 text-xl">
                         <div className="p-2 bg-primary/10 rounded-lg text-primary">
                             <Target className="h-5 w-5" />
                         </div>
-                        <div>
-                            <DialogTitle>Lançamento em Lote: Avaliação Externa</DialogTitle>
-                            <DialogDescription>Crie uma avaliação e lance as notas para toda a turma</DialogDescription>
-                        </div>
-                    </div>
+                        Lançamento em Lote: Avaliação Externa
+                    </DialogTitle>
+                    <DialogDescription className="text-base mt-2">
+                        Gerencie avaliações externas (SAEB, Prova Brasil, Simulados) para a turma inteira.
+                    </DialogDescription>
                 </DialogHeader>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-xl my-2">
-                    <div className="space-y-1 md:col-span-2">
-                        <Label className="text-[10px] uppercase font-bold">Avaliações Criadas</Label>
-                        <Select
-                            value={selectedGroupKey}
-                            onValueChange={(value) => {
-                                setSelectedGroupKey(value);
-                                const group = assessmentGroups.find(item => item.key === value);
-                                if (group) {
-                                    setForm({ ...form, ...group.sample });
-                                }
-                            }}
-                        >
-                            <SelectTrigger className="h-8 text-sm">
-                                <SelectValue placeholder="Selecione uma avaliação existente" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {assessmentGroups.length === 0 ? (
-                                    <div className="px-2 py-4 text-sm text-muted-foreground">
-                                        Nenhuma avaliação criada para esta turma.
-                                    </div>
-                                ) : (
-                                    assessmentGroups.map(group => (
-                                        <SelectItem key={group.key} value={group.key}>
-                                            {group.label} ({group.count})
-                                        </SelectItem>
-                                    ))
-                                )}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-1">
-                        <Label className="text-[10px] uppercase font-bold">Nome / Edição</Label>
-                        <Input
-                            placeholder="Ex: SAEB 2024"
-                            className="h-8 text-sm"
-                            value={form.assessmentName}
-                            onChange={e => updateForm({ assessmentName: e.target.value })}
-                        />
-                    </div>
-                    <div className="space-y-1">
-                        <Label className="text-[10px] uppercase font-bold">Tipo</Label>
-                        <Select value={form.assessmentType} onValueChange={v => updateForm({ assessmentType: v as ExternalAssessmentType })}>
-                            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="SAEB">SAEB</SelectItem>
-                                <SelectItem value="SIGE">SIGE</SelectItem>
-                                <SelectItem value="Diagnóstica">Diagnóstica</SelectItem>
-                                <SelectItem value="Simulado">Simulado</SelectItem>
-                                <SelectItem value="Outro">Outro</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-1">
-                        <Label className="text-[10px] uppercase font-bold">Disciplina</Label>
-                        <Select value={form.subject} onValueChange={v => updateForm({ subject: v })}>
-                            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="geral">Geral / Multidisciplinar</SelectItem>
-                                {subjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-1">
-                        <Label className="text-[10px] uppercase font-bold">Valor Máximo</Label>
-                        <Input
-                            type="number"
-                            className="h-8 text-sm"
-                            value={form.maxScore}
-                            onChange={e => updateForm({ maxScore: e.target.value })}
-                        />
-                    </div>
+                {/* Steps */}
+                <div className="px-6 py-4 bg-muted/20 border-b">
+                    <div className="flex items-center justify-between relative max-w-sm mx-auto">
+                        <div className="absolute left-0 top-1/2 w-full h-0.5 bg-muted-foreground/20 -z-10" />
 
-                    <div className="space-y-1">
-                        <Label className="text-[10px] uppercase font-bold">Nível</Label>
-                        <Select
-                            value={form.schoolLevel}
-                            onValueChange={v => updateForm({ schoolLevel: v as 'fundamental' | 'medio', gradeYear: v === 'fundamental' ? 6 : 1 })}
-                        >
-                            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="fundamental">Fundamental</SelectItem>
-                                <SelectItem value="medio">Ensino Médio</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-1">
-                        <Label className="text-[10px] uppercase font-bold">Série/Ano</Label>
-                        <Select value={String(form.gradeYear)} onValueChange={v => updateForm({ gradeYear: parseInt(v) })}>
-                            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                {(form.schoolLevel === 'fundamental' ? [6, 7, 8, 9] : [1, 2, 3]).map(y => (
-                                    <SelectItem key={y} value={String(y)}>{y}º ano</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-1">
-                        <Label className="text-[10px] uppercase font-bold">Bimestre</Label>
-                        <Select value={form.quarter} onValueChange={v => updateForm({ quarter: v })}>
-                            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value={NO_QUARTER_VALUE}>Sem bimestre</SelectItem>
-                                {QUARTERS.map(q => <SelectItem key={q} value={q}>{q}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-1">
-                        <Label className="text-[10px] uppercase font-bold">Data Aplicada</Label>
-                        <Input
-                            type="date"
-                            className="h-8 text-sm"
-                            value={form.appliedDate}
-                            onChange={e => updateForm({ appliedDate: e.target.value })}
-                        />
+                        <div className={`flex flex-col items-center gap-2 bg-background p-2 rounded-lg border-2 z-10 w-32 ${step === 'config' ? 'border-primary' : 'border-emerald-500/50'}`}>
+                            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'config' ? 'bg-primary text-primary-foreground' : 'bg-emerald-100 text-emerald-700'}`}>
+                                <Settings className="h-4 w-4" />
+                            </div>
+                            <span className={`text-xs font-medium ${step === 'config' ? 'text-primary' : 'text-muted-foreground'}`}>Configuração</span>
+                        </div>
+
+                        <div className={`flex flex-col items-center gap-2 bg-background p-2 rounded-lg border-2 z-10 w-32 ${step === 'launch' ? 'border-primary' : 'border-muted-foreground/20'}`}>
+                            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'launch' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                                <LayoutList className="h-4 w-4" />
+                            </div>
+                            <span className={`text-xs font-medium ${step === 'launch' ? 'text-primary' : 'text-muted-foreground'}`}>Lançamento</span>
+                        </div>
                     </div>
                 </div>
 
-                <div className="border rounded-lg p-4 bg-card">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                        <div className="space-y-1">
-                            <div className="text-sm font-semibold">Avaliações já criadas (filtro atual)</div>
-                            <div className="text-xs text-muted-foreground">
-                                {matchingAssessments.length} registros encontrados para esta turma.
+                <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
+                    {step === 'config' && (
+                        <div className="space-y-6 max-w-2xl mx-auto">
+                            <div className="space-y-3">
+                                <Label className="text-base font-semibold">O que você deseja fazer?</Label>
+                                <RadioGroup
+                                    value={mode}
+                                    onValueChange={(v) => {
+                                        setMode(v as 'new' | 'existing');
+                                        if (v === 'new') setSelectedGroupKey('');
+                                    }}
+                                    className="grid grid-cols-1 md:grid-cols-2 gap-4"
+                                >
+                                    <div className={`flex items-start space-x-3 border rounded-xl p-4 cursor-pointer transition-all ${mode === 'new' ? 'border-primary ring-1 ring-primary bg-primary/5' : 'hover:bg-muted/30 border-muted'}`} onClick={() => setMode('new')}>
+                                        <RadioGroupItem value="new" id="mode-new" className="mt-1" />
+                                        <div className="space-y-1">
+                                            <Label htmlFor="mode-new" className="font-semibold cursor-pointer">Nova Avaliação</Label>
+                                            <p className="text-xs text-muted-foreground">Criar um novo registro e lançar notas do zero.</p>
+                                        </div>
+                                    </div>
+                                    <div className={`flex items-start space-x-3 border rounded-xl p-4 cursor-pointer transition-all ${mode === 'existing' ? 'border-primary ring-1 ring-primary bg-primary/5' : 'hover:bg-muted/30 border-muted'}`} onClick={() => setMode('existing')}>
+                                        <RadioGroupItem value="existing" id="mode-existing" className="mt-1" />
+                                        <div className="space-y-1">
+                                            <Label htmlFor="mode-existing" className="font-semibold cursor-pointer">Editar Existente</Label>
+                                            <p className="text-xs text-muted-foreground">Carregar uma avaliação já lançada para editar notas.</p>
+                                        </div>
+                                    </div>
+                                </RadioGroup>
                             </div>
+
+                            {mode === 'existing' && (
+                                <div className="space-y-4 border p-4 rounded-xl bg-muted/10 animate-in fade-in slide-in-from-top-2">
+                                    <div className="space-y-2">
+                                        <Label>Selecione a Avaliação</Label>
+                                        <Select
+                                            value={selectedGroupKey}
+                                            onValueChange={(value) => {
+                                                setSelectedGroupKey(value);
+                                                const group = assessmentGroups.find(item => item.key === value);
+                                                if (group) {
+                                                    setForm({ ...form, ...group.sample });
+                                                }
+                                            }}
+                                        >
+                                            <SelectTrigger className="h-10">
+                                                <SelectValue placeholder="Selecione..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {assessmentGroups.length === 0 ? (
+                                                    <div className="p-4 text-center text-sm text-muted-foreground">
+                                                        Nenhuma avaliação encontrada.
+                                                    </div>
+                                                ) : (
+                                                    assessmentGroups.map(group => (
+                                                        <SelectItem key={group.key} value={group.key}>
+                                                            <div className="flex flex-col items-start text-left">
+                                                                <span className="font-medium">{group.label.split(' • ')[0]}</span>
+                                                                <span className="text-xs text-muted-foreground">{group.label.split(' • ').slice(1).join(' • ')}</span>
+                                                            </div>
+                                                        </SelectItem>
+                                                    ))
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    {selectedGroupKey && (
+                                        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-sm flex items-center gap-2">
+                                            <CheckCircle2 className="h-4 w-4" />
+                                            Avaliação carregada. Clique em "Continuar" para editar as notas.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {mode === 'new' && (
+                                <div className="grid gap-4 border p-4 rounded-xl bg-muted/10 animate-in fade-in slide-in-from-top-2">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Nome da Avaliação</Label>
+                                            <Input
+                                                placeholder="Ex: Simulado 1º Trimestre"
+                                                value={form.assessmentName}
+                                                onChange={e => updateForm({ assessmentName: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Tipo</Label>
+                                            <Select value={form.assessmentType} onValueChange={v => updateForm({ assessmentType: v as ExternalAssessmentType })}>
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="SAEB">SAEB</SelectItem>
+                                                    <SelectItem value="SIGE">SIGE</SelectItem>
+                                                    <SelectItem value="Diagnóstica">Diagnóstica</SelectItem>
+                                                    <SelectItem value="Simulado">Simulado</SelectItem>
+                                                    <SelectItem value="Outro">Outro</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Disciplina</Label>
+                                            <Select value={form.subject} onValueChange={v => updateForm({ subject: v })}>
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="geral">Geral / Multidisciplinar</SelectItem>
+                                                    {subjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Data Aplicada</Label>
+                                            <Input
+                                                type="date"
+                                                value={form.appliedDate}
+                                                onChange={e => updateForm({ appliedDate: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Valor Máximo</Label>
+                                            <Input
+                                                type="number"
+                                                value={form.maxScore}
+                                                onChange={e => updateForm({ maxScore: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 bg-background rounded-lg border">
+                                        <div className="space-y-2">
+                                            <Label>Nível</Label>
+                                            <Select
+                                                value={form.schoolLevel}
+                                                onValueChange={v => updateForm({ schoolLevel: v as 'fundamental' | 'medio', gradeYear: v === 'fundamental' ? 6 : 1 })}
+                                            >
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="fundamental">Fundamental</SelectItem>
+                                                    <SelectItem value="medio">Ensino Médio</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Série/Ano</Label>
+                                            <Select value={String(form.gradeYear)} onValueChange={v => updateForm({ gradeYear: parseInt(v) })}>
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    {(form.schoolLevel === 'fundamental' ? [6, 7, 8, 9] : [1, 2, 3]).map(y => (
+                                                        <SelectItem key={y} value={String(y)}>{y}º ano</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Bimestre</Label>
+                                            <Select value={form.quarter} onValueChange={v => updateForm({ quarter: v })}>
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value={NO_QUARTER_VALUE}>Sem bimestre</SelectItem>
+                                                    {QUARTERS.map(q => <SelectItem key={q} value={q}>{q}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                    </div>
-                    {matchingAssessments.length === 0 ? (
-                        <div className="mt-4 text-sm text-muted-foreground">
-                            Nenhuma avaliação registrada com esse cabeçalho.
-                        </div>
-                    ) : (
-                        <div className="mt-4 border rounded-lg overflow-hidden">
-                            <Table>
-                                <TableHeader className="bg-muted/50">
-                                    <TableRow>
-                                        <TableHead>Aluno</TableHead>
-                                        <TableHead>Nota</TableHead>
-                                        <TableHead>Disciplina</TableHead>
-                                        <TableHead>Ano</TableHead>
-                                        <TableHead>Bimestre</TableHead>
-                                        <TableHead>Data</TableHead>
-                                        <TableHead className="w-16">Ações</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                            </Table>
-                            <ScrollArea className="h-[220px]">
+                    )}
+
+                    {step === 'launch' && (
+                        <div className="space-y-6">
+                            {/* Summary Card */}
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div className="md:col-span-3 p-4 bg-muted/30 border rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                                            <BookOpen className="h-5 w-5" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg">{form.assessmentName}</h3>
+                                            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-1">
+                                                <Badge variant="outline" className="bg-background">{form.assessmentType}</Badge>
+                                                <Badge variant="outline" className="bg-background">{form.subject}</Badge>
+                                                <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {form.appliedDate}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4 text-right">
+                                        <div>
+                                            <p className="text-2xl font-bold">{completionStats.filled}/{completionStats.total}</p>
+                                            <p className="text-xs text-muted-foreground">Lançados</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-2xl font-bold">{form.maxScore}</p>
+                                            <p className="text-xs text-muted-foreground">Valor Máx</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                {completionStats.percent === 100 && (
+                                    <div className="md:col-span-1 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 rounded-xl flex flex-col items-center justify-center p-4 text-center">
+                                        <CheckCircle2 className="h-8 w-8 text-emerald-600 mb-2" />
+                                        <p className="font-bold text-emerald-700 dark:text-emerald-400">Completo!</p>
+                                        <p className="text-xs text-emerald-600/80">Todos os alunos com nota.</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Grid */}
+                            <div className="border rounded-xl overflow-hidden bg-card shadow-sm">
                                 <Table>
-                                    <TableBody>
-                                        {matchingAssessments.map((assessment) => (
-                                            <TableRow key={assessment.id}>
-                                                <TableCell className="text-xs font-medium">
-                                                    {studentNames[assessment.studentId] ?? assessment.studentId}
-                                                </TableCell>
-                                                <TableCell className="text-xs">
-                                                    {assessment.score}/{assessment.maxScore}
-                                                </TableCell>
-                                                <TableCell className="text-xs">
-                                                    {assessment.subject ?? 'Geral'}
-                                                </TableCell>
-                                                <TableCell className="text-xs">
-                                                    {assessment.schoolLevel === 'fundamental'
-                                                        ? `${assessment.gradeYear}º Fund`
-                                                        : `${assessment.gradeYear}º EM`}
-                                                </TableCell>
-                                                <TableCell className="text-xs">{assessment.quarter ?? '-'}</TableCell>
-                                                <TableCell className="text-xs">{assessment.appliedDate}</TableCell>
-                                                <TableCell>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                                                        onClick={() => deleteExternalAssessment(assessment.id)}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
+                                    <TableHeader className="bg-muted/40 sticky top-0 z-10">
+                                        <TableRow>
+                                            <TableHead className="w-[40%] pl-6">Aluno</TableHead>
+                                            <TableHead className="w-[30%] text-center">Nota (0 a {form.maxScore})</TableHead>
+                                            <TableHead className="w-[30%]">Proficiência (Opcional)</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
                                 </Table>
-                            </ScrollArea>
+                                <ScrollArea className="h-[400px]">
+                                    <Table>
+                                        <TableBody>
+                                            {classStudents.map(student => (
+                                                <TableRow key={student.id} className="hover:bg-muted/30">
+                                                    <TableCell className="pl-6 font-medium py-3">
+                                                        <div className="flex flex-col">
+                                                            <span>{student.name}</span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="py-2 text-center">
+                                                        <div className="flex justify-center">
+                                                            <Input
+                                                                placeholder="-"
+                                                                className={`h-9 w-24 text-center font-mono ${scores[student.id]?.score ? 'bg-primary/5 border-primary/30 font-bold' : ''}`}
+                                                                value={scores[student.id]?.score || ''}
+                                                                onChange={e => {
+                                                                    // Validation logic implies we trust user input but could clamp or warn
+                                                                    setScores({
+                                                                        ...scores,
+                                                                        [student.id]: { ...(scores[student.id] || { proficiency: '' }), score: e.target.value }
+                                                                    })
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="py-2 pr-6">
+                                                        <Input
+                                                            placeholder="Ex: Proficiente"
+                                                            className="h-9"
+                                                            value={scores[student.id]?.proficiency || ''}
+                                                            onChange={e => setScores({
+                                                                ...scores,
+                                                                [student.id]: { ...(scores[student.id] || { score: '' }), proficiency: e.target.value }
+                                                            })}
+                                                        />
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                            {classStudents.length === 0 && (
+                                                <TableRow>
+                                                    <TableCell colSpan={3} className="h-32 text-center text-muted-foreground">
+                                                        Nenhum aluno encontrado nesta turma.
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </ScrollArea>
+                            </div>
                         </div>
                     )}
                 </div>
 
-                <div className="flex-1 overflow-hidden border rounded-lg">
-                    <Table>
-                        <TableHeader className="bg-muted/50 sticky top-0">
-                            <TableRow>
-                                <TableHead className="w-1/2">Aluno</TableHead>
-                                <TableHead>Pontuação</TableHead>
-                                <TableHead>Proficiência (Opcional)</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                    </Table>
-                    <ScrollArea className="h-[300px]">
-                        <Table>
-                            <TableBody>
-                                {classStudents.map(student => (
-                                    <TableRow key={student.id}>
-                                        <TableCell className="font-medium py-2">
-                                            {student.name}
-                                        </TableCell>
-                                        <TableCell className="py-2">
-                                            <Input
-                                                placeholder="0.0"
-                                                className="h-8 w-24"
-                                                value={scores[student.id]?.score || ''}
-                                                onChange={e => setScores({
-                                                    ...scores,
-                                                    [student.id]: { ...(scores[student.id] || { proficiency: '' }), score: e.target.value }
-                                                })}
-                                            />
-                                        </TableCell>
-                                        <TableCell className="py-2">
-                                            <Input
-                                                placeholder="Ex: Proficiente"
-                                                className="h-8"
-                                                value={scores[student.id]?.proficiency || ''}
-                                                onChange={e => setScores({
-                                                    ...scores,
-                                                    [student.id]: { ...(scores[student.id] || { score: '' }), proficiency: e.target.value }
-                                                })}
-                                            />
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {classStudents.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={3} className="text-center py-10 text-muted-foreground">
-                                            Nenhum aluno encontrado nesta turma.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </ScrollArea>
-                </div>
+                <DialogFooter className="p-6 pt-4 border-t bg-muted/10 flex items-center justify-between sm:justify-between">
+                    <div className="flex items-center gap-2">
+                        {step === 'config' ? (
+                            <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                        ) : (
+                            <Button variant="outline" onClick={() => setStep('config')}>Voltar</Button>
+                        )}
 
-                <DialogFooter className="mt-4 flex flex-col sm:flex-row sm:justify-between gap-2">
-                    <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-                        <Button
-                            variant="destructive"
-                            onClick={handleDeleteAll}
-                            disabled={isSaving || deleteTargets.length === 0}
-                        >
-                            {selectedGroupKey ? 'Excluir avaliação' : 'Excluir todas'}
-                        </Button>
+                        {step === 'launch' && mode === 'existing' && (
+                            <Button
+                                variant="destructive"
+                                size="icon"
+                                onClick={handleDeleteAll}
+                                title="Excluir todas as notas desta avaliação"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        )}
                     </div>
-                    <Button onClick={handleSave} disabled={isSaving || classStudents.length === 0} className="gap-2">
-                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                        Salvar/Atualizar Avaliações
-                    </Button>
+
+                    <div className="flex gap-2">
+                        {step === 'config' ? (
+                            <Button onClick={handleContinue} className="bg-primary px-8">
+                                Continuar <ArrowRight className="ml-2 h-4 w-4" />
+                            </Button>
+                        ) : (
+                            <Button onClick={handleSave} disabled={isSaving || classStudents.length === 0} className="bg-emerald-600 hover:bg-emerald-700 text-white px-8">
+                                {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                                Salvar Lançamentos
+                            </Button>
+                        )}
+                    </div>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
