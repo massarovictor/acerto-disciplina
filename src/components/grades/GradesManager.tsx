@@ -56,7 +56,7 @@ export const GradesManager = () => {
   const selectedQuarter = gradesUI.selectedQuarter;
   const selectedSchoolYear = gradesUI.selectedSchoolYear as 1 | 2 | 3;
 
-  const { grades, addGrade } = useGradesScoped({
+  const { grades, addGrade, addGrades } = useGradesScoped({
     classId: selectedClass || undefined,
     quarter: selectedQuarter || undefined,
     schoolYear: selectedSchoolYear,
@@ -320,20 +320,20 @@ export const GradesManager = () => {
     let lowGradesCount = 0;
     const savedByArea: Record<string, number> = {};
 
-    const gradePromises: Promise<void>[] = [];
+    const gradesToSave: any[] = [];
+
     Object.entries(studentGrade.grades).forEach(([subject, gradeValue]) => {
       const grade = parseFloat(gradeValue);
       if (!isNaN(grade) && grade >= 0 && grade <= 10) {
-        gradePromises.push(
-          addGrade({
-            studentId: selectedStudent,
-            classId: selectedClass,
-            subject: subject,
-            quarter: selectedQuarter,
-            schoolYear: selectedSchoolYear,
-            grade: grade,
-          }),
-        );
+        gradesToSave.push({
+          studentId: selectedStudent,
+          classId: selectedClass,
+          subject: subject,
+          quarter: selectedQuarter,
+          schoolYear: selectedSchoolYear,
+          grade: grade,
+        });
+
         savedCount++;
         if (grade < 6) lowGradesCount++;
 
@@ -354,7 +354,9 @@ export const GradesManager = () => {
     }
 
     try {
-      await Promise.all(gradePromises);
+      if (gradesToSave.length > 0) {
+        await addGrades(gradesToSave);
+      }
     } catch (error) {
       toast({
         title: 'Erro',

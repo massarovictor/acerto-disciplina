@@ -520,6 +520,27 @@ export function useStudents() {
     addStudent,
     updateStudent,
     deleteStudent,
+    addStudents: async (studentsData: Omit<Student, "id">[]) => {
+      if (!user?.id || studentsData.length === 0) return;
+      const payload = studentsData.map(s => mapStudentToDb(s, user.id));
+
+      const { data, error } = await supabase
+        .from("students")
+        .insert(payload)
+        .select("*");
+
+      if (error) {
+        logError("students.bulk_insert", error);
+        throw error;
+      }
+
+      if (data) {
+        const newStudents = data.map(mapStudentFromDb);
+        // Atualizar store local em lote
+        const currentStudents = useDataStore.getState().students;
+        setStudents([...newStudents, ...currentStudents]);
+      }
+    },
   };
 }
 

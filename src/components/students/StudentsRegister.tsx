@@ -33,7 +33,7 @@ import { generateStudentTemplate } from '@/lib/excelExport';
 import { readExcelFile, validateImportData, ImportRow } from '@/lib/excelImport';
 
 export const StudentsRegister = () => {
-  const { students, addStudent } = useStudents();
+  const { students, addStudent, addStudents } = useStudents();
   const { classes } = useClasses();
   const { toast } = useToast();
 
@@ -222,7 +222,9 @@ export const StudentsRegister = () => {
     try {
       setIsImporting(true);
       const data = await readExcelFile(file);
-      const result = validateImportData(data, classes, students, selectedClassForImport);
+      // Filtrar apenas turmas ativas para validação para evitar ambiguidade com turmas arquivadas
+      const activeClasses = classes.filter(c => c.active && !c.archived);
+      const result = validateImportData(data, activeClasses, students, selectedClassForImport);
       setImportPreview(result.rows);
       setShowImportDialog(true);
     } catch (error) {
@@ -278,80 +280,36 @@ export const StudentsRegister = () => {
     let errors = 0;
     const errorMessages: string[] = [];
 
-    // Processar alunos sequencialmente para evitar problemas de concorrência
-    // Processar alunos sequencialmente para evitar problemas de concorrência
+    try {
+      // Preparar array para inserção em massa
+      const studentsToInsert = validRows.map(row => ({
+        name: row.data.name || '',
+        classId: row.data.classId!, // Validado anteriormente
+        birthDate: row.data.birthDate || '',
+        gender: row.data.gender || 'M',
+        enrollment: row.data.enrollment,
+        censusId: row.data.censusId,
+        cpf: row.data.cpf,
+        rg: row.data.rg,
+        photoUrl: row.data.photoUrl,
+        status: 'active' as const,
+      }));
 
-    for (let index = 0; index < validRows.length; index++) {
-      const row = validRows[index];
+      await addStudents(studentsToInsert);
+      imported = studentsToInsert.length;
 
+    } catch (error) {
+      console.error('Erro na importação em massa:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Erro desconhecido ao salvar dados.';
+      errorMessages.push(errorMsg);
+      errors += validRows.length; // Assumir que todos falharam se o bulk falhar
 
-      try {
-        // Usar o classId que foi validado pela planilha (baseado no nome da turma)
-        if (!row.data.classId || row.data.classId === '') {
-          const errorMsg = `Linha ${row.rowNumber}: ❌ classId VAZIO ou inválido`;
-          console.error(errorMsg, row);
-          errorMessages.push(errorMsg);
-          errors++;
-          continue;
-        }
-
-
-
-        // Verificar se a turma existe
-        const classExists = classes.find(c => c.id === row.data.classId);
-        if (!classExists) {
-          const errorMsg = `Linha ${row.rowNumber}: ❌ Turma com ID "${row.data.classId}" não encontrada no sistema`;
-          console.error(errorMsg, row);
-          if (import.meta.env.VITE_DEBUG_IMPORT === 'true') {
-            console.error(`[IMPORTAÇÃO] Turmas disponíveis:`, classes.map(c => ({ id: c.id, name: c.name })));
-          }
-          errorMessages.push(errorMsg);
-          errors++;
-          continue;
-        }
-        if (!classExists.active || classExists.archived) {
-          const errorMsg = `Linha ${row.rowNumber}: ❌ Turma "${classExists.name}" está inativa ou arquivada`;
-          console.error(errorMsg, row);
-          errorMessages.push(errorMsg);
-          errors++;
-          continue;
-        }
-
-
-
-        // Verificar campos obrigatórios
-        if (!row.data.name || !row.data.birthDate || !row.data.gender) {
-          const errorMsg = `Linha ${row.rowNumber}: ❌ Campos obrigatórios faltando`;
-          console.error(errorMsg, row);
-          errorMessages.push(errorMsg);
-          errors++;
-          continue;
-        }
-
-
-
-        await addStudent({
-          name: row.data.name || '',
-          classId: row.data.classId, // Usar classId validado da planilha
-          birthDate: row.data.birthDate || '',
-          gender: row.data.gender || 'M',
-          enrollment: row.data.enrollment,
-          censusId: row.data.censusId,
-          cpf: row.data.cpf,
-          rg: row.data.rg,
-          photoUrl: row.data.photoUrl,
-          status: 'active',
-        });
-        imported++;
-
-        // Pequeno delay para garantir IDs únicos e atualização do estado
-        await new Promise(resolve => setTimeout(resolve, 10));
-      } catch (error) {
-        const errorMsg = `Linha ${row.rowNumber}: ${error instanceof Error ? error.message : 'Erro desconhecido'}`;
-        console.error(`[IMPORTAÇÃO] ❌ Erro ao importar aluno linha ${row.rowNumber}`);
-        errorMessages.push(errorMsg);
-        errors++;
-      }
+      toast({
+        title: 'Erro Crítico',
+        description: 'Falha ao salvar os alunos no banco de dados. Tente novamente.',
+        variant: 'destructive',
+      });
+      return;
     }
 
     const description = imported > 0
