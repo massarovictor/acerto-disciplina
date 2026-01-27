@@ -17,8 +17,9 @@ import {
   Filter
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getSeverityColor, getSeverityLabel, getUrgencyDot } from '@/lib/incidentUtils';
 import { useIncidents, useClasses, useStudents } from '@/hooks/useData';
-import { IncidentDetailsDialog } from '@/components/incidents/IncidentDetailsDialog';
+
 import { IncidentManagementDialog } from '@/components/incidents/IncidentManagementDialog';
 import { IncidentWizard } from '@/components/incidents/IncidentWizard';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -46,7 +47,7 @@ const Incidents = () => {
   const setClassFilter = (value: string) => setIncidentsUI({ classFilter: value });
   const setActiveTab = (value: 'aberta' | 'acompanhamento' | 'resolvida') => setIncidentsUI({ activeTab: value });
 
-  const [viewingIncident, setViewingIncident] = useState<Incident | null>(null);
+
   const [managingIncident, setManagingIncident] = useState<Incident | null>(null);
   const [deletingIncident, setDeletingIncident] = useState<Incident | null>(null);
   const [showNewIncidentDialog, setShowNewIncidentDialog] = useState(false);
@@ -60,6 +61,10 @@ const Incidents = () => {
   const followUpIncidents = incidents.filter(i => i.status === 'acompanhamento');
   const resolvedIncidents = incidents.filter(i => i.status === 'resolvida');
 
+  // Optimize lookups
+  const classMap = useMemo(() => new Map(classes.map(c => [c.id, c])), [classes]);
+  const studentMap = useMemo(() => new Map(students.map(s => [s.id, s])), [students]);
+
   // Filter and search logic with useMemo
   const getFilteredIncidents = (statusIncidents: Incident[]) => {
     let filtered = statusIncidents;
@@ -71,14 +76,18 @@ const Incidents = () => {
 
     // Filter by Search Term
     if (searchTerm) {
+      const lowerSearch = searchTerm.toLowerCase();
       filtered = filtered.filter(incident => {
-        const incidentClass = classes.find(c => c.id === incident.classId);
-        const incidentStudents = students.filter(s => incident.studentIds.includes(s.id));
+        const incidentClass = classMap.get(incident.classId);
+        // Check if ANY student in the incident matches
+        const studentMatch = incident.studentIds.some(id =>
+          studentMap.get(id)?.name.toLowerCase().includes(lowerSearch)
+        );
 
         return (
-          incidentClass?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          incident.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          incidentStudents.some(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()))
+          incidentClass?.name.toLowerCase().includes(lowerSearch) ||
+          incident.description?.toLowerCase().includes(lowerSearch) ||
+          studentMatch
         );
       });
     }
@@ -87,39 +96,11 @@ const Incidents = () => {
   };
 
   // Memoized lists to prevent unnecessary re-filtering
-  const filteredOpenIncidents = useMemo(() => getFilteredIncidents(openIncidents), [openIncidents, classFilter, searchTerm, classes, students]);
-  const filteredFollowUpIncidents = useMemo(() => getFilteredIncidents(followUpIncidents), [followUpIncidents, classFilter, searchTerm, classes, students]);
-  const filteredResolvedIncidents = useMemo(() => getFilteredIncidents(resolvedIncidents), [resolvedIncidents, classFilter, searchTerm, classes, students]);
+  const filteredOpenIncidents = useMemo(() => getFilteredIncidents(openIncidents), [openIncidents, classFilter, searchTerm, classMap, studentMap]);
+  const filteredFollowUpIncidents = useMemo(() => getFilteredIncidents(followUpIncidents), [followUpIncidents, classFilter, searchTerm, classMap, studentMap]);
+  const filteredResolvedIncidents = useMemo(() => getFilteredIncidents(resolvedIncidents), [resolvedIncidents, classFilter, searchTerm, classMap, studentMap]);
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'leve': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800';
-      case 'intermediaria': return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800';
-      case 'grave': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800';
-      case 'gravissima': return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800';
-      default: return 'bg-muted text-muted-foreground';
-    }
-  };
 
-  const getSeverityLabel = (severity: string) => {
-    switch (severity) {
-      case 'leve': return 'Leve';
-      case 'intermediaria': return 'Intermediária';
-      case 'grave': return 'Grave';
-      case 'gravissima': return 'Gravíssima';
-      default: return severity;
-    }
-  };
-
-  const getUrgencyDot = (severity: string) => {
-    switch (severity) {
-      case 'leve': return 'bg-blue-500';
-      case 'intermediaria': return 'bg-amber-500';
-      case 'grave': return 'bg-orange-500';
-      case 'gravissima': return 'bg-red-500';
-      default: return 'bg-muted';
-    }
-  };
 
   const renderIncidentsList = (incidentsList: Incident[]) => {
     if (incidentsList.length === 0) {
@@ -176,10 +157,6 @@ const Incidents = () => {
                   size="sm"
                   className="h-8 w-8 p-0"
                   onClick={() => {
-                    if (incident.status === 'resolvida') {
-                      setViewingIncident(incident);
-                      return;
-                    }
                     if (incident.status === 'acompanhamento') {
                       setInitialTab('followup');
                     } else {
@@ -195,17 +172,15 @@ const Incidents = () => {
                   )}
                   <span className="sr-only">Ação</span>
                 </Button>
-                {incident.status === 'aberta' && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                    onClick={() => setDeletingIncident(incident)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Excluir</span>
-                  </Button>
-                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  onClick={() => setDeletingIncident(incident)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span className="sr-only">Excluir</span>
+                </Button>
               </div>
             </div>
           );
@@ -345,13 +320,7 @@ const Incidents = () => {
       </Tabs>
 
       {/* Dialogs */}
-      {viewingIncident && (
-        <IncidentDetailsDialog
-          incident={viewingIncident}
-          open={!!viewingIncident}
-          onOpenChange={(open) => !open && setViewingIncident(null)}
-        />
-      )}
+
 
       {managingIncident && (
         <IncidentManagementDialog

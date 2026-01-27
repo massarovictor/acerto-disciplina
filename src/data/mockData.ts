@@ -162,30 +162,35 @@ export const MOCK_STUDENTS: Student[] = [
 
 export const INCIDENT_EPISODES: IncidentEpisode[] = [
   // Leves
-  { id: 'leve-1', description: 'Conversa paralela durante aula', severity: 'leve', category: 'Disciplina' },
-  { id: 'leve-2', description: 'Atraso para aula', severity: 'leve', category: 'Pontualidade' },
-  { id: 'leve-3', description: 'Esquecimento de material escolar', severity: 'leve', category: 'Material' },
-  { id: 'leve-4', description: 'Não realização de tarefa', severity: 'leve', category: 'Acadêmico' },
-  { id: 'leve-5', description: 'Uniforme incompleto', severity: 'leve', category: 'Uniforme' },
+  { id: 'leve-1', description: 'Chegar à escola sem fardamento completo', severity: 'leve', category: 'Uniforme' },
+  { id: 'leve-2', description: 'Atraso na chegada sem justificativa', severity: 'leve', category: 'Pontualidade' },
+  { id: 'leve-3', description: 'Usar toalha fora do banheiro/vestiário', severity: 'leve', category: 'Conduta' },
+  { id: 'leve-4', description: 'Usar casaco fora de sala de aula', severity: 'leve', category: 'Uniforme' },
+  { id: 'leve-5', description: 'Esquecimento do material', severity: 'leve', category: 'Material' },
+  { id: 'leve-6', description: 'Não esperar o professor sentado', severity: 'leve', category: 'Disciplina' },
+  { id: 'leve-7', description: 'Não realizar atividade ou recusar-se a participar', severity: 'leve', category: 'Acadêmico' },
+  { id: 'leve-8', description: 'Levar garrafas do colega para encher', severity: 'leve', category: 'Conduta' },
 
   // Intermediárias
-  { id: 'inter-1', description: 'Desrespeito a colegas', severity: 'intermediaria', category: 'Disciplina' },
-  { id: 'inter-2', description: 'Uso de celular durante aula', severity: 'intermediaria', category: 'Disciplina' },
-  { id: 'inter-3', description: 'Recusa em participar das atividades', severity: 'intermediaria', category: 'Acadêmico' },
-  { id: 'inter-4', description: 'Linguagem inadequada', severity: 'intermediaria', category: 'Disciplina' },
-  { id: 'inter-5', description: 'Saída da sala sem autorização', severity: 'intermediaria', category: 'Disciplina' },
+  { id: 'inter-1', description: 'Atraso para chegar na sala (estando na escola)', severity: 'intermediaria', category: 'Pontualidade' },
+  { id: 'inter-2', description: 'Buscar material no armário em horário de aula', severity: 'intermediaria', category: 'Disciplina' },
+  { id: 'inter-3', description: 'Dormir em sala', severity: 'intermediaria', category: 'Conduta' },
+  { id: 'inter-4', description: 'Comer em sala', severity: 'intermediaria', category: 'Conduta' },
+  { id: 'inter-5', description: 'Riscar carteiras/cadeiras/mobiliário', severity: 'intermediaria', category: 'Patrimônio' },
+  { id: 'inter-6', description: 'Estar fora do mapeamento (lugar marcado)', severity: 'intermediaria', category: 'Disciplina' },
+  { id: 'inter-7', description: 'Baixar a cabeça durante a aula', severity: 'intermediaria', category: 'Conduta' },
+  { id: 'inter-8', description: 'Usar materiais alheios à sala de aula', severity: 'intermediaria', category: 'Disciplina' },
 
   // Graves
-  { id: 'grave-1', description: 'Agressão verbal a professor', severity: 'grave', category: 'Disciplina' },
-  { id: 'grave-2', description: 'Dano ao patrimônio escolar', severity: 'grave', category: 'Patrimônio' },
-  { id: 'grave-3', description: 'Desacato à autoridade', severity: 'grave', category: 'Disciplina' },
-  { id: 'grave-4', description: 'Bullying comprovado', severity: 'grave', category: 'Convivência' },
-  { id: 'grave-5', description: 'Falsificação de documento', severity: 'grave', category: 'Conduta' },
+  { id: 'grave-1', description: 'Colar/pescar em atividades avaliativas', severity: 'grave', category: 'Honestidade' },
+  { id: 'grave-2', description: 'Portar/usar celular ou eletrônicos', severity: 'grave', category: 'Disciplina' },
+  { id: 'grave-3', description: 'Ser encaminhado para ocorrência e não ir', severity: 'grave', category: 'Desobediência' },
+  { id: 'grave-4', description: 'Gazear aula', severity: 'grave', category: 'Frequência' },
 
   // Gravíssimas
-  { id: 'gravissima-1', description: 'Agressão física a colega', severity: 'gravissima', category: 'Convivência' },
-  { id: 'gravissima-2', description: 'Agressão física a professor/funcionário', severity: 'gravissima', category: 'Disciplina' },
-  { id: 'gravissima-3', description: 'Porte de substâncias ilícitas', severity: 'gravissima', category: 'Conduta' },
-  { id: 'gravissima-4', description: 'Ameaças graves', severity: 'gravissima', category: 'Convivência' },
-  { id: 'gravissima-5', description: 'Porte de arma branca', severity: 'gravissima', category: 'Segurança' },
+  { id: 'gravissima-1', description: 'Namorar na escola', severity: 'gravissima', category: 'Conduta' },
+  { id: 'gravissima-2', description: 'Desacatar qualquer pessoa na escola', severity: 'gravissima', category: 'Respeito' },
+  { id: 'gravissima-3', description: 'Beber ou fumar na escola', severity: 'gravissima', category: 'Proibidos' },
+  { id: 'gravissima-4', description: 'Falar palavrão', severity: 'gravissima', category: 'Linguagem' },
+  { id: 'gravissima-5', description: 'Dano ao patrimônio público escolar', severity: 'gravissima', category: 'Patrimônio' },
 ];

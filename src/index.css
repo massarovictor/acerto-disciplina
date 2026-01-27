@@ -39,18 +39,18 @@ All colors MUST be HSL.
     --radius: 0.5rem;
 
     /* Severity levels for incidents */
-    --severity-light: 142 76% 36%;
+    --severity-light: 221.2 83.2% 53.3%;
     --severity-light-foreground: 0 0% 100%;
-    --severity-light-bg: 142 76% 96%;
-    
+    --severity-light-bg: 213.8 100% 96.1%;
+
     --severity-intermediate: 38 92% 50%;
     --severity-intermediate-foreground: 0 0% 100%;
     --severity-intermediate-bg: 38 92% 96%;
-    
+
     --severity-serious: 25 95% 53%;
     --severity-serious-foreground: 0 0% 100%;
     --severity-serious-bg: 25 95% 96%;
-    
+
     --severity-critical: 0 84% 60%;
     --severity-critical-foreground: 0 0% 100%;
     --severity-critical-bg: 0 84% 96%;
@@ -101,18 +101,18 @@ All colors MUST be HSL.
     --ring: 217 91% 60%;
 
     /* Severity levels for dark mode */
-    --severity-light: 142 69% 42%;
+    --severity-light: 217.2 91.2% 59.8%;
     --severity-light-foreground: 0 0% 100%;
-    --severity-light-bg: 142 69% 15%;
-    
+    --severity-light-bg: 217.2 32.6% 17.5%;
+
     --severity-intermediate: 38 84% 55%;
     --severity-intermediate-foreground: 0 0% 100%;
     --severity-intermediate-bg: 38 84% 15%;
-    
+
     --severity-serious: 25 90% 58%;
     --severity-serious-foreground: 0 0% 100%;
     --severity-serious-bg: 25 90% 15%;
-    
+
     --severity-critical: 0 72% 51%;
     --severity-critical-foreground: 0 0% 100%;
     --severity-critical-bg: 0 72% 15%;

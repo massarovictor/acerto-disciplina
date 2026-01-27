@@ -12,7 +12,7 @@ export function calculateSuggestedAction(
     const studentIncidents = allIncidents.filter(
       incident => incident.studentIds.includes(studentId) && incident.status !== 'aberta'
     );
-    
+
     return {
       studentId,
       leve: studentIncidents.filter(i => i.finalSeverity === 'leve').length,
@@ -26,22 +26,22 @@ export function calculateSuggestedAction(
   const maxLeve = Math.max(...studentIncidentCounts.map(s => s.leve));
   const maxIntermediaria = Math.max(...studentIncidentCounts.map(s => s.intermediaria));
   const maxGrave = Math.max(...studentIncidentCounts.map(s => s.grave));
-  
+
   // Apply rules based on current severity and history
   if (finalSeverity === 'gravissima') {
-    return 'Conversa individual com o(s) estudante(s), registro da ocorrência e SUSPENSÃO DAS ATIVIDADES ESCOLARES POR TRÊS (3) DIAS. Retorno à escola somente acompanhado pelo responsável legal.';
+    return 'Conversa individual com o(s) estudante(s), registro da ocorrência e SUSPENSÃO DAS ATIVIDADES ESCOLARES POR TRÊS dias e retorno à escola somente com o responsável.';
   }
-  
+
   if (finalSeverity === 'grave' || maxIntermediaria >= 2 || maxLeve >= 3) {
-    return 'Conversa individual com o(s) estudante(s), registro da ocorrência e SUSPENSÃO DAS ATIVIDADES ESCOLARES POR UM (1) DIA. Retorno à escola somente acompanhado pelo responsável legal.';
+    return 'Conversa individual com o(s) estudante(s), registro da ocorrência e SUSPENSÃO DAS ATIVIDADES ESCOLARES POR UM dia e retorno à escola somente com o responsável.';
   }
-  
+
   if (finalSeverity === 'intermediaria' || maxLeve >= 2) {
     return 'Conversa individual com o(s) estudante(s), registro da ocorrência e ENCAMINHAMENTO DE COMUNICADO AOS PAIS E/OU RESPONSÁVEIS sobre o ocorrido.';
   }
-  
+
   // Default for first leve incident
-  return 'Conversa individual com o(s) estudante(s) e registro da ocorrência.';
+  return 'Conversa e registro.';
 }
 
 // Get follow-up type suggestion based on action taken

@@ -36,6 +36,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useStudents, useClasses, useIncidents, useGradesAnalytics } from '@/hooks/useData';
+import { getSeverityColor, getSeverityLabel, getStatusColor, getStatusLabel } from '@/lib/incidentUtils';
 import { useToast } from '@/hooks/use-toast';
 import { exportStudentsList } from '@/lib/excelExport';
 import { Search, Edit, Download, Eye, Trash2, Camera, X, CheckCircle2, XCircle, AlertTriangle, ArrowRightLeft, Clock } from 'lucide-react';
@@ -761,24 +762,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                       );
                     }
 
-                    const getSeverityColor = (severity: string) => {
-                      switch (severity) {
-                        case 'leve': return 'bg-severity-light-bg text-severity-light border-severity-light';
-                        case 'intermediaria': return 'bg-severity-intermediate-bg text-severity-intermediate border-severity-intermediate';
-                        case 'grave': return 'bg-severity-serious-bg text-severity-serious border-severity-serious';
-                        case 'gravissima': return 'bg-severity-critical-bg text-severity-critical border-severity-critical';
-                        default: return '';
-                      }
-                    };
-
-                    const getStatusColor = (status: string) => {
-                      switch (status) {
-                        case 'aberta': return 'bg-status-open/10 text-status-open border-status-open';
-                        case 'acompanhamento': return 'bg-status-analysis/10 text-status-analysis border-status-analysis';
-                        case 'resolvida': return 'bg-status-resolved/10 text-status-resolved border-status-resolved';
-                        default: return '';
-                      }
-                    };
+                    // Helper functions removed in favor of imports
 
                     return (
                       <div className="space-y-3">
@@ -793,9 +777,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                   <Badge variant="outline" className={getSeverityColor(incident.finalSeverity)}>
-                                    {incident.finalSeverity === 'leve' ? 'Leve' :
-                                      incident.finalSeverity === 'intermediaria' ? 'Intermediária' :
-                                        incident.finalSeverity === 'grave' ? 'Grave' : 'Gravíssima'}
+                                    {getSeverityLabel(incident.finalSeverity)}
                                   </Badge>
                                   <Badge variant="outline" className={getStatusColor(incident.status)}>
                                     {incident.status === 'aberta' ? 'Aberta' :

@@ -28,6 +28,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Clock, CheckCircle, Plus, FileText } from 'lucide-react';
 import { calculateSuggestedAction, suggestFollowUpType } from '@/lib/incidentActions';
 import { generateIncidentPDF } from '@/lib/incidentPdfExport';
+import { getSeverityColor, getSeverityLabel, getStatusColor } from '@/lib/incidentUtils';
 
 interface IncidentManagementDialogProps {
   incident: Incident;
@@ -52,6 +53,7 @@ export const IncidentManagementDialog = ({
 
   const [commentText, setCommentText] = useState('');
   const [tab, setTab] = useState<'info' | 'followup' | 'comments'>(initialTab);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Sincroniza a aba quando initialTab mudar
   useEffect(() => {
@@ -155,24 +157,7 @@ export const IncidentManagementDialog = ({
     { value: 'resolvida', label: 'Resolvida' },
   ];
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'aberta': return 'bg-status-open/10 text-status-open border-status-open';
-      case 'acompanhamento': return 'bg-status-analysis/10 text-status-analysis border-status-analysis';
-      case 'resolvida': return 'bg-status-resolved/10 text-status-resolved border-status-resolved';
-      default: return '';
-    }
-  };
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'leve': return 'bg-severity-light-bg text-severity-light border-severity-light';
-      case 'intermediaria': return 'bg-severity-intermediate-bg text-severity-intermediate border-severity-intermediate';
-      case 'grave': return 'bg-severity-serious-bg text-severity-serious border-severity-serious';
-      case 'gravissima': return 'bg-severity-critical-bg text-severity-critical border-severity-critical';
-      default: return '';
-    }
-  };
 
   const handleSave = async () => {
     if (!user) return;
@@ -252,20 +237,24 @@ export const IncidentManagementDialog = ({
 
     const existingFollowUpId = currentIncident.followUps?.[0]?.id;
     try {
+      setIsSaving(true);
       await saveFollowUp(incident.id, followUp, existingFollowUpId);
 
       toast({
         title: 'Acompanhamento salvo',
-        description: 'O registro foi atualizado com sucesso',
+        description: 'O registro foi atualizado com sucesso. Você pode resolver a ocorrência agora se desejar.',
       });
 
-      onOpenChange(false);
+      // Manter o diálogo aberto para permitir resolução imediata
+      // onOpenChange(false);
     } catch (error) {
       toast({
         title: 'Erro',
         description: 'Não foi possível salvar o acompanhamento.',
         variant: 'destructive',
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -457,8 +446,8 @@ export const IncidentManagementDialog = ({
                           Resolver Ocorrência
                         </Button>
                       )}
-                      <Button onClick={handleSaveFollowUp} className="ml-auto">
-                        Salvar Acompanhamento
+                      <Button onClick={handleSaveFollowUp} className="ml-auto" disabled={isSaving}>
+                        {isSaving ? 'Salvando...' : 'Salvar Acompanhamento'}
                       </Button>
                     </div>
                   </>

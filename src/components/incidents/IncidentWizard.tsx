@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
+import { getSeverityColor, getSeverityLabel } from "@/lib/incidentUtils";
 
 export interface IncidentFormData {
   classId: string;
@@ -88,7 +89,7 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
     ) {
       toast({
         title: "Erro",
-        description: "Informe o motivo da alteracao do grau final.",
+        description: "Informe o motivo da alteração do grau final.",
         variant: "destructive",
       });
       setCurrentStep(3);
@@ -153,35 +154,7 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
     return true;
   };
 
-  const getSeverityColor = (severity: IncidentSeverity) => {
-    switch (severity) {
-      case "leve":
-        return "bg-severity-light-bg text-severity-light border-severity-light";
-      case "intermediaria":
-        return "bg-severity-intermediate-bg text-severity-intermediate border-severity-intermediate";
-      case "grave":
-        return "bg-severity-serious-bg text-severity-serious border-severity-serious";
-      case "gravissima":
-        return "bg-severity-critical-bg text-severity-critical border-severity-critical";
-      default:
-        return "";
-    }
-  };
 
-  const getSeverityLabel = (severity: IncidentSeverity) => {
-    switch (severity) {
-      case "leve":
-        return "Leve";
-      case "intermediaria":
-        return "Intermediária";
-      case "grave":
-        return "Grave";
-      case "gravissima":
-        return "Gravíssima";
-      default:
-        return severity;
-    }
-  };
 
   // Determina a gravidade a exibir (final se definida, senão calculada)
   const displaySeverity = formData.finalSeverity || formData.calculatedSeverity;
@@ -196,16 +169,16 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
               <div className="flex items-center">
                 <div
                   className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${currentStep >= step.id
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-background text-muted-foreground"
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background text-muted-foreground"
                     }`}
                 >
                   {step.id}
                 </div>
                 <span
                   className={`ml-2 text-sm font-medium ${currentStep >= step.id
-                      ? "text-foreground"
-                      : "text-muted-foreground"
+                    ? "text-foreground"
+                    : "text-muted-foreground"
                     }`}
                 >
                   {step.name}

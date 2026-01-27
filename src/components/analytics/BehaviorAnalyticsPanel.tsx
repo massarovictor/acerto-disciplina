@@ -57,12 +57,10 @@ interface BehaviorAnalyticsPanelProps {
     behavioralInsights: Insight[];
 }
 
-const SEVERITY_CONFIG = {
-    leve: { label: 'Leve', color: 'bg-emerald-500', textColor: 'text-emerald-700', bgLight: 'bg-emerald-100' },
-    intermediaria: { label: 'Intermediária', color: 'bg-amber-500', textColor: 'text-amber-700', bgLight: 'bg-amber-100' },
-    grave: { label: 'Grave', color: 'bg-orange-500', textColor: 'text-orange-700', bgLight: 'bg-orange-100' },
-    gravissima: { label: 'Gravíssima', color: 'bg-red-500', textColor: 'text-red-700', bgLight: 'bg-red-100' },
-};
+import {
+    getSeverityColor,
+    getSeverityLabel
+} from '@/lib/incidentUtils';
 
 const InsightIcon = ({ type }: { type: Insight['type'] }) => {
     const iconClass = 'h-4 w-4';
@@ -138,8 +136,8 @@ export function BehaviorAnalyticsPanel({
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-emerald-500/10">
-                                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                                <div className="p-2 rounded-lg bg-blue-500/10">
+                                    <CheckCircle2 className="h-5 w-5 text-blue-500" />
                                 </div>
                                 <div>
                                     <p className="text-2xl font-bold">{resolvedIncidentsCount}</p>
@@ -173,13 +171,12 @@ export function BehaviorAnalyticsPanel({
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {incidentsBySeverity.map((item) => {
-                                const config = SEVERITY_CONFIG[item.severity];
                                 return (
                                     <div key={item.severity} className="space-y-2">
                                         <div className="flex items-center justify-between text-sm">
                                             <div className="flex items-center gap-2">
-                                                <div className={`w-3 h-3 rounded-full ${config.color}`} />
-                                                <span>{config.label}</span>
+                                                <div className={`w-3 h-3 rounded-full ${getSeverityColor(item.severity)}`} />
+                                                <span>{getSeverityLabel(item.severity)}</span>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <span className="font-medium">{item.count}</span>
@@ -421,10 +418,10 @@ export function BehaviorAnalyticsPanel({
                                         <TableHead className="w-16 text-center">Posição</TableHead>
                                         <TableHead>Turma</TableHead>
                                         <TableHead className="text-center">Total</TableHead>
-                                        <TableHead className="text-center text-green-600">Leve</TableHead>
+                                        <TableHead className="text-center text-blue-600">Leve</TableHead>
                                         <TableHead className="text-center text-amber-600">Intermed.</TableHead>
-                                        <TableHead className="text-center text-red-600">Grave</TableHead>
-                                        <TableHead className="text-center text-red-900">Gravíssima</TableHead>
+                                        <TableHead className="text-center text-orange-600">Grave</TableHead>
+                                        <TableHead className="text-center text-red-600">Gravíssima</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -447,16 +444,16 @@ export function BehaviorAnalyticsPanel({
                                             <TableCell className="text-center font-bold text-lg">{item.incidentCount}</TableCell>
                                             <TableCell className="text-center text-muted-foreground">{item.severities.leve || '-'}</TableCell>
                                             <TableCell className="text-center text-muted-foreground">{item.severities.intermediaria || '-'}</TableCell>
-                                            <TableCell className="text-center font-medium text-red-600">
+                                            <TableCell className="text-center font-medium text-orange-600">
                                                 {item.severities.grave > 0 ? (
-                                                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                                    <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
                                                         {item.severities.grave}
                                                     </Badge>
                                                 ) : '-'}
                                             </TableCell>
-                                            <TableCell className="text-center font-medium text-red-900">
+                                            <TableCell className="text-center font-medium text-red-600">
                                                 {item.severities.gravissima > 0 ? (
-                                                    <Badge variant="outline" className="bg-red-900/10 text-red-900 border-red-900/20">
+                                                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
                                                         {item.severities.gravissima}
                                                     </Badge>
                                                 ) : '-'}
@@ -496,10 +493,10 @@ export function BehaviorAnalyticsPanel({
                                         <TableHead className="w-16 text-center">Posição</TableHead>
                                         <TableHead>Aluno</TableHead>
                                         <TableHead className="text-center">Total</TableHead>
-                                        <TableHead className="text-center text-green-600">Leve</TableHead>
+                                        <TableHead className="text-center text-blue-600">Leve</TableHead>
                                         <TableHead className="text-center text-amber-600">Intermed.</TableHead>
-                                        <TableHead className="text-center text-red-600">Grave</TableHead>
-                                        <TableHead className="text-center text-red-900">Gravíssima</TableHead>
+                                        <TableHead className="text-center text-orange-600">Grave</TableHead>
+                                        <TableHead className="text-center text-red-600">Gravíssima</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -522,16 +519,16 @@ export function BehaviorAnalyticsPanel({
                                             <TableCell className="text-center font-bold text-lg">{item.incidentCount}</TableCell>
                                             <TableCell className="text-center text-muted-foreground">{item.severities.leve || '-'}</TableCell>
                                             <TableCell className="text-center text-muted-foreground">{item.severities.intermediaria || '-'}</TableCell>
-                                            <TableCell className="text-center font-medium text-red-600">
+                                            <TableCell className="text-center font-medium text-orange-600">
                                                 {item.severities.grave > 0 ? (
-                                                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                                    <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
                                                         {item.severities.grave}
                                                     </Badge>
                                                 ) : '-'}
                                             </TableCell>
-                                            <TableCell className="text-center font-medium text-red-900">
+                                            <TableCell className="text-center font-medium text-red-600">
                                                 {item.severities.gravissima > 0 ? (
-                                                    <Badge variant="outline" className="bg-red-900/10 text-red-900 border-red-900/20">
+                                                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
                                                         {item.severities.gravissima}
                                                     </Badge>
                                                 ) : '-'}

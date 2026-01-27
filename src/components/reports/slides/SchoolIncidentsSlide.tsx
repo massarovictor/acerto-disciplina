@@ -27,11 +27,16 @@ interface SchoolIncidentsSlideProps {
     period: string;
 }
 
-const SEVERITY_CONFIG = {
-    leve: { label: 'Leve', color: '#22C55E', icon: Info },
-    intermediaria: { label: 'Intermediária', color: '#F59E0B', icon: AlertCircle },
-    grave: { label: 'Grave', color: '#EF4444', icon: AlertTriangle },
-    gravissima: { label: 'Gravíssima', color: '#7C2D12', icon: AlertOctagon },
+import {
+    getSeverityColor,
+    getSeverityLabel
+} from '@/lib/incidentUtils';
+
+const SEVERITY_ICONS = {
+    leve: Info,
+    intermediaria: AlertCircle,
+    grave: AlertTriangle,
+    gravissima: AlertOctagon,
 };
 
 export const SchoolIncidentsSlide = ({
@@ -102,14 +107,28 @@ export const SchoolIncidentsSlide = ({
                     {/* Left: Severity Cards + Status */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                         {/* Severity cards */}
-                        {Object.entries(SEVERITY_CONFIG).map(([key, config]) => {
-                            const Icon = config.icon;
-                            const count = incidentData.bySeverity[key as keyof typeof incidentData.bySeverity];
+                        {(['leve', 'intermediaria', 'grave', 'gravissima'] as const).map((severity) => {
+                            const Icon = SEVERITY_ICONS[severity];
+                            const count = incidentData.bySeverity[severity];
                             const percentage = incidentData.total > 0 ? (count / incidentData.total) * 100 : 0;
+
+                            // Map tailwind classes to hex colors for the slide style
+                            const getColor = (sev: string) => {
+                                switch (sev) {
+                                    case 'leve': return '#3B82F6'; // blue-500
+                                    case 'intermediaria': return '#F59E0B'; // amber-500
+                                    case 'grave': return '#F97316'; // orange-500
+                                    case 'gravissima': return '#EF4444'; // red-500
+                                    default: return '#3B82F6';
+                                }
+                            };
+
+                            const color = getColor(severity);
+                            const label = getSeverityLabel(severity);
 
                             return (
                                 <div
-                                    key={key}
+                                    key={severity}
                                     style={{
                                         background: REPORT_COLORS.background.card,
                                         borderRadius: 16,
@@ -125,17 +144,17 @@ export const SchoolIncidentsSlide = ({
                                             width: 56,
                                             height: 56,
                                             borderRadius: 14,
-                                            background: `${config.color}15`,
+                                            background: `${color}15`,
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                         }}
                                     >
-                                        <Icon size={28} color={config.color} />
+                                        <Icon size={28} color={color} />
                                     </div>
                                     <div style={{ flex: 1 }}>
                                         <p style={{ margin: 0, fontSize: 16, fontWeight: 600, color: REPORT_COLORS.text.primary }}>
-                                            {config.label}
+                                            {label}
                                         </p>
                                         <div style={{
                                             marginTop: 8,
@@ -147,13 +166,13 @@ export const SchoolIncidentsSlide = ({
                                             <div style={{
                                                 height: '100%',
                                                 width: `${percentage}%`,
-                                                background: config.color,
+                                                background: color,
                                                 borderRadius: 4,
                                             }} />
                                         </div>
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
-                                        <p style={{ margin: 0, fontSize: 32, fontWeight: 800, color: config.color }}>
+                                        <p style={{ margin: 0, fontSize: 32, fontWeight: 800, color: color }}>
                                             {count}
                                         </p>
                                         <p style={{ margin: 0, fontSize: 12, color: REPORT_COLORS.text.tertiary }}>
@@ -248,7 +267,7 @@ export const SchoolIncidentsSlide = ({
                                             </span>
                                         )}
                                         {cls.grave > 0 && (
-                                            <span style={{ padding: '4px 8px', borderRadius: 4, background: '#EF444415', color: '#EF4444', fontSize: 12, fontWeight: 600 }}>
+                                            <span style={{ padding: '4px 8px', borderRadius: 4, background: '#F9731615', color: '#F97316', fontSize: 12, fontWeight: 600 }}>
                                                 {cls.grave} graves
                                             </span>
                                         )}
@@ -309,10 +328,10 @@ export const SchoolIncidentsSlide = ({
                                         <TableHead className="w-16 text-center">Posição</TableHead>
                                         <TableHead>Turma</TableHead>
                                         <TableHead className="text-center">Total</TableHead>
-                                        <TableHead className="text-center text-green-600">Leve</TableHead>
+                                        <TableHead className="text-center text-blue-600">Leve</TableHead>
                                         <TableHead className="text-center text-amber-600">Intermed.</TableHead>
-                                        <TableHead className="text-center text-red-600">Grave</TableHead>
-                                        <TableHead className="text-center text-red-900">Gravíssima</TableHead>
+                                        <TableHead className="text-center text-orange-600">Grave</TableHead>
+                                        <TableHead className="text-center text-red-600">Gravíssima</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -330,16 +349,16 @@ export const SchoolIncidentsSlide = ({
                                             <TableCell className="text-center font-bold text-lg">{cls.total}</TableCell>
                                             <TableCell className="text-center text-muted-foreground">{cls.leve || '-'}</TableCell>
                                             <TableCell className="text-center text-muted-foreground">{cls.intermediaria || '-'}</TableCell>
-                                            <TableCell className="text-center font-medium text-red-600">
+                                            <TableCell className="text-center font-medium text-orange-600">
                                                 {cls.grave > 0 ? (
-                                                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                                    <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
                                                         {cls.grave}
                                                     </Badge>
                                                 ) : '-'}
                                             </TableCell>
-                                            <TableCell className="text-center font-medium text-red-900">
+                                            <TableCell className="text-center font-medium text-red-600">
                                                 {cls.gravissima > 0 ? (
-                                                    <Badge variant="outline" className="bg-red-900/10 text-red-900 border-red-900/20">
+                                                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
                                                         {cls.gravissima}
                                                     </Badge>
                                                 ) : '-'}

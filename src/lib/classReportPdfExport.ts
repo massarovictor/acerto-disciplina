@@ -11,7 +11,7 @@ import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interface
 
 import { Class, Student, Grade, Incident, AttendanceRecord } from '@/types';
 import { getSchoolConfig, getDefaultConfig, SchoolConfig } from './schoolConfig';
-import { PDF_COLORS, PDF_STYLES } from './pdfGenerator';
+import { PDF_COLORS, PDF_STYLES, getPdfMake } from './pdfGenerator';
 import {
   generateAdvancedAnalytics,
   AdvancedAnalyticsResult,
@@ -24,28 +24,7 @@ import {
 import { generateInsightsReport, InsightsReport } from './insightsEngine';
 import { QUARTERS, SUBJECT_AREAS, FUNDAMENTAL_SUBJECT_AREAS, getSubjectArea } from './subjects';
 
-// pdfMake será carregado dinamicamente
-let pdfMakeInstance: any = null;
 
-async function getPdfMake() {
-  if (pdfMakeInstance) return pdfMakeInstance;
-
-  const pdfMakeModule = await import('pdfmake/build/pdfmake');
-  const pdfFontsModule = await import('pdfmake/build/vfs_fonts');
-
-  pdfMakeInstance = pdfMakeModule.default || pdfMakeModule;
-
-  const vfs = (pdfFontsModule as any).pdfMake?.vfs
-    || (pdfFontsModule as any).default?.pdfMake?.vfs
-    || (pdfFontsModule as any).vfs
-    || (pdfFontsModule as any).default?.vfs;
-
-  if (vfs) {
-    pdfMakeInstance.vfs = vfs;
-  }
-
-  return pdfMakeInstance;
-}
 
 // ============================================
 // INTERFACE PARA ANÁLISE POR ÁREA

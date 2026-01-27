@@ -60,7 +60,7 @@ import {
   Clock,
 } from "lucide-react";
 import { Class } from "@/types";
-import { getAcademicYear, shouldArchiveClass } from "@/lib/classYearCalculator";
+import { getAcademicYear, shouldArchiveClass, calculateCurrentYearFromCalendar } from "@/lib/classYearCalculator";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface ClassesManageProps {
@@ -152,8 +152,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
     const currentYear = new Date().getFullYear();
     let currentSeries: 1 | 2 | 3 = 1;
     if (cls.startCalendarYear) {
-      const yearsElapsed = currentYear - cls.startCalendarYear + 1;
-      currentSeries = Math.min(Math.max(yearsElapsed, 1), 3) as 1 | 2 | 3;
+      currentSeries = calculateCurrentYearFromCalendar(cls.startCalendarYear);
     }
 
     setEditFormData({
@@ -225,8 +224,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
     } else if (currentYear > editFormData.endCalendarYear) {
       nextSeries = 3;
     } else {
-      const yearsElapsed = currentYear - editFormData.startCalendarYear + 1;
-      nextSeries = Math.min(Math.max(yearsElapsed, 1), 3) as 1 | 2 | 3;
+      nextSeries = calculateCurrentYearFromCalendar(editFormData.startCalendarYear);
     }
 
     if (editFormData.currentSeries !== nextSeries) {
@@ -563,8 +561,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                     // Calcular série atual baseado nos anos
                     let computedSeries = cls.currentYear || 1;
                     if (cls.startCalendarYear) {
-                      const yearsElapsed = currentYear - cls.startCalendarYear + 1;
-                      computedSeries = Math.min(Math.max(yearsElapsed, 1), 3) as 1 | 2 | 3;
+                      computedSeries = calculateCurrentYearFromCalendar(cls.startCalendarYear);
                     }
 
                     const isHighlighted = highlightId === cls.id;

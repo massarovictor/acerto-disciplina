@@ -11,25 +11,33 @@ import { getSchoolConfig, SchoolConfig, getDefaultConfig } from './schoolConfig'
 // pdfMake será carregado dinamicamente
 let pdfMakeInstance: any = null;
 
-async function getPdfMake() {
+// Função exportada para uso em outros arquivos
+export async function getPdfMake() {
   if (pdfMakeInstance) return pdfMakeInstance;
-  
-  const pdfMakeModule = await import('pdfmake/build/pdfmake');
-  const pdfFontsModule = await import('pdfmake/build/vfs_fonts');
-  
-  pdfMakeInstance = pdfMakeModule.default || pdfMakeModule;
-  
-  // Tentar diferentes formas de acessar o vfs
-  const vfs = (pdfFontsModule as any).pdfMake?.vfs 
-    || (pdfFontsModule as any).default?.pdfMake?.vfs 
-    || (pdfFontsModule as any).vfs
-    || (pdfFontsModule as any).default?.vfs;
-  
-  if (vfs) {
-    pdfMakeInstance.vfs = vfs;
+
+  try {
+    const pdfMakeModule = await import('pdfmake/build/pdfmake');
+    const pdfFontsModule = await import('pdfmake/build/vfs_fonts');
+
+    pdfMakeInstance = pdfMakeModule.default || pdfMakeModule;
+
+    // Tentar diferentes formas de acesso ao vfs
+    const vfs = (pdfFontsModule as any).pdfMake?.vfs
+      || (pdfFontsModule as any).default?.pdfMake?.vfs
+      || (pdfFontsModule as any).vfs
+      || (pdfFontsModule as any).default?.vfs;
+
+    if (vfs) {
+      pdfMakeInstance.vfs = vfs;
+    } else {
+      console.warn('VFS Fonts não foram carregadas corretamente. O PDF pode ficar sem fontes.');
+    }
+
+    return pdfMakeInstance;
+  } catch (error) {
+    console.error('Erro crítico ao carregar pdfmake:', error);
+    throw error;
   }
-  
-  return pdfMakeInstance;
 }
 
 // ============================================
@@ -40,20 +48,20 @@ export const PDF_COLORS = {
   primary: '#0F172A',      // Slate 900 - Títulos principais
   secondary: '#475569',    // Slate 600 - Texto secundário
   tertiary: '#94A3B8',     // Slate 400 - Texto terciário
-  
+
   success: '#059669',      // Emerald 600
   warning: '#D97706',      // Amber 600
   danger: '#DC2626',       // Red 600
   info: '#2563EB',         // Blue 600
-  
+
   background: {
     light: '#F8FAFC',      // Slate 50
     medium: '#E2E8F0',     // Slate 200
     dark: '#0F172A',       // Slate 900
   },
-  
+
   border: '#CBD5E1',       // Slate 300
-  
+
   // Cores para classificação de alunos (padronizado)
   // Crítico = Vermelho, Atenção = Amarelo, Aprovado = Verde, Excelência = Azul
   status: {
@@ -88,7 +96,7 @@ export const PDF_STYLES: StyleDictionary = {
     color: PDF_COLORS.primary,
     margin: [0, 8, 0, 4],
   },
-  
+
   // Texto
   body: {
     fontSize: 10,
@@ -105,7 +113,7 @@ export const PDF_STYLES: StyleDictionary = {
     color: PDF_COLORS.tertiary,
     italics: true,
   },
-  
+
   // Tabelas
   tableHeader: {
     fontSize: 9,
@@ -124,7 +132,7 @@ export const PDF_STYLES: StyleDictionary = {
     color: PDF_COLORS.primary,
     alignment: 'left' as const,
   },
-  
+
   // Cards e Boxes
   cardTitle: {
     fontSize: 10,
@@ -136,7 +144,7 @@ export const PDF_STYLES: StyleDictionary = {
     bold: true,
     color: PDF_COLORS.primary,
   },
-  
+
   // Status
   statusExcelencia: {
     fontSize: 8,
@@ -162,7 +170,7 @@ export const PDF_STYLES: StyleDictionary = {
     color: '#FFFFFF',
     fillColor: PDF_COLORS.status.critico,
   },
-  
+
   // Alertas
   alertDanger: {
     fontSize: 9,
@@ -188,40 +196,40 @@ export const PDF_STYLES: StyleDictionary = {
 export class PDFGenerator {
   protected config: SchoolConfig;
   protected content: Content[] = [];
-  
+
   constructor(config?: SchoolConfig) {
     this.config = config || getDefaultConfig();
   }
-  
+
   async loadConfig(): Promise<void> {
     if (!this.config || this.config.schoolName === 'INSTITUIÇÃO DE ENSINO') {
       this.config = await getSchoolConfig();
     }
   }
-  
+
   // ============================================
   // HELPERS DE CONTEÚDO
   // ============================================
-  
+
   /**
    * Cria o cabeçalho do documento com informações da escola
    */
   createHeader(title: string, subtitle?: string): Content[] {
     const header: Content[] = [];
-    
+
     // Nome da escola
     header.push({
       text: this.config.schoolName,
       style: 'h1',
       margin: [0, 0, 0, 2],
     });
-    
+
     // Informações da escola
     const schoolInfo: string[] = [];
     if (this.config.inep) schoolInfo.push(`INEP: ${this.config.inep}`);
     if (this.config.phone) schoolInfo.push(`Tel: ${this.config.phone}`);
     if (this.config.email) schoolInfo.push(this.config.email);
-    
+
     if (schoolInfo.length > 0) {
       header.push({
         text: schoolInfo.join('  |  '),
@@ -229,7 +237,7 @@ export class PDFGenerator {
         margin: [0, 0, 0, 2],
       });
     }
-    
+
     if (this.config.address) {
       const addr = `${this.config.address}${this.config.city ? `, ${this.config.city}` : ''}${this.config.state ? ` - ${this.config.state}` : ''}`;
       header.push({
@@ -238,7 +246,7 @@ export class PDFGenerator {
         margin: [0, 0, 0, 8],
       });
     }
-    
+
     // Linha divisória
     header.push({
       canvas: [
@@ -254,14 +262,14 @@ export class PDFGenerator {
       ],
       margin: [0, 0, 0, 12],
     });
-    
+
     // Título do relatório
     header.push({
       text: title,
       style: 'h1',
       alignment: 'center',
     });
-    
+
     if (subtitle) {
       header.push({
         text: subtitle,
@@ -270,10 +278,10 @@ export class PDFGenerator {
         margin: [0, 0, 0, 16],
       });
     }
-    
+
     return header;
   }
-  
+
   /**
    * Cria uma seção com título
    */
@@ -286,7 +294,7 @@ export class PDFGenerator {
       margin: [0, 8, 0, 8],
     };
   }
-  
+
   /**
    * Cria uma tabela formatada
    */
@@ -308,27 +316,27 @@ export class PDFGenerator {
       zebra = true,
       layout = 'lightHorizontalLines',
     } = options;
-    
+
     const headerRow: TableCell[] = headers.map((h) => ({
       text: h,
       style: headerStyle,
       fillColor: PDF_COLORS.primary,
     }));
-    
-    const bodyRows: TableCell[][] = rows.map((row, rowIndex) => 
+
+    const bodyRows: TableCell[][] = rows.map((row, rowIndex) =>
       row.map((cell) => {
         const isContent = typeof cell === 'object' && cell !== null;
-        const baseCell: TableCell = isContent 
+        const baseCell: TableCell = isContent
           ? (cell as TableCell)
           : { text: String(cell), style: cellStyle };
-        
+
         if (zebra && rowIndex % 2 === 0 && !isContent) {
           return { ...baseCell, fillColor: PDF_COLORS.background.light };
         }
         return baseCell;
       })
     );
-    
+
     return {
       table: {
         headerRows: 1,
@@ -346,7 +354,7 @@ export class PDFGenerator {
       },
     };
   }
-  
+
   /**
    * Cria cards de métricas em grid
    */
@@ -355,7 +363,7 @@ export class PDFGenerator {
     columns: number = 4
   ): Content {
     const columnWidth = 100 / columns;
-    
+
     const cards: Content[] = metrics.map((metric) => ({
       stack: [
         {
@@ -373,7 +381,7 @@ export class PDFGenerator {
       width: `${columnWidth}%`,
       margin: [4, 4, 4, 4],
     }));
-    
+
     // Agrupar em linhas
     const rows: Content[] = [];
     for (let i = 0; i < cards.length; i += columns) {
@@ -382,13 +390,13 @@ export class PDFGenerator {
         columnGap: 8,
       });
     }
-    
+
     return {
       stack: rows,
       margin: [0, 8, 0, 8],
     };
   }
-  
+
   /**
    * Cria um box de alerta/destaque
    */
@@ -403,10 +411,10 @@ export class PDFGenerator {
       danger: { bg: '#FEF2F2', border: PDF_COLORS.danger, text: PDF_COLORS.danger },
       success: { bg: '#F0FDF4', border: PDF_COLORS.success, text: PDF_COLORS.success },
     };
-    
+
     const color = colors[type];
     const contentArray = Array.isArray(content) ? content : [content];
-    
+
     return {
       table: {
         widths: [3, '*'],
@@ -426,7 +434,7 @@ export class PDFGenerator {
       margin: [0, 8, 0, 8],
     };
   }
-  
+
   /**
    * Cria badge de status
    */
@@ -443,7 +451,7 @@ export class PDFGenerator {
       background: PDF_COLORS.status[status],
     };
   }
-  
+
   /**
    * Cria lista com bullets
    */
@@ -454,7 +462,7 @@ export class PDFGenerator {
       margin: [0, 4, 0, 4],
     };
   }
-  
+
   /**
    * Cria card de aluno individual
    */
@@ -471,7 +479,7 @@ export class PDFGenerator {
       atencao: 'Atenção',
       critico: 'Crítico',
     };
-    
+
     return {
       table: {
         widths: ['*'],
@@ -533,7 +541,7 @@ export class PDFGenerator {
       margin: [0, 4, 0, 4],
     };
   }
-  
+
   /**
    * Cria matriz de correlação visual
    */
@@ -551,7 +559,7 @@ export class PDFGenerator {
       if (value >= -0.7) return '#EF4444';     // Vermelho
       return '#DC2626';                         // Vermelho forte
     };
-    
+
     const headerRow: TableCell[] = [
       { text: '', fillColor: '#FFFFFF' },
       ...labels.map((l) => ({
@@ -562,7 +570,7 @@ export class PDFGenerator {
         fillColor: PDF_COLORS.background.medium,
       })),
     ];
-    
+
     const bodyRows: TableCell[][] = matrix.map((row, i) => [
       {
         text: labels[i].length > 10 ? labels[i].substring(0, 10) + '...' : labels[i],
@@ -578,7 +586,7 @@ export class PDFGenerator {
         color: Math.abs(value) > 0.5 ? '#FFFFFF' : PDF_COLORS.primary,
       })),
     ]);
-    
+
     return {
       stack: [
         { text: title, style: 'h3' },
@@ -608,31 +616,30 @@ export class PDFGenerator {
       margin: [0, 8, 0, 8],
     };
   }
-  
+
   // ============================================
   // GERAÇÃO DO DOCUMENTO
   // ============================================
-  
+
   /**
    * Gera e baixa o PDF
    */
   async generate(content: Content[], filename: string): Promise<void> {
     await this.loadConfig();
-    
+
     const pdfMake = await getPdfMake();
-    
+
     const docDefinition: TDocumentDefinitions = {
       pageSize: 'A4',
       pageMargins: [40, 40, 40, 60],
-      
+
       styles: PDF_STYLES,
       defaultStyle: {
-        font: 'Helvetica',
         fontSize: 10,
       },
-      
+
       content,
-      
+
       footer: (currentPage, pageCount) => ({
         columns: [
           {
@@ -650,7 +657,7 @@ export class PDFGenerator {
         ],
       }),
     };
-    
+
     pdfMake.createPdf(docDefinition).download(filename);
   }
 }

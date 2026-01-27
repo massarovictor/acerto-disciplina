@@ -12,12 +12,10 @@ interface ReviewStepProps {
   updateFormData: (data: Partial<IncidentFormData>) => void;
 }
 
-const severityConfig = {
-  leve: { label: 'Leve', color: 'bg-severity-light-bg text-severity-light border-severity-light' },
-  intermediaria: { label: 'Intermediária', color: 'bg-severity-intermediate-bg text-severity-intermediate border-severity-intermediate' },
-  grave: { label: 'Grave', color: 'bg-severity-serious-bg text-severity-serious border-severity-serious' },
-  gravissima: { label: 'Gravíssima', color: 'bg-severity-critical-bg text-severity-critical border-severity-critical' },
-};
+import {
+  getSeverityColor,
+  getSeverityLabel
+} from '@/lib/incidentUtils';
 
 export const ReviewStep = ({ formData }: ReviewStepProps) => {
   const { classes } = useClasses();
@@ -83,8 +81,8 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
             <CardTitle className="text-base flex items-center justify-between">
               <span>Episódios Selecionados</span>
               {formData.calculatedSeverity && (
-                <Badge className={severityConfig[formData.calculatedSeverity].color}>
-                  {severityConfig[formData.calculatedSeverity].label}
+                <Badge className={getSeverityColor(formData.calculatedSeverity)}>
+                  {getSeverityLabel(formData.calculatedSeverity)}
                 </Badge>
               )}
             </CardTitle>
@@ -113,14 +111,14 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
                 <span className="text-muted-foreground">Calculado:</span>
                 <span className="font-medium">
                   {formData.calculatedSeverity
-                    ? severityConfig[formData.calculatedSeverity].label
+                    ? getSeverityLabel(formData.calculatedSeverity)
                     : '-'}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Final:</span>
                 <span className="font-medium">
-                  {severityConfig[formData.finalSeverity].label}
+                  {getSeverityLabel(formData.finalSeverity || '')}
                 </span>
               </div>
               {formData.severityOverrideReason && (

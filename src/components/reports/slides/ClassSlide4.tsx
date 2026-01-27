@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, BookOpen } from 'lucide-react';
 import { Class, Student, Incident, Grade } from '@/types';
 import { SUBJECT_AREAS } from '@/lib/subjects';
+import { getUrgencyDot, getSeverityLabel } from '@/lib/incidentUtils';
 
 interface ClassSlide4Props {
   classData: Class;
@@ -28,7 +29,7 @@ export const ClassSlide4 = ({ classData, students, incidents, grades }: ClassSli
         ? studentGrades.reduce((sum, g) => sum + g.grade, 0) / studentGrades.length
         : 0;
       const hasIncidents = incidents.some(i => i.studentIds.includes(student.id));
-      
+
       return studentAvg < 6 && hasIncidents;
     }).length;
 
@@ -39,28 +40,14 @@ export const ClassSlide4 = ({ classData, students, incidents, grades }: ClassSli
     };
   });
 
-  const incidentsBySeverity = [
-    { 
-      severity: 'Leve', 
-      count: incidents.filter(i => i.finalSeverity === 'leve').length,
-      color: 'bg-severity-light'
-    },
-    { 
-      severity: 'Intermediária', 
-      count: incidents.filter(i => i.finalSeverity === 'intermediaria').length,
-      color: 'bg-severity-intermediate'
-    },
-    { 
-      severity: 'Grave', 
-      count: incidents.filter(i => i.finalSeverity === 'grave').length,
-      color: 'bg-severity-serious'
-    },
-    { 
-      severity: 'Gravíssima', 
-      count: incidents.filter(i => i.finalSeverity === 'gravissima').length,
-      color: 'bg-severity-critical'
-    },
-  ];
+  // Helper for consistent order
+  const severityOrder = ['leve', 'intermediaria', 'grave', 'gravissima'] as const;
+
+  const incidentsBySeverity = severityOrder.map(severity => ({
+    severity: getSeverityLabel(severity),
+    count: incidents.filter(i => i.finalSeverity === severity).length,
+    color: getUrgencyDot(severity)
+  }));
 
   return (
     <div className="h-full p-8 bg-gradient-to-br from-primary/5 to-background flex flex-col">
@@ -80,7 +67,7 @@ export const ClassSlide4 = ({ classData, students, incidents, grades }: ClassSli
                 <BookOpen className="h-5 w-5 text-primary" />
                 <h3 className="font-semibold">Desempenho por Área de Conhecimento</h3>
               </div>
-              
+
               <div className="space-y-4">
                 {areaAnalysis.map((area, index) => (
                   <div key={index} className="space-y-2">
@@ -98,12 +85,11 @@ export const ClassSlide4 = ({ classData, students, incidents, grades }: ClassSli
                       </div>
                     </div>
                     <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full rounded-full ${
-                          area.average >= 7 ? 'bg-green-500' :
-                          area.average >= 6 ? 'bg-yellow-500' :
-                          'bg-red-500'
-                        }`}
+                      <div
+                        className={`h-full rounded-full ${area.average >= 7 ? 'bg-green-500' :
+                            area.average >= 6 ? 'bg-yellow-500' :
+                              'bg-red-500'
+                          }`}
                         style={{ width: `${(area.average / 10) * 100}%` }}
                       />
                     </div>
@@ -147,18 +133,18 @@ export const ClassSlide4 = ({ classData, students, incidents, grades }: ClassSli
           <Card className="bg-card/50 backdrop-blur">
             <CardContent className="pt-6">
               <h3 className="font-semibold mb-4">Principais Conclusões</h3>
-              
+
               <div className="space-y-4 text-sm">
                 <div className="p-3 bg-primary/5 rounded">
                   <p className="font-medium mb-2">📊 Padrão Identificado:</p>
                   <p className="text-muted-foreground">
                     Alunos com 3+ ocorrências apresentam média {
-                      classGrades.length > 0 ? 
-                      ((classGrades.filter(g => {
-                        const studentIncidents = incidents.filter(i => i.studentIds.includes(g.studentId));
-                        return studentIncidents.length >= 3 && g.grade < 6;
-                      }).length / classGrades.length) * 100).toFixed(0)
-                      : 0
+                      classGrades.length > 0 ?
+                        ((classGrades.filter(g => {
+                          const studentIncidents = incidents.filter(i => i.studentIds.includes(g.studentId));
+                          return studentIncidents.length >= 3 && g.grade < 6;
+                        }).length / classGrades.length) * 100).toFixed(0)
+                        : 0
                     }% menor que a média da turma.
                   </p>
                 </div>
@@ -166,7 +152,7 @@ export const ClassSlide4 = ({ classData, students, incidents, grades }: ClassSli
                 <div className="p-3 bg-primary/5 rounded">
                   <p className="font-medium mb-2">🎯 Área Crítica:</p>
                   <p className="text-muted-foreground">
-                    {areaAnalysis.reduce((prev, current) => 
+                    {areaAnalysis.reduce((prev, current) =>
                       current.studentsAtRisk > prev.studentsAtRisk ? current : prev
                     ).area} apresenta maior correlação entre ocorrências e baixo desempenho.
                   </p>
@@ -186,7 +172,7 @@ export const ClassSlide4 = ({ classData, students, incidents, grades }: ClassSli
           <Card className="bg-card/50 backdrop-blur">
             <CardContent className="pt-6">
               <h3 className="font-semibold mb-4">Próximos Passos</h3>
-              
+
               <div className="space-y-3 text-sm">
                 <div className="flex items-start gap-3">
                   <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">

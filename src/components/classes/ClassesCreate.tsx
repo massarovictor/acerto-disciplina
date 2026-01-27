@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { useClasses, useProfessionalSubjects, useProfessionalSubjectTemplates, useAuthorizedEmails } from '@/hooks/useData';
+import { calculateCurrentYearFromCalendar } from "@/lib/classYearCalculator";
 import { useToast } from '@/hooks/use-toast';
 import { AlertCircle, Info, Calendar } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -67,8 +68,7 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
         setFormData({ currentSeries: 3 });
       } else {
         // Turma em andamento - calcular série atual
-        const yearsElapsed = currentYear - formData.startCalendarYear + 1;
-        const series = Math.min(yearsElapsed, 3) as 1 | 2 | 3;
+        const series = calculateCurrentYearFromCalendar(formData.startCalendarYear);
         setFormData({ currentSeries: series });
       }
     }
