@@ -132,6 +132,19 @@ export const PDF_STYLES: StyleDictionary = {
     color: PDF_COLORS.primary,
     alignment: 'left' as const,
   },
+  // V7: High Density Styles
+  tableCompact: {
+    fontSize: 8,
+    color: PDF_COLORS.primary,
+    margin: [0, 2, 0, 2],
+  },
+  headerGroup: {
+    fontSize: 8,
+    bold: true,
+    color: '#FFFFFF',
+    fillColor: PDF_COLORS.secondary,
+    alignment: 'center' as const,
+  },
 
   // Cards e Boxes
   cardTitle: {
@@ -143,6 +156,17 @@ export const PDF_STYLES: StyleDictionary = {
     fontSize: 16,
     bold: true,
     color: PDF_COLORS.primary,
+  },
+  kpiValue: {
+    fontSize: 24,
+    bold: true,
+    color: PDF_COLORS.primary,
+  },
+  kpiLabel: {
+    fontSize: 8,
+    bold: true,
+    color: PDF_COLORS.secondary,
+    characterSpacing: 0.5,
   },
 
   // Status
@@ -331,7 +355,7 @@ export class PDFGenerator {
           : { text: String(cell), style: cellStyle };
 
         if (zebra && rowIndex % 2 === 0 && !isContent) {
-          return { ...baseCell, fillColor: PDF_COLORS.background.light };
+          return { ...(baseCell as any), fillColor: PDF_COLORS.background.light };
         }
         return baseCell;
       })
@@ -453,6 +477,107 @@ export class PDFGenerator {
   }
 
   /**
+   * Cria um KPI Box estilo Dashboard (Slide)
+   */
+  createKPIBox(label: string, value: string | number, color: string, subtext?: string): Content {
+    return {
+      stack: [
+        {
+          table: {
+            widths: ['*'],
+            body: [[
+              {
+                stack: [
+                  { text: label.toUpperCase(), style: 'kpiLabel', color: PDF_COLORS.secondary, margin: [0, 0, 0, 2] },
+                  { text: String(value), style: 'kpiValue', color: color },
+                  subtext ? { text: subtext, fontSize: 7, color: PDF_COLORS.tertiary, margin: [0, 2, 0, 0] } : '',
+                ],
+                fillColor: '#F8FAFC',
+                margin: [10, 8, 10, 8],
+              }
+            ]]
+          },
+          layout: {
+            hLineWidth: (i: number) => i === 0 || i === 1 ? 1 : 0,
+            vLineWidth: (i: number) => i === 0 || i === 1 ? 1 : 0,
+            hLineColor: () => '#E2E8F0',
+            vLineColor: () => '#E2E8F0',
+          }
+        }
+      ],
+      margin: [0, 0, 0, 0]
+    };
+  }
+
+  /**
+   * Cria uma pílula de status horizontal
+   */
+  /**
+   * Cria uma pílula de status horizontal
+   */
+  createStatusPill(text: string, color: string): Content {
+    return {
+      table: {
+        body: [[
+          {
+            text: text.toUpperCase(),
+            fontSize: 7,
+            bold: true,
+            color: '#FFFFFF',
+            fillColor: color,
+            margin: [6, 2, 6, 2],
+          }
+        ]]
+      },
+      layout: 'noBorders' as any,
+      width: 'auto' as any,
+    } as Content;
+  }
+
+  /**
+   * Cria uma barra de progresso visual (V7)
+   */
+  createProgressBar(value: number, max: number = 10, color: string = PDF_COLORS.info): Content {
+    const percentage = Math.min(Math.max(value / max, 0), 1) * 100;
+    return {
+      canvas: [
+        {
+          type: 'rect',
+          x: 0,
+          y: 4,
+          w: 50, // Largura total fixa
+          h: 6,
+          r: 2,
+          color: '#E2E8F0', // Fundo
+        },
+        {
+          type: 'rect',
+          x: 0,
+          y: 4,
+          w: (percentage / 100) * 50, // Largura proporcional
+          h: 6,
+          r: 2,
+          color: color,
+        }
+      ]
+    };
+  }
+
+  /**
+   * Cria uma linha de Dashboard com múltiplas colunas
+   */
+  createDashboardRow(items: Content[]): Content {
+    return {
+      columns: items.map(item => ({
+        ...(item as any),
+        width: '*'
+      })),
+      columnGap: 10,
+      margin: [0, 0, 0, 15]
+    } as Content;
+  }
+
+  /**
    * Cria lista com bullets
    */
   createBulletList(items: string[], style: string = 'body'): Content {
@@ -460,6 +585,24 @@ export class PDFGenerator {
       ul: items,
       style,
       margin: [0, 4, 0, 4],
+    };
+  }
+
+  /**
+   * Cria uma linha pontilhada visual
+   */
+  createDottedLine(width: number = 100): Content {
+    return {
+      canvas: [{
+        type: 'line',
+        x1: 0, y1: 5,
+        x2: width, y2: 5,
+        lineWidth: 1,
+        dash: { length: 1, space: 2 },
+        lineColor: '#CBD5E1'
+      }],
+      width: width,
+      margin: [0, 0, 0, 0]
     };
   }
 

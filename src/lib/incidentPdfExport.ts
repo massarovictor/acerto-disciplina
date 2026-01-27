@@ -97,6 +97,7 @@ class IncidentPDF extends BasePDFGenerator {
 
       // Descrição
       if (incident.description) {
+        this.checkPageBreak(35); // Orphan control: Garante título + ~3-4 linhas
         this.renderSectionTitle('Descrição dos Fatos');
         this.setFont('xs', 'normal', '#000000');
         const lines = this.pdf.splitTextToSize(incident.description, this.contentWidth);
@@ -110,6 +111,7 @@ class IncidentPDF extends BasePDFGenerator {
 
       // Providências
       if (incident.actions) {
+        this.checkPageBreak(35); // Orphan control
         this.renderSectionTitle('Providências Tomadas / Combinados');
         this.setFont('xs', 'normal', '#000000');
         const lines = this.pdf.splitTextToSize(incident.actions, this.contentWidth);
@@ -203,6 +205,7 @@ class IncidentPDF extends BasePDFGenerator {
   }
 
   private renderFollowUps(followUps: FollowUpRecord[]) {
+    this.checkPageBreak(35);
     this.renderSectionTitle('Histórico de Acompanhamento');
 
     const sorted = [...followUps].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -242,6 +245,7 @@ class IncidentPDF extends BasePDFGenerator {
   }
 
   private renderComments(comments: Comment[]) {
+    this.checkPageBreak(35);
     this.renderSectionTitle('Observações Adicionais');
     comments.forEach(c => {
       this.checkPageBreak(15);
@@ -257,7 +261,7 @@ class IncidentPDF extends BasePDFGenerator {
   }
 
   private renderSignatures(student?: Student, legalGuardianName?: string) {
-    this.checkPageBreak(50);
+    this.checkPageBreak(60); // Aumentado para garantir bloco completo
     this.y += 15;
 
     const sigY = this.y + 15;

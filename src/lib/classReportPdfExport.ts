@@ -11,7 +11,7 @@ import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interface
 
 import { Class, Student, Grade, Incident, AttendanceRecord } from '@/types';
 import { getSchoolConfig, getDefaultConfig, SchoolConfig } from './schoolConfig';
-import { PDF_COLORS, PDF_STYLES, getPdfMake } from './pdfGenerator';
+import { PDF_COLORS, PDF_STYLES, getPdfMake, getPDFGenerator } from './pdfGenerator';
 import {
   generateAdvancedAnalytics,
   AdvancedAnalyticsResult,
@@ -36,10 +36,9 @@ interface AreaAnalysis {
   studentsEvaluated: number;
   studentsBelow6: number;
   studentsAbove8: number;
-  criticalSubjects: { subject: string; average: number; belowCount: number }[];
-  highlights: { studentName: string; average: number }[];
-  falhas: string[];
-  potencialidades: string[];
+  criticalDetails: { studentName: string; subject: string; average: number }[];
+  highlightDetails: { studentName: string; subject: string; average: number }[];
+  subjects: string[]; // V7 Requirement
 }
 
 // ============================================
@@ -153,7 +152,7 @@ class ClassReportPDFGenerator {
 
     // Determinar se é ensino fundamental com base na série
     const series = this.currentClass?.series;
-    const isFundamental = series ? ['6º', '7º', '8º', '9º'].some(s => series.includes(s)) : false;
+    const isFundamental = series ? (['6º', '7º', '8º', '9º'].some(s => series.includes(s)) || series.toLowerCase().includes('fundamental')) : false;
 
     // Incluir áreas padrão (Médio ou Fundamental) + profissional se houver
     const baseAreas = isFundamental ? FUNDAMENTAL_SUBJECT_AREAS : SUBJECT_AREAS;
@@ -185,65 +184,31 @@ class ClassReportPDFGenerator {
 
       const studentsBelow6 = studentAverages.filter(s => s.avg < 6).length;
       const studentsAbove8 = studentAverages.filter(s => s.avg >= 8).length;
-      const areaAverage = areaGrades.reduce((s, g) => s + g.grade, 0) / areaGrades.length;
+      const areaAverage = areaGrades.length > 0
+        ? areaGrades.reduce((s, g) => s + g.grade, 0) / areaGrades.length
+        : 0;
 
-      // Disciplinas críticas (média < 6)
-      const subjectStats: Record<string, { grades: number[]; students: Set<string> }> = {};
-      areaGrades.forEach(g => {
-        if (!subjectStats[g.subject]) {
-          subjectStats[g.subject] = { grades: [], students: new Set() };
-        }
-        subjectStats[g.subject].grades.push(g.grade);
-        subjectStats[g.subject].students.add(g.studentId);
+      // Detalhamento Nominal de Atenção (Notas < 6,0)
+      const criticalDetails: { studentName: string; subject: string; average: number }[] = [];
+      areaGrades.filter(g => g.grade < 6).forEach(g => {
+        const student = this.students.find(s => s.id === g.studentId);
+        criticalDetails.push({
+          studentName: student?.name || 'Estudante não identificado',
+          subject: g.subject,
+          average: g.grade
+        });
       });
 
-      const criticalSubjects = Object.entries(subjectStats)
-        .map(([subject, data]) => ({
-          subject,
-          average: data.grades.reduce((a, b) => a + b, 0) / data.grades.length,
-          belowCount: data.grades.filter(g => g < 6).length,
-        }))
-        .filter(s => s.average < 6 || s.belowCount >= Math.ceil(studentsInArea.length * 0.3))
-        .sort((a, b) => a.average - b.average);
-
-      // Destaques (alunos com média >= 8)
-      const highlights = studentAverages
-        .filter(s => s.avg >= 8)
-        .sort((a, b) => b.avg - a.avg)
-        .slice(0, 5)
-        .map(s => ({ studentName: s.name, average: s.avg }));
-
-      // Construir falhas e potencialidades
-      const falhas: string[] = [];
-      const potencialidades: string[] = [];
-
-      if (areaAverage < 6) {
-        falhas.push(`Média da área (${areaAverage.toFixed(1)}) está abaixo do esperado.`);
-      }
-
-      if (studentsBelow6 > 0) {
-        const percent = ((studentsBelow6 / studentsInArea.length) * 100).toFixed(0);
-        falhas.push(`${studentsBelow6} aluno(s) (${percent}%) com média abaixo de 6,0 na área.`);
-      }
-
-      if (criticalSubjects.length > 0) {
-        const subjects = criticalSubjects.slice(0, 3).map(s => s.subject).join(', ');
-        falhas.push(`Disciplinas críticas: ${subjects}.`);
-      }
-
-      if (areaAverage >= 7) {
-        potencialidades.push(`Bom desempenho coletivo com média ${areaAverage.toFixed(1)}.`);
-      }
-
-      if (studentsAbove8 > 0) {
-        const percent = ((studentsAbove8 / studentsInArea.length) * 100).toFixed(0);
-        potencialidades.push(`${studentsAbove8} aluno(s) (${percent}%) com excelência (média ≥ 8,0).`);
-      }
-
-      if (highlights.length > 0) {
-        const names = highlights.slice(0, 3).map(h => h.studentName).join(', ');
-        potencialidades.push(`Destaques: ${names}.`);
-      }
+      // Detalhamento Nominal de Destaque (Notas >= 8,0)
+      const highlightDetails: { studentName: string; subject: string; average: number }[] = [];
+      areaGrades.filter(g => g.grade >= 8).forEach(g => {
+        const student = this.students.find(s => s.id === g.studentId);
+        highlightDetails.push({
+          studentName: student?.name || 'Estudante não identificado',
+          subject: g.subject,
+          average: g.grade
+        });
+      });
 
       areas.push({
         areaName: area.name,
@@ -251,14 +216,47 @@ class ClassReportPDFGenerator {
         studentsEvaluated: studentsInArea.length,
         studentsBelow6,
         studentsAbove8,
-        criticalSubjects,
-        highlights,
-        falhas,
-        potencialidades,
+        criticalDetails: criticalDetails.sort((a, b) => a.average - b.average),
+        highlightDetails: highlightDetails.sort((a, b) => b.average - a.average),
+        subjects: area.subjects // V7 Requirement
       });
     });
 
     return areas;
+  }
+
+  private generateAreaNarrative(area: AreaAnalysis): Content[] {
+    const contents: Content[] = [];
+
+    // 1. Visão Geral da Área - Factual
+    const statusLabel = area.average >= 7 ? 'DESTAQUE' : area.average >= 6 ? 'ESTÁVEL' : 'CRÍTICO';
+    contents.push({ text: `Status: ${statusLabel} (Média ${area.average.toFixed(1)})`, bold: true, margin: [0, 0, 0, 8] });
+
+    // 2. Registros de Atenção (Tópicos Nominais)
+    if (area.criticalDetails.length > 0) {
+      contents.push({ text: 'ATENÇÃO PEDAGÓGICA:', fontSize: 8, bold: true, color: PDF_COLORS.status.critico, margin: [0, 4, 0, 4] });
+      const listagem = area.criticalDetails.map(d => `• ${d.studentName} (${d.subject}: ${d.average.toFixed(1)})`);
+      contents.push({
+        ul: listagem,
+        fontSize: 9,
+        margin: [0, 0, 0, 8]
+      });
+    }
+
+    // 3. Consolidação de Rendimento (Tópicos Nominais)
+    if (area.highlightDetails.length > 0) {
+      contents.push({ text: 'INDICADORES DE CONSOLIDAÇÃO:', fontSize: 8, bold: true, color: PDF_COLORS.status.aprovado, margin: [0, 4, 0, 4] });
+      const listagem = area.highlightDetails.map(d => `• ${d.studentName} (${d.subject}: ${d.average.toFixed(1)})`);
+      contents.push({
+        ul: listagem,
+        fontSize: 9,
+        margin: [0, 0, 0, 8]
+      });
+    } else if (area.average >= 6.5) {
+      contents.push({ text: 'OBSERVAÇÃO: Desempenho linear em conformidade com os índices regulamentares.', italics: true, fontSize: 9, margin: [0, 4, 0, 0] });
+    }
+
+    return contents;
   }
 
   // ============================================
@@ -282,69 +280,54 @@ class ClassReportPDFGenerator {
     }).join(', ');
   }
 
-  private generateStudentNarrative(profile: StudentProfile): string {
-    const parts: string[] = [];
-    const hasGrades = Object.keys(profile.subjectAverages).length > 0;
+  private generateStudentNarrative(profile: StudentProfile): Content[] {
+    const contents: Content[] = [];
 
-    if (!hasGrades) {
-      return 'Sem dados suficientes para análise acadêmica neste período. Aguardar lançamento de notas para avaliações mais precisas.';
-    }
+    // 1. STATUS GERAL
+    const label = CLASSIFICATION_LABELS[profile.classification].toUpperCase();
+    contents.push({ text: `STATUS GERAL: ${label}`, bold: true, margin: [0, 0, 0, 8] });
 
-    // 1. SITUAÇÃO ATUAL - Claro e direto
-    if (profile.classification === 'critico') {
-      parts.push(`Situação crítica: ${profile.subjectsBelow6.length} disciplina(s) abaixo da média mínima.`);
-    } else if (profile.classification === 'atencao') {
-      parts.push(`Situação de atenção: ${profile.subjectsBelow6.length} disciplina(s) em recuperação.`);
-    } else if (profile.classification === 'excelencia') {
-      parts.push(`Situação de excelência: aprovado em todas as disciplinas com média geral superior a 8,0.`);
-    } else {
-      parts.push(`Situação regular: aprovado em todas as disciplinas.`);
-    }
-
-    // 2. DISCIPLINAS EM DIFICULDADE (com notas específicas)
+    // 2. RENDIMENTO (Tópicos)
     if (profile.subjectsBelow6.length > 0) {
-      const disciplinasFormatadas = this.formatSubjectsWithGrades(profile.subjectsBelow6);
-      parts.push(`Disciplinas abaixo de 6,0: ${disciplinasFormatadas}.`);
+      contents.push({ text: 'VULNERABILIDADES (Abaixo de 6,0):', fontSize: 8, bold: true, color: PDF_COLORS.status.critico, margin: [0, 4, 0, 2] });
+      const listagem = profile.subjectsBelow6.map(s => `• ${s.subject} (${s.average.toFixed(1)})`);
+      contents.push({ ul: listagem, fontSize: 9, margin: [0, 0, 0, 8] });
     }
 
-    // 3. PONTOS FORTES (com notas)
-    if (profile.strengths.length > 0) {
-      const fortesFormatados = this.formatStrengthsWithGrades(profile.strengths, profile.subjectAverages);
-      parts.push(`Pontos fortes: ${fortesFormatados}.`);
+    // 3. CONSOLIDAÇÕES (Tópicos)
+    const strengths = profile.strengths || [];
+    if (strengths.length > 0) {
+      contents.push({ text: 'INDICADORES DE CONSOLIDAÇÃO:', fontSize: 8, bold: true, color: PDF_COLORS.status.aprovado, margin: [0, 4, 0, 2] });
+      const listagem = strengths.map(s => {
+        const avg = profile.subjectAverages[s];
+        return avg ? `• ${s} (${avg.toFixed(1)})` : `• ${s}`;
+      });
+      contents.push({ ul: listagem, fontSize: 9, margin: [0, 0, 0, 8] });
     }
 
-    // 4. TENDÊNCIA - Análise temporal cumulativa
-    if (profile.trend.direction === 'crescente' && profile.trend.confidence > 30) {
-      parts.push(`Tendência: melhora progressiva ao longo dos bimestres (confiança ${profile.trend.confidence.toFixed(0)}%).`);
-    } else if (profile.trend.direction === 'decrescente' && profile.trend.confidence > 30) {
-      parts.push(`Tendência: queda de desempenho ao longo dos bimestres (confiança ${profile.trend.confidence.toFixed(0)}%).`);
-    } else if (profile.trend.direction === 'estavel') {
-      parts.push(`Tendência: desempenho estável ao longo dos bimestres.`);
+    // 4. CAMPO DISCIPLINAR
+    const studentIncidents = this.incidents.filter(i => i.studentIds.includes(profile.studentId));
+    if (studentIncidents.length > 0) {
+      const graveCount = studentIncidents.filter(i => i.finalSeverity === 'grave' || i.finalSeverity === 'gravissima').length;
+      const desc = graveCount > 0
+        ? `Constam ${studentIncidents.length} registros, sendo ${graveCount} de maior complexidade, requerendo alinhamento regimental.`
+        : `Registram-se ${studentIncidents.length} intercorrências pontuais sob monitoramento para assegurar a conformidade.`;
+      contents.push({ text: 'CAMPO DISCIPLINAR:', fontSize: 8, bold: true, margin: [0, 4, 0, 2] });
+      contents.push({ text: desc, fontSize: 9, margin: [0, 0, 0, 8] });
+    } else {
+      contents.push({ text: 'CAMPO DISCIPLINAR: Ausência de intercorrências registradas.', fontSize: 8, bold: true, margin: [0, 4, 0, 8] });
     }
 
-    // 5. CORRELAÇÕES ENTRE DISCIPLINAS
-    if (this.analytics && profile.subjectsBelow6.length > 0) {
-      const gateways = this.analytics.gatewaySubjects;
-      const disciplinasAfetadas = profile.subjectsBelow6.map(s => s.subject);
-      const affectedByGateway = gateways.find(g => disciplinasAfetadas.includes(g.subject));
+    // 5. ENCAMINHAMENTO
+    const acao = profile.classification === 'critico' ?
+      'Intervenção imediata e plano de recuperação individualizado.' :
+      profile.classification === 'atencao' ?
+        'Intensificação do suporte pedagógico nos componentes sinalizados.' :
+        'Manutenção do acompanhamento regular.';
 
-      if (affectedByGateway) {
-        parts.push(`Correlação identificada: a dificuldade em ${affectedByGateway.subject} pode estar ` +
-          `impactando ${affectedByGateway.dependentSubjects.slice(0, 2).join(' e ')}.`);
-      }
-    }
+    contents.push({ text: `ENCAMINHAMENTO: ${acao}`, fontSize: 9, bold: true, margin: [0, 4, 0, 0] });
 
-    // 6. PREDIÇÃO - Projeção baseada em dados acumulados
-    if (profile.trend.prediction > 0 && profile.trend.confidence > 20) {
-      const prediction = Math.max(0, Math.min(10, profile.trend.prediction));
-      parts.push(`Projeção: média final estimada de ${prediction.toFixed(1)} ` +
-        `com base nos dados acumulados dos bimestres anteriores.`);
-    }
-
-    // 7. RECOMENDAÇÃO - Ação clara e objetiva
-    parts.push(`Ação: ${profile.recommendation}`);
-
-    return parts.join(' ');
+    return contents;
   }
 
   // ============================================
@@ -377,7 +360,7 @@ class ClassReportPDFGenerator {
       margin: [40, 20, 40, 10],
       columns: [
         { text: this.config.schoolName, style: 'bodySmall', width: '*' },
-        { text: `Turma: ${cls.name}`, style: 'bodySmall', alignment: 'right', width: 'auto' },
+        { text: `Turma: ${cls.name} `, style: 'bodySmall', alignment: 'right', width: 'auto' },
       ],
     };
   }
@@ -387,12 +370,12 @@ class ClassReportPDFGenerator {
       margin: [40, 0, 40, 20],
       columns: [
         {
-          text: `Gerado por MAVIC - Sistema de Acompanhamento Escolar em ${new Date().toLocaleDateString('pt-BR')}`,
+          text: `Gerado por MAVIC - Sistema de Acompanhamento Escolar em ${new Date().toLocaleDateString('pt-BR')} `,
           style: 'caption',
           alignment: 'left',
         },
         {
-          text: `Página ${currentPage} de ${pageCount}`,
+          text: `Página ${currentPage} de ${pageCount} `,
           style: 'caption',
           alignment: 'right',
         },
@@ -434,7 +417,7 @@ class ClassReportPDFGenerator {
           margin: [0, 10, 0, 5],
         },
         {
-          text: `${cls.name} | Período: ${this.period}`,
+          text: `${cls.name} | Período: ${this.period} `,
           fontSize: 12,
           alignment: 'center',
           color: PDF_COLORS.secondary,
@@ -449,85 +432,52 @@ class ClassReportPDFGenerator {
 
     const summary = this.insights.executiveSummary;
     const counts = summary.classificationCounts;
+    const gen = getPDFGenerator();
 
     return {
       stack: [
         { text: 'SUMÁRIO EXECUTIVO', style: 'h2', margin: [0, 0, 0, 10] },
 
-        // Linha 1: Métricas gerais (Frequência removida)
-        {
-          table: {
-            widths: ['*', '*'],
-            body: [[
-              {
-                stack: [
-                  { text: 'Total de Alunos', fontSize: 9, color: PDF_COLORS.secondary, alignment: 'center' },
-                  { text: summary.totalStudents.toString(), fontSize: 20, bold: true, alignment: 'center' },
-                ],
-                fillColor: '#F8FAFC',
-                margin: [10, 8, 10, 8],
-              },
-              {
-                stack: [
-                  { text: 'Média Geral', fontSize: 9, color: PDF_COLORS.secondary, alignment: 'center' },
-                  { text: summary.classAverage.toFixed(1), fontSize: 20, bold: true, alignment: 'center' },
-                ],
-                fillColor: '#F8FAFC',
-                margin: [10, 8, 10, 8],
-              },
-              // DISABLED: Frequência Média removida temporariamente
-              // {
-              //   stack: [
-              //     { text: 'Frequência Média', fontSize: 9, color: PDF_COLORS.secondary, alignment: 'center' },
-              //     { text: `${summary.classFrequency.toFixed(0)}%`, fontSize: 20, bold: true, alignment: 'center' },
-              //   ],
-              //   fillColor: '#F8FAFC',
-              //   margin: [10, 8, 10, 8],
-              // },
-            ]],
-          },
-          layout: {
-            hLineWidth: () => 1,
-            vLineWidth: () => 1,
-            hLineColor: () => PDF_COLORS.border,
-            vLineColor: () => PDF_COLORS.border,
-          },
-          margin: [0, 0, 0, 10],
-        },
+        // Linha 1: KPIs Principais
+        gen.createDashboardRow([
+          gen.createKPIBox('Total de Alunos', summary.totalStudents, PDF_COLORS.primary, 'Matriculados'),
+          gen.createKPIBox('Média Geral', summary.classAverage.toFixed(1), summary.classAverage >= 6 ? PDF_COLORS.status.aprovado : PDF_COLORS.status.critico, 'Média Global'),
+          gen.createKPIBox('Taxa de Aprovação', summary.approvalRate.toFixed(1) + '%', summary.approvalRate >= 70 ? PDF_COLORS.status.aprovado : PDF_COLORS.status.atencao, 'Aprovados + Exc.')
+        ]),
 
-        // Linha 2: Classificações
+        // Linha 2: Distribuição Acadêmica (Dashboard Style)
         {
           table: {
             widths: ['*', '*', '*', '*'],
             body: [[
               {
                 stack: [
-                  { text: 'Crítico', fontSize: 9, color: '#FFFFFF', alignment: 'center' },
-                  { text: counts.critico.toString(), fontSize: 16, bold: true, color: '#FFFFFF', alignment: 'center' },
+                  { text: 'CRÍTICO', style: 'kpiLabel', color: '#FFFFFF', alignment: 'center' },
+                  { text: counts.critico.toString(), fontSize: 18, bold: true, color: '#FFFFFF', alignment: 'center' },
                 ],
                 fillColor: CLASSIFICATION_COLORS.critico,
                 margin: [8, 6, 8, 6],
               },
               {
                 stack: [
-                  { text: 'Atenção', fontSize: 9, color: '#000000', alignment: 'center' },
-                  { text: counts.atencao.toString(), fontSize: 16, bold: true, color: '#000000', alignment: 'center' },
+                  { text: 'ATENÇÃO', style: 'kpiLabel', color: '#000000', alignment: 'center' },
+                  { text: counts.atencao.toString(), fontSize: 18, bold: true, color: '#000000', alignment: 'center' },
                 ],
                 fillColor: CLASSIFICATION_COLORS.atencao,
                 margin: [8, 6, 8, 6],
               },
               {
                 stack: [
-                  { text: 'Aprovado', fontSize: 9, color: '#FFFFFF', alignment: 'center' },
-                  { text: counts.aprovado.toString(), fontSize: 16, bold: true, color: '#FFFFFF', alignment: 'center' },
+                  { text: 'APROVADO', style: 'kpiLabel', color: '#FFFFFF', alignment: 'center' },
+                  { text: counts.aprovado.toString(), fontSize: 18, bold: true, color: '#FFFFFF', alignment: 'center' },
                 ],
                 fillColor: CLASSIFICATION_COLORS.aprovado,
                 margin: [8, 6, 8, 6],
               },
               {
                 stack: [
-                  { text: 'Excelência', fontSize: 9, color: '#FFFFFF', alignment: 'center' },
-                  { text: counts.excelencia.toString(), fontSize: 16, bold: true, color: '#FFFFFF', alignment: 'center' },
+                  { text: 'EXCELÊNCIA', style: 'kpiLabel', color: '#FFFFFF', alignment: 'center' },
+                  { text: counts.excelencia.toString(), fontSize: 18, bold: true, color: '#FFFFFF', alignment: 'center' },
                 ],
                 fillColor: CLASSIFICATION_COLORS.excelencia,
                 margin: [8, 6, 8, 6],
@@ -538,28 +488,19 @@ class ClassReportPDFGenerator {
           margin: [0, 0, 0, 15],
         },
 
-        // Legenda das classificações
+        // Legenda e Contexto (Minimalist Box)
         {
-          table: {
-            widths: ['*'],
-            body: [[{
-              stack: [
-                { text: 'Critérios de Classificação:', fontSize: 9, bold: true, margin: [0, 0, 0, 4] },
-                { text: '• Crítico: 3 ou mais disciplinas com nota < 6,0', fontSize: 8, color: PDF_COLORS.secondary },
-                { text: '• Atenção: 1 ou 2 disciplinas com nota < 6,0', fontSize: 8, color: PDF_COLORS.secondary },
-                { text: '• Aprovado: Todas disciplinas ≥ 6,0, média geral < 8,0', fontSize: 8, color: PDF_COLORS.secondary },
-                { text: '• Excelência: Todas disciplinas ≥ 6,0 e média geral ≥ 8,0', fontSize: 8, color: PDF_COLORS.secondary },
-              ],
-              fillColor: '#F8FAFC',
-              margin: [10, 8, 10, 8],
-            }]],
-          },
-          layout: {
-            hLineWidth: () => 1,
-            vLineWidth: () => 1,
-            hLineColor: () => PDF_COLORS.border,
-            vLineColor: () => PDF_COLORS.border,
-          },
+          stack: [
+            { text: 'DIRETRIZES TÉCNICAS MAVIC', fontSize: 8, bold: true, color: PDF_COLORS.secondary, margin: [0, 0, 0, 4] },
+            {
+              text: 'O nível CRÍTICO sinaliza vulnerabilidade em 3+ componentes; ATENÇÃO indica necessidade de suporte em 1-2 componentes; APROVADO reflete o cumprimento das metas; e EXCELÊNCIA destaca domínio pleno (Média > 8.0).',
+              fontSize: 7,
+              color: PDF_COLORS.tertiary,
+              alignment: 'justify',
+              lineHeight: 1.2
+            },
+          ],
+          margin: [2, 0, 0, 0],
         },
       ],
     };
@@ -578,20 +519,33 @@ class ClassReportPDFGenerator {
     }
 
     // Adicionar espaçamento entre áreas (2 quebras de linha)
+    // V7.3: Grouping 'Humanas', 'Natureza', 'Matemática'
+    const groupedAreas = ['Ciências Humanas e suas Tecnologias', 'Ciências da Natureza e suas Tecnologias', 'Matemática e suas Tecnologias'];
+
     const areaContents: Content[] = [];
     areas.forEach((area, index) => {
+      const isGrouped = groupedAreas.includes(area.areaName);
+      const prevIsGrouped = index > 0 && groupedAreas.includes(areas[index - 1].areaName);
+
       if (index > 0) {
-        // Duas quebras de linha antes de cada área (exceto a primeira)
-        areaContents.push({ text: '', margin: [0, 0, 0, 0] });
-        areaContents.push({ text: '', margin: [0, 0, 0, 0] });
+        if (isGrouped && prevIsGrouped) {
+          // Minimal spacing for grouped areas
+          areaContents.push({ text: '', margin: [0, 5, 0, 0] });
+        } else {
+          // Standard spacing
+          areaContents.push({ text: '', margin: [0, 0, 0, 0] });
+          areaContents.push({ text: '', margin: [0, 0, 0, 0] });
+        }
       }
-      areaContents.push(this.buildAreaCard(area));
+
+      // Pass 'isCompact' flag for these areas
+      areaContents.push(this.buildAreaCard(area, isGrouped));
     });
 
     return {
       stack: [
-        { text: '', margin: [0, 0, 0, 0] }, // Primeira quebra de linha
-        { text: '', margin: [0, 0, 0, 0] }, // Segunda quebra de linha
+        { text: '', margin: [0, 0, 0, 0] },
+        { text: '', margin: [0, 0, 0, 0] },
         { text: 'AVALIAÇÃO POR ÁREA DO CONHECIMENTO', style: 'h2', margin: [0, 0, 0, 10] },
         {
           text: 'Análise detalhada das falhas e potencialidades identificadas em cada área.',
@@ -603,67 +557,183 @@ class ClassReportPDFGenerator {
     };
   }
 
-  private buildAreaCard(area: AreaAnalysis): Content {
+
+
+  // ============================================
+  // V7: Lógica e Layout de Alta Densidade
+  // ============================================
+
+  private buildAreaCard(area: AreaAnalysis, isCompact: boolean = false): Content {
+    const gen = getPDFGenerator();
+
+    // 1. Calcular estatísticas bimestrais para esta área
+    const subjectStats = this.calculateSubjectStats(area.subjects);
+
+    // 2. Ordenar disciplinas: Menor Desempenho Primeiro
+    const rankedSubjects = [...subjectStats].sort((a, b) => a.average - b.average);
+
+    // Dynamic Margins based on compactness
+    const containerMargin = isCompact ? [0, 0, 0, 4] : [0, 0, 0, 15]; // Minimal gap between stacked areas
+    const internalMargin = isCompact ? [8, 4, 8, 4] : [10, 10, 10, 10]; // Tighter internal padding
+    const headerMargin = isCompact ? [0, 0, 0, 2] : [0, 0, 0, 10]; // Tighter header
+    const rankingMargin = isCompact ? [0, 0, 0, 3] : [0, 0, 0, 15]; // Tighter ranking
+    const titleSize = isCompact ? 13 : 18; // Smaller title for stacked format
+
     return ({
       table: {
         widths: ['*'],
-        body: [[{
-          stack: [
-            // Header da área
-            {
-              columns: [
-                { text: area.areaName, fontSize: 12, bold: true, width: '*' },
-                {
-                  text: `Média: ${area.average.toFixed(1)}`,
-                  fontSize: 10,
-                  bold: true,
-                  color: area.average >= 7 ? PDF_COLORS.status.aprovado :
-                    area.average >= 6 ? PDF_COLORS.status.atencao : PDF_COLORS.status.critico,
-                  alignment: 'right',
-                  width: 'auto',
-                },
-              ],
-              margin: [0, 0, 0, 8],
-            },
+        body: [[
+          {
+            stack: [
+              // HEADER DA ÁREA
+              {
+                columns: [
+                  {
+                    stack: [
+                      { text: area.areaName.toUpperCase(), fontSize: titleSize, bold: true, color: PDF_COLORS.primary },
+                      { text: 'Análise detalhada • Ano Letivo', fontSize: 10, color: PDF_COLORS.secondary }
+                    ],
+                    width: '*'
+                  },
+                  {
+                    stack: [
+                      { text: 'Média Geral da Área', fontSize: 8, color: PDF_COLORS.secondary, alignment: 'right' },
+                      { text: area.average.toFixed(1), fontSize: 24, bold: true, color: area.average >= 7 ? PDF_COLORS.status.aprovado : PDF_COLORS.status.critico, alignment: 'right' }
+                    ],
+                    width: 'auto'
+                  }
+                ],
+                margin: headerMargin
+              },
 
-            // Estatísticas
-            {
-              text: `${area.studentsEvaluated} aluno(s) avaliado(s) | ${area.studentsBelow6} abaixo de 6,0 | ${area.studentsAbove8} com excelência`,
-              fontSize: 9,
-              color: PDF_COLORS.secondary,
-              margin: [0, 0, 0, 10],
-            },
+              // LAYOUT PRINCIPAL: RANKING (VISUAL) + TABELA (DADOS)
+              {
+                stack: [
+                  // Seção de Ranking Visual (ALINHADA COM TABBELA)
+                  { text: `Médias por Disciplina (${rankedSubjects.length} disciplina(s) analisada(s))`, style: 'h3', margin: rankingMargin },
+                  {
+                    columns: [
+                      // Tabela Esquerda
+                      {
+                        table: {
+                          widths: [80, 20, 50, 25],
+                          body: rankedSubjects.slice(0, Math.ceil(rankedSubjects.length / 2)).map(sub => ([
+                            { text: sub.name, fontSize: 8, alignment: 'left', margin: [0, 3, 0, 0] },
+                            gen.createDottedLine(15),
+                            { stack: [gen.createProgressBar(sub.average, 10, sub.average >= 6 ? PDF_COLORS.info : PDF_COLORS.danger)], margin: [0, 2, 0, 0] },
+                            { text: sub.average.toFixed(1), fontSize: 9, bold: true, alignment: 'right' }
+                          ]))
+                        },
+                        layout: 'noBorders'
+                      },
+                      // Tabela Direita (se houver items)
+                      {
+                        table: {
+                          widths: [80, 20, 50, 25],
+                          body: rankedSubjects.length > 1 ? rankedSubjects.slice(Math.ceil(rankedSubjects.length / 2)).map(sub => ([
+                            { text: sub.name, fontSize: 8, alignment: 'left', margin: [0, 3, 0, 0] },
+                            gen.createDottedLine(15),
+                            { stack: [gen.createProgressBar(sub.average, 10, sub.average >= 6 ? PDF_COLORS.info : PDF_COLORS.danger)], margin: [0, 2, 0, 0] },
+                            { text: sub.average.toFixed(1), fontSize: 9, bold: true, alignment: 'right' }
+                          ])) : [[{}, {}, {}, {}]]
+                        },
+                        layout: 'noBorders'
+                      }
+                    ],
+                    columnGap: 20,
+                    margin: rankingMargin
+                  },
 
-            // Falhas
-            area.falhas.length > 0 ? {
-              stack: [
-                { text: 'FALHAS IDENTIFICADAS', fontSize: 9, bold: true, color: PDF_COLORS.status.critico, margin: [0, 0, 0, 4] },
-                ...area.falhas.map(f => ({ text: `• ${f}`, fontSize: 9, margin: [8, 0, 0, 2] })),
-              ],
-              margin: [0, 0, 0, 8],
-            } : '',
+                  // Tabela Bimestral de Alta Densidade
+                  this.buildQuarterlyTable(rankedSubjects)
+                ]
+              }
+            ],
+            margin: internalMargin
+          }
+        ]]
+      },
+      layout: 'noBorders',
+      fillColor: '#F8FAFC',
+      margin: containerMargin,
+      unbreakable: true
+    } as unknown as Content);
+  }
 
-            // Potencialidades
-            area.potencialidades.length > 0 ? {
-              stack: [
-                { text: 'POTENCIALIDADES', fontSize: 9, bold: true, color: PDF_COLORS.status.aprovado, margin: [0, 0, 0, 4] },
-                ...area.potencialidades.map(p => ({ text: `• ${p}`, fontSize: 9, margin: [8, 0, 0, 2] })),
-              ],
-            } : '',
-          ],
-          margin: [12, 10, 12, 10],
-        }]],
+  private calculateSubjectStats(subjects: string[]) {
+    return subjects.map(sub => {
+      const subGrades = this.grades.filter(g => g.subject === sub);
+      const quarters = [1, 2, 3, 4].map(q => {
+        // Garantir comparação de tipos compatíveis com regex para "1", "1º", "1o"
+        const qGrades = subGrades.filter(g => {
+          if (!g.quarter) return false;
+          // Extrair apenas o primeiro dígito numérico
+          const match = String(g.quarter).match(/\d/);
+          return match ? match[0] === String(q) : false;
+        });
+        const count = qGrades.length;
+        const avg = count > 0 ? qGrades.reduce((a, b) => a + b.grade, 0) / count : 0;
+        const reproved = qGrades.filter(g => g.grade < 6).length;
+        const approved = count - reproved;
+        return { q, avg, approved, reproved, count };
+      });
+
+      // Média anual simples dos bimestres existentes
+      const validQuarters = quarters.filter(q => q.count > 0);
+      const annualAvg = validQuarters.length > 0
+        ? validQuarters.reduce((a, b) => a + b.avg, 0) / validQuarters.length
+        : 0;
+
+      return { name: sub, quarters, average: annualAvg };
+    });
+  }
+
+  private buildQuarterlyTable(stats: any[]): Content {
+    // Header Complexo
+    const headerRow: TableCell[] = [
+      { text: 'Disciplina', style: 'headerGroup', rowSpan: 2, margin: [0, 8, 0, 0] },
+      { text: '1º Bimestre', style: 'headerGroup', colSpan: 3 }, {}, {},
+      { text: '2º Bimestre', style: 'headerGroup', colSpan: 3 }, {}, {},
+      { text: '3º Bimestre', style: 'headerGroup', colSpan: 3 }, {}, {},
+      { text: '4º Bimestre', style: 'headerGroup', colSpan: 3 }, {}, {}
+    ];
+
+    const subHeaderRow: TableCell[] = [
+      {},
+      { text: 'Apr', style: 'tableCompact', fontSize: 7, bold: true }, { text: 'Rep', style: 'tableCompact', fontSize: 7, bold: true }, { text: 'Méd', style: 'tableCompact', fontSize: 7, bold: true },
+      { text: 'Apr', style: 'tableCompact', fontSize: 7, bold: true }, { text: 'Rep', style: 'tableCompact', fontSize: 7, bold: true }, { text: 'Méd', style: 'tableCompact', fontSize: 7, bold: true },
+      { text: 'Apr', style: 'tableCompact', fontSize: 7, bold: true }, { text: 'Rep', style: 'tableCompact', fontSize: 7, bold: true }, { text: 'Méd', style: 'tableCompact', fontSize: 7, bold: true },
+      { text: 'Apr', style: 'tableCompact', fontSize: 7, bold: true }, { text: 'Rep', style: 'tableCompact', fontSize: 7, bold: true }, { text: 'Méd', style: 'tableCompact', fontSize: 7, bold: true },
+    ];
+
+    const bodyRows = stats.map((sub, idx) => {
+      const row: TableCell[] = [{ text: sub.name, style: 'tableCompact', alignment: 'left', bold: true }];
+      sub.quarters.forEach((q: any) => {
+        row.push({ text: q.count > 0 ? q.approved : '-', style: 'tableCompact' });
+        row.push({ text: q.count > 0 ? q.reproved : '-', style: 'tableCompact', color: q.reproved > 0 ? PDF_COLORS.danger : PDF_COLORS.secondary, bold: q.reproved > 0 });
+        row.push({ text: q.count > 0 ? q.avg.toFixed(1) : '-', style: 'tableCompact', bold: true });
+      });
+      return row;
+    });
+
+    return {
+      table: {
+        headerRows: 2,
+        widths: ['*', 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20], // 12 colunas de dados + 1 nome
+        body: [
+          headerRow,
+          subHeaderRow,
+          ...bodyRows
+        ]
       },
       layout: {
-        hLineWidth: () => 1,
-        vLineWidth: () => 1,
-        hLineColor: () => PDF_COLORS.border,
-        vLineColor: () => PDF_COLORS.border,
-      },
-      margin: [0, 0, 0, 12],
-      // Garantir que o bloco não seja cortado - manter conteúdo junto
-      unbreakable: true,
-    } as unknown as Content);
+        hLineWidth: (i: number, node: any) => (i === 0 || i === node.table.body.length) ? 1 : 0.5,
+        vLineWidth: (i: number) => (i === 0 || i === 13) ? 0 : (i === 1 || i === 4 || i === 7 || i === 10) ? 0.5 : 0, // Linhas verticais separando bimestres
+        hLineColor: () => '#E2E8F0',
+        vLineColor: () => '#CBD5E1',
+        fillColor: (i: number) => i > 1 && i % 2 === 0 ? '#F8FAFC' : null, // Zebra
+      }
+    };
   }
 
   private buildIndividualAnalysisSection(): Content {
@@ -684,98 +754,131 @@ class ClassReportPDFGenerator {
     });
 
     // Adicionar espaçamento entre alunos (2 quebras de linha)
-    const studentCards: Content[] = [];
-    sortedProfiles.forEach((profile, index) => {
-      if (index > 0) {
-        // Duas quebras de linha antes de cada aluno (exceto o primeiro)
-        studentCards.push({ text: '', margin: [0, 0, 0, 0] });
-        studentCards.push({ text: '', margin: [0, 0, 0, 0] });
-      }
-      studentCards.push(this.buildStudentCard(profile, index + 1));
-    });
+    // V7: Compact Student Grid
+    const studentCards = sortedProfiles.map(profile => this.buildStudentCompactCard(profile));
 
     return {
       stack: [
-        { text: '', margin: [0, 0, 0, 0] }, // Primeira quebra de linha
-        { text: '', margin: [0, 0, 0, 0] }, // Segunda quebra de linha
-        { text: 'AVALIAÇÃO INDIVIDUAL DOS ALUNOS', style: 'h2', margin: [0, 0, 0, 10] },
+        { text: 'ANÁLISE INDIVIDUAL DOS ESTUDANTES', style: 'h2', pageBreak: 'before', margin: [0, 0, 0, 15] },
         {
-          text: 'Análise qualitativa de cada aluno utilizando correlações entre disciplinas, tendências e modelo preditivo.',
-          style: 'body',
-          margin: [0, 0, 0, 15],
-        },
-        ...studentCards,
-      ],
+          stack: studentCards
+        }
+      ]
     };
   }
 
-  private buildStudentCard(profile: StudentProfile, number: number): Content {
-    const narrative = this.generateStudentNarrative(profile);
-    const color = CLASSIFICATION_COLORS[profile.classification];
-    const label = CLASSIFICATION_LABELS[profile.classification];
+  // Novo Card Compacto (V7.4 Topificado)
+  private buildStudentCompactCard(profile: StudentProfile): Content {
+    const student = this.students.find(s => s.id === profile.studentId);
+    const studentName = student?.name || 'Aluno Desconhecido';
+
+    const statusColor = CLASSIFICATION_COLORS[profile.classification];
+    const statusLabel = CLASSIFICATION_LABELS[profile.classification];
+    const average = profile.average.toFixed(1);
+    const frequency = 100; // Placeholder as attendance is disabled currently
+    const reprovacoes = profile.subjectsBelow6.length;
+
+    // Preparar Listas
+    const vulnerabilities = profile.subjectsBelow6.map(s => `• ${s.subject} (${s.average.toFixed(1)})`);
+    const strengths = (profile.strengths || []).map(s => {
+      const avg = profile.subjectAverages[s];
+      return avg ? `• ${s} (${avg.toFixed(1)})` : `• ${s}`;
+    }).slice(0, 5); // Limit to top 5 to save space
+
+    // Texto Disciplinar
+    const studentIncidents = this.incidents.filter(i => i.studentIds.includes(profile.studentId));
+    let incidentText = 'Ausência de intercorrências registradas.';
+    if (studentIncidents.length > 0) {
+      const graveCount = studentIncidents.filter(i => i.finalSeverity === 'grave' || i.finalSeverity === 'gravissima').length;
+      incidentText = graveCount > 0
+        ? `Constam ${studentIncidents.length} registros, sendo ${graveCount} de maior complexidade.`
+        : `Registram-se ${studentIncidents.length} intercorrências pontuais sob monitoramento.`;
+    }
+
+    // Encaminhamento
+    let encaminhamento = 'Manutenção do acompanhamento regular.';
+    if (profile.classification === 'critico') encaminhamento = 'Intervenção imediata e plano de recuperação individualizado.';
+    if (profile.classification === 'atencao') encaminhamento = 'Intensificação do suporte pedagógico nos componentes sinalizados.';
 
     return {
       table: {
-        widths: [3, '*'],
+        widths: ['*'],
         body: [[
-          { text: '', fillColor: color },
           {
             stack: [
-              // Header
+              // 1. Header: NOME + STATUS
               {
-                columns: [
-                  { text: `${number}. ${profile.studentName}`, fontSize: 11, bold: true, width: '*' },
-                  {
-                    table: {
-                      body: [[{
-                        text: label.toUpperCase(),
-                        fontSize: 8,
-                        bold: true,
-                        color: profile.classification === 'atencao' ? '#000000' : '#FFFFFF',
-                        fillColor: color,
-                        margin: [6, 2, 6, 2],
-                      }]],
-                    },
-                    layout: 'noBorders',
-                    width: 'auto',
-                  },
+                text: [
+                  { text: `${studentName.toUpperCase()} `, fontSize: 9, bold: true, color: PDF_COLORS.primary },
+                  { text: statusLabel.toUpperCase(), fontSize: 8, bold: true, color: statusColor }
                 ],
-                margin: [0, 0, 0, 6],
+                margin: [0, 0, 0, 2]
               },
 
-              // Métricas rápidas
+              // 2. Métricas Lineares
               {
-                columns: [
-                  { text: `Média: ${profile.average.toFixed(1)}`, fontSize: 9, color: PDF_COLORS.secondary },
-                  { text: `Frequência: ${profile.frequency.toFixed(0)}%`, fontSize: 9, color: PDF_COLORS.secondary },
-                  {
-                    text: `Reprovações: ${profile.subjectsBelow6.length}`,
-                    fontSize: 9,
-                    color: profile.subjectsBelow6.length >= 3 ? PDF_COLORS.status.critico :
-                      profile.subjectsBelow6.length > 0 ? PDF_COLORS.status.atencao : PDF_COLORS.secondary
-                  },
-                ],
-                margin: [0, 0, 0, 8],
+                text: `Média: ${average}   |   Frequência: ${frequency}%   |   Reprovações: ${reprovacoes}`,
+                fontSize: 8, color: PDF_COLORS.secondary, bold: true, margin: [0, 0, 0, 4]
               },
 
-              // Narrativa qualitativa
+              // 3. Status Geral (Redundante mas pedido)
+              // { text: `STATUS GERAL: ${statusLabel.toUpperCase()}`, fontSize: 7, bold: true, margin: [0, 0, 0, 4] },
+
+              // 4. Colunas de Vulnerabilidades e Indicadores
               {
-                text: narrative,
-                fontSize: 9,
-                alignment: 'justify',
-                lineHeight: 1.3,
+                columns: [
+                  // Vulnerabilidades
+                  vulnerabilities.length > 0 ? {
+                    stack: [
+                      { text: 'VULNERABILIDADES (Abaixo de 6,0):', fontSize: 7, bold: true, color: PDF_COLORS.status.critico },
+                      { ul: vulnerabilities, fontSize: 7, margin: [0, 2, 0, 0], color: '#475569' }
+                    ],
+                    width: '*', margin: [0, 0, 5, 0]
+                  } : { text: '', width: 0 },
+
+                  // Consolidações
+                  strengths.length > 0 ? {
+                    stack: [
+                      { text: 'INDICADORES DE CONSOLIDAÇÃO:', fontSize: 7, bold: true, color: PDF_COLORS.status.aprovado },
+                      { ul: strengths, fontSize: 7, margin: [0, 2, 0, 0], color: '#475569' }
+                    ],
+                    width: '*'
+                  } : { text: '', width: 0 }
+                ],
+                columnGap: 10,
+                margin: [0, 2, 0, 4]
               },
+
+              // 5. Campo Disciplinar
+              {
+                text: [
+                  { text: 'CAMPO DISCIPLINAR: ', fontSize: 7, bold: true },
+                  { text: incidentText, fontSize: 7 }
+                ],
+                margin: [0, 2, 0, 2]
+              },
+
+              // 6. Encaminhamento
+              {
+                text: [
+                  { text: 'ENCAMINHAMENTO: ', fontSize: 7, bold: true },
+                  { text: encaminhamento, fontSize: 7 }
+                ],
+                margin: [0, 0, 0, 0]
+              }
+
             ],
-            margin: [10, 10, 10, 10],
-          },
-        ]],
+            margin: [8, 6, 8, 6]
+          }
+        ]]
       },
       layout: 'noBorders',
-      margin: [0, 0, 0, 10],
-      // Garantir que o bloco não seja cortado - manter conteúdo junto
-      unbreakable: true,
-    };
+      fillColor: '#F8FAFC',
+      margin: [0, 0, 0, 8],
+      unbreakable: true
+    } as Content;
   }
+
 }
 
 // ============================================

@@ -5,12 +5,12 @@
  * com linguagem clara e recomendações específicas
  */
 
-import { 
-  AdvancedAnalyticsResult, 
-  StudentProfile, 
+import {
+  AdvancedAnalyticsResult,
+  StudentProfile,
   StudentClassification,
   CLASSIFICATION_LABELS,
-  CLASSIFICATION_COLORS 
+  CLASSIFICATION_COLORS
 } from './advancedAnalytics';
 import { TrendAnalysisResult } from './mlAnalytics';
 
@@ -29,6 +29,7 @@ export interface ExecutiveSummary {
   totalStudents: number;
   classAverage: number;
   classFrequency: number;
+  approvalRate: number;
   classificationCounts: ClassificationCounts;
   criticalCount: number;
   excellentCount: number;
@@ -42,7 +43,7 @@ export interface CorrelationInsight {
   title: string;
   description: string;
   subjects: string[];
-  strength: 'forte' | 'moderada' | 'fraca';
+  strength: 'forte' | 'moderada' | 'fraca' | 'insignificante';
   actionable: string;
   visualData?: { label: string; value: number }[];
 }
@@ -102,25 +103,27 @@ export function generateExecutiveSummary(
     aprovado: analytics.studentProfiles.filter(p => p.classification === 'aprovado').length,
     excelencia: analytics.studentProfiles.filter(p => p.classification === 'excelencia').length,
   };
-  
+
   const criticalCount = classificationCounts.critico;
   const attentionCount = classificationCounts.atencao;
   const excellentCount = classificationCounts.excelencia;
-  
-  // Determinar status geral
+
   let overallStatus: ExecutiveSummary['overallStatus'];
   let statusDescription: string;
-  
+
   const criticalRatio = (criticalCount + attentionCount) / totalStudents;
   const excellentRatio = excellentCount / totalStudents;
-  
+  const approvalCount = classificationCounts.aprovado + classificationCounts.excelencia;
+  const approvalRate = totalStudents > 0 ? (approvalCount / totalStudents) * 100 : 0;
+
+  // Determinar status geral
   if (criticalRatio > 0.3 || classAverage < 5) {
     overallStatus = 'critico';
     statusDescription = `Situação crítica: ${((criticalRatio) * 100).toFixed(0)}% dos alunos necessitam intervenção urgente. ` +
       `Média da turma (${classAverage.toFixed(1)}) abaixo do esperado.`;
   } else if (criticalRatio > 0.15 || classAverage < 6) {
     overallStatus = 'atencao';
-    statusDescription = `Atenção necessária: ${criticalCount + highRiskCount} aluno(s) em risco. ` +
+    statusDescription = `Atenção necessária: ${criticalCount + attentionCount} aluno(s) em risco. ` +
       `Média da turma: ${classAverage.toFixed(1)}. Ação preventiva recomendada.`;
   } else if (excellentRatio > 0.3 && classAverage >= 7) {
     overallStatus = 'excelente';
@@ -131,11 +134,12 @@ export function generateExecutiveSummary(
     statusDescription = `Desempenho satisfatório: Média da turma ${classAverage.toFixed(1)}. ` +
       `${criticalCount > 0 ? `Atenção para ${criticalCount} aluno(s) em situação crítica.` : 'Sem alertas críticos.'}`;
   }
-  
+
   return {
     totalStudents,
     classAverage,
     classFrequency,
+    approvalRate,
     classificationCounts,
     criticalCount,
     excellentCount,
@@ -152,7 +156,7 @@ export function generateExecutiveSummary(
 
 export function generateCorrelationInsights(analytics: AdvancedAnalyticsResult): CorrelationInsight[] {
   const insights: CorrelationInsight[] = [];
-  
+
   // Insights de disciplinas gateway
   analytics.gatewaySubjects.slice(0, 3).forEach(gateway => {
     insights.push({
@@ -167,7 +171,7 @@ export function generateCorrelationInsights(analytics: AdvancedAnalyticsResult):
       })),
     });
   });
-  
+
   // Insights de correlações fortes
   analytics.subjectCorrelations
     .filter(c => c.correlation.strength === 'forte')
@@ -183,13 +187,13 @@ export function generateCorrelationInsights(analytics: AdvancedAnalyticsResult):
           : `Avaliar equilíbrio de dedicação entre ${corr.subject1} e ${corr.subject2}.`,
       });
     });
-  
+
   // Insights de áreas
   if (analytics.strongestArea && analytics.weakestArea) {
     const areaInfluence = analytics.areaInfluences.find(
       i => i.sourceArea === analytics.weakestArea || i.targetArea === analytics.weakestArea
     );
-    
+
     insights.push({
       title: `Áreas: Força vs Fragilidade`,
       description: `"${analytics.strongestArea}" é a área mais forte, enquanto "${analytics.weakestArea}" requer mais atenção. ` +
@@ -199,7 +203,7 @@ export function generateCorrelationInsights(analytics: AdvancedAnalyticsResult):
       actionable: `Avaliar transferência de metodologias bem-sucedidas de "${analytics.strongestArea}" para "${analytics.weakestArea}".`,
     });
   }
-  
+
   return insights;
 }
 
@@ -214,12 +218,12 @@ export function generateStudentInsights(
   return profiles.map(profile => {
     // Usar classificação padronizada do perfil
     const status: StudentInsight['status'] = profile.classification;
-    
+
     // Formatar disciplinas abaixo com notas
     const subjectsWithGrades = profile.subjectsBelow6
       .map(s => `${s.subject} (${s.average.toFixed(1)})`)
       .join(', ');
-    
+
     // Gerar insight principal baseado na classificação
     let mainInsight: string;
     if (status === 'critico') {
@@ -236,14 +240,14 @@ export function generateStudentInsights(
       mainInsight = `Aprovado em todas as disciplinas com média ${profile.average.toFixed(1)}. ` +
         `${profile.strengths.length > 0 ? `Potencial em ${profile.strengths.slice(0, 2).join(', ')}.` : 'Manter acompanhamento regular.'}`;
     }
-    
+
     // Métricas usando dados reais do perfil
     const metrics = [
       {
         label: 'Média Geral',
         value: profile.average.toFixed(1),
         trend: profile.trend.direction === 'crescente' ? 'up' as const :
-               profile.trend.direction === 'decrescente' ? 'down' as const : 'stable' as const,
+          profile.trend.direction === 'decrescente' ? 'down' as const : 'stable' as const,
       },
       {
         label: 'Frequência',
@@ -255,7 +259,7 @@ export function generateStudentInsights(
         value: profile.subjectsBelow6.length.toString(),
       },
     ];
-    
+
     // Riscos identificados
     const risks: string[] = [];
     if (profile.trend.direction === 'decrescente') {
@@ -276,12 +280,12 @@ export function generateStudentInsights(
         risks.push(`Queda brusca em ${drops.map(d => d.subject).join(', ')}`);
       }
     }
-    
+
     // Urgência baseada na classificação
     const urgencyLevel = status === 'critico' ? 10 :
-                         status === 'atencao' ? 7 :
-                         status === 'aprovado' ? 3 : 1;
-    
+      status === 'atencao' ? 7 :
+        status === 'aprovado' ? 3 : 1;
+
     return {
       studentName: profile.studentName,
       status,
@@ -304,7 +308,7 @@ export function generateActionableRecommendations(
 ): ActionableRecommendation[] {
   const recommendations: ActionableRecommendation[] = [];
   let idCounter = 1;
-  
+
   // Recomendações para alunos críticos
   const criticalStudents = analytics.studentProfiles.filter(p => p.urgency === 'critica');
   if (criticalStudents.length > 0) {
@@ -327,7 +331,7 @@ export function generateActionableRecommendations(
       metrics: ['Frequência às aulas de reforço', 'Notas em avaliações parciais', 'Participação em sala'],
     });
   }
-  
+
   // Recomendações para disciplinas gateway
   analytics.gatewaySubjects.slice(0, 2).forEach(gateway => {
     recommendations.push({
@@ -350,7 +354,7 @@ export function generateActionableRecommendations(
       metrics: ['Média em avaliações', 'Taxa de participação', 'Evolução nas disciplinas dependentes'],
     });
   });
-  
+
   // Recomendação para área mais fraca
   if (analytics.weakestArea) {
     recommendations.push({
@@ -372,11 +376,11 @@ export function generateActionableRecommendations(
       metrics: ['Média da área', 'Número de alunos abaixo da média', 'Engajamento nas atividades'],
     });
   }
-  
+
   // Recomendação comportamental se houver impacto
   if (analytics.behaviorImpact.length > 0) {
     const mostImpactful = analytics.behaviorImpact.sort((a, b) => b.averageGradeDrop - a.averageGradeDrop)[0];
-    
+
     recommendations.push({
       id: `rec-${idCounter++}`,
       category: 'comportamento',
@@ -397,7 +401,7 @@ export function generateActionableRecommendations(
       metrics: ['Número de ocorrências/mês', 'Média dos alunos com ocorrências', 'Tempo de recuperação'],
     });
   }
-  
+
   // Oportunidade de tutoria entre pares
   const excellentStudents = analytics.studentProfiles.filter(p => p.riskScore < 10);
   if (excellentStudents.length >= 2 && criticalStudents.length > 0) {
@@ -421,11 +425,11 @@ export function generateActionableRecommendations(
       metrics: ['Participação nas sessões', 'Evolução dos tutorandos', 'Satisfação dos participantes'],
     });
   }
-  
+
   // Ordenar por prioridade
   const priorityOrder = { critica: 0, alta: 1, media: 2, baixa: 3 };
   recommendations.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
-  
+
   return recommendations;
 }
 
@@ -444,7 +448,7 @@ export function generateInsightsReport(
   const correlationInsights = generateCorrelationInsights(analytics);
   const studentInsights = generateStudentInsights(analytics.studentProfiles, classAverage);
   const recommendations = generateActionableRecommendations(analytics);
-  
+
   return {
     generatedAt: new Date(),
     period,
