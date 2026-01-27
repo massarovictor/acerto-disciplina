@@ -1726,25 +1726,55 @@ export function useIncidents() {
   ) => {
     if (!user?.id) return;
     const payload = mapFollowUpToDb(followUp, incidentId, user.id, user.id);
+    let savedFollowUp: FollowUpRecord | null = null;
 
     if (followUpId) {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("follow_ups")
         .update(payload)
-        .eq("id", followUpId);
+        .eq("id", followUpId)
+        .select()
+        .single();
       if (error) {
         logError("follow_ups.update", error);
         throw error;
       }
+      savedFollowUp = mapFollowUpFromDb(data);
     } else {
-      const { error } = await supabase.from("follow_ups").insert(payload);
+      const { data, error } = await supabase
+        .from("follow_ups")
+        .insert(payload)
+        .select()
+        .single();
       if (error) {
         logError("follow_ups.insert", error);
         throw error;
       }
+      savedFollowUp = mapFollowUpFromDb(data);
     }
 
-    await fetchIncidents();
+    // Otimização: Atualizar store local imediatamente sem refetch total
+    const currentIncidents = useDataStore.getState().incidents;
+    const incidentToUpdate = currentIncidents.find(i => i.id === incidentId);
+
+    if (incidentToUpdate && savedFollowUp) {
+      const currentFollowUps = incidentToUpdate.followUps || [];
+      let newFollowUps;
+
+      if (followUpId) {
+        newFollowUps = currentFollowUps.map(fu => fu.id === followUpId ? savedFollowUp! : fu);
+      } else {
+        newFollowUps = [...currentFollowUps, savedFollowUp];
+      }
+
+      // Ordenar por data
+      newFollowUps.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      storeUpdateIncident(incidentId, { followUps: newFollowUps });
+    } else {
+      // Fallback se não encontrar no store (improvável)
+      await fetchIncidents();
+    }
   };
 
   const addComment = async (incidentId: string, text: string) => {
@@ -1759,13 +1789,30 @@ export function useIncidents() {
       user.id,
     );
 
-    const { error } = await supabase.from("comments").insert(payload);
+    const { data, error } = await supabase
+      .from("comments")
+      .insert(payload)
+      .select()
+      .single();
+
     if (error) {
       logError("comments.insert", error);
       throw error;
     }
 
-    await fetchIncidents();
+    const savedComment = mapCommentFromDb(data);
+
+    // Otimização: Atualizar store
+    const currentIncidents = useDataStore.getState().incidents;
+    const incidentToUpdate = currentIncidents.find(i => i.id === incidentId);
+
+    if (incidentToUpdate) {
+      const currentComments = incidentToUpdate.comments || [];
+      const newComments = [...currentComments, savedComment];
+      storeUpdateIncident(incidentId, { comments: newComments });
+    } else {
+      await fetchIncidents();
+    }
   };
 
   return {
