@@ -63,6 +63,7 @@ import {
     Info,
     RefreshCw
 } from 'lucide-react';
+import { ClassTrajectoryView } from '@/components/trajectory/ClassTrajectoryView';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 
@@ -1069,11 +1070,18 @@ const StudentTrajectory = () => {
                 </div>
 
                 <div className="space-y-1">
-                    <Select value={selectedStudent} onValueChange={setSelectedStudent} disabled={!selectedClass}>
+                    <Select
+                        value={selectedStudent || 'view_all_class'}
+                        onValueChange={(val) => setSelectedStudent(val === 'view_all_class' ? '' : val)}
+                        disabled={!selectedClass}
+                    >
                         <SelectTrigger className="h-10 bg-background">
                             <SelectValue placeholder="Selecione o aluno" />
                         </SelectTrigger>
                         <SelectContent>
+                            <SelectItem value="view_all_class" className="text-primary font-medium border-b mb-1 pb-1">
+                                🏫 Visão Geral da Turma
+                            </SelectItem>
                             {filteredStudents.length === 0 ? (
                                 <div className="px-2 py-6 text-center text-sm text-muted-foreground">
                                     {selectedClass ? 'Nenhum aluno nesta turma' : 'Selecione uma turma primeiro'}
@@ -1088,11 +1096,12 @@ const StudentTrajectory = () => {
                 </div>
 
                 <div className="space-y-1">
-                    <Select value={selectedSubject} onValueChange={setSelectedSubject} disabled={!selectedStudent}>
+                    <Select value={selectedSubject} onValueChange={setSelectedSubject} disabled={!selectedClass}>
                         <SelectTrigger className="h-10 bg-background">
                             <SelectValue placeholder="Escolha a disciplina" />
                         </SelectTrigger>
                         <SelectContent className="max-h-80">
+                            {/* Option "All" is already there */}
                             <SelectItem value="all">Todas as disciplinas</SelectItem>
                             {/* Áreas conforme o nível do aluno */}
                             {(isStudentFundamental ? FUNDAMENTAL_SUBJECT_AREAS : SUBJECT_AREAS).map(area => (
@@ -1136,10 +1145,17 @@ const StudentTrajectory = () => {
 
             {
                 !selectedStudent ? (
-                    <Card className="h-64 flex flex-col items-center justify-center text-muted-foreground border-dashed">
-                        <User className="h-12 w-12 mb-2 opacity-20" />
-                        <p>Aguardando seleção de aluno...</p>
-                    </Card>
+                    selectedClass ? (
+                        <ClassTrajectoryView
+                            classId={selectedClass}
+                            selectedSubject={selectedSubject === 'all' ? '' : selectedSubject}
+                        />
+                    ) : (
+                        <Card className="h-64 flex flex-col items-center justify-center text-muted-foreground border-dashed">
+                            <User className="h-12 w-12 mb-2 opacity-20" />
+                            <p>Selecione uma turma para ver a visão geral ou escolha um aluno.</p>
+                        </Card>
+                    )
                 ) : (
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                         <TabsList className="bg-muted p-1 rounded-lg w-full justify-start overflow-x-auto">
