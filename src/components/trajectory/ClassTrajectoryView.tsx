@@ -200,7 +200,7 @@ export const ClassTrajectoryView = ({ classId, selectedSubject }: ClassTrajector
                     <Card className="border-none shadow-sm bg-card/60">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-lg flex items-center gap-2">
-                                <Activity className="h-5 w-5 text-emerald-600" />
+                                <Activity className="h-5 w-5 text-blue-600" />
                                 Pulso de Performance - Turma
                             </CardTitle>
                             <CardDescription>
@@ -218,8 +218,8 @@ export const ClassTrajectoryView = ({ classId, selectedSubject }: ClassTrajector
                                     <ComposedChart data={timelineData} margin={{ top: 20, right: 30, left: 10, bottom: 20 }}>
                                         <defs>
                                             <linearGradient id="pulseGradientClass" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                                                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                                             </linearGradient>
                                         </defs>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.1} />
@@ -238,11 +238,11 @@ export const ClassTrajectoryView = ({ classId, selectedSubject }: ClassTrajector
                                         <Area
                                             type="monotone"
                                             dataKey="grade"
-                                            stroke="#10b981"
+                                            stroke="#3b82f6"
                                             strokeWidth={3}
                                             fill="url(#pulseGradientClass)"
-                                            activeDot={{ r: 6, fill: "#10b981" }}
-                                            dot={{ r: 4, fill: "#10b981", strokeWidth: 2, stroke: "hsl(var(--background))" }}
+                                            activeDot={{ r: 6, fill: "#3b82f6" }}
+                                            dot={{ r: 4, fill: "#3b82f6", strokeWidth: 2, stroke: "hsl(var(--background))" }}
                                         />
                                     </ComposedChart>
                                 </ResponsiveContainer>

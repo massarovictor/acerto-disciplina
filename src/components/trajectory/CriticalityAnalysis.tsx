@@ -58,9 +58,9 @@ export const CriticalityAnalysis = ({ studentsData, className, externalFilter }:
                 value: buckets[bucket.level].length,
                 students: buckets[bucket.level],
                 color: bucket.level === 'MUITO CRITICO' ? '#991b1b' : // red-800
-                    bucket.level === 'CRITICO' ? '#dc2626' :      // red-600
-                        bucket.level === 'INTERMEDIARIO' ? '#d97706' : // amber-600
-                            '#059669' // emerald-600
+                    bucket.level === 'CRITICO' ? '#d97706' :      // amber-600
+                        bucket.level === 'INTERMEDIARIO' ? '#059669' : // emerald-600
+                            '#2563eb' // blue-600
             }));
         };
 
