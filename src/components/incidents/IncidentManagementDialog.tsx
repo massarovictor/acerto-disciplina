@@ -119,9 +119,13 @@ export const IncidentManagementDialog = ({
   const incidentClass = classes.find(c => c.id === currentIncident.classId);
   const incidentStudents = students.filter(s => currentIncident.studentIds.includes(s.id));
 
-  const canManage = true;
+  // Permissões: Apenas Admin ou Diretor da Turma podem gerenciar (criar acompanhamento/resolver)
+  const isAdmin = profile?.role === 'admin';
+  const isClassDirector = incidentClass?.directorId === user?.id;
+  const canManage = isAdmin || isClassDirector;
+
   const canStartFollowUp = currentIncident.status === 'aberta' && canManage;
-  const canEditFollowUp = currentIncident.status === 'acompanhamento';
+  const canEditFollowUp = currentIncident.status === 'acompanhamento' && canManage;
   const canResolve = currentIncident.status === 'acompanhamento' &&
     (currentIncident.followUps?.length || 0) > 0 &&
     canManage;
