@@ -39,7 +39,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/services/supabase';
-import { Search, Plus, Edit, Trash2, Shield, User, GraduationCap } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Shield, User, GraduationCap, Loader2 } from 'lucide-react';
 
 interface AuthorizedEmail {
     email: string;
@@ -56,6 +56,7 @@ export const UsersManage = () => {
     const [editingUser, setEditingUser] = useState<AuthorizedEmail | null>(null);
     const [deletingUser, setDeletingUser] = useState<AuthorizedEmail | null>(null);
     const [formData, setFormData] = useState({ email: '', role: 'professor' });
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const fetchUsers = async () => {
         setIsLoading(true);
@@ -97,6 +98,7 @@ export const UsersManage = () => {
             return;
         }
 
+        setIsSubmitting(true);
         const normalizedEmail = formData.email.toLowerCase().trim();
 
         const { data, error } = await supabase.functions.invoke('create-user', {
@@ -112,6 +114,7 @@ export const UsersManage = () => {
                 description: error.message || 'Não foi possível adicionar o usuário.',
                 variant: 'destructive',
             });
+            setIsSubmitting(false);
             return;
         }
 
@@ -126,14 +129,18 @@ export const UsersManage = () => {
                 description: 'Usuário adicionado e criado no sistema.',
             });
         }
+
         setIsAddDialogOpen(false);
         setFormData({ email: '', role: 'professor' });
-        fetchUsers();
+        setSearchTerm(''); // Clear search to ensure new user is visible
+        await fetchUsers(); // Await to ensure list is updated before unlocking
+        setIsSubmitting(false);
     };
 
     const handleUpdateUser = async () => {
         if (!editingUser) return;
 
+        setIsSubmitting(true);
         const { error } = await supabase
             .from('authorized_emails')
             .update({ role: formData.role })
@@ -145,6 +152,7 @@ export const UsersManage = () => {
                 description: 'Não foi possível atualizar o usuário.',
                 variant: 'destructive',
             });
+            setIsSubmitting(false);
             return;
         }
 
@@ -167,32 +175,36 @@ export const UsersManage = () => {
             description: 'Usuário atualizado com sucesso.',
         });
         setEditingUser(null);
-        fetchUsers();
+        await fetchUsers();
+        setIsSubmitting(false);
     };
 
     const handleDeleteUser = async () => {
         if (!deletingUser) return;
 
-        const { error } = await supabase
-            .from('authorized_emails')
-            .delete()
-            .eq('email', deletingUser.email);
+        setIsSubmitting(true);
+        const { error } = await supabase.functions.invoke('create-user', {
+            method: 'DELETE',
+            body: { email: deletingUser.email },
+        });
 
         if (error) {
             toast({
                 title: 'Erro',
-                description: 'Não foi possível remover o usuário.',
+                description: error.message || 'Não foi possível remover o usuário.',
                 variant: 'destructive',
             });
+            setIsSubmitting(false);
             return;
         }
 
         toast({
             title: 'Sucesso',
-            description: 'Usuário removido da lista de autorizados.',
+            description: 'Usuário removido do sistema (login e email autorizado).',
         });
         setDeletingUser(null);
-        fetchUsers();
+        await fetchUsers();
+        setIsSubmitting(false);
     };
 
     const getRoleBadge = (role: string) => {
@@ -360,7 +372,16 @@ export const UsersManage = () => {
                         <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                             Cancelar
                         </Button>
-                        <Button onClick={handleAddUser}>Adicionar</Button>
+                        <Button onClick={handleAddUser} disabled={isSubmitting}>
+                            {isSubmitting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Adicionando...
+                                </>
+                            ) : (
+                                'Adicionar'
+                            )}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -402,7 +423,16 @@ export const UsersManage = () => {
                         <Button variant="outline" onClick={() => setEditingUser(null)}>
                             Cancelar
                         </Button>
-                        <Button onClick={handleUpdateUser}>Salvar</Button>
+                        <Button onClick={handleUpdateUser} disabled={isSubmitting}>
+                            {isSubmitting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Salvando...
+                                </>
+                            ) : (
+                                'Salvar'
+                            )}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -421,10 +451,21 @@ export const UsersManage = () => {
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={handleDeleteUser}
+                            onClick={(e) => {
+                                e.preventDefault(); // Prevent auto-close
+                                handleDeleteUser();
+                            }}
+                            disabled={isSubmitting}
                             className="bg-destructive hover:bg-destructive/90"
                         >
-                            Remover
+                            {isSubmitting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Removendo...
+                                </>
+                            ) : (
+                                'Remover'
+                            )}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

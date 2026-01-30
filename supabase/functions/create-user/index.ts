@@ -3,6 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS, DELETE',
 };
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -38,7 +39,7 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  if (req.method !== 'POST') {
+  if (req.method !== 'POST' && req.method !== 'DELETE') {
     return jsonResponse({ error: 'Metodo nao permitido.' }, 405);
   }
 
@@ -88,12 +89,52 @@ Deno.serve(async (req) => {
   }
 
   const email = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : '';
-  const role = typeof payload.role === 'string' ? payload.role : 'professor';
-  const name = typeof payload.name === 'string' ? payload.name.trim() : '';
 
   if (!email || !emailRegex.test(email)) {
     return jsonResponse({ error: 'Email invalido.' }, 400);
   }
+
+  // --- DELETE LOGIC ---
+  if (req.method === 'DELETE') {
+    let deletedCount = 0;
+
+    // 1. Find user in auth.users by email
+    const existingUser = await findUserByEmail(adminClient, email);
+
+    // 2. Delete from auth.users if exists
+    if (existingUser) {
+      const { error: deleteUserError } = await adminClient.auth.admin.deleteUser(existingUser.id);
+      if (deleteUserError) {
+        return jsonResponse({ error: `Erro ao remover conta de usuario: ${deleteUserError.message}` }, 500);
+      }
+      deletedCount++;
+    }
+
+    // 3. Delete from authorized_emails
+    const { error: deleteEmailError } = await adminClient
+      .from('authorized_emails')
+      .delete()
+      .eq('email', email);
+
+    if (deleteEmailError) {
+      return jsonResponse({ error: 'Erro ao remover email autorizado.' }, 500);
+    }
+
+    // Check if we deleted anything just for info (optional, delete queries usually succeed even if 0 rows)
+
+    return jsonResponse({
+      ok: true,
+      message: 'Usuario removido com sucesso.',
+      details: {
+        authAccountRemoved: !!existingUser,
+        emailRemoved: true
+      }
+    });
+  }
+
+  // --- POST (CREATE) LOGIC ---
+  const role = typeof payload.role === 'string' ? payload.role : 'professor';
+  const name = typeof payload.name === 'string' ? payload.name.trim() : '';
 
   const allowedRoles = new Set(['admin', 'diretor', 'professor', 'coordenador', 'secretaria']);
   const normalizedRole = allowedRoles.has(role) ? role : 'professor';
@@ -111,6 +152,7 @@ Deno.serve(async (req) => {
 
   if (createError) {
     const message = createError.message?.toLowerCase() ?? '';
+    // Ignore "already exists" errors, we just want to ensure it's in authorized_emails and has profile
     if (!message.includes('already') && !message.includes('exists')) {
       return jsonResponse({ error: createError.message }, 400);
     }
