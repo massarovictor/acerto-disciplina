@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CriticalityAnalysis } from './CriticalityAnalysis';
 import {
-    ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, LabelList
+    ComposedChart, Line, Area, AreaChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, LabelList
 } from 'recharts';
 import { Users, GraduationCap, Target, School, TrendingUp, BookOpen, Activity, BarChart2 } from 'lucide-react';
 import { useTrajectoryStatistics } from '@/hooks/useTrajectoryStatistics';
@@ -27,7 +27,7 @@ export const ClassTrajectoryView = ({ classId, selectedSubject }: ClassTrajector
         statsByClass,
         distinctAssessments,
         loading
-    } = useTrajectoryStatistics({ classIds: [classId], selectedSubject });
+    } = useTrajectoryStatistics({ classIds: [classId], selectedSubject, selectedAssessment: selectedExternalAssessment });
 
     const aggregatedData = statsByClass?.[classId];
     const timelineData = aggregatedData?.timelineData || [];
@@ -135,6 +135,8 @@ export const ClassTrajectoryView = ({ classId, selectedSubject }: ClassTrajector
                 <TabsContent value="criticality">
                     <CriticalityAnalysis
                         studentsData={aggregatedData.studentStats}
+                        classId={classId}
+                        selectedSubject={selectedSubject}
                         externalFilter={
                             <div className="w-[200px]">
                                 <Select value={selectedExternalAssessment} onValueChange={setSelectedExternalAssessment}>
@@ -167,31 +169,64 @@ export const ClassTrajectoryView = ({ classId, selectedSubject }: ClassTrajector
                                     <p>Sem dados suficientes para gerar o gráfico.</p>
                                 </div>
                             ) : (
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <ComposedChart data={timelineData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.1} />
-                                        <XAxis dataKey="label" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" height={60} />
-                                        <YAxis domain={[0, 10]} tick={{ fontSize: 11 }} />
-                                        <Tooltip
-                                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                            formatter={(value: number) => value.toFixed(1)}
-                                        />
-                                        <Legend />
-                                        <ReferenceLine y={6} stroke="#e74c3c" strokeDasharray="3 3" />
-
-                                        <Line
-                                            type="monotone"
-                                            dataKey="grade"
-                                            name="Média Turma"
-                                            stroke="#2563eb"
-                                            strokeWidth={3}
-                                            connectNulls
-                                            activeDot={{ r: 6 }}
-                                        >
-                                            <LabelList dataKey="grade" position="top" formatter={(v: number) => v.toFixed(1)} style={{ fontSize: 10, fill: '#2563eb', fontWeight: 'bold' }} />
-                                        </Line>
-                                    </ComposedChart>
-                                </ResponsiveContainer>
+                                <div className="h-[300px] w-full mt-4">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <ComposedChart data={timelineData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                                            <XAxis
+                                                dataKey="label"
+                                                tick={{ fontSize: 9 }}
+                                                height={70}
+                                                interval="preserveStartEnd"
+                                                angle={-35}
+                                                textAnchor="end"
+                                                padding={{ left: 10, right: 30 }}
+                                                dy={0}
+                                            />
+                                            <YAxis
+                                                domain={[0, 10]}
+                                                axisLine={false}
+                                                tickLine={false}
+                                                tick={{ fill: '#64748B', fontSize: 12 }}
+                                            />
+                                            <Tooltip
+                                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                            />
+                                            <Legend />
+                                            <ReferenceLine y={6} stroke="#e74c3c" strokeDasharray="3 3" />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="fundamental"
+                                                name="Fundamental"
+                                                stroke="#2563eb"
+                                                strokeWidth={3}
+                                                dot={{ r: 4, fill: "#2563eb", strokeWidth: 2, stroke: "#fff" }}
+                                                activeDot={{ r: 6, fill: "#2563eb" }}
+                                                connectNulls
+                                            />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="medio"
+                                                name="Ensino Médio"
+                                                stroke="#7c3aed"
+                                                strokeWidth={3}
+                                                dot={{ r: 4, fill: "#7c3aed", strokeWidth: 2, stroke: "#fff" }}
+                                                activeDot={{ r: 6, fill: "#7c3aed" }}
+                                                connectNulls
+                                            />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="external"
+                                                name="Aval. Externa"
+                                                stroke="#f39c12"
+                                                strokeWidth={3}
+                                                dot={{ r: 4, fill: "#f39c12", strokeWidth: 2, stroke: "#fff" }}
+                                                activeDot={{ r: 6, fill: "#f39c12" }}
+                                                connectNulls
+                                            />
+                                        </ComposedChart>
+                                    </ResponsiveContainer>
+                                </div>
                             )}
                         </CardContent>
                     </Card>
@@ -215,34 +250,44 @@ export const ClassTrajectoryView = ({ classId, selectedSubject }: ClassTrajector
                                 </div>
                             ) : (
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <ComposedChart data={timelineData} margin={{ top: 20, right: 30, left: 10, bottom: 20 }}>
+                                    <ComposedChart data={timelineData} margin={{ top: 5, right: 0, left: 0, bottom: 5 }}>
                                         <defs>
                                             <linearGradient id="pulseGradientClass" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
+                                                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                                             </linearGradient>
                                         </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.1} />
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                                         <XAxis
                                             dataKey="label"
-                                            tick={{ fontSize: 10 }}
-                                            angle={-30}
+                                            tick={{ fontSize: 9 }}
+                                            height={70}
+                                            interval="preserveStartEnd"
+                                            angle={-35}
                                             textAnchor="end"
-                                            height={60}
+                                            padding={{ left: 10, right: 30 }}
+                                            dy={0}
                                         />
-                                        <YAxis domain={[0, 10]} tick={{ fontSize: 11 }} />
+                                        <YAxis
+                                            domain={[0, 10]}
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#64748B', fontSize: 10 }}
+                                        />
                                         <Tooltip
                                             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                            formatter={(value: number) => value.toFixed(1)}
+                                            formatter={(value: number) => [value?.toFixed(1), 'Nota']}
                                         />
-                                        <Area
+                                        <ReferenceLine y={6} stroke="#e74c3c" strokeDasharray="3 3" />
+                                        <Line
                                             type="monotone"
-                                            dataKey="grade"
-                                            stroke="#3b82f6"
+                                            dataKey="unified"
+                                            name="Performance"
+                                            stroke="#10b981"
                                             strokeWidth={3}
-                                            fill="url(#pulseGradientClass)"
-                                            activeDot={{ r: 6, fill: "#3b82f6" }}
-                                            dot={{ r: 4, fill: "#3b82f6", strokeWidth: 2, stroke: "hsl(var(--background))" }}
+                                            dot={{ r: 4, fill: "#10b981", strokeWidth: 2, stroke: "#fff" }}
+                                            activeDot={{ r: 6, fill: "#10b981" }}
+                                            connectNulls
                                         />
                                     </ComposedChart>
                                 </ResponsiveContainer>
@@ -250,7 +295,7 @@ export const ClassTrajectoryView = ({ classId, selectedSubject }: ClassTrajector
                         </CardContent>
                     </Card>
                 </TabsContent>
-            </Tabs>
-        </div>
+            </Tabs >
+        </div >
     );
 };

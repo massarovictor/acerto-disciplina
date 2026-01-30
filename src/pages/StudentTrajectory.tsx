@@ -116,6 +116,7 @@ const StudentTrajectory = () => {
     useEffect(() => {
         const classIdParam = searchParams.get('classId');
         const studentIdParam = searchParams.get('studentId');
+        const subjectParam = searchParams.get('subject');
 
         const updates: Partial<typeof trajectoryUI> = {};
         let needsUpdate = false;
@@ -128,11 +129,15 @@ const StudentTrajectory = () => {
             updates.selectedStudentId = studentIdParam;
             needsUpdate = true;
         }
+        if (subjectParam && subjectParam !== selectedSubject) {
+            updates.selectedSubject = subjectParam;
+            needsUpdate = true;
+        }
 
         if (needsUpdate) {
             setTrajectoryUI(updates);
         }
-    }, [searchParams, selectedClass, selectedStudent, setTrajectoryUI]);
+    }, [searchParams, selectedClass, selectedStudent, selectedSubject, setTrajectoryUI]);
 
     const setSelectedClass = (value: string) => {
         const nextParams = new URLSearchParams(searchParams);

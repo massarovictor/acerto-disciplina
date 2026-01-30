@@ -12,6 +12,7 @@ import {
     Cell,
     LabelList
 } from 'recharts';
+import { Link } from 'react-router-dom';
 import { CRITICALITY_BUCKETS, CriticalityLevel, getCriticalityLevel, getCriticalityBucket } from '@/lib/analytics/criticality';
 import { AlertTriangle, TrendingUp, Target, School } from 'lucide-react';
 import { useMemo } from 'react';
@@ -28,9 +29,11 @@ interface CriticalityAnalysisProps {
     studentsData: StudentData[];
     className?: string;
     externalFilter?: React.ReactNode;
+    classId: string;
+    selectedSubject: string;
 }
 
-export const CriticalityAnalysis = ({ studentsData, className, externalFilter }: CriticalityAnalysisProps) => {
+export const CriticalityAnalysis = ({ studentsData, className, externalFilter, classId, selectedSubject }: CriticalityAnalysisProps) => {
 
     // Process Data
     const distributions = useMemo(() => {
@@ -140,15 +143,21 @@ export const CriticalityAnalysis = ({ studentsData, className, externalFilter }:
                                             <Badge variant="secondary" className="h-5 text-[10px] px-1.5">{category.value}</Badge>
                                         </div>
                                         <div className="grid grid-cols-1 gap-1 pl-2 border-l-2 border-muted ml-1">
-                                            {category.students.map((s: StudentData) => (
-                                                <div key={s.id} className="text-xs flex justify-between items-center group hover:bg-muted/50 p-1.5 rounded transition-colors cursor-default">
-                                                    <span className="text-slate-700 dark:text-slate-300 truncate max-w-[180px]" title={s.name}>
+                                            {[...category.students].sort((a, b) => a[typeKey] - b[typeKey]).map((s: StudentData) => (
+                                                <Link
+                                                    key={s.id}
+                                                    to={`/trajetoria?classId=${classId}&studentId=${s.id}&subject=${selectedSubject}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-xs flex justify-between items-center group hover:bg-muted/50 p-1.5 rounded transition-colors cursor-pointer text-decoration-none text-foreground"
+                                                >
+                                                    <span className="text-slate-700 dark:text-slate-300 truncate max-w-[180px] group-hover:underline decoration-slate-400 underline-offset-2" title={s.name}>
                                                         {s.name}
                                                     </span>
                                                     <span className={`font-mono font-medium ${bucket.color}`}>
                                                         {s[typeKey].toFixed(1)}
                                                     </span>
-                                                </div>
+                                                </Link>
                                             ))}
                                         </div>
                                     </div>
