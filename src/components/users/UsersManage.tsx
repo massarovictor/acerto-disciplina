@@ -141,33 +141,23 @@ export const UsersManage = () => {
         if (!editingUser) return;
 
         setIsSubmitting(true);
-        const { error } = await supabase
-            .from('authorized_emails')
-            .update({ role: formData.role })
-            .eq('email', editingUser.email);
+
+        const { error } = await supabase.functions.invoke('create-user', {
+            method: 'PUT',
+            body: {
+                email: editingUser.email,
+                role: formData.role
+            },
+        });
 
         if (error) {
             toast({
                 title: 'Erro',
-                description: 'Não foi possível atualizar o usuário.',
+                description: error.message || 'Não foi possível atualizar o usuário.',
                 variant: 'destructive',
             });
             setIsSubmitting(false);
             return;
-        }
-
-        // Also update the profile if exists
-        const { data: userData } = await supabase
-            .from('auth.users')
-            .select('id')
-            .eq('email', editingUser.email)
-            .single();
-
-        if (userData?.id) {
-            await supabase
-                .from('profiles')
-                .update({ role: formData.role })
-                .eq('id', userData.id);
         }
 
         toast({

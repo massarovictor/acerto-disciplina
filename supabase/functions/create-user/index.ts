@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS, DELETE',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS, DELETE, PUT',
 };
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  if (req.method !== 'POST' && req.method !== 'DELETE') {
+  if (req.method !== 'POST' && req.method !== 'DELETE' && req.method !== 'PUT') {
     return jsonResponse({ error: 'Metodo nao permitido.' }, 405);
   }
 
@@ -92,6 +92,43 @@ Deno.serve(async (req) => {
 
   if (!email || !emailRegex.test(email)) {
     return jsonResponse({ error: 'Email invalido.' }, 400);
+  }
+
+  // --- UPDATE (PUT) LOGIC ---
+  if (req.method === 'PUT') {
+    const roleToUpdate = typeof payload.role === 'string' ? payload.role : 'professor';
+
+    // 1. Update authorized_emails
+    const { error: updateEmailError } = await adminClient
+      .from('authorized_emails')
+      .update({ role: roleToUpdate })
+      .eq('email', email);
+
+    if (updateEmailError) {
+      return jsonResponse({ error: 'Erro ao atualizar email autorizado.' }, 500);
+    }
+
+    // 2. Find user to update profile
+    const existingUser = await findUserByEmail(adminClient, email);
+
+    if (existingUser) {
+      // 3. Update public.profiles
+      const { error: updateProfileError } = await adminClient
+        .from('profiles')
+        .update({ role: roleToUpdate })
+        .eq('id', existingUser.id);
+
+      if (updateProfileError) {
+        return jsonResponse({ warning: 'Email atualizado, mas perfil falhou. Verifique permissoes.' });
+      }
+
+      // 4. Update auth.users metadata (optional but good for consistency)
+      await adminClient.auth.admin.updateUserById(existingUser.id, {
+        user_metadata: { role: roleToUpdate }
+      });
+    }
+
+    return jsonResponse({ ok: true });
   }
 
   // --- DELETE LOGIC ---
