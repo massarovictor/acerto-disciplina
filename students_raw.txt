@@ -1,0 +1,376 @@
+Mat Sige
+ID Censo
+ Aluno	
+Dt. Nasc.
+ Sexo
+Situação
+Movimento
+Turma
+Tipo Matrícula
+4171853
+  1 - ADRIAN KAFTELLY FRANKLIM DE FREITAS	
+21/09/2010
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+5689564
+  2 - ANA BEATRIZ GONCALVES DE QUEIROZ	
+24/08/2010
+ FEMININO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3578361
+  3 - ANA CLAUDIA CARNEIRO VICTOR	
+27/09/2010
+ FEMININO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3636220
+  4 - ANA JULIA GONCALVES LIMA	
+24/08/2010
+ FEMININO
+Matriculado
+Novato
+D
+Matrícula Inicial
+4605803
+  5 - ANNY HELOISE DE SOUSA ARAUJO	
+24/05/2011
+ FEMININO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3189062
+  6 - ANY MILENA ALVES MOTA	
+03/02/2011
+ FEMININO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3145228
+  7 - CAIC BENICIO NOGUEIRA E SILVA	
+02/01/2011
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3155121
+  8 - CASSIO ALEXANDRE DIAS RODRIGUES DE LIMA	
+31/12/2010
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+4881704
+123994622971
+  9 - EMILLY DE LIMA QUEIROZ	
+31/10/2010
+ FEMININO
+Matriculado
+Novato
+D
+Matrícula Inicial
+4661218
+  10 - EMILLY NICOLE ESTEVAM NARCISO	
+16/02/2011
+ FEMININO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3147865
+  11 - FRANCISCO SAMUEL CARLOS RODRIGUES	
+14/10/2010
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3737599
+  12 - GUSTAVO ALVES MAGALHAES	
+02/05/2011
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3187562
+  13 - JADSON RENNER DE OLIVEIRA FRANCA	
+01/07/2011
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3154603
+  14 - JOAO LUCAS VIEIRA DE NEGREIROS	
+26/06/2010
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3189733
+  15 - JOAO PEDRO ALVES PACHECO	
+06/02/2011
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3937503
+  16 - JOAO VICTOR AQUINO MACEDO	
+14/01/2011
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3492370
+  17 - JOCELIO SOUZA DA COSTA	
+19/01/2011
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+5690623
+  18 - JOSE CAIO PESSOA FERNANDES	
+18/11/2010
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3184758
+126220151860
+  19 - JOSE IGOR ROCHA DA SILVA	
+09/07/2010
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3184907
+126224762057
+  20 - JUAN ROCHA OLIVEIRA	
+27/08/2010
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+5089095
+122313520950
+  21 - KAIQUE PAULINO SOARES	
+25/06/2010
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3491741
+  22 - KAUAN DA SILVA NARCISO	
+22/09/2010
+ MASCULINO
+Matriculado
+Transferência
+D
+Admitido
+3638332
+  23 - KELLEN BIANCA DE LIMA QUEIROZ	
+14/08/2010
+ FEMININO
+Matriculado
+Novato
+D
+Matrícula Inicial
+4896746
+  24 - LARA GABRIELE VIANA LIMA	
+29/09/2010
+ FEMININO
+Matriculado
+Novato
+D
+Matrícula Inicial
+2871592
+  25 - LAURA BIANCA OLIVEIRA DE LIMA	
+03/08/2010
+ FEMININO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3189741
+  26 - LAURA SOPHIA DE SOUSA LIMA	
+17/09/2010
+ FEMININO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3188116
+  27 - LUIS FELIPE NANES DA SILVA	
+12/04/2010
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+5012666
+124083305214
+  28 - MARCOS ALTAMIRO BESSA CHAVES	
+09/08/2010
+ MASCULINO
+Matriculado
+Novato
+D
+Admitido
+5689900
+  29 - MARIA BEATRIZ DE AQUINO TEIXEIRA	
+17/08/2010
+ FEMININO
+Matriculado
+Novato
+D
+Matrícula Inicial
+4349775
+  30 - MARIANA ESTER LIMA FERNANDES	
+30/03/2011
+ FEMININO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3145348
+  31 - MARIA RITA DE AQUINO LUCAS	
+14/10/2010
+ FEMININO
+Matriculado
+Novato
+D
+Matrícula Inicial
+5265298
+123865546780
+  32 - MARIA RITA DIOGENES MEDEIROS	
+19/01/2011
+ FEMININO
+Matriculado
+Novato
+D
+Matrícula Inicial
+4619325
+  33 - MIGUEL QUEIROZ DAMIAO	
+22/05/2010
+ MASCULINO
+Matriculado
+Transferência
+D
+Admitido
+3145373
+  34 - MURILO ANDRADE BENEVIDES	
+24/05/2011
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+5689297
+  35 - MURILO KAIO DE CARVALHO	
+21/06/2010
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+5689431
+  36 - PEDRO AYRTON DIOGENES NUNES	
+20/07/2010
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3155298
+  37 - PEDRO ENZO ALVES DA SILVA	
+10/12/2010
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3189423
+  38 - PEDRO MIGUEL AMORIM DA SILVA	
+14/01/2011
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3189141
+  39 - RUAN CARLOS CARNEIRO FONSECA	
+01/09/2010
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3189439
+  40 - RUTYELLY NOGUEIRA RODRIGUES	
+29/03/2011
+ FEMININO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3197928
+  41 - THALITA ADRIELLY FERNANDES MAIA	
+11/08/2010
+ FEMININO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3189462
+  42 - VICTOR EMANOEL AMORIM MATIAS	
+08/01/2011
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3153565
+124379322083
+  43 - VITORIA NARCISA DA SILVA	
+26/08/2010
+ FEMININO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3189474
+  44 - YCARO EMANUEL DA SILVA OLIVEIRA	
+13/04/2011
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial
+3403287
+  45 - YURI MATEUS GOMES SILVA	
+16/06/2010
+ MASCULINO
+Matriculado
+Novato
+D
+Matrícula Inicial

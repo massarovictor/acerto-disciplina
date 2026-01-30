@@ -3,12 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useStudents, useGradesAnalytics, useHistoricalGrades, useExternalAssessments } from '@/hooks/useData';
 import { CriticalityAnalysis } from './CriticalityAnalysis';
 import {
     ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, LabelList
 } from 'recharts';
-import { Users, GraduationCap, Target, School, TrendingUp, BookOpen, Activity } from 'lucide-react';
+import { Users, GraduationCap, Target, School, TrendingUp, BookOpen, Activity, BarChart2 } from 'lucide-react';
+import { useTrajectoryStatistics } from '@/hooks/useTrajectoryStatistics';
+import { Button } from '@/components/ui/button';
+import { TrajectoryComparisonDialog } from './TrajectoryComparisonDialog';
 
 interface ClassTrajectoryViewProps {
     classId: string;
@@ -16,127 +18,23 @@ interface ClassTrajectoryViewProps {
 }
 
 export const ClassTrajectoryView = ({ classId, selectedSubject }: ClassTrajectoryViewProps) => {
-    // Data Hooks
-    const { students } = useStudents();
-    const { grades: classGrades } = useGradesAnalytics({ classId });
-    const { historicalGrades } = useHistoricalGrades();
-    const { externalAssessments } = useExternalAssessments();
-
     // UI State
     const [selectedExternalAssessment, setSelectedExternalAssessment] = useState<string>('all');
+    const [isComparisonOpen, setIsComparisonOpen] = useState(false);
 
-    // 1. Filter Data for this Class
-    const classStudentIds = useMemo(() => {
-        return students
-            .filter(s => s.classId === classId && s.status === 'active')
-            .map(s => s.id);
-    }, [students, classId]);
+    // Data Hook (Aggregated logic extracted)
+    const {
+        statsByClass,
+        distinctAssessments,
+        loading
+    } = useTrajectoryStatistics({ classIds: [classId], selectedSubject });
 
-    const filteredHistorical = useMemo(() => {
-        return historicalGrades.filter(h => classStudentIds.includes(h.studentId));
-    }, [historicalGrades, classStudentIds]);
+    const aggregatedData = statsByClass?.[classId];
+    const timelineData = aggregatedData?.timelineData || [];
 
-    const filteredExternal = useMemo(() => {
-        return externalAssessments.filter(e =>
-            classStudentIds.includes(e.studentId) &&
-            (selectedExternalAssessment === 'all' || e.assessmentName === selectedExternalAssessment)
-        );
-    }, [externalAssessments, classStudentIds, selectedExternalAssessment]);
-
-    // Unique External Assessment Names for Filter
-    const distinctAssessments = useMemo(() => {
-        return Array.from(new Set(externalAssessments
-            .filter(e => classStudentIds.includes(e.studentId))
-            .map(e => e.assessmentName)
-        )).sort();
-    }, [externalAssessments, classStudentIds]);
-
-    // 2. Aggregate Data for Holistic Summary & Criticality
-    const aggregatedData = useMemo(() => {
-        if (classStudentIds.length === 0) return null;
-
-        // --- Averages Calculation ---
-        let totalFund = 0, countFund = 0;
-        let totalHS = 0, countHS = 0;
-        let totalExt = 0, countExt = 0;
-
-        // Map for Criticality Analysis (per student averages)
-        const studentStats = classStudentIds.map(studentId => {
-            const student = students.find(s => s.id === studentId);
-
-            // Fundamental Avg for this student
-            const sFund = filteredHistorical.filter(h => h.studentId === studentId && (selectedSubject === 'all' || !selectedSubject || h.subject === selectedSubject));
-            const sFundAvg = sFund.length > 0 ? sFund.reduce((a, b) => a + b.grade, 0) / sFund.length : 0;
-
-            // High School Avg for this student
-            const sHS = classGrades.filter(g => g.studentId === studentId && (selectedSubject === 'all' || !selectedSubject || g.subject === selectedSubject));
-            const sHSAvg = sHS.length > 0 ? sHS.reduce((a, b) => a + b.grade, 0) / sHS.length : 0;
-
-            // External Avg for this student
-            const sExt = filteredExternal.filter(e => e.studentId === studentId && (selectedSubject === 'all' || !selectedSubject || e.subject === selectedSubject));
-            const sExtAvg = sExt.length > 0 ? sExt.reduce((a, b) => a + b.score, 0) / sExt.length : 0;
-
-            if (sFundAvg > 0) { totalFund += sFundAvg; countFund++; }
-            if (sHSAvg > 0) { totalHS += sHSAvg; countHS++; }
-            if (sExtAvg > 0) { totalExt += sExtAvg; countExt++; }
-
-            return {
-                id: studentId,
-                name: student?.name || 'Aluno Desconhecido',
-                fundAvg: sFundAvg,
-                highSchoolAvg: sHSAvg,
-                externalAvg: sExtAvg
-            };
-        });
-
-        const avgFund = countFund > 0 ? totalFund / countFund : 0;
-        const avgHS = countHS > 0 ? totalHS / countHS : 0;
-        const avgExt = countExt > 0 ? totalExt / countExt : 0;
-
-        return {
-            averages: { fund: avgFund, hs: avgHS, ext: avgExt },
-            studentStats
-        };
-    }, [classStudentIds, filteredHistorical, classGrades, filteredExternal, selectedSubject, students]);
-
-    // 3. Prepare Timeline & Pulse Data
-    const timelineData = useMemo(() => {
-        const data: any[] = [];
-
-        // Fundamental Years (6-9)
-        [6, 7, 8, 9].forEach(year => {
-            const gradesForYear = filteredHistorical.filter(h => h.gradeYear === year && (selectedSubject === 'all' || !selectedSubject || h.subject === selectedSubject));
-            if (gradesForYear.length > 0) {
-                const avg = gradesForYear.reduce((acc, curr) => acc + curr.grade, 0) / gradesForYear.length;
-                data.push({
-                    label: `${year}º Ano`,
-                    grade: parseFloat(avg.toFixed(1)),
-                    type: 'Fundamental'
-                });
-            }
-        });
-
-        // High School (Group by Quarter for cleaner pulse)
-        const gradesByPeriod: Record<string, number[]> = {};
-
-        classGrades.forEach(g => {
-            if (selectedSubject !== 'all' && selectedSubject && g.subject !== selectedSubject) return;
-            const key = `${g.schoolYear}º ano - ${g.quarter}`;
-            if (!gradesByPeriod[key]) gradesByPeriod[key] = [];
-            gradesByPeriod[key].push(g.grade);
-        });
-
-        Object.entries(gradesByPeriod).sort().forEach(([label, values]) => {
-            const avg = values.reduce((a, b) => a + b, 0) / values.length;
-            data.push({
-                label: label,
-                grade: parseFloat(avg.toFixed(1)),
-                type: 'Médio'
-            });
-        });
-
-        return data;
-    }, [filteredHistorical, classGrades, selectedSubject]);
+    if (loading) {
+        return <div className="p-8 text-center text-muted-foreground">Carregando dados da turma...</div>;
+    }
 
     if (!aggregatedData) {
         return (
@@ -161,8 +59,18 @@ export const ClassTrajectoryView = ({ classId, selectedSubject }: ClassTrajector
                         Análise agregada de desempenho e distribuição de criticidade.
                     </p>
                 </div>
-
+                <Button variant="outline" className="gap-2" onClick={() => setIsComparisonOpen(true)}>
+                    <BarChart2 className="h-4 w-4" />
+                    Comparar Turmas
+                </Button>
             </div>
+
+            <TrajectoryComparisonDialog
+                open={isComparisonOpen}
+                onOpenChange={setIsComparisonOpen}
+                currentClassId={classId}
+                selectedSubject={selectedSubject}
+            />
 
             {/* Holistic Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

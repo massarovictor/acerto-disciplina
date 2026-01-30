@@ -15,37 +15,37 @@ export const CRITICALITY_BUCKETS: CriticalityBucket[] = [
         level: 'MUITO CRITICO',
         label: 'Muito Crítico',
         min: 0,
-        max: 2.5,
+        max: 5.0,
         color: 'text-red-800',
         bg: 'bg-red-100',
-        description: 'Desempenho extremamente baixo (0 - 2.5)'
+        description: 'Desempenho muito crítico (0 - 5.0)'
     },
     {
         level: 'CRITICO',
         label: 'Crítico',
-        min: 2.5,
-        max: 5.0,
+        min: 5.0,
+        max: 6.0,
         color: 'text-red-600',
         bg: 'bg-red-50',
-        description: 'Desempenho insuficiente (2.5 - 5.0)'
+        description: 'Desempenho crítico (5.0 - 6.0)'
     },
     {
         level: 'INTERMEDIARIO',
         label: 'Intermediário',
-        min: 5.0,
-        max: 7.5,
+        min: 6.0,
+        max: 7.0,
         color: 'text-amber-600',
         bg: 'bg-amber-50',
-        description: 'Desempenho mediano (5.0 - 7.5)'
+        description: 'Desempenho intermediário (6.0 - 7.0)'
     },
     {
         level: 'ADEQUADO',
         label: 'Adequado',
-        min: 7.5,
+        min: 7.0,
         max: 10.1, // To include 10
         color: 'text-emerald-600',
         bg: 'bg-emerald-50',
-        description: 'Desempenho satisfatório (7.5 - 10)'
+        description: 'Desempenho adequado (7.0 - 10)'
     }
 ];
 
@@ -55,9 +55,9 @@ export const getCriticalityLevel = (grade: number): CriticalityLevel => {
     if (grade > 10) return 'ADEQUADO';
     if (isNaN(grade)) return 'MUITO CRITICO';
 
-    if (grade < 2.5) return 'MUITO CRITICO';
-    if (grade < 5.0) return 'CRITICO';
-    if (grade < 7.5) return 'INTERMEDIARIO';
+    if (grade < 5.0) return 'MUITO CRITICO';
+    if (grade < 6.0) return 'CRITICO';
+    if (grade < 7.0) return 'INTERMEDIARIO';
     return 'ADEQUADO';
 };
 
