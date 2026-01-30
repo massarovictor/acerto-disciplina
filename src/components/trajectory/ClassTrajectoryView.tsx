@@ -10,7 +10,7 @@ import {
 import { Users, GraduationCap, Target, School, TrendingUp, BookOpen, Activity, BarChart2 } from 'lucide-react';
 import { useTrajectoryStatistics } from '@/hooks/useTrajectoryStatistics';
 import { Button } from '@/components/ui/button';
-import { TrajectoryComparisonDialog } from './TrajectoryComparisonDialog';
+import { TrajectoryComparisonDialog } from '@/components/trajectory/TrajectoryComparisonDialog';
 
 interface ClassTrajectoryViewProps {
     classId: string;
