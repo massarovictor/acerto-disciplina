@@ -76,10 +76,6 @@ const InsightIcon = ({ type }: { type: Insight['type'] }) => {
     }
 };
 
-const formatNumber = (num: number, decimals: number = 1): string => {
-    return num.toFixed(decimals);
-};
-
 export function BehaviorAnalyticsPanel({
     behavioralAnalytics,
     behavioralInsights

@@ -35,7 +35,8 @@ import {
   BookOpen,
   Users2,
   ShieldAlert,
-  BarChart3
+  BarChart3,
+  ClipboardList,
 } from 'lucide-react';
 import {
   useClasses,
@@ -43,6 +44,7 @@ import {
   useIncidents,
   useProfessionalSubjects,
   useProfessionalSubjectTemplates,
+  useExternalAssessments,
 } from '@/hooks/useData';
 import { AnalyticsFilters, Insight, SubjectAnalytics } from '@/hooks/useSchoolAnalytics';
 import { useSchoolAnalyticsWorker } from '@/hooks/useSchoolAnalyticsWorker';
@@ -55,6 +57,7 @@ import { SubjectAnalysisPanel } from '@/components/analytics/SubjectAnalysisPane
 import { ClassComparisonDialog } from '@/components/analytics/ClassComparisonDialog';
 import { BehaviorAnalyticsPanel } from '@/components/analytics/BehaviorAnalyticsPanel';
 import { CohortComparisonTable } from '@/components/analytics/CohortComparisonTable';
+import { ExternalAssessmentAnalyticsPanel } from '@/components/analytics/ExternalAssessmentAnalyticsPanel';
 import { useUIStore } from '@/stores/useUIStore';
 import { useToast } from '@/hooks/use-toast';
 import { PageContainer } from '@/components/layout/PageContainer';
@@ -183,6 +186,7 @@ const Analytics = () => {
   const { analyticsUI, setAnalyticsFilters } = useUIStore();
   const filters = analyticsUI.filters as AnalyticsFilters;
   const { incidents } = useIncidents();
+  const { externalAssessments } = useExternalAssessments();
 
   const {
     grades,
@@ -209,15 +213,7 @@ const Analytics = () => {
     filters
   );
 
-  useEffect(() => {
-    // DEBUG: imprimir quantas disciplinas o worker retornou
-    try {
-      // eslint-disable-next-line no-console
-      console.info('[DEBUG] analytics.subjectAnalytics.length =', analytics?.subjectAnalytics?.length);
-    } catch (e) {
-      // ignore
-    }
-  }, [analytics?.subjectAnalytics?.length]);
+
 
   const analyticsContext = analytics.context ?? {
     mode: 'general' as const,
@@ -378,7 +374,7 @@ const Analytics = () => {
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-6">
           <TabsTrigger value="dashboard" className="gap-2">
             <LayoutDashboard className="h-4 w-4" />
             Visão 360º
@@ -398,6 +394,10 @@ const Analytics = () => {
           <TabsTrigger value="behavior" className="gap-2">
             <Users2 className="h-4 w-4" />
             Convivência
+          </TabsTrigger>
+          <TabsTrigger value="external-assessments" className="gap-2">
+            <ClipboardList className="h-4 w-4" />
+            Avaliações Externas
           </TabsTrigger>
         </TabsList>
 
@@ -444,7 +444,6 @@ const Analytics = () => {
             areaAnalytics={analytics.areaAnalytics}
           />
 
-          <div className="text-xs text-muted-foreground">DEBUG: disciplinas retornadas: {analytics.subjectAnalytics.length}</div>
 
           {/* Comparativo de Disciplinas */}
           {analyticsContext.hasSubjectFilter && (
@@ -535,6 +534,16 @@ const Analytics = () => {
               </Button>
             </div>
           )}
+        </TabsContent>
+
+        {/* ================= ABA 6: AVALIAÇÕES EXTERNAS ================= */}
+        <TabsContent value="external-assessments" className="space-y-8">
+          <ExternalAssessmentAnalyticsPanel
+            assessments={externalAssessments}
+            students={students}
+            classes={classes}
+            filters={filters}
+          />
         </TabsContent>
 
       </Tabs>

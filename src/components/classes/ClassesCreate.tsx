@@ -146,6 +146,16 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
       return;
     }
 
+    // Validar email do diretor de turma (obrigatório para notificações)
+    if (!formData.directorEmail) {
+      toast({
+        title: 'Erro',
+        description: 'O email do diretor de turma é obrigatório para receber notificações de ocorrências.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     // Verificar duplicatas
     const normalizedName = normalizeName(generatedName);
     const duplicate = classes.find(
@@ -430,7 +440,9 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
                 )}
 
                 <div className="space-y-2 md:col-span-2 pt-2">
-                  <Label htmlFor="directorEmail">Diretor de Turma</Label>
+                  <Label htmlFor="directorEmail" className="flex items-center gap-1">
+                    Diretor de Turma <span className="text-red-500">*</span>
+                  </Label>
                   <Select
                     value={formData.directorEmail || 'none'}
                     onValueChange={(value) => {
@@ -451,15 +463,18 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
                     }}
                   >
                     <SelectTrigger id="directorEmail">
-                      <SelectValue placeholder="Selecione um diretor (opcional)" />
+                      <SelectValue placeholder="Selecione um diretor de turma" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Sem diretor atribuído</SelectItem>
-                      {directors.map((d) => (
-                        <SelectItem key={d.email} value={d.email}>
-                          {d.email} ({getDirectorLoad(d.email)} turmas)
-                        </SelectItem>
-                      ))}
+                      {directors.length === 0 ? (
+                        <SelectItem value="none" disabled>Nenhum professor cadastrado</SelectItem>
+                      ) : (
+                        directors.map((d) => (
+                          <SelectItem key={d.email} value={d.email}>
+                            {d.email} ({getDirectorLoad(d.email)} turmas)
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
 
@@ -492,6 +507,6 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
           </div>
         </form>
       </CardContent>
-    </Card>
+    </Card >
   );
 };

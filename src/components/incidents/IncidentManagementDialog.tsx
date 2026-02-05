@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { FollowUpList } from './FollowUpList';
 import { FollowUpForm } from './FollowUpForm';
 import {
@@ -26,9 +26,10 @@ import { useIncidents, useClasses, useStudents } from '@/hooks/useData';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Clock, CheckCircle, Plus, FileText } from 'lucide-react';
-import { calculateSuggestedAction, suggestFollowUpType } from '@/lib/incidentActions';
+import { calculateSuggestedAction, suggestFollowUpType, getRequiredActionLevel, getRequiredFollowUpType, ActionLevel } from '@/lib/incidentActions';
 import { generateIncidentPDF } from '@/lib/incidentPdfExport';
 import { getSeverityColor, getSeverityLabel, getStatusColor } from '@/lib/incidentUtils';
+import { sendIncidentEmail } from '@/lib/emailService';
 
 interface IncidentManagementDialogProps {
   incident: Incident;
@@ -80,21 +81,32 @@ export const IncidentManagementDialog = ({
   // Auto-preencher acompanhamento quando mudar para status acompanhamento
   useEffect(() => {
     if (currentIncident.status === 'acompanhamento' && !currentIncident.followUps?.length) {
+      // Calculate required action level based on severity + accumulated history
+      const requiredLevel = getRequiredActionLevel(
+        currentIncident.studentIds,
+        currentIncident.finalSeverity,
+        incidents
+      );
+      const requiredType = getRequiredFollowUpType(requiredLevel);
+
       const suggested = calculateSuggestedAction(
         currentIncident.studentIds,
         currentIncident.finalSeverity,
         incidents,
         students
       );
-      const autoType = suggestFollowUpType(suggested, currentIncident.finalSeverity);
 
-      setFollowUpType(autoType);
+      // Force the required follow-up type based on accumulation rules
+      setFollowUpType(requiredType);
       setFollowUpProvidencias(suggested);
 
       if (currentIncident.finalSeverity === 'grave' || currentIncident.finalSeverity === 'gravissima') {
         setFollowUpMotivo('1 - Comportamento inadequado');
       } else if (currentIncident.finalSeverity === 'intermediaria') {
         setFollowUpMotivo('2 - Conflitos/Relação interpessoal');
+      } else if (requiredType === 'conversa_pais') {
+        // Accumulated leves requiring parent contact
+        setFollowUpMotivo('6 - Rendimento (Intervenções por baixo rendimento/Elogios/Reconhecimento)');
       }
     }
 
@@ -195,6 +207,12 @@ export const IncidentManagementDialog = ({
         status: 'acompanhamento',
       });
 
+      // Enviar email de acompanhamento ao diretor
+      if (incidentClass?.directorEmail) {
+        sendIncidentEmail('incident_followup', incident, incidentClass, students)
+          .catch(err => console.error('Erro ao enviar email:', err));
+      }
+
       toast({
         title: 'Acompanhamento iniciado',
         description: 'Preencha os detalhes da ação realizada na aba Acompanhamento.',
@@ -269,6 +287,12 @@ export const IncidentManagementDialog = ({
       await updateIncident(incident.id, {
         status: 'resolvida',
       });
+
+      // Enviar email de resolução ao diretor
+      if (incidentClass?.directorEmail) {
+        sendIncidentEmail('incident_resolved', incident, incidentClass, students)
+          .catch(err => console.error('Erro ao enviar email:', err));
+      }
 
       onStatusChange?.('resolvida');
 

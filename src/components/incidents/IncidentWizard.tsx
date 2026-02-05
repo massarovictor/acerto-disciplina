@@ -9,12 +9,13 @@ import { EpisodesStep } from "./wizard/EpisodesStep";
 import { DetailsStep } from "./wizard/DetailsStep";
 import { ReviewStep } from "./wizard/ReviewStep";
 import { IncidentSeverity } from "@/types";
-import { useIncidents } from "@/hooks/useData";
+import { useIncidents, useClasses, useStudents } from "@/hooks/useData";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { getSeverityColor, getSeverityLabel } from "@/lib/incidentUtils";
+import { sendIncidentEmail } from "@/lib/emailService";
 
 export interface IncidentFormData {
   classId: string;
@@ -50,6 +51,8 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
   });
 
   const { addIncident } = useIncidents();
+  const { classes } = useClasses();
+  const { students } = useStudents();
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -97,7 +100,7 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
     }
 
     try {
-      await addIncident({
+      const newIncident = await addIncident({
         classId: formData.classId,
         date: formData.date || new Date().toISOString().split("T")[0],
         studentIds: formData.studentIds,
@@ -112,6 +115,22 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
         status: "aberta",
         createdBy: user.id,
       });
+
+      // Enviar email de notificação ao diretor de turma
+      if (newIncident) {
+        const incidentClass = classes.find(c => c.id === formData.classId);
+        if (incidentClass?.directorEmail) {
+          sendIncidentEmail('new_incident', newIncident, incidentClass, students)
+            .then(result => {
+              if (result.success) {
+                console.log('Email de notificação enviado com sucesso');
+              } else {
+                console.warn('Falha ao enviar email:', result.error);
+              }
+            })
+            .catch(err => console.error('Erro ao enviar email:', err));
+        }
+      }
 
       toast({
         title: "Ocorrência registrada",

@@ -182,7 +182,7 @@ export interface HistoricalGrade {
   updatedAt?: string;
 }
 
-export type ExternalAssessmentType = 'SAEB' | 'SIGE' | 'Diagnóstica' | 'Simulado' | 'Outro';
+export type ExternalAssessmentType = 'SAEB' | 'SIGE' | 'SPAECE' | 'Diagnóstica' | 'Simulado' | 'Outro';
 
 // Posição temporal na timeline
 export interface TemporalPosition {

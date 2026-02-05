@@ -1,24 +1,58 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertTriangle } from 'lucide-react';
 import { IncidentFormData } from '../IncidentWizard';
-import { calculateSuggestedAction } from '@/lib/incidentActions';
-import { useIncidents } from '@/hooks/useData';
-import { useStudents } from '@/hooks/useData';
+import {
+  calculateSuggestedAction,
+  getRequiredActionLevel,
+  getActionText,
+  checkEscalationStatus,
+  ActionLevel
+} from '@/lib/incidentActions';
+import { useIncidents, useStudents } from '@/hooks/useData';
 
 interface DetailsStepProps {
   formData: Partial<IncidentFormData>;
   updateFormData: (data: Partial<IncidentFormData>) => void;
 }
 
+const ACTION_LEVEL_LABELS: Record<ActionLevel, string> = {
+  'conversa_registro': 'Conversa e Registro',
+  'comunicado_pais': 'Comunicado aos Pais',
+  'suspensao_1_dia': 'Suspensão de 1 Dia',
+  'suspensao_3_dias': 'Suspensão de 3 Dias',
+};
+
 export const DetailsStep = ({ formData, updateFormData }: DetailsStepProps) => {
   const { incidents } = useIncidents();
   const { students } = useStudents();
 
+  // Calculate required action level based on current severity + history
+  const requiredLevel = useMemo(() => {
+    if (!formData.studentIds?.length || !formData.finalSeverity) return 'conversa_registro';
+    return getRequiredActionLevel(formData.studentIds, formData.finalSeverity, incidents);
+  }, [formData.studentIds, formData.finalSeverity, incidents]);
+
+  // Check escalation status for each student
+  const escalationInfo = useMemo(() => {
+    if (!formData.studentIds?.length) return [];
+    return formData.studentIds.map(studentId => {
+      const student = students.find(s => s.id === studentId);
+      const status = checkEscalationStatus(studentId, incidents);
+      return {
+        studentId,
+        studentName: student?.name || 'Aluno',
+        ...status
+      };
+    }).filter(info => info.isEscalated);
+  }, [formData.studentIds, incidents, students]);
+
   useEffect(() => {
     const suggested = calculateSuggestedAction(
-      formData.studentIds,
-      formData.finalSeverity,
+      formData.studentIds || [],
+      formData.finalSeverity || 'leve',
       incidents,
       students
     );
@@ -40,6 +74,43 @@ export const DetailsStep = ({ formData, updateFormData }: DetailsStepProps) => {
         </p>
       </div>
 
+      {/* Escalation Warning */}
+      {escalationInfo.length > 0 && (
+        <Alert variant="destructive" className="border-orange-500 bg-orange-50 dark:bg-orange-950/30">
+          <AlertTriangle className="h-5 w-5 text-orange-600" />
+          <AlertTitle className="text-orange-800 dark:text-orange-300 font-bold">
+            ⚠️ Acumulação de Ocorrências Detectada
+          </AlertTitle>
+          <AlertDescription className="text-orange-700 dark:text-orange-400 space-y-2">
+            <p className="font-medium">
+              Ação obrigatória: <strong>{ACTION_LEVEL_LABELS[requiredLevel]}</strong>
+            </p>
+            <ul className="list-disc list-inside text-sm space-y-1">
+              {escalationInfo.map(info => (
+                <li key={info.studentId}>
+                  <strong>{info.studentName}</strong>: {info.reason}
+                </li>
+              ))}
+            </ul>
+            <p className="text-sm mt-2 font-medium">
+              O acompanhamento desta ocorrência exigirá contato com os responsáveis.
+            </p>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Required Action Level Badge */}
+      {requiredLevel !== 'conversa_registro' && (
+        <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-4 rounded-lg">
+          <p className="text-sm font-semibold text-red-800 dark:text-red-300">
+            📋 Nível de Ação Obrigatório: {ACTION_LEVEL_LABELS[requiredLevel]}
+          </p>
+          <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+            Baseado na gravidade atual e histórico acumulado do(s) aluno(s).
+          </p>
+        </div>
+      )}
+
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="description">Descrição Detalhada</Label>
@@ -59,7 +130,7 @@ export const DetailsStep = ({ formData, updateFormData }: DetailsStepProps) => {
         {formData.suggestedAction && (
           <div className="bg-muted/50 p-4 rounded-lg space-y-2 border">
             <h4 className="font-semibold text-sm flex items-center gap-2">
-              💡 Sugestão do Sistema
+              💡 Ação Sugerida pelo Sistema
             </h4>
             <p className="text-sm text-muted-foreground">{formData.suggestedAction}</p>
           </div>
