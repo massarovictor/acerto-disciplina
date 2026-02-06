@@ -39,7 +39,10 @@ export interface StudentAnalytics {
   className: string;
   incidentCount: number;
   trend: 'up' | 'down' | 'stable';
+  hasGrades: boolean;
 }
+
+
 
 export interface StudentPrediction {
   student: Student;
@@ -1028,6 +1031,7 @@ export function computeSchoolAnalytics(
         className: studentClass?.name || 'Sem turma',
         incidentCount: 0,
         trend: 'stable' as const,
+        hasGrades: studentGrades.length > 0,
       };
     });
 
@@ -1073,10 +1077,10 @@ export function computeSchoolAnalytics(
         classAttendance.length > 0 ? (present / classAttendance.length) * 100 : 100;
 
       const classifications = {
-        critico: classStudents.filter((student) => student.classification.classification === 'critico').length,
-        atencao: classStudents.filter((student) => student.classification.classification === 'atencao').length,
-        aprovado: classStudents.filter((student) => student.classification.classification === 'aprovado').length,
-        excelencia: classStudents.filter((student) => student.classification.classification === 'excelencia').length,
+        critico: classStudents.filter((student) => student.hasGrades && student.classification.classification === 'critico').length,
+        atencao: classStudents.filter((student) => student.hasGrades && student.classification.classification === 'atencao').length,
+        aprovado: classStudents.filter((student) => student.hasGrades && student.classification.classification === 'aprovado').length,
+        excelencia: classStudents.filter((student) => student.hasGrades && student.classification.classification === 'excelencia').length,
       };
 
       const quarterAverages = QUARTERS.map((quarter) => {
@@ -1203,15 +1207,28 @@ export function computeSchoolAnalytics(
 
 
   const classIdsWithGrades = new Set(filteredGrades.map((grade) => grade.classId));
+  const classIdsWithIncidents = new Set(filteredIncidents.map((incident) => incident.classId));
+  const classIdsWithAttendance = new Set(filteredAttendance.map((record) => record.classId));
+
   const studentIdsWithGrades = new Set(filteredGrades.map((grade) => grade.studentId));
-  const filteredClasses = candidateClasses.filter((cls) => classIdsWithGrades.has(cls.id));
+  const studentIdsWithIncidents = new Set(filteredIncidents.map((incident) => incident.studentIds).flat());
+  const studentIdsWithAttendance = new Set(filteredAttendance.map((record) => record.studentId));
+
+  const filteredClasses = candidateClasses.filter((cls) =>
+    classIdsWithGrades.has(cls.id) ||
+    classIdsWithIncidents.has(cls.id) ||
+    classIdsWithAttendance.has(cls.id)
+  );
+
   const filteredClassIds = new Set(filteredClasses.map((cls) => cls.id));
   const filteredClassById = new Map(filteredClasses.map((cls) => [cls.id, cls]));
 
   const filteredStudents = students.filter(
     (student) =>
       filteredClassIds.has(student.classId) &&
-      studentIdsWithGrades.has(student.id),
+      (studentIdsWithGrades.has(student.id) ||
+        studentIdsWithIncidents.has(student.id) ||
+        studentIdsWithAttendance.has(student.id))
   );
 
   filteredAttendance = filteredAttendance.filter(a => filteredClassIds.has(a.classId));
@@ -1307,6 +1324,7 @@ export function computeSchoolAnalytics(
       className: studentClass?.name || 'Sem turma',
       incidentCount: studentIncidents.length,
       trend,
+      hasGrades: studentGrades.length > 0,
     };
   });
 
@@ -1350,10 +1368,10 @@ export function computeSchoolAnalytics(
     const frequency = classAttendance.length > 0 ? (present / classAttendance.length) * 100 : 100;
 
     const classifications = {
-      critico: classStudents.filter(s => s.classification.classification === 'critico').length,
-      atencao: classStudents.filter(s => s.classification.classification === 'atencao').length,
-      aprovado: classStudents.filter(s => s.classification.classification === 'aprovado').length,
-      excelencia: classStudents.filter(s => s.classification.classification === 'excelencia').length,
+      critico: classStudents.filter(s => s.hasGrades && s.classification.classification === 'critico').length,
+      atencao: classStudents.filter(s => s.hasGrades && s.classification.classification === 'atencao').length,
+      aprovado: classStudents.filter(s => s.hasGrades && s.classification.classification === 'aprovado').length,
+      excelencia: classStudents.filter(s => s.hasGrades && s.classification.classification === 'excelencia').length,
     };
 
     // Calcular tendência da turma (média mensal)
@@ -1633,10 +1651,10 @@ export function computeSchoolAnalytics(
   // ============================================
 
   const totalClassifications = {
-    critico: studentAnalyticsList.filter(s => s.classification.classification === 'critico').length,
-    atencao: studentAnalyticsList.filter(s => s.classification.classification === 'atencao').length,
-    aprovado: studentAnalyticsList.filter(s => s.classification.classification === 'aprovado').length,
-    excelencia: studentAnalyticsList.filter(s => s.classification.classification === 'excelencia').length,
+    critico: studentAnalyticsList.filter(s => s.hasGrades && s.classification.classification === 'critico').length,
+    atencao: studentAnalyticsList.filter(s => s.hasGrades && s.classification.classification === 'atencao').length,
+    aprovado: studentAnalyticsList.filter(s => s.hasGrades && s.classification.classification === 'aprovado').length,
+    excelencia: studentAnalyticsList.filter(s => s.hasGrades && s.classification.classification === 'excelencia').length,
   };
 
   const overallAverage = filteredGrades.length > 0

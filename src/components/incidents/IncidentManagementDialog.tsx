@@ -30,6 +30,8 @@ import { calculateSuggestedAction, suggestFollowUpType, getRequiredActionLevel, 
 import { generateIncidentPDF } from '@/lib/incidentPdfExport';
 import { getSeverityColor, getSeverityLabel, getStatusColor } from '@/lib/incidentUtils';
 import { sendIncidentEmail } from '@/lib/emailService';
+import { AddStudentsDialog } from './AddStudentsDialog';
+import { X } from 'lucide-react';
 
 interface IncidentManagementDialogProps {
   incident: Incident;
@@ -60,6 +62,7 @@ export const IncidentManagementDialog = ({
   const [editDescription, setEditDescription] = useState('');
   const [editSuggestedAction, setEditSuggestedAction] = useState('');
   const [editActions, setEditActions] = useState('');
+  const [isAddStudentsOpen, setIsAddStudentsOpen] = useState(false);
 
   // Sincroniza a aba quando initialTab mudar
   useEffect(() => {
@@ -158,6 +161,12 @@ export const IncidentManagementDialog = ({
     (currentIncident.followUps?.length || 0) > 0 &&
     canManage;
 
+  const canAddStudents = canManage && currentIncident.status === 'acompanhamento';
+
+
+  // Permite edição se for admin/diretor E (status aberta OU acompanhamento)
+  const isEditableInfo = canManage && (['aberta', 'acompanhamento'].includes(currentIncident.status));
+
 
   const motivoOptions = [
     '1 - Comportamento inadequado',
@@ -197,6 +206,31 @@ export const IncidentManagementDialog = ({
     editDescription !== (currentIncident.description || '') ||
     editSuggestedAction !== (currentIncident.suggestedAction || '') ||
     editActions !== (currentIncident.actions || '');
+
+  const handleRemoveStudent = async (studentId: string) => {
+    if (currentIncident.studentIds.length <= 1) {
+      toast({
+        variant: 'destructive',
+        title: 'Operação não permitida',
+        description: 'A ocorrência deve ter pelo menos um aluno envolvido.'
+      });
+      return;
+    }
+
+    const newStudentIds = currentIncident.studentIds.filter(id => id !== studentId);
+
+    // Se o removido era o único no followUp (caso raro de inconsistência), limpo? 
+    // Por simplicidade, apenas atualizamos a lista da ocorrência.
+
+    await updateIncident(currentIncident.id, {
+      studentIds: newStudentIds
+    });
+
+    toast({
+      title: 'Aluno removido',
+      description: 'O aluno foi removido da ocorrência com sucesso.'
+    });
+  };
 
   const handleSaveEdit = async () => {
     if (!user || !canManage) return;
@@ -414,20 +448,61 @@ export const IncidentManagementDialog = ({
                 {new Date(currentIncident.createdAt).toLocaleDateString('pt-BR')}
               </div>
               <div className="col-span-2">
-                <span className="font-medium">Alunos:</span>
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Alunos:</span>
+                  {canAddStudents && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => setIsAddStudentsOpen(true)}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Adicionar Alunos
+                    </Button>
+                  )}
+                </div>
                 <div className="mt-1 flex flex-wrap gap-2">
                   {incidentStudents.map(student => (
                     <Badge
                       key={student.id}
                       variant="secondary"
-                      className="cursor-default"
+                      className={`cursor-default flex items-center gap-1 ${canAddStudents ? 'pr-1' : ''}`}
                     >
                       {student.name}
+                      {canAddStudents && incidentStudents.length > 1 && (
+                        <button
+                          onClick={() => handleRemoveStudent(student.id)}
+                          className="hover:bg-destructive/10 hover:text-destructive rounded-full p-0.5 transition-colors"
+                          title="Remover aluno"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
                     </Badge>
                   ))}
                 </div>
               </div>
             </div>
+
+            {/* Dialog para adicionar alunos */}
+            {canAddStudents && incidentClass && (
+              <AddStudentsDialog
+                open={isAddStudentsOpen}
+                onOpenChange={setIsAddStudentsOpen}
+                classId={incidentClass.id}
+                existingStudentIds={currentIncident.studentIds}
+                onAddStudents={async (newIds) => {
+                  await updateIncident(currentIncident.id, {
+                    studentIds: [...currentIncident.studentIds, ...newIds]
+                  });
+                  toast({
+                    title: 'Alunos adicionados',
+                    description: `${newIds.length} alunos foram adicionados à ocorrência.`
+                  });
+                }}
+              />
+            )}
 
 
             {/* Tabs */}
@@ -445,7 +520,7 @@ export const IncidentManagementDialog = ({
               <TabsContent value="info" className="space-y-4 mt-4">
                 <div className="space-y-2">
                   <Label>Descrição</Label>
-                  {canManage && currentIncident.status === 'aberta' ? (
+                  {isEditableInfo ? (
                     <Textarea
                       value={editDescription}
                       onChange={(e) => setEditDescription(e.target.value)}
@@ -462,7 +537,7 @@ export const IncidentManagementDialog = ({
 
                 <div className="space-y-2">
                   <Label>Providência Sugerida</Label>
-                  {canManage && currentIncident.status === 'aberta' ? (
+                  {isEditableInfo ? (
                     <Textarea
                       value={editSuggestedAction}
                       onChange={(e) => setEditSuggestedAction(e.target.value)}
@@ -481,7 +556,7 @@ export const IncidentManagementDialog = ({
 
                 <div className="space-y-2">
                   <Label>Providências Tomadas</Label>
-                  {canManage && currentIncident.status === 'aberta' ? (
+                  {isEditableInfo ? (
                     <Textarea
                       value={editActions}
                       onChange={(e) => setEditActions(e.target.value)}
@@ -499,7 +574,7 @@ export const IncidentManagementDialog = ({
                 </div>
 
                 {/* Botão de Salvar Edições */}
-                {canManage && currentIncident.status === 'aberta' && hasEditChanges && (
+                {isEditableInfo && hasEditChanges && (
                   <>
                     <Separator />
                     <Button
