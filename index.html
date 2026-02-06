@@ -17,6 +17,33 @@
 </head>
 
 <body>
+  <!-- Patch para evitar conflitos com extensões do navegador (Google Translate, etc.) -->
+  <script>
+    // Patch para prevenir erro "removeChild" causado por extensões que modificam o DOM
+    if (typeof Node === 'function' && Node.prototype) {
+      const originalRemoveChild = Node.prototype.removeChild;
+      Node.prototype.removeChild = function(child) {
+        if (child.parentNode !== this) {
+          if (console) {
+            console.warn('Cannot remove child - not a child of this node (likely browser extension conflict)');
+          }
+          return child;
+        }
+        return originalRemoveChild.apply(this, arguments);
+      };
+      
+      const originalInsertBefore = Node.prototype.insertBefore;
+      Node.prototype.insertBefore = function(newNode, referenceNode) {
+        if (referenceNode && referenceNode.parentNode !== this) {
+          if (console) {
+            console.warn('Cannot insert before - reference not a child of this node (likely browser extension conflict)');
+          }
+          return newNode;
+        }
+        return originalInsertBefore.apply(this, arguments);
+      };
+    }
+  </script>
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
