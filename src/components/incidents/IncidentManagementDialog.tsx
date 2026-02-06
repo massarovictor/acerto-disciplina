@@ -56,6 +56,11 @@ export const IncidentManagementDialog = ({
   const [tab, setTab] = useState<'info' | 'followup' | 'comments'>(initialTab);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Campos editáveis da ocorrência (para quando status = 'aberta')
+  const [editDescription, setEditDescription] = useState('');
+  const [editSuggestedAction, setEditSuggestedAction] = useState('');
+  const [editActions, setEditActions] = useState('');
+
   // Sincroniza a aba quando initialTab mudar
   useEffect(() => {
     setTab(initialTab);
@@ -77,6 +82,13 @@ export const IncidentManagementDialog = ({
 
   // Sempre pega a versão mais recente dos incidents
   const currentIncident = incidents.find(i => i.id === incident.id) || incident;
+
+  // Inicializa campos editáveis quando incident muda
+  useEffect(() => {
+    setEditDescription(currentIncident.description || '');
+    setEditSuggestedAction(currentIncident.suggestedAction || '');
+    setEditActions(currentIncident.actions || '');
+  }, [currentIncident.id, currentIncident.description, currentIncident.suggestedAction, currentIncident.actions]);
 
   // Auto-preencher acompanhamento quando mudar para status acompanhamento
   useEffect(() => {
@@ -131,16 +143,21 @@ export const IncidentManagementDialog = ({
   const incidentClass = classes.find(c => c.id === currentIncident.classId);
   const incidentStudents = students.filter(s => currentIncident.studentIds.includes(s.id));
 
-  // Permissões: Apenas Admin ou Diretor da Turma podem gerenciar (criar acompanhamento/resolver)
-  const isAdmin = profile?.role === 'admin';
-  const isClassDirector = incidentClass?.directorId === user?.id;
-  const canManage = isAdmin || isClassDirector;
+  // Permissões:
+  // - Admin e Gestor podem gerenciar TODAS as ocorrências em aberto/acompanhamento
+  // - Diretor de Turma pode gerenciar apenas ocorrências da sua turma
+  const isAdminOrCoordenador = profile?.role === 'admin' || profile?.role === 'coordenador';
+  const isClassDirector = incidentClass?.directorEmail === profile?.email ||
+    incidentClass?.directorId === user?.id;
+  const canManage = isAdminOrCoordenador || isClassDirector;
 
+  // Permissões específicas por status
   const canStartFollowUp = currentIncident.status === 'aberta' && canManage;
   const canEditFollowUp = currentIncident.status === 'acompanhamento' && canManage;
   const canResolve = currentIncident.status === 'acompanhamento' &&
     (currentIncident.followUps?.length || 0) > 0 &&
     canManage;
+
 
   const motivoOptions = [
     '1 - Comportamento inadequado',
@@ -174,6 +191,38 @@ export const IncidentManagementDialog = ({
   ];
 
 
+
+  // Verifica se há alterações para salvar
+  const hasEditChanges =
+    editDescription !== (currentIncident.description || '') ||
+    editSuggestedAction !== (currentIncident.suggestedAction || '') ||
+    editActions !== (currentIncident.actions || '');
+
+  const handleSaveEdit = async () => {
+    if (!user || !canManage) return;
+    setIsSaving(true);
+
+    try {
+      await updateIncident(currentIncident.id, {
+        description: editDescription,
+        suggestedAction: editSuggestedAction,
+        actions: editActions,
+      });
+
+      toast({
+        title: 'Ocorrência atualizada',
+        description: 'As alterações foram salvas com sucesso.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível salvar as alterações.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!user) return;
@@ -396,27 +445,72 @@ export const IncidentManagementDialog = ({
               <TabsContent value="info" className="space-y-4 mt-4">
                 <div className="space-y-2">
                   <Label>Descrição</Label>
-                  <p className="text-sm bg-muted p-3 rounded-md">
-                    {currentIncident.description}
-                  </p>
+                  {canManage && currentIncident.status === 'aberta' ? (
+                    <Textarea
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      rows={3}
+                      placeholder="Descrição da ocorrência..."
+                      className="resize-none"
+                    />
+                  ) : (
+                    <p className="text-sm bg-muted p-3 rounded-md">
+                      {currentIncident.description}
+                    </p>
+                  )}
                 </div>
 
-                {currentIncident.suggestedAction && (
-                  <div className="space-y-2">
-                    <Label>Providência Sugerida</Label>
-                    <p className="text-sm bg-muted p-3 rounded-md">
-                      {currentIncident.suggestedAction}
-                    </p>
-                  </div>
-                )}
+                <div className="space-y-2">
+                  <Label>Providência Sugerida</Label>
+                  {canManage && currentIncident.status === 'aberta' ? (
+                    <Textarea
+                      value={editSuggestedAction}
+                      onChange={(e) => setEditSuggestedAction(e.target.value)}
+                      rows={3}
+                      placeholder="Ação sugerida..."
+                      className="resize-none"
+                    />
+                  ) : (
+                    currentIncident.suggestedAction && (
+                      <p className="text-sm bg-muted p-3 rounded-md">
+                        {currentIncident.suggestedAction}
+                      </p>
+                    )
+                  )}
+                </div>
 
-                {currentIncident.actions && (
-                  <div className="space-y-2">
-                    <Label>Providências Tomadas</Label>
-                    <p className="text-sm bg-muted p-3 rounded-md">
-                      {currentIncident.actions}
-                    </p>
-                  </div>
+                <div className="space-y-2">
+                  <Label>Providências Tomadas</Label>
+                  {canManage && currentIncident.status === 'aberta' ? (
+                    <Textarea
+                      value={editActions}
+                      onChange={(e) => setEditActions(e.target.value)}
+                      rows={3}
+                      placeholder="Providências já realizadas..."
+                      className="resize-none"
+                    />
+                  ) : (
+                    currentIncident.actions && (
+                      <p className="text-sm bg-muted p-3 rounded-md">
+                        {currentIncident.actions}
+                      </p>
+                    )
+                  )}
+                </div>
+
+                {/* Botão de Salvar Edições */}
+                {canManage && currentIncident.status === 'aberta' && hasEditChanges && (
+                  <>
+                    <Separator />
+                    <Button
+                      onClick={handleSaveEdit}
+                      disabled={isSaving}
+                      variant="secondary"
+                      className="w-full gap-2"
+                    >
+                      {isSaving ? 'Salvando...' : 'Salvar Alterações'}
+                    </Button>
+                  </>
                 )}
 
                 {canStartFollowUp && (

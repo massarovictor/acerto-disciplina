@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -72,6 +72,21 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
       setCurrentStep((prev) => prev - 1);
     }
   };
+
+  // Ref para scroll container
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Scroll para o topo quando troca de página
+  useEffect(() => {
+    // Encontra o container com scroll (DialogContent ou página)
+    const scrollableParent = contentRef.current?.closest('[data-radix-scroll-area-viewport], .overflow-y-auto, [style*="overflow"]');
+    if (scrollableParent) {
+      scrollableParent.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      // Fallback: scroll da janela
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [currentStep]);
 
   const handleSubmit = async () => {
     if (
@@ -179,7 +194,7 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
   const displaySeverity = formData.finalSeverity || formData.calculatedSeverity;
 
   return (
-    <div className="space-y-6">
+    <div ref={contentRef} className="space-y-6">
       {/* Progress indicator with severity badge */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center justify-between flex-1">
