@@ -19,6 +19,7 @@ import { useIncidents, useClasses, useStudents } from '@/hooks/useData';
 import { SchoolConfigDialog } from '@/components/settings/SchoolConfigDialog';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { BirthdayWidget } from '@/components/dashboard/BirthdayWidget';
 
 interface NavigationCard {
   title: string;
@@ -179,6 +180,9 @@ const Dashboard = () => {
           </Card>
         ))}
       </div>
+
+      {/* Birthday Widget */}
+      <BirthdayWidget students={students} classes={classes} />
 
       {/* Archived Classes Link */}
       <div className="flex justify-center">
