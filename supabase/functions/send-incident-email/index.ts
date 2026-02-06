@@ -78,7 +78,7 @@ ${incident.suggestedAction || 'Avaliar situação e definir ação'}
 Por favor, acesse o sistema para iniciar o acompanhamento.
 
 Atenciosamente,
-Sistema de Gestão Escolar`,
+MAVIC - Sistema de Gestão Escolar`,
             };
 
         case 'incident_followup':
@@ -96,7 +96,7 @@ O acompanhamento da ocorrência foi iniciado:
 Por favor, acompanhe o caso e registre as ações realizadas no sistema.
 
 Atenciosamente,
-Sistema de Gestão Escolar`,
+MAVIC - Sistema de Gestão Escolar`,
             };
 
         case 'incident_resolved':
@@ -111,7 +111,7 @@ A ocorrência registrada em ${dateFormatted} foi RESOLVIDA.
 ✅ Status: Acompanhamento Concluído
 
 Atenciosamente,
-Sistema de Gestão Escolar`,
+MAVIC - Sistema de Gestão Escolar`,
             };
 
         default:
@@ -124,7 +124,7 @@ Houve uma atualização na ocorrência da turma ${className}.
 Por favor, acesse o sistema para mais detalhes.
 
 Atenciosamente,
-Sistema de Gestão Escolar`,
+MAVIC - Sistema de Gestão Escolar`,
             };
     }
 }

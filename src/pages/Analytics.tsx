@@ -44,7 +44,6 @@ import {
   useIncidents,
   useProfessionalSubjects,
   useProfessionalSubjectTemplates,
-  useExternalAssessments,
 } from '@/hooks/useData';
 import { AnalyticsFilters, Insight, SubjectAnalytics } from '@/hooks/useSchoolAnalytics';
 import { useSchoolAnalyticsWorker } from '@/hooks/useSchoolAnalyticsWorker';
@@ -57,7 +56,6 @@ import { SubjectAnalysisPanel } from '@/components/analytics/SubjectAnalysisPane
 import { ClassComparisonDialog } from '@/components/analytics/ClassComparisonDialog';
 import { BehaviorAnalyticsPanel } from '@/components/analytics/BehaviorAnalyticsPanel';
 import { CohortComparisonTable } from '@/components/analytics/CohortComparisonTable';
-import { ExternalAssessmentAnalyticsPanel } from '@/components/analytics/ExternalAssessmentAnalyticsPanel';
 import { useUIStore } from '@/stores/useUIStore';
 import { useToast } from '@/hooks/use-toast';
 import { PageContainer } from '@/components/layout/PageContainer';
@@ -186,7 +184,6 @@ const Analytics = () => {
   const { analyticsUI, setAnalyticsFilters } = useUIStore();
   const filters = analyticsUI.filters as AnalyticsFilters;
   const { incidents } = useIncidents();
-  const { externalAssessments } = useExternalAssessments();
 
   const {
     grades,
@@ -374,7 +371,7 @@ const Analytics = () => {
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-6">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
           <TabsTrigger value="dashboard" className="gap-2">
             <LayoutDashboard className="h-4 w-4" />
             Visão 360º
@@ -394,10 +391,6 @@ const Analytics = () => {
           <TabsTrigger value="behavior" className="gap-2">
             <Users2 className="h-4 w-4" />
             Convivência
-          </TabsTrigger>
-          <TabsTrigger value="external-assessments" className="gap-2">
-            <ClipboardList className="h-4 w-4" />
-            Avaliações Externas
           </TabsTrigger>
         </TabsList>
 
@@ -534,16 +527,6 @@ const Analytics = () => {
               </Button>
             </div>
           )}
-        </TabsContent>
-
-        {/* ================= ABA 6: AVALIAÇÕES EXTERNAS ================= */}
-        <TabsContent value="external-assessments" className="space-y-8">
-          <ExternalAssessmentAnalyticsPanel
-            assessments={externalAssessments}
-            students={students}
-            classes={classes}
-            filters={filters}
-          />
         </TabsContent>
 
       </Tabs>
