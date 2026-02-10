@@ -21,6 +21,7 @@ export const SubjectTemplatesManager = () => {
   const [viewingTemplate, setViewingTemplate] = useState<ProfessionalSubjectTemplate | null>(null);
   const [editingTemplate, setEditingTemplate] = useState<ProfessionalSubjectTemplate | null>(null);
   const [deletingTemplate, setDeletingTemplate] = useState<ProfessionalSubjectTemplate | null>(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   const [createFormData, setCreateFormData] = useState({
@@ -154,7 +155,12 @@ export const SubjectTemplatesManager = () => {
         title: 'Template excluído',
         description: 'O template foi excluído com sucesso.',
       });
+      toast({
+        title: 'Template excluído',
+        description: 'O template foi excluído com sucesso.',
+      });
       setDeletingTemplate(null);
+      setDeleteConfirmationText('');
     } catch (error) {
       toast({
         title: 'Erro',
@@ -651,7 +657,7 @@ export const SubjectTemplatesManager = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription className="space-y-4">
               {deletingTemplate && getTemplateUsageCount(deletingTemplate.id) > 0 ? (
                 <div className="space-y-2">
                   <Alert variant="destructive">
@@ -663,16 +669,33 @@ export const SubjectTemplatesManager = () => {
                   </Alert>
                 </div>
               ) : (
-                <>
-                  Tem certeza que deseja excluir o template "{deletingTemplate?.name}"? Esta ação não pode ser desfeita.
-                </>
+                <div className="space-y-2">
+                  <p>
+                    Tem certeza que deseja excluir o template "<strong>{deletingTemplate?.name}</strong>"?
+                  </p>
+                  <p className="text-sm font-medium pt-2">
+                    Digite <span className="font-bold text-red-600">excluir</span> para confirmar:
+                  </p>
+                  <Input
+                    value={deleteConfirmationText}
+                    onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                    placeholder="excluir"
+                    className="border-red-200 focus-visible:ring-red-500"
+                  />
+                </div>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setDeleteConfirmationText('')}>Cancelar</AlertDialogCancel>
             {deletingTemplate && getTemplateUsageCount(deletingTemplate.id) === 0 && (
-              <AlertDialogAction onClick={handleDelete}>Excluir</AlertDialogAction>
+              <AlertDialogAction
+                onClick={handleDelete}
+                disabled={deleteConfirmationText.toLowerCase() !== 'excluir'}
+                className="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Excluir
+              </AlertDialogAction>
             )}
           </AlertDialogFooter>
         </AlertDialogContent>

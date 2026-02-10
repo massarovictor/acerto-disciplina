@@ -14,7 +14,8 @@ import {
   CheckCircle2,
   Trash2,
   Edit,
-  Filter
+  Filter,
+  ExternalLink
 } from 'lucide-react';
 import { getSeverityColor, getSeverityLabel, getUrgencyDot } from '@/lib/incidentUtils';
 import { useIncidents, useClasses, useStudents } from '@/hooks/useData';
@@ -50,6 +51,7 @@ const Incidents = () => {
 
   const [managingIncident, setManagingIncident] = useState<Incident | null>(null);
   const [deletingIncident, setDeletingIncident] = useState<Incident | null>(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
   const [showNewIncidentDialog, setShowNewIncidentDialog] = useState(false);
   const [initialTab, setInitialTab] = useState<'info' | 'followup' | 'comments'>('info');
   const normalizeEmail = (value?: string | null) => (value || '').trim().toLowerCase();
@@ -167,7 +169,15 @@ const Incidents = () => {
           return (
             <div
               key={incident.id}
-              className="flex items-start gap-4 p-4 border rounded-lg hover:border-primary/30 hover:bg-muted/30 transition-all bg-card shadow-sm"
+              className="flex items-start gap-4 p-4 border rounded-lg hover:border-primary/30 hover:bg-muted/30 transition-all bg-card shadow-sm cursor-pointer group"
+              onClick={() => {
+                if (incident.status === 'acompanhamento') {
+                  setInitialTab('followup');
+                } else {
+                  setInitialTab('info');
+                }
+                setManagingIncident(incident);
+              }}
             >
               <div className={`mt-1.5 w-2.5 h-2.5 rounded-full ${getUrgencyDot(incident.finalSeverity)} shadow-sm`} />
 
@@ -209,18 +219,22 @@ const Incidents = () => {
                   }}
                 >
                   {!canManage || incident.status === 'resolvida' ? (
-                    <Eye className="h-4 w-4 text-muted-foreground" />
+                    <Eye className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                   ) : (
-                    <Edit className="h-4 w-4 text-muted-foreground" />
+                    <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                   )}
-                  <span className="sr-only">Ação</span>
+                  <span className="sr-only">Abrir Detalhes</span>
                 </Button>
                 {canManage && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 w-8 p-0 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                    onClick={() => setDeletingIncident(incident)}
+                    className="h-8 w-8 p-0 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 z-10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeletingIncident(incident);
+                      setDeleteConfirmationText('');
+                    }}
                   >
                     <Trash2 className="h-4 w-4" />
                     <span className="sr-only">Excluir</span>
@@ -393,13 +407,24 @@ const Incidents = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir esta ocorrência? Esta ação não pode ser desfeita.
+            <AlertDialogDescription className="space-y-4">
+              <p>Tem certeza que deseja excluir esta ocorrência? Esta ação não pode ser desfeita.</p>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Digite <span className="font-bold text-red-600">excluir</span> para confirmar:</p>
+                <Input
+                  value={deleteConfirmationText}
+                  onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                  placeholder="excluir"
+                  className="border-red-200 focus-visible:ring-red-500"
+                />
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setDeleteConfirmationText('')}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
+              disabled={deleteConfirmationText.toLowerCase() !== 'excluir'}
+              className="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={async () => {
                 if (deletingIncident) {
                   try {

@@ -62,6 +62,7 @@ export const UsersManage = () => {
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<AuthorizedEmail | null>(null);
     const [deletingUser, setDeletingUser] = useState<AuthorizedEmail | null>(null);
+    const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
     const [formData, setFormData] = useState<{ email: string; role: UserRole }>({ email: '', role: 'professor' });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -199,7 +200,13 @@ export const UsersManage = () => {
             title: 'Sucesso',
             description: 'Usuário removido do sistema (login e email autorizado).',
         });
+        toast({
+            title: 'Sucesso',
+            description: 'Usuário removido do sistema (login e email autorizado).',
+        });
         setDeletingUser(null);
+        setDeleteConfirmationText('');
+        await fetchUsers();
         await fetchUsers();
         setIsSubmitting(false);
     };
@@ -443,21 +450,41 @@ export const UsersManage = () => {
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Confirmar Remoção</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Tem certeza que deseja remover <strong>{deletingUser?.email}</strong> da lista de usuários autorizados?
-                            <br /><br />
-                            Este usuário não poderá mais acessar o sistema.
+                        <AlertDialogDescription className="space-y-4">
+                            <div className="space-y-2">
+                                <p>
+                                    Tem certeza que deseja remover <strong>{deletingUser?.email}</strong> da lista de usuários autorizados?
+                                </p>
+                                <div className="bg-red-50 dark:bg-red-900/10 p-3 rounded-md text-sm text-red-800 dark:text-red-200 border border-red-200 dark:border-red-900/30">
+                                    <p className="font-semibold mb-1 flex items-center gap-1">
+                                        <AlertTriangle className="h-4 w-4" />
+                                        Atenção:
+                                    </p>
+                                    <p>
+                                        Este usuário perderá o acesso ao sistema imediatamente.
+                                    </p>
+                                </div>
+                                <p className="text-sm font-medium pt-2">
+                                    Digite <span className="font-bold text-red-600">excluir</span> para confirmar:
+                                </p>
+                                <Input
+                                    value={deleteConfirmationText}
+                                    onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                                    placeholder="excluir"
+                                    className="border-red-200 focus-visible:ring-red-500"
+                                />
+                            </div>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogCancel onClick={() => setDeleteConfirmationText('')}>Cancelar</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={(e) => {
                                 e.preventDefault(); // Prevent auto-close
                                 handleDeleteUser();
                             }}
-                            disabled={isSubmitting}
-                            className="bg-destructive hover:bg-destructive/90"
+                            disabled={isSubmitting || deleteConfirmationText.toLowerCase() !== 'excluir'}
+                            className="bg-destructive hover:bg-destructive/90 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {isSubmitting ? (
                                 <>

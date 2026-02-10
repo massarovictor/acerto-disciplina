@@ -73,6 +73,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
   const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [deletingStudent, setDeletingStudent] = useState<Student | null>(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
   const [editFormData, setEditFormData] = useState({
     name: '',
     classId: '',
@@ -360,7 +361,12 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
         title: 'Sucesso',
         description: 'Aluno excluído com sucesso.',
       });
+      toast({
+        title: 'Sucesso',
+        description: 'Aluno excluído com sucesso.',
+      });
       setDeletingStudent(null);
+      setDeleteConfirmationText('');
     } catch (error) {
       toast({
         title: 'Erro',
@@ -502,17 +508,14 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Foto</TableHead>
-                    <TableHead>Nome</TableHead>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-[250px]">Aluno</TableHead>
                     <TableHead>Matrícula</TableHead>
-                    <TableHead>ID Censo</TableHead>
                     <TableHead>Turma</TableHead>
-                    <TableHead>Sexo</TableHead>
                     <TableHead>Idade</TableHead>
                     <TableHead>Situação</TableHead>
                     <TableHead>Status Acadêmico</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
+                    <TableHead className="text-right pr-6">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -534,19 +537,19 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                                 </AvatarFallback>
                               )}
                             </Avatar>
-                            <span className="font-semibold text-foreground">{student.name}</span>
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-foreground">{student.name}</span>
+                              <span className="text-xs text-muted-foreground">{student.censusId || 'Sem ID Censo'}</span>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>{student.enrollment || '-'}</TableCell>
-                        <TableCell>{student.censusId || '-'}</TableCell>
                         <TableCell>{getClassName(student.classId)}</TableCell>
                         <TableCell>
-                          {student.gender === 'M' ? 'M' :
-                            student.gender === 'F' ? 'F' :
-                              student.gender === 'O' ? 'Outro' : 'N/I'}
-                        </TableCell>
-                        <TableCell>
                           {calculateAge(student.birthDate)} anos
+                          <span className="text-xs text-muted-foreground ml-1">
+                            ({student.gender === 'M' ? 'M' : student.gender === 'F' ? 'F' : 'Outro'})
+                          </span>
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={
@@ -562,11 +565,12 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                             <span className="text-muted-foreground text-sm">Não calculado</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex gap-2 justify-end">
+                        <TableCell className="text-right pr-4">
+                          <div className="flex gap-1 justify-end">
                             <Button
                               variant="ghost"
                               size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
                               onClick={() => setViewingStudent(student)}
                             >
                               <Eye className="h-4 w-4" />
@@ -574,6 +578,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                             <Button
                               variant="ghost"
                               size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                               onClick={() => handleEditClick(student)}
                             >
                               <Edit className="h-4 w-4" />
@@ -581,20 +586,22 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                             <Button
                               variant="ghost"
                               size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                               onClick={() => {
                                 setTransferringStudent(student);
                                 setTransferTargetClassId('');
                               }}
                               title="Transferir aluno"
                             >
-                              <ArrowRightLeft className="h-4 w-4 text-blue-600" />
+                              <ArrowRightLeft className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                               onClick={() => setDeletingStudent(student)}
                             >
-                              <Trash2 className="h-4 w-4 text-severity-critical" />
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>
@@ -1093,6 +1100,50 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingStudent} onOpenChange={(open) => !open && setDeletingStudent(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4">
+              <div className="space-y-2">
+                <p>
+                  Tem certeza que deseja excluir o aluno <strong>{deletingStudent?.name}</strong>?
+                </p>
+                <div className="bg-red-50 dark:bg-red-900/10 p-3 rounded-md text-sm text-red-800 dark:text-red-200 border border-red-200 dark:border-red-900/30">
+                  <p className="font-semibold mb-1 flex items-center gap-1">
+                    <AlertTriangle className="h-4 w-4" />
+                    Atenção:
+                  </p>
+                  <p>
+                    Esta ação removerá permanentemente o aluno do sistema, incluindo histórico escolar e dados pessoais.
+                  </p>
+                </div>
+                <p className="text-sm font-medium pt-2">
+                  Digite <span className="font-bold text-red-600">excluir</span> para confirmar:
+                </p>
+                <Input
+                  value={deleteConfirmationText}
+                  onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                  placeholder="excluir"
+                  className="border-red-200 focus-visible:ring-red-500"
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteConfirmationText('')}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleteConfirmationText.toLowerCase() !== 'excluir'}
+              className="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Excluir Aluno
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div >
   );
 };

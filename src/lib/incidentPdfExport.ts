@@ -120,23 +120,51 @@ class IncidentPDF extends BasePDFGenerator {
         this.y += 5;
       }
 
-      // Providências
-      if (incident.actions) {
+      // Providências (Ações Iniciais + Encaminhamentos dos Acompanhamentos)
+      const hasActions = !!incident.actions;
+      const followUpsWithEncaminhamentos = incident.followUps?.filter(f => f.encaminhamentos && f.encaminhamentos.trim()) || [];
+
+      if (hasActions || followUpsWithEncaminhamentos.length > 0) {
         this.checkPageBreak(35); // Orphan control
         this.renderSectionTitle('Providências Tomadas / Combinados');
-        this.setFont('xs', 'normal', '#000000');
-        const lines = this.pdf.splitTextToSize(incident.actions, this.contentWidth);
-        lines.forEach((line: string) => {
-          this.checkPageBreak(5);
-          this.drawText(line, this.margin, this.y + 4);
-          this.y += 5;
-        });
-        this.y += 5;
-      }
 
-      // Acompanhamentos
-      if (incident.followUps && incident.followUps.length > 0) {
-        this.renderFollowUps(incident.followUps);
+        // 1. Ações Iniciais (Campo "Providências" do registro principal)
+        if (hasActions) {
+          this.setFont('xs', 'normal', '#000000');
+          const lines = this.pdf.splitTextToSize(incident.actions, this.contentWidth);
+          lines.forEach((line: string) => {
+            this.checkPageBreak(5);
+            this.drawText(line, this.margin, this.y + 4);
+            this.y += 5;
+          });
+          this.y += 3; // Espaçamento entre as ações iniciais e os combinados
+        }
+
+        // 2. Encaminhamentos de Acompanhamentos (Sorted by date)
+        if (followUpsWithEncaminhamentos.length > 0) {
+          const sorted = [...followUpsWithEncaminhamentos].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+          sorted.forEach((fu, index) => {
+            this.checkPageBreak(15);
+            const dateStr = new Date(fu.date).toLocaleDateString('pt-BR');
+
+            // Subtítulo do combinado
+            this.setFont('xs', 'bold', '#000000');
+            this.drawText(`Combinado em ${dateStr}:`, this.margin, this.y + 4);
+            this.y += 5;
+
+            // Conteúdo do combinado
+            this.setFont('xs', 'normal', '#000000');
+            const lines = this.pdf.splitTextToSize(fu.encaminhamentos || '', this.contentWidth);
+            lines.forEach((line: string) => {
+              this.checkPageBreak(5);
+              this.drawText(line, this.margin, this.y + 4);
+              this.y += 5;
+            });
+            this.y += 3; // Espaçamento entre itens
+          });
+        }
+        this.y += 2; // Espaçamento final da seção
       }
 
       // Comentários
@@ -215,45 +243,7 @@ class IncidentPDF extends BasePDFGenerator {
     this.y += 5;
   }
 
-  private renderFollowUps(followUps: FollowUpRecord[]) {
-    this.checkPageBreak(35);
-    this.renderSectionTitle('Histórico de Acompanhamento');
 
-    const sorted = [...followUps].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    sorted.forEach((fu, index) => {
-      this.checkPageBreak(25);
-
-      this.setFont('xs', 'bold', '#000000');
-      this.drawText(`${index + 1}. ${new Date(fu.date).toLocaleDateString('pt-BR')} - ${this.getFollowUpType(fu.type)}`, this.margin, this.y + 4);
-      this.y += 6;
-
-      const fields = [];
-      if (fu.responsavel) fields.push(`Registrado por: ${fu.responsavel}`);
-      if (fu.motivo) fields.push(`Motivo: ${fu.motivo}`);
-      if (fu.providencias) fields.push(`Providências: ${fu.providencias}`);
-
-      this.setFont('xs', 'normal', '#000000');
-      fields.forEach(f => {
-        const lines = this.pdf.splitTextToSize(f, this.contentWidth - 10);
-        lines.forEach((line: string) => {
-          this.checkPageBreak(5);
-          this.drawText(line, this.margin + 5, this.y + 3);
-          this.y += 4;
-        });
-      });
-      this.y += 2;
-    });
-  }
-
-  private getFollowUpType(type: string) {
-    const map: any = {
-      conversa_individual: 'Conversa Individual',
-      conversa_pais: 'Conversa com Responsáveis',
-      situacoes_diversas: 'Outras Situações'
-    };
-    return map[type] || type;
-  }
 
   private renderComments(comments: Comment[]) {
     this.checkPageBreak(35);

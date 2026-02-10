@@ -95,6 +95,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
     attendanceCount: number;
     incidentCount: number;
   } | null>(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
   const [archiveReason, setArchiveReason] = useState("Arquivamento manual");
   const [editFormData, setEditFormData] = useState({
     templateId: "",
@@ -391,6 +392,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
       attendanceCount,
       incidentCount,
     });
+    setDeleteConfirmationText('');
   };
 
   const handleCascadeDelete = async () => {
@@ -427,11 +429,11 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
 
       toast({
         title: "Turma excluída",
-        // DISABLED: Frequência removida temporariamente
         description: `Turma excluída com sucesso. ${studentCount} aluno(s) transferido(s) e ${gradeCount} nota(s) removidas.`,
       });
 
       setDeleteConfirmData(null);
+      setDeleteConfirmationText('');
     } catch (error) {
       toast({
         title: "Erro",
@@ -1150,29 +1152,32 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                           permanentemente excluídas
                         </li>
                       )}
-                      {/* DISABLED: Frequência removida temporariamente
-                      {deleteConfirmData.attendanceCount > 0 && (
-                        <li>
-                          {deleteConfirmData.attendanceCount} registro(s) de
-                          frequência - serão permanentemente excluídos
-                        </li>
-                      )}
-                      */}
                     </ul>
                   </div>
                 )}
 
-              <p className="font-semibold text-severity-critical">
-                Esta ação não pode ser desfeita. Tem certeza que deseja
-                continuar?
-              </p>
+              <div className="space-y-2">
+                <p className="font-semibold text-severity-critical">
+                  Esta ação não pode ser desfeita.
+                </p>
+                <p className="text-sm font-medium">
+                  Digite <span className="font-bold text-red-600">excluir</span> para confirmar:
+                </p>
+                <Input
+                  value={deleteConfirmationText}
+                  onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                  placeholder="excluir"
+                  className="border-red-200 focus-visible:ring-red-500"
+                />
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setDeleteConfirmationText('')}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
+              disabled={deleteConfirmationText.toLowerCase() !== 'excluir'}
               onClick={handleCascadeDelete}
-              className="bg-severity-critical hover:bg-severity-critical/90"
+              className="bg-severity-critical hover:bg-severity-critical/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Excluir Tudo
             </AlertDialogAction>
