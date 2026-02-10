@@ -7,6 +7,9 @@ const corsHeaders = {
 };
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const allowedRoles = new Set(['admin', 'diretor', 'professor']);
+const normalizeRole = (role: string | undefined) =>
+  role && allowedRoles.has(role) ? role : 'professor';
 
 const jsonResponse = (body: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -96,7 +99,9 @@ Deno.serve(async (req) => {
 
   // --- UPDATE (PUT) LOGIC ---
   if (req.method === 'PUT') {
-    const roleToUpdate = typeof payload.role === 'string' ? payload.role : 'professor';
+    const roleToUpdate = normalizeRole(
+      typeof payload.role === 'string' ? payload.role : undefined,
+    );
 
     // 1. Update authorized_emails
     const { error: updateEmailError } = await adminClient
@@ -173,8 +178,7 @@ Deno.serve(async (req) => {
   const role = typeof payload.role === 'string' ? payload.role : 'professor';
   const name = typeof payload.name === 'string' ? payload.name.trim() : '';
 
-  const allowedRoles = new Set(['admin', 'diretor', 'professor', 'coordenador', 'secretaria']);
-  const normalizedRole = allowedRoles.has(role) ? role : 'professor';
+  const normalizedRole = normalizeRole(role);
   const displayName = name || email.split('@')[0];
 
   let userId: string | null = null;

@@ -15,15 +15,15 @@ export const MOCK_USERS: User[] = [
   },
   {
     id: '3',
-    email: 'coordenador@escola.com',
+    email: 'professor2@escola.com',
     name: 'Pedro Costa',
-    role: 'coordenador',
+    role: 'professor',
   },
   {
     id: '4',
-    email: 'secretaria@escola.com',
+    email: 'professor3@escola.com',
     name: 'Ana Oliveira',
-    role: 'secretaria',
+    role: 'professor',
   },
   {
     id: '5',

@@ -79,7 +79,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
   const { templates, getTemplate } = useProfessionalSubjectTemplates();
   const { authorizedEmails } = useAuthorizedEmails();
   const { profiles } = useProfiles();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<
@@ -116,6 +116,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
   const [archivingClass, setArchivingClass] = useState<Class | null>(null);
   const normalizeName = (value: string) =>
     value.trim().replace(/\s+/g, ' ').toLowerCase();
+  const normalizeEmail = (value?: string | null) => (value || "").trim().toLowerCase();
 
   const filteredClasses = useMemo(() => classes.filter((cls) => {
     // Filtrar apenas turmas não arquivadas
@@ -132,6 +133,11 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
       return matchesSearch && !cls.directorId && !cls.directorEmail;
     return matchesSearch;
   }), [classes, searchTerm, filterStatus]);
+
+  const directorCandidates = useMemo(
+    () => authorizedEmails.filter((auth) => auth.role === "diretor"),
+    [authorizedEmails],
+  );
 
   const getDirectorName = (cls: Class) => {
     if (cls.directorId) {
@@ -160,7 +166,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
       letter: cls.letter || "",
       course: cls.course || "",
       directorId: cls.directorId || "",
-      directorEmail: cls.directorEmail || "",
+      directorEmail: normalizeEmail(cls.directorEmail),
       active: cls.active,
       startCalendarYear: cls.startCalendarYear,
       endCalendarYear: cls.endCalendarYear,
@@ -286,6 +292,15 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
 
     const normalizedLetter = editFormData.letter.trim().toUpperCase();
     const newName = `${editFormData.startCalendarYear}-${editFormData.endCalendarYear} ${resolvedCourse.trim()} ${normalizedLetter}`.trim();
+    const normalizedDirectorEmail = normalizeEmail(editFormData.directorEmail);
+    const currentUserEmail = normalizeEmail(user?.email);
+    const resolvedDirectorId = !normalizedDirectorEmail
+      ? editFormData.directorId || null
+      : normalizedDirectorEmail === currentUserEmail
+        ? (user?.id ?? null)
+        : normalizeEmail(editingClass.directorEmail) === normalizedDirectorEmail
+          ? (editingClass.directorId ?? null)
+          : null;
 
     const normalizedName = normalizeName(newName);
     const duplicate = classes.find(
@@ -306,8 +321,8 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
         series: `${editFormData.currentSeries}º ano`,
         letter: normalizedLetter,
         course: resolvedCourse.trim() || undefined,
-        directorId: editFormData.directorId || undefined,
-        directorEmail: editFormData.directorEmail || undefined,
+        directorId: resolvedDirectorId,
+        directorEmail: normalizedDirectorEmail || null,
         active: editFormData.active,
         startYear: 1,
         currentYear: editFormData.currentSeries,
@@ -1040,19 +1055,31 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                   <Label htmlFor="edit-director">Diretor de Turma</Label>
                   <Select
                     value={editFormData.directorEmail || "none"}
-                    onValueChange={(value) =>
-                      setEditFormData({
-                        ...editFormData,
-                        directorEmail: value === "none" ? "" : value,
-                      })
-                    }
+                    onValueChange={(value) => {
+                      const nextDirectorEmail = value === "none" ? "" : normalizeEmail(value);
+                      setEditFormData((prev) => {
+                        const previousEmail = normalizeEmail(prev.directorEmail);
+                        const nextDirectorId = !nextDirectorEmail
+                          ? ""
+                          : nextDirectorEmail === normalizeEmail(user?.email)
+                            ? user?.id || ""
+                            : nextDirectorEmail === previousEmail
+                              ? prev.directorId
+                              : "";
+                        return {
+                          ...prev,
+                          directorEmail: nextDirectorEmail,
+                          directorId: nextDirectorId,
+                        };
+                      });
+                    }}
                   >
                     <SelectTrigger id="edit-director">
                       <SelectValue placeholder="Selecione o diretor" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Sem diretor atribuído</SelectItem>
-                      {authorizedEmails.map((auth) => (
+                      {directorCandidates.map((auth) => (
                         <SelectItem key={auth.email} value={auth.email}>
                           {auth.email} ({auth.role})
                         </SelectItem>

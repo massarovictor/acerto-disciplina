@@ -2,7 +2,7 @@
  * Relatório Individual do Aluno - Versão V5.1 (Topicalizada e Robusta)
  * 
  * Estrutura:
- * 1. Informações do Estudante + Métricas (Média, Frequência, Ocorrências)
+ * 1. Informações do Estudante + Métricas (Média, Ocorrências)
  * 2. Quadro de Aproveitamento
  * 3. Parecer Pedagógico (Topicalizado - Estilo Ata)
  * 4. Histórico Comportamental
@@ -29,6 +29,7 @@ class StudentReportPDFGenerator {
   private grades: Grade[] = [];
   private incidents: Incident[] = [];
   private attendance: AttendanceRecord[] = [];
+  private periodLabel = 'Ano Completo';
 
   constructor() {
     this.config = getDefaultConfig();
@@ -40,7 +41,8 @@ class StudentReportPDFGenerator {
     grades: Grade[],
     incidents: Incident[],
     attendance: AttendanceRecord[],
-    subjects?: string[]
+    subjects?: string[],
+    periodContextLabel: string = 'Ano Completo',
   ): Promise<void> {
     try {
       this.config = await getSchoolConfig();
@@ -49,12 +51,21 @@ class StudentReportPDFGenerator {
       this.grades = grades.filter(g => g.studentId === student.id);
       this.incidents = incidents.filter(i => i.studentIds.includes(student.id));
       this.attendance = []; // Feature desativada
+      this.periodLabel = periodContextLabel?.trim() || 'Ano Completo';
 
       const content = this.buildDocumentContent(subjects);
       const docDefinition = this.createDocDefinition(content);
 
+      const periodToken = this.periodLabel
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '_')
+        .replace(/[^\w]/g, '');
+      const safePeriodToken = periodToken.length > 0 ? periodToken : 'Ano_Completo';
       const pdfMake = await getPdfMake();
-      pdfMake.createPdf(docDefinition).download(`Analise_Individual_${this.student.name.replace(/\s+/g, '_')}.pdf`);
+      pdfMake.createPdf(docDefinition).download(
+        `Analise_Individual_${this.student.name.replace(/\s+/g, '_')}_${safePeriodToken}.pdf`,
+      );
     } catch (error) {
       console.error('Erro ao gerar PDF Individual:', error);
       throw error;
@@ -122,12 +133,24 @@ class StudentReportPDFGenerator {
 
   private buildTitleSection(): Content {
     return {
-      text: 'RELATÓRIO INDIVIDUAL DE DESEMPENHO',
-      fontSize: 16,
-      bold: true,
-      alignment: 'center',
-      color: PDF_COLORS.primary,
-      margin: [0, 0, 0, 20],
+      stack: [
+        {
+          text: 'RELATÓRIO INDIVIDUAL DE DESEMPENHO',
+          fontSize: 16,
+          bold: true,
+          alignment: 'center',
+          color: PDF_COLORS.primary,
+          margin: [0, 0, 0, 4],
+        },
+        {
+          text: `PERÍODO: ${this.periodLabel}`,
+          fontSize: 10,
+          bold: true,
+          alignment: 'center',
+          color: PDF_COLORS.secondary,
+          margin: [0, 0, 0, 16],
+        },
+      ],
     };
   }
 
@@ -161,7 +184,6 @@ class StudentReportPDFGenerator {
         // 2. Linha de KPIs (Dashboard Row)
         gen.createDashboardRow([
           gen.createKPIBox('Média Geral', avgScore.toFixed(1), avgScore >= 6 ? PDF_COLORS.status.aprovado : PDF_COLORS.status.critico, 'Desempenho Global'),
-          gen.createKPIBox('Frequência', '100%', PDF_COLORS.info, 'Presença'), // Attendance Disabled
           gen.createKPIBox('Ocorrências', this.incidents.length.toString(), this.incidents.length > 0 ? PDF_COLORS.status.atencao : PDF_COLORS.status.aprovado, 'Total Registrado')
         ])
       ],
@@ -251,15 +273,15 @@ class StudentReportPDFGenerator {
     const below6 = subjects.filter(s => subjectAverages[s] < 6).map(s => ({ name: s, avg: subjectAverages[s] }));
     const above8 = subjects.filter(s => subjectAverages[s] >= 8).map(s => ({ name: s, avg: subjectAverages[s] }));
 
-    const vulnerabilities = below6.map(s => `• ${s.name} (${s.avg.toFixed(1)})`);
-    const strengths = above8.map(s => `• ${s.name} (${s.avg.toFixed(1)})`);
+    const vulnerabilities = below6.map(s => `${s.name} (${s.avg.toFixed(1)})`);
+    const strengths = above8.map(s => `${s.name} (${s.avg.toFixed(1)})`);
 
-    let incidentText = 'Ausência de intercorrências registradas.';
+    let incidentText = 'Ausência de ocorrências registradas.';
     if (this.incidents.length > 0) {
       const graveCount = this.incidents.filter(i => i.finalSeverity === 'grave' || i.finalSeverity === 'gravissima').length;
       incidentText = graveCount > 0
         ? `Constam ${this.incidents.length} registros, sendo ${graveCount} de maior complexidade.`
-        : `Registram-se ${this.incidents.length} intercorrências pontuais sob monitoramento.`;
+        : `Registram-se ${this.incidents.length} ocorrências pontuais sob monitoramento.`;
     }
 
     let encaminhamento = 'Manutenção do acompanhamento regular.';

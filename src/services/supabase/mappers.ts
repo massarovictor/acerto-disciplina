@@ -343,8 +343,9 @@ export const mapIncidentToDb = (
   data: Omit<Incident, 'id' | 'createdAt' | 'updatedAt' | 'followUps' | 'comments'>,
   ownerId: string,
   createdBy: string | null,
+  options: { includeOwnerId?: boolean } = {},
 ) => ({
-  owner_id: ownerId,
+  ...(options.includeOwnerId === false ? {} : { owner_id: ownerId }),
   class_id: data.classId,
   date: data.date,
   student_ids: data.studentIds,

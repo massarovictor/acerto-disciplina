@@ -23,8 +23,9 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
   const { setProfessionalSubjectsForClass } = useProfessionalSubjects();
   const { templates } = useProfessionalSubjectTemplates();
   const { toast } = useToast();
-  const { profile } = useAuth();
+  const { user } = useAuth();
   const { authorizedEmails } = useAuthorizedEmails();
+  const normalizeEmail = (value?: string | null) => (value || '').trim().toLowerCase();
 
   const currentCalendarYear = new Date().getFullYear();
 
@@ -97,7 +98,10 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
   }, [formData.templateId, formData.currentSeries, templates]);
 
   const getDirectorLoad = (directorEmail: string) => {
-    return classes.filter(c => c.directorEmail === directorEmail && !c.archived).length;
+    const normalized = normalizeEmail(directorEmail);
+    return classes.filter(
+      (c) => normalizeEmail(c.directorEmail) === normalized && !c.archived,
+    ).length;
   };
 
   const selectedDirectorLoad = formData.directorEmail ? getDirectorLoad(formData.directorEmail) : 0;
@@ -147,7 +151,8 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
     }
 
     // Validar email do diretor de turma (obrigatório para notificações)
-    if (!formData.directorEmail) {
+    const normalizedDirectorEmail = normalizeEmail(formData.directorEmail);
+    if (!normalizedDirectorEmail) {
       toast({
         title: 'Erro',
         description: 'O email do diretor de turma é obrigatório para receber notificações de ocorrências.',
@@ -185,7 +190,11 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
         series: `${formData.currentSeries}º ano`,
         letter: formData.letter.toUpperCase(),
         course: formData.course.trim(),
-        directorEmail: formData.directorEmail || undefined,
+        directorId:
+          normalizedDirectorEmail === normalizeEmail(user?.email)
+            ? user?.id
+            : undefined,
+        directorEmail: normalizedDirectorEmail || undefined,
         active: formData.active,
         startYear: 1,
         currentYear: formData.currentSeries,
@@ -228,7 +237,7 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
     return years;
   }, [currentCalendarYear]);
 
-  const directors = authorizedEmails?.filter(director => director.role === 'professor' || director.role === 'diretor') || [];
+  const directors = authorizedEmails?.filter(director => director.role === 'diretor') || [];
   return (
     <Card>
       <CardHeader className="pb-3 border-b bg-muted/20">
@@ -446,7 +455,7 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
                   <Select
                     value={formData.directorEmail || 'none'}
                     onValueChange={(value) => {
-                      const newEmail = value === 'none' ? '' : value;
+                      const newEmail = value === 'none' ? '' : normalizeEmail(value);
                       setFormData({ ...formData, directorEmail: newEmail });
 
                       // Verificar warning imediatamente ao trocar
@@ -467,7 +476,7 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
                     </SelectTrigger>
                     <SelectContent>
                       {directors.length === 0 ? (
-                        <SelectItem value="none" disabled>Nenhum professor cadastrado</SelectItem>
+                        <SelectItem value="none" disabled>Nenhum diretor cadastrado</SelectItem>
                       ) : (
                         directors.map((d) => (
                           <SelectItem key={d.email} value={d.email}>

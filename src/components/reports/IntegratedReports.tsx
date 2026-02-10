@@ -15,10 +15,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Users, FileDown, UserCheck, Calendar, GraduationCap } from "lucide-react";
+import {
+  Users,
+  FileDown,
+  UserCheck,
+  GraduationCap,
+  AlertTriangle,
+} from "lucide-react";
 import { Class, Student, Incident } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -57,14 +61,15 @@ export const IntegratedReports = ({
 }: IntegratedReportsProps) => {
   const [selectedClass, setSelectedClass] = useState("");
   const [selectedStudent, setSelectedStudent] = useState("");
-  const [showPeriodDialog, setShowPeriodDialog] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<string>("anual");
+  const [selectedIndividualPeriod, setSelectedIndividualPeriod] =
+    useState<string>("anual");
   const [selectedSchoolYear, setSelectedSchoolYear] = useState<1 | 2 | 3>(1);
   const [isGenerating, setIsGenerating] = useState(false);
+  const trajectoryFeatureIncomplete = true;
   const { toast } = useToast();
-  const { grades } = useGradesScoped({
+  const { grades, loading: isGradesLoading } = useGradesScoped({
     classId: selectedClass || undefined,
-    quarter: selectedPeriod === "anual" ? undefined : selectedPeriod,
     schoolYear: selectedSchoolYear,
   }, { enabled });
   const { historicalGrades } = useHistoricalGradesScoped(
@@ -120,6 +125,22 @@ export const IntegratedReports = ({
   }, [selectedClass, classes]);
 
   const parseLocalDate = (value: string) => new Date(`${value}T00:00:00`);
+  const extractQuarterNumber = (value?: string) => {
+    if (!value) return null;
+    const match = String(value).match(/\d+/);
+    if (!match) return null;
+    const parsed = Number(match[0]);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const isGradeInPeriod = (quarterValue: string, period: string) => {
+    if (period === "anual") return true;
+    const gradeQuarterNumber = extractQuarterNumber(quarterValue);
+    const selectedQuarterNumber = extractQuarterNumber(period);
+    if (gradeQuarterNumber !== null && selectedQuarterNumber !== null) {
+      return gradeQuarterNumber === selectedQuarterNumber;
+    }
+    return quarterValue.trim() === period.trim();
+  };
   const addMonths = (date: Date, months: number) => {
     const next = new Date(date);
     next.setMonth(next.getMonth() + months);
@@ -158,6 +179,40 @@ export const IntegratedReports = ({
     const yearEnd = addMonths(yearStart, 8);
     return { start: yearStart, end: yearEnd };
   };
+  const getCalendarYearForSchoolYear = (
+    classData: Class | null,
+    schoolYear: 1 | 2 | 3,
+  ): number | null => {
+    if (!classData) return null;
+
+    if (classData.startCalendarYear) {
+      return classData.startCalendarYear + (schoolYear - 1);
+    }
+
+    if (classData.startYearDate) {
+      const startDate = parseLocalDate(classData.startYearDate);
+      if (!Number.isNaN(startDate.getTime())) {
+        return startDate.getFullYear() + (schoolYear - 1);
+      }
+    }
+
+    if (classData.endCalendarYear) {
+      return classData.endCalendarYear - (3 - schoolYear);
+    }
+
+    return null;
+  };
+  const formatPeriodContextLabel = (
+    period: string,
+    schoolYear: 1 | 2 | 3,
+    calendarYear: number | null,
+  ) => {
+    const periodLabel = period === "anual" ? "Ano Completo" : period;
+    const schoolYearLabel = `${schoolYear}º ano`;
+    return calendarYear
+      ? `${periodLabel} • ${schoolYearLabel} • ${calendarYear}`
+      : `${periodLabel} • ${schoolYearLabel}`;
+  };
   const isDateInRange = (
     value: string,
     range: { start: Date; end: Date } | null,
@@ -187,6 +242,55 @@ export const IntegratedReports = ({
     () => getSchoolYearRange(effectiveStartYearDate, selectedSchoolYear),
     [effectiveStartYearDate, selectedSchoolYear],
   );
+  const selectedCalendarYear = useMemo(
+    () => getCalendarYearForSchoolYear(selectedClassData, selectedSchoolYear),
+    [selectedClassData, selectedSchoolYear],
+  );
+  const classPeriodContextLabel = useMemo(
+    () =>
+      formatPeriodContextLabel(
+        selectedPeriod,
+        selectedSchoolYear,
+        selectedCalendarYear,
+      ),
+    [selectedPeriod, selectedSchoolYear, selectedCalendarYear],
+  );
+  const individualPeriodContextLabel = useMemo(
+    () =>
+      formatPeriodContextLabel(
+        selectedIndividualPeriod,
+        selectedSchoolYear,
+        selectedCalendarYear,
+      ),
+    [selectedIndividualPeriod, selectedSchoolYear, selectedCalendarYear],
+  );
+  const classPeriodRange = useMemo(
+    () =>
+      selectedPeriod !== "anual"
+        ? getQuarterRange(
+          effectiveStartYearDate,
+          selectedSchoolYear,
+          selectedPeriod,
+        )
+        : schoolYearRange,
+    [effectiveStartYearDate, schoolYearRange, selectedPeriod, selectedSchoolYear],
+  );
+  const individualPeriodRange = useMemo(
+    () =>
+      selectedIndividualPeriod !== "anual"
+        ? getQuarterRange(
+          effectiveStartYearDate,
+          selectedSchoolYear,
+          selectedIndividualPeriod,
+        )
+        : schoolYearRange,
+    [
+      effectiveStartYearDate,
+      schoolYearRange,
+      selectedIndividualPeriod,
+      selectedSchoolYear,
+    ],
+  );
 
   const classGrades = useMemo(
     () =>
@@ -199,6 +303,24 @@ export const IntegratedReports = ({
         : [],
     [grades, selectedClass, selectedSchoolYear],
   );
+  const classGradesForPeriod = useMemo(
+    () =>
+      selectedPeriod === "anual"
+        ? classGrades
+        : classGrades.filter((grade) =>
+          isGradeInPeriod(grade.quarter, selectedPeriod),
+        ),
+    [classGrades, selectedPeriod],
+  );
+  const individualGradesForPeriod = useMemo(
+    () =>
+      selectedIndividualPeriod === "anual"
+        ? classGrades
+        : classGrades.filter((grade) =>
+          isGradeInPeriod(grade.quarter, selectedIndividualPeriod),
+        ),
+    [classGrades, selectedIndividualPeriod],
+  );
 
   const classIncidents = useMemo(
     () =>
@@ -210,6 +332,20 @@ export const IntegratedReports = ({
         )
         : [],
     [incidents, selectedClass, schoolYearRange],
+  );
+  const classIncidentsForPeriod = useMemo(
+    () =>
+      classIncidents.filter((incident) =>
+        isDateInRange(incident.date, classPeriodRange),
+      ),
+    [classIncidents, classPeriodRange],
+  );
+  const individualIncidentsForPeriod = useMemo(
+    () =>
+      classIncidents.filter((incident) =>
+        isDateInRange(incident.date, individualPeriodRange),
+      ),
+    [classIncidents, individualPeriodRange],
   );
 
   // DISABLED: Attendance feature temporarily removed
@@ -225,6 +361,20 @@ export const IntegratedReports = ({
   //   [attendance, selectedClass, schoolYearRange]
   // );
   const classAttendance: any[] = []; // Empty array - attendance disabled
+  const classAttendanceForPeriod = useMemo(
+    () =>
+      classAttendance.filter((record) =>
+        isDateInRange(record.date, classPeriodRange),
+      ),
+    [classAttendance, classPeriodRange],
+  );
+  const individualAttendanceForPeriod = useMemo(
+    () =>
+      classAttendance.filter((record) =>
+        isDateInRange(record.date, individualPeriodRange),
+      ),
+    [classAttendance, individualPeriodRange],
+  );
 
   const templateSubjects = useMemo(() => {
     if (!selectedClassData?.templateId) return [];
@@ -251,10 +401,10 @@ export const IntegratedReports = ({
     });
     return Array.from(unique);
   }, [templateSubjects, manualSubjects]);
-  const reportSubjects = useMemo(() => {
+  const individualReportSubjects = useMemo(() => {
     if (!selectedClassData) return [];
     const gradeSubjects = [
-      ...new Set(classGrades.map((grade) => grade.subject)),
+      ...new Set(individualGradesForPeriod.map((grade) => grade.subject)),
     ];
     if (gradeSubjects.length > 0) {
       return gradeSubjects.sort();
@@ -268,12 +418,12 @@ export const IntegratedReports = ({
     const areas = isFundamental ? FUNDAMENTAL_SUBJECT_AREAS : SUBJECT_AREAS;
     const baseSubjects = areas.flatMap((area) => area.subjects);
     return [...new Set([...baseSubjects, ...professionalSubjects])].sort();
-  }, [selectedClassData, classGrades, professionalSubjects]);
+  }, [selectedClassData, individualGradesForPeriod, professionalSubjects]);
 
   const classAverage =
-    classGrades.length > 0
-      ? classGrades.reduce((sum, grade) => sum + grade.grade, 0) /
-      classGrades.length
+    classGradesForPeriod.length > 0
+      ? classGradesForPeriod.reduce((sum, grade) => sum + grade.grade, 0) /
+      classGradesForPeriod.length
       : 0;
 
   const selectedStudentData = selectedStudent
@@ -283,7 +433,7 @@ export const IntegratedReports = ({
   const selectedStudentMetrics = useMemo(() => {
     if (!selectedStudentData) return null;
 
-    const studentGrades = classGrades.filter(
+    const studentGrades = individualGradesForPeriod.filter(
       (g) => g.studentId === selectedStudentData.id,
     );
     const subjects = [...new Set(studentGrades.map((g) => g.subject))];
@@ -309,77 +459,47 @@ export const IntegratedReports = ({
       .filter((s) => s.average < 6)
       .map((s) => s.subject);
 
-    const studentIncidents = classIncidents.filter((i) =>
+    const studentIncidents = individualIncidentsForPeriod.filter((i) =>
       i.studentIds.includes(selectedStudentData.id),
     );
-    const studentAttendance = classAttendance.filter(
-      (a) => a.studentId === selectedStudentData.id,
-    );
-    const absences = studentAttendance.filter(
-      (a) => a.status !== "presente",
-    ).length;
-    const presenceRate =
-      studentAttendance.length > 0
-        ? ((studentAttendance.length - absences) / studentAttendance.length) *
-        100
-        : 100;
 
     return {
       average: overallAverage,
       subjectsBelowAverage,
       incidents: studentIncidents.length,
-      absences,
-      presenceRate,
     };
-  }, [selectedStudentData, classGrades, classIncidents, classAttendance]);
-
-  const handleOpenPeriodDialog = () => {
-    if (!selectedClassData) {
-      toast({
-        variant: "destructive",
-        title: "Selecione uma turma",
-        description: "Escolha a turma para gerar o relatório.",
-      });
-      return;
-    }
-    // Close previous dialog to prevent overlap
-    setShowClassReportDialog(false);
-
-    setSelectedPeriod("anual");
-    setShowPeriodDialog(true);
-  };
+  }, [
+    selectedStudentData,
+    individualGradesForPeriod,
+    individualIncidentsForPeriod,
+    individualAttendanceForPeriod,
+  ]);
 
   const handleGenerateClassReport = async () => {
     if (!selectedClassData) return;
+    if (isGradesLoading) {
+      toast({
+        variant: "destructive",
+        title: "Aguarde o carregamento",
+        description: "As notas da turma ainda estão sendo carregadas.",
+      });
+      return;
+    }
 
     setIsGenerating(true);
     try {
-      const periodRange =
-        selectedPeriod !== "anual"
-          ? getQuarterRange(
-            effectiveStartYearDate,
-            selectedSchoolYear,
-            selectedPeriod,
-          )
-          : schoolYearRange;
-      const reportAttendance = classAttendance.filter((record) =>
-        isDateInRange(record.date, periodRange),
-      );
-      const reportIncidents = classIncidents.filter((incident) =>
-        isDateInRange(incident.date, periodRange),
-      );
-
       await generateProfessionalClassReportPDF(
         selectedClassData,
         classStudents,
-        classGrades,
-        reportIncidents,
-        reportAttendance,
+        classGradesForPeriod,
+        classIncidentsForPeriod,
+        classAttendanceForPeriod,
         professionalSubjects,
         selectedPeriod,
+        classPeriodContextLabel,
       );
 
-      setShowPeriodDialog(false);
+      setShowClassReportDialog(false);
       toast({
         title: "Relatório Gerado",
         description: `O relatório qualitativo da turma ${selectedClassData.name} foi baixado.`,
@@ -405,17 +525,28 @@ export const IntegratedReports = ({
       });
       return;
     }
+    if (isGradesLoading) {
+      toast({
+        variant: "destructive",
+        title: "Aguarde o carregamento",
+        description: "As notas do relatório ainda estão sendo carregadas.",
+      });
+      return;
+    }
 
+    setIsGenerating(true);
     try {
       await generateStudentReportPDF(
         selectedStudentData,
         selectedClassData,
-        classGrades,
-        classIncidents,
-        classAttendance,
-        reportSubjects,
+        individualGradesForPeriod,
+        individualIncidentsForPeriod,
+        individualAttendanceForPeriod,
+        individualReportSubjects,
+        individualPeriodContextLabel,
       );
 
+      setShowIndividualReportDialog(false);
       toast({
         title: "Relatório Gerado",
         description: `O relatório de ${selectedStudentData.name} foi baixado.`,
@@ -429,6 +560,8 @@ export const IntegratedReports = ({
         title: "Erro na geração",
         description: "Não foi possível criar o PDF. Tente novamente.",
       });
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -480,7 +613,10 @@ export const IntegratedReports = ({
         {/* Card 1: Relatório de Turma (Entry Point) */}
         <Card
           className="cursor-pointer hover:shadow-md transition-all h-full"
-          onClick={() => setShowClassReportDialog(true)}
+          onClick={() => {
+            setSelectedPeriod("anual");
+            setShowClassReportDialog(true);
+          }}
         >
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -504,7 +640,10 @@ export const IntegratedReports = ({
         {/* Card 2: Relatório Individual (Entry Point) */}
         <Card
           className="cursor-pointer hover:shadow-md transition-all h-full"
-          onClick={() => setShowIndividualReportDialog(true)}
+          onClick={() => {
+            setSelectedIndividualPeriod("anual");
+            setShowIndividualReportDialog(true);
+          }}
         >
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -534,17 +673,27 @@ export const IntegratedReports = ({
             <CardTitle className="flex items-center gap-2 text-lg">
               <GraduationCap className="h-5 w-5 text-violet-600" />
               Relatório de Trajetória
+              {trajectoryFeatureIncomplete && (
+                <Badge variant="outline" className="text-[11px]">
+                  Em construção
+                </Badge>
+              )}
             </CardTitle>
             <CardDescription>
-              Histórico completo escolar.
+              Histórico escolar consolidado (parcial).
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
-              Gere a ficha completa com histórico fundamental, avaliações externas e ensino médio.
+              Gere um documento preliminar com histórico fundamental, avaliações externas e ensino médio.
             </p>
+            {trajectoryFeatureIncomplete && (
+              <p className="text-xs text-amber-700 mb-3">
+                Algumas análises ainda podem variar enquanto o módulo é finalizado.
+              </p>
+            )}
             <Button variant="outline" className="w-full">
-              Gerar Trajetória
+              Gerar Trajetória (beta)
             </Button>
           </CardContent>
         </Card>
@@ -581,17 +730,37 @@ export const IntegratedReports = ({
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>Período</Label>
+              <Select
+                value={selectedPeriod}
+                onValueChange={setSelectedPeriod}
+                disabled={!selectedClass}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o período" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="anual">Ano Completo</SelectItem>
+                  {QUARTERS.map((quarter) => (
+                    <SelectItem key={quarter} value={quarter}>
+                      {quarter}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             {selectedClassData && (
               <div className="rounded-lg border bg-muted/40 p-4 text-sm space-y-2">
                 <div className="flex justify-between"><span>Alunos:</span><span className="font-bold">{classStudents.length}</span></div>
-                <div className="flex justify-between"><span>Média Geral:</span><span className="font-bold">{classAverage.toFixed(1)}</span></div>
+                <div className="flex justify-between"><span>Média do Período:</span><span className="font-bold">{classAverage.toFixed(1)}</span></div>
               </div>
             )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowClassReportDialog(false)}>Cancelar</Button>
-            <Button onClick={handleOpenPeriodDialog} disabled={!selectedClass || isGenerating}>
-              {isGenerating ? "Gerando..." : "Prosseguir para Geração"}
+            <Button onClick={handleGenerateClassReport} disabled={!selectedClass || isGenerating}>
+              {isGenerating ? "Gerando..." : "Baixar Relatório"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -605,10 +774,12 @@ export const IntegratedReports = ({
               <UserCheck className="h-5 w-5 text-emerald-600" />
               Gerar Relatório Individual
             </DialogTitle>
-            <DialogDescription>Selecione um aluno para análise detalhada.</DialogDescription>
+            <DialogDescription>
+              Selecione turma, ano, período e aluno para análise detalhada.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="space-y-2">
                 <Label>Turma</Label>
                 <Select value={selectedClass} onValueChange={(value) => { setSelectedClass(value); setSelectedStudent(""); }}>
@@ -629,6 +800,26 @@ export const IntegratedReports = ({
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label>Período</Label>
+                <Select
+                  value={selectedIndividualPeriod}
+                  onValueChange={setSelectedIndividualPeriod}
+                  disabled={!selectedClass}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Período" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="anual">Ano Completo</SelectItem>
+                    {QUARTERS.map((quarter) => (
+                      <SelectItem key={quarter} value={quarter}>
+                        {quarter}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Aluno</Label>
@@ -645,10 +836,10 @@ export const IntegratedReports = ({
                 <div className="flex items-center justify-between border-b pb-2">
                   <span className="font-bold text-lg">{selectedStudentData.name}</span>
                   <Badge variant={selectedStudentMetrics.average >= 6 ? "default" : "destructive"}>
-                    Média: {selectedStudentMetrics.average.toFixed(1)}
+                    Média no Período: {selectedStudentMetrics.average.toFixed(1)}
                   </Badge>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="grid grid-cols-2 gap-2 text-center">
                   <div>
                     <p className="text-xs text-muted-foreground">Ocorrências</p>
                     <p className="font-bold">{selectedStudentMetrics.incidents}</p>
@@ -656,10 +847,6 @@ export const IntegratedReports = ({
                   <div>
                     <p className="text-xs text-muted-foreground">Abaixo da Média</p>
                     <p className="font-bold">{selectedStudentMetrics.subjectsBelowAverage.length} disc.</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Presença</p>
-                    <p className="font-bold">{selectedStudentMetrics.presenceRate.toFixed(1)}%</p>
                   </div>
                 </div>
                 {selectedStudentMetrics.subjectsBelowAverage.length > 0 && (
@@ -689,9 +876,22 @@ export const IntegratedReports = ({
               <GraduationCap className="h-5 w-5 text-violet-600" />
               Gerar Trajetória Completa
             </DialogTitle>
-            <DialogDescription>Documento completo com histórico e vida escolar.</DialogDescription>
+            <DialogDescription>
+              Documento em evolução com histórico e vida escolar.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {trajectoryFeatureIncomplete && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <p className="font-medium flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Relatório de Trajetória em construção
+                </p>
+                <p className="mt-1">
+                  Esta saída ainda não está 100% funcional. Use como apoio preliminar.
+                </p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Turma</Label>
@@ -739,68 +939,6 @@ export const IntegratedReports = ({
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de seleção de período */}
-      <Dialog open={showPeriodDialog} onOpenChange={setShowPeriodDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Gerar Relatório Qualitativo
-            </DialogTitle>
-            <DialogDescription>
-              Selecione o período para análise. O relatório inclui análise por
-              área do conhecimento, correlação comportamento x desempenho,
-              predições de risco e recomendações.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-4">
-            <Label className="text-sm font-medium mb-3 block">
-              Período de análise
-            </Label>
-            <RadioGroup
-              value={selectedPeriod}
-              onValueChange={setSelectedPeriod}
-              className="space-y-2"
-            >
-              <div className="flex items-center space-x-2 rounded-lg border p-3 hover:bg-muted/50 cursor-pointer">
-                <RadioGroupItem value="anual" id="anual" />
-                <Label htmlFor="anual" className="flex-1 cursor-pointer">
-                  <span className="font-medium">Ano Completo</span>
-                  <p className="text-xs text-muted-foreground">
-                    Análise consolidada de todos os bimestres
-                  </p>
-                </Label>
-              </div>
-
-              {QUARTERS.map((quarter) => (
-                <div
-                  key={quarter}
-                  className="flex items-center space-x-2 rounded-lg border p-3 hover:bg-muted/50 cursor-pointer"
-                >
-                  <RadioGroupItem value={quarter} id={quarter} />
-                  <Label htmlFor={quarter} className="flex-1 cursor-pointer">
-                    <span className="font-medium">{quarter}</span>
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
-          </div>
-
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setShowPeriodDialog(false)}
-              disabled={isGenerating}
-            >
-              Cancelar
-            </Button>
-            <Button onClick={handleGenerateClassReport} disabled={isGenerating}>
-              {isGenerating ? "Gerando..." : "Gerar PDF"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 };

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { FollowUpList } from './FollowUpList';
 import { FollowUpForm } from './FollowUpForm';
 import {
@@ -26,9 +26,10 @@ import { useIncidents, useClasses, useStudents } from '@/hooks/useData';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Clock, CheckCircle, Plus, FileText } from 'lucide-react';
-import { calculateSuggestedAction, suggestFollowUpType, getRequiredActionLevel, getRequiredFollowUpType, ActionLevel } from '@/lib/incidentActions';
+import { calculateSuggestedAction, getRequiredActionLevel, getRequiredFollowUpType } from '@/lib/incidentActions';
 import { generateIncidentPDF } from '@/lib/incidentPdfExport';
-import { getSeverityColor, getSeverityLabel, getStatusColor } from '@/lib/incidentUtils';
+import { generateIncidentParentNotificationPDF } from '@/lib/incidentParentNotificationPdfExport';
+import { getSeverityColor, getStatusColor } from '@/lib/incidentUtils';
 import { sendIncidentEmail } from '@/lib/emailService';
 import { AddStudentsDialog } from './AddStudentsDialog';
 import { X } from 'lucide-react';
@@ -145,14 +146,21 @@ export const IncidentManagementDialog = ({
 
   const incidentClass = classes.find(c => c.id === currentIncident.classId);
   const incidentStudents = students.filter(s => currentIncident.studentIds.includes(s.id));
+  const normalizeEmail = (value?: string | null) => (value || '').trim().toLowerCase();
 
   // Permissões:
-  // - Admin e Gestor podem gerenciar TODAS as ocorrências em aberto/acompanhamento
-  // - Diretor de Turma pode gerenciar apenas ocorrências da sua turma
-  const isAdminOrCoordenador = profile?.role === 'admin' || profile?.role === 'coordenador';
-  const isClassDirector = incidentClass?.directorEmail === profile?.email ||
-    incidentClass?.directorId === user?.id;
-  const canManage = isAdminOrCoordenador || isClassDirector;
+  // - Admin pode gerenciar TODAS as ocorrências
+  // - Diretor pode gerenciar apenas ocorrências da turma sob sua responsabilidade
+  // - Professor somente registra ocorrência (não gerencia acompanhamento/resolução)
+  const isAdmin = profile?.role === 'admin';
+  const isDirectorRole = profile?.role === 'diretor';
+  const isClassDirectorByEmail =
+    normalizeEmail(incidentClass?.directorEmail) !== '' &&
+    normalizeEmail(incidentClass?.directorEmail) === normalizeEmail(user?.email || profile?.email);
+  const isClassDirectorById =
+    !!incidentClass?.directorId && !!user?.id && incidentClass.directorId === user.id;
+  const isClassDirector = isClassDirectorByEmail || isClassDirectorById;
+  const canManage = isAdmin || (isDirectorRole && isClassDirector);
 
   // Permissões específicas por status
   const canStartFollowUp = currentIncident.status === 'aberta' && canManage;
@@ -160,6 +168,8 @@ export const IncidentManagementDialog = ({
   const canResolve = currentIncident.status === 'acompanhamento' &&
     (currentIncident.followUps?.length || 0) > 0 &&
     canManage;
+  const canDownloadParentNotification =
+    currentIncident.status === 'acompanhamento' && canManage;
 
   const canAddStudents = canManage && currentIncident.status === 'acompanhamento';
 
@@ -208,6 +218,8 @@ export const IncidentManagementDialog = ({
     editActions !== (currentIncident.actions || '');
 
   const handleRemoveStudent = async (studentId: string) => {
+    if (!canAddStudents) return;
+
     if (currentIncident.studentIds.length <= 1) {
       toast({
         variant: 'destructive',
@@ -259,7 +271,7 @@ export const IncidentManagementDialog = ({
   };
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!user || !canManage) return;
 
     if (commentText.trim()) {
       try {
@@ -283,7 +295,7 @@ export const IncidentManagementDialog = ({
   };
 
   const handleStartFollowUp = async () => {
-    if (!user) return;
+    if (!user || !canStartFollowUp) return;
 
     try {
       await updateIncident(incident.id, {
@@ -313,7 +325,7 @@ export const IncidentManagementDialog = ({
   };
 
   const handleSaveFollowUp = async () => {
-    if (!user) return;
+    if (!user || !canEditFollowUp) return;
 
     const followUp: any = {
       type: followUpType,
@@ -364,7 +376,7 @@ export const IncidentManagementDialog = ({
   };
 
   const handleResolve = async () => {
-    if (!user) return;
+    if (!user || !canResolve) return;
 
     try {
       await updateIncident(incident.id, {
@@ -420,23 +432,57 @@ export const IncidentManagementDialog = ({
                       currentIncident.finalSeverity === 'grave' ? 'Grave' : 'Gravíssima'}
                 </Badge>
               </div>
-              {currentIncident.status === 'resolvida' && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    try {
-                      await generateIncidentPDF(currentIncident, incidentClass, incidentStudents);
-                    } catch (error) {
-                      console.error('Erro ao gerar PDF:', error);
-                    }
-                  }}
-                  className="gap-2"
-                >
-                  <FileText className="h-4 w-4" />
-                  Exportar PDF
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                {canDownloadParentNotification && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await generateIncidentParentNotificationPDF(
+                          currentIncident,
+                          incidentClass,
+                          incidentStudents,
+                          incidents,
+                        );
+                        toast({
+                          title: 'Notificacao gerada',
+                          description: 'O PDF de notificacao para os responsaveis foi baixado.',
+                        });
+                      } catch (error) {
+                        console.error('Erro ao gerar notificacao em PDF:', error);
+                        toast({
+                          title: 'Erro',
+                          description: 'Nao foi possivel gerar o PDF de notificacao.',
+                          variant: 'destructive',
+                        });
+                      }
+                    }}
+                    className="gap-2"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Baixar Notificacao
+                  </Button>
+                )}
+
+                {currentIncident.status === 'resolvida' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await generateIncidentPDF(currentIncident, incidentClass, incidentStudents);
+                      } catch (error) {
+                        console.error('Erro ao gerar PDF:', error);
+                      }
+                    }}
+                    className="gap-2"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Exportar PDF
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-sm">
@@ -668,10 +714,11 @@ export const IncidentManagementDialog = ({
                   <Label htmlFor="comment">Adicionar Comentário</Label>
                   <Textarea
                     id="comment"
-                    placeholder="Adicione observações sobre a ocorrência..."
+                    placeholder={canManage ? "Adicione observações sobre a ocorrência..." : "Sem permissão para comentar nesta ocorrência."}
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     rows={4}
+                    disabled={!canManage}
                   />
                 </div>
 
@@ -705,7 +752,7 @@ export const IncidentManagementDialog = ({
                 <Button variant="outline" onClick={() => onOpenChange(false)}>
                   Fechar
                 </Button>
-                <Button onClick={handleSave} disabled={!commentText.trim()}>
+                <Button onClick={handleSave} disabled={!canManage || !commentText.trim()}>
                   Salvar Comentário
                 </Button>
               </div>

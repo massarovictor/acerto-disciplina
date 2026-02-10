@@ -40,12 +40,19 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/services/supabase';
 import { Search, Plus, Edit, Trash2, Shield, User, GraduationCap, Loader2 } from 'lucide-react';
+import type { UserRole } from '@/types';
 
 interface AuthorizedEmail {
     email: string;
-    role: string;
+    role: UserRole;
     created_at: string;
 }
+
+const roleOptions: Array<{ value: UserRole; label: string }> = [
+    { value: 'professor', label: 'Professor' },
+    { value: 'diretor', label: 'Diretor de Turma' },
+    { value: 'admin', label: 'Administrador' },
+];
 
 export const UsersManage = () => {
     const { toast } = useToast();
@@ -55,7 +62,7 @@ export const UsersManage = () => {
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<AuthorizedEmail | null>(null);
     const [deletingUser, setDeletingUser] = useState<AuthorizedEmail | null>(null);
-    const [formData, setFormData] = useState({ email: '', role: 'professor' });
+    const [formData, setFormData] = useState<{ email: string; role: UserRole }>({ email: '', role: 'professor' });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const fetchUsers = async () => {
@@ -197,7 +204,7 @@ export const UsersManage = () => {
         setIsSubmitting(false);
     };
 
-    const getRoleBadge = (role: string) => {
+    const getRoleBadge = (role: UserRole) => {
         switch (role) {
             case 'admin':
                 return (
@@ -344,16 +351,18 @@ export const UsersManage = () => {
                             <Select
                                 value={formData.role}
                                 onValueChange={(value) =>
-                                    setFormData({ ...formData, role: value })
+                                    setFormData({ ...formData, role: value as UserRole })
                                 }
                             >
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="professor">Professor</SelectItem>
-                                    <SelectItem value="diretor">Diretor de Turma</SelectItem>
-                                    <SelectItem value="admin">Administrador</SelectItem>
+                                    {roleOptions.map((roleOption) => (
+                                        <SelectItem key={roleOption.value} value={roleOption.value}>
+                                            {roleOption.label}
+                                        </SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -395,16 +404,18 @@ export const UsersManage = () => {
                             <Select
                                 value={formData.role}
                                 onValueChange={(value) =>
-                                    setFormData({ ...formData, role: value })
+                                    setFormData({ ...formData, role: value as UserRole })
                                 }
                             >
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="professor">Professor</SelectItem>
-                                    <SelectItem value="diretor">Diretor de Turma</SelectItem>
-                                    <SelectItem value="admin">Administrador</SelectItem>
+                                    {roleOptions.map((roleOption) => (
+                                        <SelectItem key={roleOption.value} value={roleOption.value}>
+                                            {roleOption.label}
+                                        </SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>

@@ -1,6 +1,6 @@
 // Core types for the School Incidents System
 
-export type UserRole = 'admin' | 'professor' | 'diretor' | 'coordenador' | 'secretaria';
+export type UserRole = 'admin' | 'professor' | 'diretor';
 
 export interface User {
   id: string;
@@ -76,8 +76,8 @@ export interface Class {
   series: string;
   letter?: string;
   course?: string; // Opcional - pode ser digitado livremente
-  directorId?: string;
-  directorEmail?: string;
+  directorId?: string | null;
+  directorEmail?: string | null;
   active: boolean;
   startYear?: 1 | 2 | 3; // Ano de início da turma (série)
   currentYear?: 1 | 2 | 3; // Ano atual da turma (calculado automaticamente)

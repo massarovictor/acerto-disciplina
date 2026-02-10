@@ -240,7 +240,7 @@ export function useClasses() {
         "postgres_changes",
         { event: "*", schema: "public", table: "classes" },
         () => {
-          fetchClasses();
+          fetchClasses(true);
         },
       )
       .subscribe();
@@ -288,6 +288,14 @@ export function useClasses() {
       updates,
       "templateId",
     );
+    const hasDirectorId = Object.prototype.hasOwnProperty.call(
+      updates,
+      "directorId",
+    );
+    const hasDirectorEmail = Object.prototype.hasOwnProperty.call(
+      updates,
+      "directorEmail",
+    );
     const hasName = Object.prototype.hasOwnProperty.call(updates, "name");
 
     const nextCourse = updates.course ?? base.course;
@@ -307,8 +315,12 @@ export function useClasses() {
         series: updates.series ?? base.series,
         letter: updates.letter ?? base.letter,
         course: nextCourse,
-        directorId: updates.directorId ?? base.directorId,
-        directorEmail: updates.directorEmail ?? base.directorEmail,
+        directorId: hasDirectorId
+          ? (updates.directorId ?? null)
+          : base.directorId,
+        directorEmail: hasDirectorEmail
+          ? (updates.directorEmail ?? null)
+          : base.directorEmail,
         active: updates.active ?? base.active,
         startYear: nextStartYear,
         currentYear: updates.currentYear ?? base.currentYear,
@@ -444,7 +456,7 @@ export function useStudents() {
         "postgres_changes",
         { event: "*", schema: "public", table: "students" },
         () => {
-          fetchStudents();
+          fetchStudents(true);
         },
       )
       .subscribe();
@@ -1432,7 +1444,7 @@ export function useAttendance() {
         "postgres_changes",
         { event: "*", schema: "public", table: "attendance" },
         () => {
-          fetchAttendance();
+          fetchAttendance(true);
         },
       )
       .subscribe();
@@ -1484,6 +1496,7 @@ export function useIncidents() {
   const { user, profile } = useAuth();
 
   // ✅ Usando store global para estado compartilhado entre componentes
+  const classes = useDataStore((state) => state.classes);
   const incidents = useDataStore((state) => state.incidents);
   const setIncidents = useDataStore((state) => state.setIncidents);
   const storeAddIncident = useDataStore((state) => state.addIncident);
@@ -1493,6 +1506,87 @@ export function useIncidents() {
   const incidentsFetching = useDataStore((state) => state.incidentsFetching);
   const setIncidentsLoaded = useDataStore((state) => state.setIncidentsLoaded);
   const setIncidentsFetching = useDataStore((state) => state.setIncidentsFetching);
+  const normalizeEmail = (value?: string | null) => (value || "").trim().toLowerCase();
+
+  const getCurrentRole = () => {
+    const profileRole = profile?.role;
+    if (
+      profileRole === "admin" ||
+      profileRole === "diretor" ||
+      profileRole === "professor"
+    ) {
+      return profileRole;
+    }
+
+    const metadataRole =
+      typeof user?.user_metadata?.role === "string"
+        ? user.user_metadata.role
+        : undefined;
+
+    if (
+      metadataRole === "admin" ||
+      metadataRole === "diretor" ||
+      metadataRole === "professor"
+    ) {
+      return metadataRole;
+    }
+
+    // Compatibilidade: perfis legados com papel inválido se comportam como professor.
+    return user?.id ? "professor" : undefined;
+  };
+
+  const canManageIncident = (incident: Incident) => {
+    if (!user?.id) return false;
+
+    const role = getCurrentRole();
+    if (role === "admin") return true;
+    if (role !== "diretor") return false;
+
+    const incidentClass = classes.find((cls) => cls.id === incident.classId);
+    if (!incidentClass) return false;
+
+    const normalizedClassDirectorEmail = normalizeEmail(incidentClass.directorEmail);
+    const normalizedUserEmail = normalizeEmail(user.email);
+    const normalizedProfileEmail = normalizeEmail(profile?.email);
+    const isClassDirectorByEmail =
+      normalizedClassDirectorEmail !== "" &&
+      (normalizedClassDirectorEmail === normalizedUserEmail ||
+        (normalizedProfileEmail !== "" &&
+          normalizedClassDirectorEmail === normalizedProfileEmail));
+    const isClassDirectorById =
+      !!incidentClass.directorId && incidentClass.directorId === user.id;
+
+    return isClassDirectorByEmail || isClassDirectorById;
+  };
+
+  const getIncidentOrThrow = (incidentId: string) => {
+    const incident = incidents.find((item) => item.id === incidentId);
+    if (!incident) {
+      const notFoundError = new Error("Ocorrência não encontrada.");
+      logError("incidents.lookup", notFoundError);
+      throw notFoundError;
+    }
+    return incident;
+  };
+
+  const assertCanManageIncident = (incident: Incident) => {
+    if (!canManageIncident(incident)) {
+      const permissionError = new Error(
+        "Sem permissão para gerenciar esta ocorrência.",
+      );
+      logError("incidents.permission", permissionError);
+      throw permissionError;
+    }
+  };
+
+  const assertCanCreateIncident = () => {
+    const role = getCurrentRole();
+    if (!role) {
+      const permissionError = new Error("Perfil sem permissão para criar ocorrência.");
+      logError("incidents.permission", permissionError);
+      throw permissionError;
+    }
+  };
 
   const fetchIncidents = useCallback(async (force = false) => {
     if (!user?.id) {
@@ -1604,21 +1698,21 @@ export function useIncidents() {
         "postgres_changes",
         { event: "*", schema: "public", table: "incidents" },
         () => {
-          fetchIncidents();
+          fetchIncidents(true);
         },
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "follow_ups" },
         () => {
-          fetchIncidents();
+          fetchIncidents(true);
         },
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "comments" },
         () => {
-          fetchIncidents();
+          fetchIncidents(true);
         },
       )
       .subscribe();
@@ -1632,6 +1726,7 @@ export function useIncidents() {
     incident: Omit<Incident, "id" | "createdAt" | "updatedAt">,
   ) => {
     if (!user?.id) return null;
+    assertCanCreateIncident();
 
     const { followUps, comments, ...incidentData } = incident;
     const payload = mapIncidentToDb(incidentData, user.id, user.id);
@@ -1654,8 +1749,8 @@ export function useIncidents() {
 
   const updateIncident = async (id: string, updates: Partial<Incident>) => {
     if (!user?.id) return;
-    const base = incidents.find((incident) => incident.id === id);
-    if (!base) return;
+    const base = getIncidentOrThrow(id);
+    assertCanManageIncident(base);
 
     const payload = mapIncidentToDb(
       {
@@ -1678,26 +1773,52 @@ export function useIncidents() {
       },
       user.id,
       base.createdBy || user.id,
+      { includeOwnerId: false },
     );
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("incidents")
       .update(payload)
-      .eq("id", id);
+      .eq("id", id)
+      .select("id")
+      .maybeSingle();
 
     if (error) {
       logError("incidents.update", error);
       throw error;
+    }
+    if (!data) {
+      const updateError = new Error(
+        "Ocorrência não encontrada ou sem permissão para atualização.",
+      );
+      logError("incidents.update", updateError);
+      throw updateError;
     }
 
     storeUpdateIncident(id, updates); // ✅ Atualiza store global
   };
 
   const deleteIncident = async (id: string) => {
-    const { error } = await supabase.from("incidents").delete().eq("id", id);
+    if (!user?.id) return;
+    const base = getIncidentOrThrow(id);
+    assertCanManageIncident(base);
+
+    const { data, error } = await supabase
+      .from("incidents")
+      .delete()
+      .eq("id", id)
+      .select("id")
+      .maybeSingle();
     if (error) {
       logError("incidents.delete", error);
       throw error;
+    }
+    if (!data) {
+      const deleteError = new Error(
+        "Ocorrência não encontrada ou sem permissão para exclusão.",
+      );
+      logError("incidents.delete", deleteError);
+      throw deleteError;
     }
     storeDeleteIncident(id); // ✅ Atualiza store global
   };
@@ -1707,6 +1828,8 @@ export function useIncidents() {
     followUp: Omit<FollowUpRecord, "id" | "incidentId" | "createdAt">,
   ) => {
     if (!user?.id) return;
+    const incident = getIncidentOrThrow(incidentId);
+    assertCanManageIncident(incident);
 
     const payload = mapFollowUpToDb(followUp, incidentId, user.id, user.id);
     const { error } = await supabase.from("follow_ups").insert(payload);
@@ -1716,7 +1839,7 @@ export function useIncidents() {
       throw error;
     }
 
-    await fetchIncidents();
+    await fetchIncidents(true);
   };
 
   const saveFollowUp = async (
@@ -1725,6 +1848,9 @@ export function useIncidents() {
     followUpId?: string,
   ) => {
     if (!user?.id) return;
+    const incident = getIncidentOrThrow(incidentId);
+    assertCanManageIncident(incident);
+
     const payload = mapFollowUpToDb(followUp, incidentId, user.id, user.id);
     let savedFollowUp: FollowUpRecord | null = null;
 
@@ -1773,12 +1899,15 @@ export function useIncidents() {
       storeUpdateIncident(incidentId, { followUps: newFollowUps });
     } else {
       // Fallback se não encontrar no store (improvável)
-      await fetchIncidents();
+      await fetchIncidents(true);
     }
   };
 
   const addComment = async (incidentId: string, text: string) => {
     if (!user?.id) return;
+    const incident = getIncidentOrThrow(incidentId);
+    assertCanManageIncident(incident);
+
     const payload = mapCommentToDb(
       {
         userId: user.id,
@@ -1811,7 +1940,7 @@ export function useIncidents() {
       const newComments = [...currentComments, savedComment];
       storeUpdateIncident(incidentId, { comments: newComments });
     } else {
-      await fetchIncidents();
+      await fetchIncidents(true);
     }
   };
 

@@ -51,6 +51,7 @@ class ClassReportPDFGenerator {
   private insights: InsightsReport | null = null;
   private currentClass: Class | null = null;
   private period: string = 'Anual';
+  private periodContextLabel: string = 'Anual';
   private grades: Grade[] = [];
   private students: Student[] = [];
   private incidents: Incident[] = [];
@@ -67,7 +68,8 @@ class ClassReportPDFGenerator {
     incidents: Incident[],
     attendance: AttendanceRecord[],
     professionalSubjects: string[] = [],
-    selectedQuarter?: string
+    selectedQuarter?: string,
+    periodContextLabel?: string,
   ): Promise<void> {
     try {
       this.config = await getSchoolConfig();
@@ -79,10 +81,13 @@ class ClassReportPDFGenerator {
       this.period = selectedQuarter && selectedQuarter !== 'anual'
         ? selectedQuarter
         : 'Anual';
+      this.periodContextLabel = periodContextLabel?.trim() || this.period;
 
       // Filtrar dados por período
       this.grades = selectedQuarter && selectedQuarter !== 'anual'
-        ? grades.filter(g => g.quarter === selectedQuarter)
+        ? grades.filter((g) =>
+          this.isQuarterMatch(g.quarter, selectedQuarter),
+        )
         : grades;
 
       // Gerar analytics
@@ -131,6 +136,25 @@ class ClassReportPDFGenerator {
   // ============================================
   // CÁLCULOS
   // ============================================
+
+  private extractQuarterNumber(value?: string): number | null {
+    if (!value) return null;
+    const match = String(value).match(/\d+/);
+    if (!match) return null;
+    const parsed = Number(match[0]);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private isQuarterMatch(gradeQuarter: string | undefined, selectedQuarter: string): boolean {
+    const gradeQuarterNumber = this.extractQuarterNumber(gradeQuarter);
+    const selectedQuarterNumber = this.extractQuarterNumber(selectedQuarter);
+
+    if (gradeQuarterNumber !== null && selectedQuarterNumber !== null) {
+      return gradeQuarterNumber === selectedQuarterNumber;
+    }
+
+    return String(gradeQuarter || "").trim() === String(selectedQuarter).trim();
+  }
 
   private calculateClassAverage(): number {
     if (this.grades.length === 0) return 0;
@@ -235,7 +259,7 @@ class ClassReportPDFGenerator {
     // 2. Registros de Atenção (Tópicos Nominais)
     if (area.criticalDetails.length > 0) {
       contents.push({ text: 'ATENÇÃO PEDAGÓGICA:', fontSize: 8, bold: true, color: PDF_COLORS.status.critico, margin: [0, 4, 0, 4] });
-      const listagem = area.criticalDetails.map(d => `• ${d.studentName} (${d.subject}: ${d.average.toFixed(1)})`);
+      const listagem = area.criticalDetails.map(d => `${d.studentName} (${d.subject}: ${d.average.toFixed(1)})`);
       contents.push({
         ul: listagem,
         fontSize: 9,
@@ -246,7 +270,7 @@ class ClassReportPDFGenerator {
     // 3. Consolidação de Rendimento (Tópicos Nominais)
     if (area.highlightDetails.length > 0) {
       contents.push({ text: 'INDICADORES DE CONSOLIDAÇÃO:', fontSize: 8, bold: true, color: PDF_COLORS.status.aprovado, margin: [0, 4, 0, 4] });
-      const listagem = area.highlightDetails.map(d => `• ${d.studentName} (${d.subject}: ${d.average.toFixed(1)})`);
+      const listagem = area.highlightDetails.map(d => `${d.studentName} (${d.subject}: ${d.average.toFixed(1)})`);
       contents.push({
         ul: listagem,
         fontSize: 9,
@@ -290,7 +314,7 @@ class ClassReportPDFGenerator {
     // 2. RENDIMENTO (Tópicos)
     if (profile.subjectsBelow6.length > 0) {
       contents.push({ text: 'VULNERABILIDADES (Abaixo de 6,0):', fontSize: 8, bold: true, color: PDF_COLORS.status.critico, margin: [0, 4, 0, 2] });
-      const listagem = profile.subjectsBelow6.map(s => `• ${s.subject} (${s.average.toFixed(1)})`);
+      const listagem = profile.subjectsBelow6.map(s => `${s.subject} (${s.average.toFixed(1)})`);
       contents.push({ ul: listagem, fontSize: 9, margin: [0, 0, 0, 8] });
     }
 
@@ -300,7 +324,7 @@ class ClassReportPDFGenerator {
       contents.push({ text: 'INDICADORES DE CONSOLIDAÇÃO:', fontSize: 8, bold: true, color: PDF_COLORS.status.aprovado, margin: [0, 4, 0, 2] });
       const listagem = strengths.map(s => {
         const avg = profile.subjectAverages[s];
-        return avg ? `• ${s} (${avg.toFixed(1)})` : `• ${s}`;
+        return avg ? `${s} (${avg.toFixed(1)})` : `${s}`;
       });
       contents.push({ ul: listagem, fontSize: 9, margin: [0, 0, 0, 8] });
     }
@@ -311,11 +335,11 @@ class ClassReportPDFGenerator {
       const graveCount = studentIncidents.filter(i => i.finalSeverity === 'grave' || i.finalSeverity === 'gravissima').length;
       const desc = graveCount > 0
         ? `Constam ${studentIncidents.length} registros, sendo ${graveCount} de maior complexidade, requerendo alinhamento regimental.`
-        : `Registram-se ${studentIncidents.length} intercorrências pontuais sob monitoramento para assegurar a conformidade.`;
+        : `Registram-se ${studentIncidents.length} ocorrências pontuais sob monitoramento para assegurar a conformidade.`;
       contents.push({ text: 'CAMPO DISCIPLINAR:', fontSize: 8, bold: true, margin: [0, 4, 0, 2] });
       contents.push({ text: desc, fontSize: 9, margin: [0, 0, 0, 8] });
     } else {
-      contents.push({ text: 'CAMPO DISCIPLINAR: Ausência de intercorrências registradas.', fontSize: 8, bold: true, margin: [0, 4, 0, 8] });
+      contents.push({ text: 'CAMPO DISCIPLINAR: Ausência de ocorrências registradas.', fontSize: 8, bold: true, margin: [0, 4, 0, 8] });
     }
 
     // 5. ENCAMINHAMENTO
@@ -417,7 +441,7 @@ class ClassReportPDFGenerator {
           margin: [0, 10, 0, 5],
         },
         {
-          text: `${cls.name} | Período: ${this.period} `,
+          text: `${cls.name} | Período: ${this.periodContextLabel} `,
           fontSize: 12,
           alignment: 'center',
           color: PDF_COLORS.secondary,
@@ -610,7 +634,7 @@ class ClassReportPDFGenerator {
               {
                 stack: [
                   // Seção de Ranking Visual (ALINHADA COM TABBELA)
-                  { text: `Médias por Disciplina (${rankedSubjects.length} disciplina(s) analisada(s))`, style: 'h3', margin: rankingMargin },
+                  { text: 'Médias por Disciplina', style: 'h3', margin: rankingMargin },
                   {
                     columns: [
                       // Tabela Esquerda
@@ -664,12 +688,9 @@ class ClassReportPDFGenerator {
     return subjects.map(sub => {
       const subGrades = this.grades.filter(g => g.subject === sub);
       const quarters = [1, 2, 3, 4].map(q => {
-        // Garantir comparação de tipos compatíveis com regex para "1", "1º", "1o"
         const qGrades = subGrades.filter(g => {
-          if (!g.quarter) return false;
-          // Extrair apenas o primeiro dígito numérico
-          const match = String(g.quarter).match(/\d/);
-          return match ? match[0] === String(q) : false;
+          const quarterNumber = this.extractQuarterNumber(g.quarter);
+          return quarterNumber === q;
         });
         const count = qGrades.length;
         const avg = count > 0 ? qGrades.reduce((a, b) => a + b.grade, 0) / count : 0;
@@ -684,34 +705,56 @@ class ClassReportPDFGenerator {
         ? validQuarters.reduce((a, b) => a + b.avg, 0) / validQuarters.length
         : 0;
 
-      return { name: sub, quarters, average: annualAvg };
-    });
+      return {
+        name: sub,
+        quarters,
+        average: annualAvg,
+        hasData: validQuarters.length > 0,
+      };
+    }).filter((subject) => subject.hasData);
   }
 
   private buildQuarterlyTable(stats: any[]): Content {
+    const mainHeaderCell = {
+      style: 'headerGroup',
+      color: PDF_COLORS.primary,
+      fillColor: '#E2E8F0',
+      alignment: 'center' as const,
+      bold: true,
+    };
+    const subHeaderCell = {
+      style: 'tableCompact',
+      color: PDF_COLORS.primary,
+      fillColor: '#E2E8F0',
+      alignment: 'center' as const,
+      bold: true,
+      noWrap: true,
+      fontSize: 7,
+    };
+
     // Header Complexo
     const headerRow: TableCell[] = [
-      { text: 'Disciplina', style: 'headerGroup', rowSpan: 2, margin: [0, 8, 0, 0] },
-      { text: '1º Bimestre', style: 'headerGroup', colSpan: 3 }, {}, {},
-      { text: '2º Bimestre', style: 'headerGroup', colSpan: 3 }, {}, {},
-      { text: '3º Bimestre', style: 'headerGroup', colSpan: 3 }, {}, {},
-      { text: '4º Bimestre', style: 'headerGroup', colSpan: 3 }, {}, {}
+      { text: 'Disciplina', rowSpan: 2, margin: [0, 8, 0, 0], ...mainHeaderCell },
+      { text: '1º BIMESTRE', colSpan: 3, ...mainHeaderCell }, {}, {},
+      { text: '2º BIMESTRE', colSpan: 3, ...mainHeaderCell }, {}, {},
+      { text: '3º BIMESTRE', colSpan: 3, ...mainHeaderCell }, {}, {},
+      { text: '4º BIMESTRE', colSpan: 3, ...mainHeaderCell }, {}, {}
     ];
 
     const subHeaderRow: TableCell[] = [
       {},
-      { text: 'Apr', style: 'tableCompact', fontSize: 7, bold: true }, { text: 'Rep', style: 'tableCompact', fontSize: 7, bold: true }, { text: 'Méd', style: 'tableCompact', fontSize: 7, bold: true },
-      { text: 'Apr', style: 'tableCompact', fontSize: 7, bold: true }, { text: 'Rep', style: 'tableCompact', fontSize: 7, bold: true }, { text: 'Méd', style: 'tableCompact', fontSize: 7, bold: true },
-      { text: 'Apr', style: 'tableCompact', fontSize: 7, bold: true }, { text: 'Rep', style: 'tableCompact', fontSize: 7, bold: true }, { text: 'Méd', style: 'tableCompact', fontSize: 7, bold: true },
-      { text: 'Apr', style: 'tableCompact', fontSize: 7, bold: true }, { text: 'Rep', style: 'tableCompact', fontSize: 7, bold: true }, { text: 'Méd', style: 'tableCompact', fontSize: 7, bold: true },
+      { text: 'Aprov.', ...subHeaderCell }, { text: 'Reprov.', ...subHeaderCell }, { text: 'Média', ...subHeaderCell },
+      { text: 'Aprov.', ...subHeaderCell }, { text: 'Reprov.', ...subHeaderCell }, { text: 'Média', ...subHeaderCell },
+      { text: 'Aprov.', ...subHeaderCell }, { text: 'Reprov.', ...subHeaderCell }, { text: 'Média', ...subHeaderCell },
+      { text: 'Aprov.', ...subHeaderCell }, { text: 'Reprov.', ...subHeaderCell }, { text: 'Média', ...subHeaderCell },
     ];
 
-    const bodyRows = stats.map((sub, idx) => {
+    const bodyRows = stats.map((sub) => {
       const row: TableCell[] = [{ text: sub.name, style: 'tableCompact', alignment: 'left', bold: true }];
       sub.quarters.forEach((q: any) => {
-        row.push({ text: q.count > 0 ? q.approved : '-', style: 'tableCompact' });
-        row.push({ text: q.count > 0 ? q.reproved : '-', style: 'tableCompact', color: q.reproved > 0 ? PDF_COLORS.danger : PDF_COLORS.secondary, bold: q.reproved > 0 });
-        row.push({ text: q.count > 0 ? q.avg.toFixed(1) : '-', style: 'tableCompact', bold: true });
+        row.push({ text: q.count > 0 ? q.approved : '-', style: 'tableCompact', alignment: 'center' });
+        row.push({ text: q.count > 0 ? q.reproved : '-', style: 'tableCompact', alignment: 'center', color: q.reproved > 0 ? PDF_COLORS.danger : PDF_COLORS.secondary, bold: q.reproved > 0 });
+        row.push({ text: q.count > 0 ? q.avg.toFixed(1) : '-', style: 'tableCompact', alignment: 'center', bold: true });
       });
       return row;
     });
@@ -719,7 +762,7 @@ class ClassReportPDFGenerator {
     return {
       table: {
         headerRows: 2,
-        widths: ['*', 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20], // 12 colunas de dados + 1 nome
+        widths: ['*', 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28], // 12 colunas de dados + 1 nome
         body: [
           headerRow,
           subHeaderRow,
@@ -775,24 +818,24 @@ class ClassReportPDFGenerator {
     const statusColor = CLASSIFICATION_COLORS[profile.classification];
     const statusLabel = CLASSIFICATION_LABELS[profile.classification];
     const average = profile.average.toFixed(1);
-    const frequency = 100; // Placeholder as attendance is disabled currently
+    const frequencyLabel = 'N/D';
     const reprovacoes = profile.subjectsBelow6.length;
 
     // Preparar Listas
-    const vulnerabilities = profile.subjectsBelow6.map(s => `• ${s.subject} (${s.average.toFixed(1)})`);
+    const vulnerabilities = profile.subjectsBelow6.map(s => `${s.subject} (${s.average.toFixed(1)})`);
     const strengths = (profile.strengths || []).map(s => {
       const avg = profile.subjectAverages[s];
-      return avg ? `• ${s} (${avg.toFixed(1)})` : `• ${s}`;
+      return avg ? `${s} (${avg.toFixed(1)})` : `${s}`;
     }).slice(0, 5); // Limit to top 5 to save space
 
     // Texto Disciplinar
     const studentIncidents = this.incidents.filter(i => i.studentIds.includes(profile.studentId));
-    let incidentText = 'Ausência de intercorrências registradas.';
+    let incidentText = 'Ausência de ocorrências registradas.';
     if (studentIncidents.length > 0) {
       const graveCount = studentIncidents.filter(i => i.finalSeverity === 'grave' || i.finalSeverity === 'gravissima').length;
       incidentText = graveCount > 0
         ? `Constam ${studentIncidents.length} registros, sendo ${graveCount} de maior complexidade.`
-        : `Registram-se ${studentIncidents.length} intercorrências pontuais sob monitoramento.`;
+        : `Registram-se ${studentIncidents.length} ocorrências pontuais sob monitoramento.`;
     }
 
     // Encaminhamento
@@ -817,7 +860,7 @@ class ClassReportPDFGenerator {
 
               // 2. Métricas Lineares
               {
-                text: `Média: ${average}   |   Frequência: ${frequency}%   |   Reprovações: ${reprovacoes}`,
+                text: `Média: ${average}   |   Frequência: ${frequencyLabel}   |   Reprovações: ${reprovacoes}`,
                 fontSize: 8, color: PDF_COLORS.secondary, bold: true, margin: [0, 0, 0, 4]
               },
 
@@ -892,7 +935,8 @@ export async function generateProfessionalClassReportPDF(
   incidents: Incident[],
   attendance: AttendanceRecord[],
   professionalSubjects?: string[],
-  selectedQuarter?: string
+  selectedQuarter?: string,
+  periodContextLabel?: string,
 ): Promise<void> {
   const generator = new ClassReportPDFGenerator();
   await generator.generate(
@@ -902,6 +946,7 @@ export async function generateProfessionalClassReportPDF(
     incidents,
     attendance,
     professionalSubjects || [],
-    selectedQuarter
+    selectedQuarter,
+    periodContextLabel,
   );
 }

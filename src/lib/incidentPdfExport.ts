@@ -31,13 +31,21 @@ class IncidentPDF extends BasePDFGenerator {
     super();
   }
 
-  private async getResponsibleName(incident: Incident): Promise<string> {
+  private async getResponsibleName(
+    incident: Incident,
+    incidentClass?: Class,
+  ): Promise<string> {
     // Tenta buscar o email do último acompanhamento primeiro
     if (incident.followUps && incident.followUps.length > 0) {
       const lastFollowUp = incident.followUps[incident.followUps.length - 1];
-      if (lastFollowUp.responsavel) {
-        return lastFollowUp.responsavel;
+      if (lastFollowUp.responsavel?.trim()) {
+        return lastFollowUp.responsavel.trim();
       }
+    }
+
+    // Se não tiver no acompanhamento, usa o email do diretor da turma
+    if (incidentClass?.directorEmail?.trim()) {
+      return incidentClass.directorEmail.trim();
     }
 
     // Se não tiver, busca o email do usuário que criou o incidente
@@ -61,8 +69,8 @@ class IncidentPDF extends BasePDFGenerator {
       }
     }
 
-    // Fallback para o diretor configurado
-    return this.config.directorName || 'Responsável pela Escola';
+    // Fallback para o responsável configurado
+    return this.config.directorName || 'Responsável pelo Registro';
   }
 
   public async generate(
@@ -73,7 +81,10 @@ class IncidentPDF extends BasePDFGenerator {
   ) {
     try {
       await this.loadConfig();
-      this.responsibleName = await this.getResponsibleName(incident);
+      this.responsibleName = await this.getResponsibleName(
+        incident,
+        incidentClass,
+      );
       this.renderHeader();
 
       // Título do Documento - formato profissional
@@ -270,10 +281,10 @@ class IncidentPDF extends BasePDFGenerator {
     this.pdf.setLineWidth(0.3);
     this.pdf.setDrawColor('#000000');
 
-    // Responsável pela Escola (quem registrou/acompanhou)
+    // Responsável pelo Registro (quem registrou/acompanhou)
     this.pdf.line(this.margin, sigY, this.margin + colW - 5, sigY);
     this.setFont('xs', 'normal', '#000000');
-    this.drawText('Responsável pela Escola', this.margin + (colW - 5) / 2, sigY + 4, { align: 'center' });
+    this.drawText('Responsável pelo Registro', this.margin + (colW - 5) / 2, sigY + 4, { align: 'center' });
     if (this.responsibleName) {
       this.setFont('xs', 'bold', '#000000');
       this.drawText(this.responsibleName, this.margin + (colW - 5) / 2, sigY + 8, { align: 'center', maxWidth: colW - 5 });
@@ -297,7 +308,7 @@ class IncidentPDF extends BasePDFGenerator {
       this.drawText(legalGuardianName, this.margin + (colW * 2) + (colW - 5) / 2, sigY + 8, { align: 'center', maxWidth: colW - 5 });
     }
 
-    // Assinatura Digitalizada se houver (posicionada no responsável pela escola)
+    // Assinatura Digitalizada se houver (posicionada no responsável pelo registro)
     if (this.config.signatureBase64) {
       try {
         this.pdf.addImage(this.config.signatureBase64, 'PNG', this.margin + 5, sigY - 12, 25, 10);

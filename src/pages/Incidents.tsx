@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,6 @@ import {
   Edit,
   Filter
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { getSeverityColor, getSeverityLabel, getUrgencyDot } from '@/lib/incidentUtils';
 import { useIncidents, useClasses, useStudents } from '@/hooks/useData';
 
@@ -29,9 +28,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useUIStore } from '@/stores/useUIStore';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Incidents = () => {
-  const navigate = useNavigate();
+  const { user, profile } = useAuth();
   const { incidents, deleteIncident } = useIncidents();
   const { classes } = useClasses();
   const { students } = useStudents();
@@ -66,7 +66,7 @@ const Incidents = () => {
   const studentMap = useMemo(() => new Map(students.map(s => [s.id, s])), [students]);
 
   // Filter and search logic with useMemo
-  const getFilteredIncidents = (statusIncidents: Incident[]) => {
+  const getFilteredIncidents = useCallback((statusIncidents: Incident[]) => {
     let filtered = statusIncidents;
 
     // Filter by Class
@@ -93,12 +93,30 @@ const Incidents = () => {
     }
 
     return filtered;
-  };
+  }, [classFilter, searchTerm, classMap, studentMap]);
 
   // Memoized lists to prevent unnecessary re-filtering
-  const filteredOpenIncidents = useMemo(() => getFilteredIncidents(openIncidents), [openIncidents, classFilter, searchTerm, classMap, studentMap]);
-  const filteredFollowUpIncidents = useMemo(() => getFilteredIncidents(followUpIncidents), [followUpIncidents, classFilter, searchTerm, classMap, studentMap]);
-  const filteredResolvedIncidents = useMemo(() => getFilteredIncidents(resolvedIncidents), [resolvedIncidents, classFilter, searchTerm, classMap, studentMap]);
+  const filteredOpenIncidents = useMemo(() => getFilteredIncidents(openIncidents), [openIncidents, getFilteredIncidents]);
+  const filteredFollowUpIncidents = useMemo(() => getFilteredIncidents(followUpIncidents), [followUpIncidents, getFilteredIncidents]);
+  const filteredResolvedIncidents = useMemo(() => getFilteredIncidents(resolvedIncidents), [resolvedIncidents, getFilteredIncidents]);
+
+  const normalizeEmail = (value?: string | null) => (value || '').trim().toLowerCase();
+  const canManageIncident = useCallback((incident: Incident) => {
+    if (!profile || !user) return false;
+    if (profile.role === 'admin') return true;
+    if (profile.role !== 'diretor') return false;
+
+    const incidentClass = classMap.get(incident.classId);
+    if (!incidentClass) return false;
+
+    const isClassDirectorByEmail =
+      normalizeEmail(incidentClass.directorEmail) !== '' &&
+      normalizeEmail(incidentClass.directorEmail) === normalizeEmail(user.email || profile.email);
+    const isClassDirectorById =
+      !!incidentClass.directorId && incidentClass.directorId === user.id;
+
+    return isClassDirectorByEmail || isClassDirectorById;
+  }, [classMap, profile, user]);
 
 
 
@@ -120,6 +138,7 @@ const Incidents = () => {
         {incidentsList.map((incident) => {
           const incidentClass = classes.find(c => c.id === incident.classId);
           const incidentStudents = students.filter(s => incident.studentIds.includes(s.id));
+          const canManage = canManageIncident(incident);
 
           return (
             <div
@@ -165,22 +184,24 @@ const Incidents = () => {
                     setManagingIncident(incident);
                   }}
                 >
-                  {incident.status === 'resolvida' ? (
+                  {!canManage || incident.status === 'resolvida' ? (
                     <Eye className="h-4 w-4 text-muted-foreground" />
                   ) : (
                     <Edit className="h-4 w-4 text-muted-foreground" />
                   )}
                   <span className="sr-only">Ação</span>
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                  onClick={() => setDeletingIncident(incident)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span className="sr-only">Excluir</span>
-                </Button>
+                {canManage && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    onClick={() => setDeletingIncident(incident)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span className="sr-only">Excluir</span>
+                  </Button>
+                )}
               </div>
             </div>
           );
