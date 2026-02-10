@@ -1,4 +1,5 @@
 import { Incident, IncidentSeverity, Student } from '@/types';
+import { isPerformanceConvocationIncident } from './incidentClassification';
 
 /**
  * Action levels based on accumulation rules:
@@ -24,6 +25,7 @@ export function getStudentIncidentCounts(
   const studentIncidents = allIncidents.filter(incident => {
     if (!incident.studentIds.includes(studentId)) return false;
     if (incident.status === 'aberta') return false; // Only count validated incidents
+    if (isPerformanceConvocationIncident(incident)) return false;
 
     // Filter by school year (incidents from current academic year)
     const incidentYear = new Date(incident.date).getFullYear();

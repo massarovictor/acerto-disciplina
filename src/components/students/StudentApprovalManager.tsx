@@ -22,7 +22,7 @@ export const StudentApprovalManager = () => {
   const { getProfessionalSubjects } = useProfessionalSubjects();
   const { templates } = useProfessionalSubjectTemplates();
   const { incidents, addIncident } = useIncidents();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState('quarter');
@@ -38,11 +38,32 @@ export const StudentApprovalManager = () => {
     classId: selectedClass || undefined,
     schoolYear: selectedSchoolYear,
   });
+  const currentCalendarYear = new Date().getFullYear();
 
   const classStudents = students
     .filter((s) => s.classId === selectedClass)
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   const selectedClassData = classes.find((c) => c.id === selectedClass);
+  const canGenerateConvocations =
+    profile?.role === 'admin' || profile?.role === 'diretor';
+  const selectedCalendarYear = useMemo(() => {
+    if (!selectedClassData) return null;
+
+    if (selectedClassData.startCalendarYear) {
+      return selectedClassData.startCalendarYear + (selectedSchoolYear - 1);
+    }
+
+    if (selectedClassData.startYearDate) {
+      const computed = Number(
+        getAcademicYear(selectedClassData.startYearDate, selectedSchoolYear),
+      );
+      return Number.isFinite(computed) ? computed : null;
+    }
+
+    return null;
+  }, [selectedClassData, selectedSchoolYear]);
+  const isPastCalendarYearSelection =
+    selectedCalendarYear !== null && selectedCalendarYear < currentCalendarYear;
   const handleSelectClass = (value: string) => {
     setSelectedClass(value);
     const nextClass = classes.find((cls) => cls.id === value);
@@ -167,11 +188,36 @@ export const StudentApprovalManager = () => {
       });
       return;
     }
+    if (!canGenerateConvocations) {
+      toast({
+        title: 'Acesso negado',
+        description: 'Somente admin e diretor podem gerar convocações.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     if (!selectedClassData) {
       toast({
         title: 'Erro',
         description: 'Selecione uma turma primeiro.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (selectedCalendarYear === null) {
+      toast({
+        title: 'Ano calendário indisponível',
+        description:
+          'Não foi possível identificar o ano calendário da seleção. Configure o ano de início da turma.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (isPastCalendarYearSelection) {
+      toast({
+        title: 'Geração bloqueada',
+        description: `Não é permitido gerar convocações para ano calendário passado (${selectedCalendarYear}).`,
         variant: 'destructive',
       });
       return;
@@ -359,7 +405,8 @@ export const StudentApprovalManager = () => {
                 <strong>Turma:</strong> {selectedClassData.name} |{' '}
                 <strong>Ano Atual:</strong> {selectedClassData.currentYear || 'Não definido'} |{' '}
                 <strong>Alunos:</strong> {classStudents.length} |{' '}
-                <strong>Ano selecionado:</strong> {selectedSchoolYear}º
+                <strong>Ano selecionado:</strong> {selectedSchoolYear}º |{' '}
+                <strong>Ano calendário:</strong> {selectedCalendarYear ?? 'Não definido'}
               </AlertDescription>
             </Alert>
           )}
@@ -402,13 +449,26 @@ export const StudentApprovalManager = () => {
                     <Button
                       variant="outline"
                       onClick={handleGenerateQuarterIncidents}
-                      disabled={quarterResults.length === 0}
+                      disabled={
+                        quarterResults.length === 0 ||
+                        isPastCalendarYearSelection ||
+                        !canGenerateConvocations
+                      }
                     >
                       Gerar Convocações
                     </Button>
                   </>
                 )}
               </div>
+
+              {isPastCalendarYearSelection && (
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    A geração de convocações está bloqueada para ano calendário passado ({selectedCalendarYear}).
+                    Selecione um ano calendário de {currentCalendarYear} em diante.
+                  </AlertDescription>
+                </Alert>
+              )}
 
               {quarterResults.length > 0 && (
                 <Card>

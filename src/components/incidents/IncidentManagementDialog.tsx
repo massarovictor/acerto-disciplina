@@ -31,6 +31,7 @@ import { generateIncidentPDF } from '@/lib/incidentPdfExport';
 import { generateIncidentParentNotificationPDF } from '@/lib/incidentParentNotificationPdfExport';
 import { getSeverityColor, getStatusColor } from '@/lib/incidentUtils';
 import { sendIncidentEmail } from '@/lib/emailService';
+import { isPerformanceConvocationIncident } from '@/lib/incidentClassification';
 import { AddStudentsDialog } from './AddStudentsDialog';
 import { X } from 'lucide-react';
 
@@ -86,6 +87,7 @@ export const IncidentManagementDialog = ({
 
   // Sempre pega a versão mais recente dos incidents
   const currentIncident = incidents.find(i => i.id === incident.id) || incident;
+  const isPerformanceConvocation = isPerformanceConvocationIncident(currentIncident);
 
   // Inicializa campos editáveis quando incident muda
   useEffect(() => {
@@ -98,25 +100,31 @@ export const IncidentManagementDialog = ({
   useEffect(() => {
     if (currentIncident.status === 'acompanhamento' && !currentIncident.followUps?.length) {
       // Calculate required action level based on severity + accumulated history
-      const requiredLevel = getRequiredActionLevel(
-        currentIncident.studentIds,
-        currentIncident.finalSeverity,
-        incidents
-      );
+      const requiredLevel = isPerformanceConvocation
+        ? 'comunicado_pais'
+        : getRequiredActionLevel(
+            currentIncident.studentIds,
+            currentIncident.finalSeverity,
+            incidents
+          );
       const requiredType = getRequiredFollowUpType(requiredLevel);
 
-      const suggested = calculateSuggestedAction(
-        currentIncident.studentIds,
-        currentIncident.finalSeverity,
-        incidents,
-        students
-      );
+      const suggested = isPerformanceConvocation
+        ? 'Convocar responsáveis para comparecimento à escola e alinhamentos pedagógicos sobre o rendimento bimestral.'
+        : calculateSuggestedAction(
+            currentIncident.studentIds,
+            currentIncident.finalSeverity,
+            incidents,
+            students
+          );
 
       // Force the required follow-up type based on accumulation rules
       setFollowUpType(requiredType);
       setFollowUpProvidencias(suggested);
 
-      if (currentIncident.finalSeverity === 'grave' || currentIncident.finalSeverity === 'gravissima') {
+      if (isPerformanceConvocation) {
+        setFollowUpMotivo('6 - Rendimento (Intervenções por baixo rendimento/Elogios/Reconhecimento)');
+      } else if (currentIncident.finalSeverity === 'grave' || currentIncident.finalSeverity === 'gravissima') {
         setFollowUpMotivo('1 - Comportamento inadequado');
       } else if (currentIncident.finalSeverity === 'intermediaria') {
         setFollowUpMotivo('2 - Conflitos/Relação interpessoal');
@@ -142,7 +150,7 @@ export const IncidentManagementDialog = ({
       setFollowUpNomeResponsavelPai(followUp.nomeResponsavelPai || '');
       setFollowUpGrauParentesco(followUp.grauParentesco || '');
     }
-  }, [currentIncident.status, currentIncident.followUps, incidents, students, currentIncident.studentIds, currentIncident.finalSeverity]);
+  }, [currentIncident.status, currentIncident.followUps, incidents, students, currentIncident.studentIds, currentIncident.finalSeverity, isPerformanceConvocation]);
 
   const incidentClass = classes.find(c => c.id === currentIncident.classId);
   const incidentStudents = students.filter(s => currentIncident.studentIds.includes(s.id));

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -52,9 +52,34 @@ const Incidents = () => {
   const [deletingIncident, setDeletingIncident] = useState<Incident | null>(null);
   const [showNewIncidentDialog, setShowNewIncidentDialog] = useState(false);
   const [initialTab, setInitialTab] = useState<'info' | 'followup' | 'comments'>('info');
+  const normalizeEmail = (value?: string | null) => (value || '').trim().toLowerCase();
 
   // Get active classes for filter
   const activeClasses = classes.filter(c => !c.archived && c.active);
+  const directorOwnedClasses = useMemo(() => {
+    if (!profile || profile.role !== 'diretor' || !user) return [];
+    return activeClasses.filter((incidentClass) => {
+      const isClassDirectorByEmail =
+        normalizeEmail(incidentClass.directorEmail) !== '' &&
+        normalizeEmail(incidentClass.directorEmail) === normalizeEmail(user.email || profile.email);
+      const isClassDirectorById =
+        !!incidentClass.directorId && incidentClass.directorId === user.id;
+      return isClassDirectorByEmail || isClassDirectorById;
+    });
+  }, [activeClasses, profile, user]);
+
+  // Para diretor, aplica automaticamente o filtro da própria turma quando estiver em "all".
+  useEffect(() => {
+    if (profile?.role !== 'diretor') return;
+    if (classFilter !== 'all') return;
+    if (directorOwnedClasses.length === 0) return;
+
+    const firstDirectorClass = [...directorOwnedClasses]
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))[0];
+    if (firstDirectorClass) {
+      setClassFilter(firstDirectorClass.id);
+    }
+  }, [classFilter, directorOwnedClasses, profile?.role, setClassFilter]);
 
   // Filter incidents by status
   const openIncidents = incidents.filter(i => i.status === 'aberta');
@@ -100,7 +125,6 @@ const Incidents = () => {
   const filteredFollowUpIncidents = useMemo(() => getFilteredIncidents(followUpIncidents), [followUpIncidents, getFilteredIncidents]);
   const filteredResolvedIncidents = useMemo(() => getFilteredIncidents(resolvedIncidents), [resolvedIncidents, getFilteredIncidents]);
 
-  const normalizeEmail = (value?: string | null) => (value || '').trim().toLowerCase();
   const canManageIncident = useCallback((incident: Incident) => {
     if (!profile || !user) return false;
     if (profile.role === 'admin') return true;

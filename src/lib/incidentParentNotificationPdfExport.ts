@@ -2,6 +2,7 @@ import { Class, FollowUpRecord, Incident, Student } from '@/types';
 import { INCIDENT_EPISODES } from '@/data/mockData';
 import { BasePDFGenerator } from './basePdfExport';
 import { ActionLevel, getRequiredActionLevel } from './incidentActions';
+import { isPerformanceConvocationIncident } from './incidentClassification';
 
 const EPISODE_MAP = new Map(
   INCIDENT_EPISODES.map((episode) => [episode.id, episode.description]),
@@ -24,6 +25,14 @@ const ACTION_LEVEL_SHORT_TEXT: Record<ActionLevel, string> = {
 };
 
 class IncidentParentNotificationPDF extends BasePDFGenerator {
+  private hasSuspensionLanguage(value?: string | null): boolean {
+    return (value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .includes('suspens');
+  }
+
   private getResponsibleName(
     incident: Incident,
     incidentClass?: Class,
@@ -62,15 +71,46 @@ class IncidentParentNotificationPDF extends BasePDFGenerator {
     return 'Ocorrência disciplinar registrada no sistema da escola.';
   }
 
-  private getSchoolMeasure(incident: Incident, actionLevel: ActionLevel): string {
+  private getSchoolMeasure(
+    incident: Incident,
+    actionLevel: ActionLevel,
+    isPerformanceConvocation: boolean,
+  ): string {
     const latestFollowUp = this.getLatestFollowUp(incident.followUps);
+
+    if (isPerformanceConvocation) {
+      const followUpMeasure = latestFollowUp?.providencias?.trim();
+      if (followUpMeasure && !this.hasSuspensionLanguage(followUpMeasure)) {
+        return followUpMeasure;
+      }
+
+      const incidentMeasure = incident.actions?.trim();
+      if (incidentMeasure && !this.hasSuspensionLanguage(incidentMeasure)) {
+        return incidentMeasure;
+      }
+
+      const suggestedMeasure = incident.suggestedAction?.trim();
+      if (suggestedMeasure && !this.hasSuspensionLanguage(suggestedMeasure)) {
+        return suggestedMeasure;
+      }
+
+      return 'Convocação dos responsáveis para comparecimento à escola e alinhamentos pedagógicos sobre o rendimento bimestral do estudante.';
+    }
+
     if (latestFollowUp?.providencias?.trim()) return latestFollowUp.providencias.trim();
     if (incident.actions?.trim()) return incident.actions.trim();
     if (incident.suggestedAction?.trim()) return incident.suggestedAction.trim();
     return ACTION_LEVEL_SHORT_TEXT[actionLevel];
   }
 
-  private getFamilyMessage(actionLevel: ActionLevel): string {
+  private getFamilyMessage(
+    actionLevel: ActionLevel,
+    isPerformanceConvocation: boolean,
+  ): string {
+    if (isPerformanceConvocation) {
+      return 'Solicitamos o comparecimento do responsável legal na escola para alinhamentos pedagógicos e acompanhamento do rendimento bimestral.';
+    }
+
     if (actionLevel === 'suspensao_1_dia' || actionLevel === 'suspensao_3_dias') {
       return 'Solicitamos o comparecimento do responsável legal na escola para alinhamento das medidas aplicadas.';
     }
@@ -162,11 +202,16 @@ class IncidentParentNotificationPDF extends BasePDFGenerator {
 
     const targetStudent = singleStudent || students[0];
     const targetStudentIds = targetStudent ? [targetStudent.id] : incident.studentIds;
-    const actionLevel = getRequiredActionLevel(
-      targetStudentIds,
-      incident.finalSeverity,
-      allIncidents,
-    );
+    const isPerformanceConvocation = isPerformanceConvocationIncident(incident);
+    const incidentSchoolYear = new Date(incident.date).getFullYear();
+    const actionLevel = isPerformanceConvocation
+      ? 'comunicado_pais'
+      : getRequiredActionLevel(
+          targetStudentIds,
+          incident.finalSeverity,
+          allIncidents,
+          Number.isFinite(incidentSchoolYear) ? incidentSchoolYear : undefined,
+        );
 
     this.setFont('md', 'bold', '#000000');
     this.drawText('Notificação aos Responsáveis', this.margin, this.y);
@@ -199,7 +244,7 @@ class IncidentParentNotificationPDF extends BasePDFGenerator {
 
     this.renderSectionTitle('Medida adotada pela escola');
     const measureLines = this.pdf.splitTextToSize(
-      this.getSchoolMeasure(incident, actionLevel),
+      this.getSchoolMeasure(incident, actionLevel, isPerformanceConvocation),
       this.contentWidth - 2,
     );
     this.setFont('xs', 'normal', '#000000');
@@ -207,7 +252,10 @@ class IncidentParentNotificationPDF extends BasePDFGenerator {
     this.y += Math.max(6, measureLines.length * 4) + 3;
 
     this.renderSectionTitle('Encaminhamento aos responsáveis');
-    const familyLines = this.pdf.splitTextToSize(this.getFamilyMessage(actionLevel), this.contentWidth - 2);
+    const familyLines = this.pdf.splitTextToSize(
+      this.getFamilyMessage(actionLevel, isPerformanceConvocation),
+      this.contentWidth - 2
+    );
     this.setFont('xs', 'normal', '#000000');
     this.drawText(familyLines, this.margin + 1, this.y + 3);
     this.y += Math.max(6, familyLines.length * 4) + 3;

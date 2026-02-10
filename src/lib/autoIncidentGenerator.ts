@@ -91,7 +91,8 @@ export function generateQuarterIncidents(
         .map((subject) => `${subject} (${result.subjectGrades[subject]?.toFixed(1) || 'N/A'})`)
         .join(', ');
 
-      const description = `CONVOCAÇÃO DE PAIS - ${quarterNames[quarter] || quarter}: Aluno com ${result.subjectsBelowAverage.length} disciplina(s) abaixo da média: ${subjectsDetail}.`;
+      const quarterLabel = quarterNames[quarter] || quarter;
+      const description = `CONVOCAÇÃO DE PAIS - ${quarterLabel}: Convocação por baixo rendimento no ${quarterLabel}. Critério institucional: estudante com 3 ou mais disciplinas abaixo da média no bimestre. Situação identificada: ${result.subjectsBelowAverage.length} disciplina(s) abaixo da média (${subjectsDetail}).`;
 
       const newIncident: Omit<Incident, 'id' | 'createdAt' | 'updatedAt'> = {
         classId: classData.id,
@@ -101,8 +102,9 @@ export function generateQuarterIncidents(
         calculatedSeverity: severity,
         finalSeverity: severity,
         description,
-        suggestedAction: `Convocar responsáveis para reunião pedagógica sobre o rendimento no ${quarterNames[quarter] || quarter}.`,
-        status: 'aberta',
+        suggestedAction: `Convocar responsáveis para reunião pedagógica devido ao registro de 3 ou mais disciplinas abaixo da média no ${quarterLabel}.`,
+        // Convocação gerada na página de aprovações já entra em acompanhamento.
+        status: 'acompanhamento',
         createdBy,
         followUps: [],
         comments: [],
