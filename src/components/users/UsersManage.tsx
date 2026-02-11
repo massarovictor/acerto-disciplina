@@ -39,7 +39,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/services/supabase';
-import { Search, Plus, Edit, Trash2, Shield, User, GraduationCap, Loader2 } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, AlertTriangle, Shield, User, GraduationCap, Loader2 } from 'lucide-react';
 import type { UserRole } from '@/types';
 
 interface AuthorizedEmail {
