@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { GraduationCap, Mail, Lock } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import { supabase } from '@/services/supabase';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 
@@ -101,20 +101,20 @@ const Login = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10 p-4">
       <Card className="w-full max-w-md shadow-lg border-t-4 border-t-primary">
-        <CardHeader className="space-y-4 text-center">
+        <CardHeader className="space-y-2 text-center pb-2">
           <div className="flex justify-center">
-            <div className="bg-primary/10 text-primary p-4 rounded-full ring-4 ring-primary/5">
-              <GraduationCap className="h-10 w-10" />
+            <div className="bg-primary text-primary-foreground p-3 rounded-full ring-4 ring-primary/5">
+              <img src="/logo-white.svg" alt="MAVIC Logo" className="h-12 w-12" />
             </div>
           </div>
-          <div>
-            <CardTitle className="text-3xl font-bold tracking-tight text-foreground">MAVIC</CardTitle>
-            <CardDescription className="mt-2 text-base">
+          <div className="space-y-1">
+            <CardTitle className="text-[28px] font-bold tracking-tighter lowercase text-slate-800 dark:text-slate-50 leading-none" style={{ fontFamily: 'Sora, sans-serif' }}>mavic</CardTitle>
+            <CardDescription className="text-xs font-normal leading-none" style={{ fontFamily: 'Inter, sans-serif' }}>
               Sistema de Acompanhamento Escolar
             </CardDescription>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-10">
           {step === 'email' ? (
             <form onSubmit={handleSendOtp} className="space-y-4">
               <div className="space-y-2">
