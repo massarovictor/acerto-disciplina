@@ -262,8 +262,16 @@ export function ClassRankingTable({
                     >
                       <TableCell className="font-medium">
                         <Badge
-                          variant={rank <= 3 ? 'default' : 'outline'}
-                          className={rank === 1 ? 'bg-warning/100' : rank === 2 ? 'bg-muted' : rank === 3 ? 'bg-warning' : ''}
+                          variant={rank <= 3 ? 'secondary' : 'outline'}
+                          className={
+                            rank === 1
+                              ? 'bg-warning/20 text-warning-foreground border-warning/50 dark:bg-warning/20 dark:text-warning'
+                              : rank === 2
+                                ? 'bg-muted text-muted-foreground border-border dark:bg-muted dark:text-muted-foreground'
+                                : rank === 3
+                                  ? 'bg-status-analysis/20 text-status-analysis border-status-analysis/50 dark:bg-status-analysis/20 dark:text-status-analysis'
+                                  : ''
+                          }
                         >
                           {rank}º
                         </Badge>

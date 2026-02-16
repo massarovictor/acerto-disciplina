@@ -38,7 +38,7 @@ interface ChartDataItem {
 interface ChartProps {
     data: ChartDataItem[];
     width?: number | string;
-    height?: number;
+    height?: number | string;
     title?: string;
     showLegend?: boolean;
     showGrid?: boolean;
@@ -77,6 +77,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 interface BarChartProps extends ChartProps {
     layout?: 'horizontal' | 'vertical';
     colorByValue?: boolean;
+    barSize?: number;
 }
 
 export const ReportBarChart: React.FC<BarChartProps> = ({
@@ -88,6 +89,7 @@ export const ReportBarChart: React.FC<BarChartProps> = ({
     animate = true,
     layout = 'vertical',
     colorByValue = true,
+    barSize = 40,
 }) => {
     const isHorizontal = layout === 'horizontal';
 
@@ -112,8 +114,9 @@ export const ReportBarChart: React.FC<BarChartProps> = ({
                         <YAxis
                             type="category"
                             dataKey="name"
-                            tick={{ fontSize: 16, fontWeight: 700, fill: REPORT_COLORS.text.primary }}
+                            tick={{ fontSize: 14, fontWeight: 700, fill: REPORT_COLORS.text.primary }}
                             width={180}
+                            interval={0} // Force show all labels
                         />
                     </>
                 ) : (
@@ -129,7 +132,7 @@ export const ReportBarChart: React.FC<BarChartProps> = ({
                     radius={[0, 10, 10, 0]}
                     isAnimationActive={animate}
                     animationDuration={CHART_CONFIG.animationDuration}
-                    barSize={40}
+                    barSize={barSize}
                 >
                     <LabelList
                         dataKey="value"

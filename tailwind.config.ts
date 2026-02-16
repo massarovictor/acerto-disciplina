@@ -3,8 +3,8 @@ import tailwindcssAnimate from 'tailwindcss-animate';
 
 const token = (name: string) => ({ opacityValue }: { opacityValue?: string }) =>
   opacityValue === undefined
-    ? `rgb(var(${name}))`
-    : `rgb(var(${name}) / ${opacityValue})`;
+    ? `oklch(var(${name}))`
+    : `oklch(var(${name}) / ${opacityValue})`;
 
 const varColor = (name: string) => `var(${name})`;
 
@@ -22,15 +22,15 @@ export default {
     },
     extend: {
       colors: {
-        border: token('--border-rgb'),
-        input: token('--input-rgb'),
-        ring: token('--ring-rgb'),
-        background: token('--background-rgb'),
-        foreground: token('--foreground-rgb'),
+        border: token('--border'),
+        input: token('--input'),
+        ring: token('--ring'),
+        background: token('--background'),
+        foreground: token('--foreground'),
 
         primary: {
-          DEFAULT: token('--primary-rgb'),
-          foreground: token('--primary-foreground-rgb'),
+          DEFAULT: token('--primary'),
+          foreground: token('--primary-foreground'),
           50: varColor('--primary-50'),
           100: varColor('--primary-100'),
           200: varColor('--primary-200'),
@@ -43,20 +43,20 @@ export default {
           900: varColor('--primary-900'),
         },
         secondary: {
-          DEFAULT: token('--secondary-rgb'),
-          foreground: token('--secondary-foreground-rgb'),
+          DEFAULT: token('--secondary'),
+          foreground: token('--secondary-foreground'),
         },
         destructive: {
-          DEFAULT: token('--destructive-rgb'),
-          foreground: token('--destructive-foreground-rgb'),
+          DEFAULT: token('--destructive'),
+          foreground: token('--destructive-foreground'),
         },
         muted: {
-          DEFAULT: token('--muted-rgb'),
-          foreground: token('--muted-foreground-rgb'),
+          DEFAULT: token('--muted'),
+          foreground: token('--muted-foreground'),
         },
         accent: {
-          DEFAULT: token('--accent-rgb'),
-          foreground: token('--accent-foreground-rgb'),
+          DEFAULT: token('--accent'),
+          foreground: token('--accent-foreground'),
           50: varColor('--accent-50'),
           100: varColor('--accent-100'),
           200: varColor('--accent-200'),
@@ -69,25 +69,25 @@ export default {
           900: varColor('--accent-900'),
         },
         popover: {
-          DEFAULT: token('--popover-rgb'),
-          foreground: token('--popover-foreground-rgb'),
+          DEFAULT: token('--popover'),
+          foreground: token('--popover-foreground'),
         },
         card: {
-          DEFAULT: token('--card-rgb'),
-          foreground: token('--card-foreground-rgb'),
+          DEFAULT: token('--card'),
+          foreground: token('--card-foreground'),
         },
 
         success: {
-          DEFAULT: token('--success-rgb'),
-          foreground: token('--success-foreground-rgb'),
+          DEFAULT: token('--success'),
+          foreground: token('--success-foreground'),
         },
         warning: {
-          DEFAULT: token('--warning-rgb'),
-          foreground: token('--warning-foreground-rgb'),
+          DEFAULT: token('--warning'),
+          foreground: token('--warning-foreground'),
         },
         info: {
-          DEFAULT: token('--info-rgb'),
-          foreground: token('--info-foreground-rgb'),
+          DEFAULT: token('--info'),
+          foreground: token('--info-foreground'),
         },
 
         brand: {
@@ -124,36 +124,36 @@ export default {
         },
 
         sidebar: {
-          DEFAULT: token('--sidebar-background-rgb'),
-          foreground: token('--sidebar-foreground-rgb'),
-          primary: token('--sidebar-primary-rgb'),
-          'primary-foreground': token('--sidebar-primary-foreground-rgb'),
-          accent: token('--sidebar-accent-rgb'),
-          'accent-foreground': token('--sidebar-accent-foreground-rgb'),
-          border: token('--sidebar-border-rgb'),
-          ring: token('--sidebar-ring-rgb'),
+          DEFAULT: token('--sidebar-background'),
+          foreground: token('--sidebar-foreground'),
+          primary: token('--sidebar-primary'),
+          'primary-foreground': token('--sidebar-primary-foreground'),
+          accent: token('--sidebar-accent'),
+          'accent-foreground': token('--sidebar-accent-foreground'),
+          border: token('--sidebar-border'),
+          ring: token('--sidebar-ring'),
         },
 
         severity: {
-          light: token('--severity-light-rgb'),
+          light: token('--severity-light'),
           'light-foreground': varColor('--severity-light-foreground'),
           'light-bg': varColor('--severity-light-bg'),
-          intermediate: token('--severity-intermediate-rgb'),
+          intermediate: token('--severity-intermediate'),
           'intermediate-foreground': varColor('--severity-intermediate-foreground'),
           'intermediate-bg': varColor('--severity-intermediate-bg'),
-          serious: token('--severity-serious-rgb'),
+          serious: token('--severity-serious'),
           'serious-foreground': varColor('--severity-serious-foreground'),
           'serious-bg': varColor('--severity-serious-bg'),
-          critical: token('--severity-critical-rgb'),
+          critical: token('--severity-critical'),
           'critical-foreground': varColor('--severity-critical-foreground'),
           'critical-bg': varColor('--severity-critical-bg'),
         },
 
         status: {
-          open: token('--status-open-rgb'),
-          analysis: token('--status-analysis-rgb'),
-          resolved: token('--status-resolved-rgb'),
-          closed: token('--status-closed-rgb'),
+          open: token('--status-open'),
+          analysis: token('--status-analysis'),
+          resolved: token('--status-resolved'),
+          closed: token('--status-closed'),
         },
       },
       borderRadius: {

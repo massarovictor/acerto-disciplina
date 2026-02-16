@@ -156,14 +156,85 @@ export const ClassSlides = ({
     quarter: selectedPeriod === "all" ? undefined : selectedPeriod,
     schoolYear: selectedSchoolYear,
   }, { enabled });
+
+  const [selectedCalendarYear, setSelectedCalendarYear] = useState<number>(new Date().getFullYear());
+
+  const getStartCalendarYear = (cls: Class) => {
+    if (typeof cls.startCalendarYear === 'number') return cls.startCalendarYear;
+    if (cls.startYearDate) {
+      const date = parseLocalDate(cls.startYearDate);
+      if (!Number.isNaN(date.getTime())) return date.getFullYear();
+    }
+    const currentYear = new Date().getFullYear();
+    const inferredYear =
+      cls.currentYear && [1, 2, 3].includes(cls.currentYear)
+        ? currentYear - (cls.currentYear - 1)
+        : undefined;
+    return inferredYear;
+  };
+
   const schoolClassIds = useMemo(
-    () => (viewMode === "school" ? classes.map((cls) => cls.id) : []),
-    [classes, viewMode],
+    () => {
+      if (viewMode !== "school") return [];
+
+      return classes.filter(cls => {
+        const startYear = getStartCalendarYear(cls);
+        const endYear = cls.endCalendarYear ?? (startYear ? startYear + 2 : undefined);
+
+        if (!startYear) return false;
+
+        return startYear !== undefined && startYear <= selectedCalendarYear && selectedCalendarYear <= (endYear || startYear + 2);
+      }).map((cls) => cls.id);
+    },
+    [classes, viewMode, selectedCalendarYear],
   );
-  const { grades: schoolGrades } = useGradesAnalytics({
+  const { grades: rawSchoolGrades } = useGradesAnalytics({
     classIds: schoolClassIds,
     quarter: schoolPeriod === "all" ? undefined : schoolPeriod,
   }, { enabled: enabled && viewMode === "school" });
+
+  const schoolGrades = useMemo(() => {
+    // Debug log
+    if (viewMode === 'school') {
+      console.log(`[ClassSlides] Filtering for year: ${selectedCalendarYear}`);
+      console.log(`[ClassSlides] Total raw grades: ${rawSchoolGrades.length}`);
+    }
+
+    const filtered = rawSchoolGrades.filter(g => {
+      // 1. Try to filter by School Year (Series) logic first - most robust for longitudinal data
+      const cls = classes.find(c => c.id === g.classId);
+      if (cls && cls.startCalendarYear && g.schoolYear) {
+        // Calculate which series (1, 2, or 3) corresponds to the selected calendar year
+        // e.g. Start 2024. Selected 2026. Diff = 2. Expected Year = 3.
+        const expectedYear = selectedCalendarYear - cls.startCalendarYear + 1;
+
+        // Validate if expected year is within valid range (1-3)
+        if (expectedYear >= 1 && expectedYear <= 3) {
+          return g.schoolYear === expectedYear;
+        }
+      }
+
+      // 2. Fallback to recordedAt date if structural logic isn't possible
+      if (!g.recordedAt) return false;
+
+      // Parse year directly from ISO string (YYYY-MM-DD...)
+      let gradeYear = 0;
+      try {
+        const yearStr = g.recordedAt.substring(0, 4);
+        gradeYear = parseInt(yearStr, 10);
+      } catch (e) {
+        const date = new Date(g.recordedAt);
+        gradeYear = date.getFullYear();
+      }
+
+      return gradeYear === Number(selectedCalendarYear);
+    });
+
+    if (viewMode === 'school') {
+      console.log(`[ClassSlides] Filtered grades: ${filtered.length} / ${rawSchoolGrades.length}`);
+    }
+    return filtered;
+  }, [rawSchoolGrades, selectedCalendarYear, viewMode, classes]);
 
   const classData = classes.find((c) => c.id === selectedClass);
   useEffect(() => {
@@ -1219,8 +1290,8 @@ export const ClassSlides = ({
             </TabsContent>
 
             <TabsContent value="school" className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
+              <div className="flex flex-col md:flex-row gap-4 items-end">
+                <div className="space-y-2 min-w-[200px] flex-1">
                   <Label>Período</Label>
                   <Select
                     value={schoolPeriod}
@@ -1243,10 +1314,29 @@ export const ClassSlides = ({
                   </Select>
                 </div>
 
-                <div className="flex items-end">
-                  <div className="p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground w-full">
-                    <p className="font-medium text-foreground">{schoolName}</p>
-                    <p>{classes.length} turmas • {students.length} alunos matriculados</p>
+                {viewMode === "school" && (
+                  <div className="space-y-2 w-[120px]">
+                    <Label>Ano</Label>
+                    <Select
+                      value={String(selectedCalendarYear)}
+                      onValueChange={(val) => setSelectedCalendarYear(Number(val))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Ano" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i + 1).reverse().map((year) => (
+                          <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <div className="flex-1 min-w-[300px]">
+                  <div className="p-2.5 bg-muted/50 rounded-lg text-sm text-muted-foreground border">
+                    <p className="font-medium text-foreground truncate" title={schoolName}>{schoolName}</p>
+                    <p className="text-xs">{classes.length} turmas • {students.length} alunos matriculados</p>
                   </div>
                 </div>
               </div>

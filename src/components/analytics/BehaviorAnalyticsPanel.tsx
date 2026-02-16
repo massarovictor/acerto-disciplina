@@ -59,7 +59,8 @@ interface BehaviorAnalyticsPanelProps {
 
 import {
     getSeverityColor,
-    getSeverityLabel
+    getSeverityLabel,
+    getUrgencyDot
 } from '@/lib/incidentUtils';
 
 const InsightIcon = ({ type }: { type: Insight['type'] }) => {
@@ -171,7 +172,7 @@ export function BehaviorAnalyticsPanel({
                                     <div key={item.severity} className="space-y-2">
                                         <div className="flex items-center justify-between text-sm">
                                             <div className="flex items-center gap-2">
-                                                <div className={`w-3 h-3 rounded-full ${getSeverityColor(item.severity)}`} />
+                                                <div className={`w-3 h-3 rounded-full ${getUrgencyDot(item.severity)}`} />
                                                 <span>{getSeverityLabel(item.severity)}</span>
                                             </div>
                                             <div className="flex items-center gap-2">
@@ -182,6 +183,7 @@ export function BehaviorAnalyticsPanel({
                                         <Progress
                                             value={item.percent}
                                             className="h-2"
+                                            indicatorClassName={getUrgencyDot(item.severity)}
                                         />
                                     </div>
                                 );
@@ -425,8 +427,12 @@ export function BehaviorAnalyticsPanel({
                                         <TableRow key={item.classData.id}>
                                             <TableCell className="text-center font-medium">
                                                 <Badge
-                                                    variant={index < 3 ? 'default' : 'outline'}
-                                                    className={index === 0 ? 'bg-warning/100' : index === 1 ? 'bg-muted' : index === 2 ? 'bg-warning' : ''}
+                                                    variant={index < 3 ? 'outline' : 'outline'}
+                                                    className={
+                                                        index === 0 ? 'bg-severity-critical/20 text-severity-critical border-severity-critical/50' :
+                                                            index === 1 ? 'bg-severity-serious/20 text-severity-serious border-severity-serious/50' :
+                                                                index === 2 ? 'bg-severity-intermediate/20 text-severity-intermediate border-severity-intermediate/50' : ''
+                                                    }
                                                 >
                                                     {index + 1}º
                                                 </Badge>
@@ -500,8 +506,12 @@ export function BehaviorAnalyticsPanel({
                                         <TableRow key={item.student.id}>
                                             <TableCell className="text-center font-medium">
                                                 <Badge
-                                                    variant={index < 3 ? 'default' : 'outline'}
-                                                    className={index === 0 ? 'bg-warning/100' : index === 1 ? 'bg-muted' : index === 2 ? 'bg-warning' : ''}
+                                                    variant={index < 3 ? 'outline' : 'outline'}
+                                                    className={
+                                                        index === 0 ? 'bg-severity-critical/20 text-severity-critical border-severity-critical/50' :
+                                                            index === 1 ? 'bg-severity-serious/20 text-severity-serious border-severity-serious/50' :
+                                                                index === 2 ? 'bg-severity-intermediate/20 text-severity-intermediate border-severity-intermediate/50' : ''
+                                                    }
                                                 >
                                                     {index + 1}º
                                                 </Badge>

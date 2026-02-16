@@ -2,10 +2,10 @@ import { IncidentSeverity, IncidentStatus } from "@/types";
 
 export const getSeverityColor = (severity: IncidentSeverity | string) => {
     switch (severity) {
-        case 'leve': return 'bg-info/15 text-info dark:bg-info/20 dark:text-info border-info/30 dark:border-info/40';
-        case 'intermediaria': return 'bg-warning/15 text-warning dark:bg-warning/20 dark:text-warning border-warning/30 dark:border-warning/40';
-        case 'grave': return 'bg-warning/15 text-warning dark:bg-warning/20 dark:text-warning border-warning/30 dark:border-warning/40';
-        case 'gravissima': return 'bg-destructive/15 text-destructive dark:bg-destructive/20 dark:text-destructive border-destructive/30 dark:border-destructive/40';
+        case 'leve': return 'bg-severity-light/15 text-severity-light dark:bg-severity-light/20 dark:text-severity-light border-severity-light/30 dark:border-severity-light/40';
+        case 'intermediaria': return 'bg-severity-intermediate/15 text-severity-intermediate dark:bg-severity-intermediate/20 dark:text-severity-intermediate border-severity-intermediate/30 dark:border-severity-intermediate/40';
+        case 'grave': return 'bg-severity-serious/15 text-severity-serious dark:bg-severity-serious/20 dark:text-severity-serious border-severity-serious/30 dark:border-severity-serious/40';
+        case 'gravissima': return 'bg-severity-critical/15 text-severity-critical dark:bg-severity-critical/20 dark:text-severity-critical border-severity-critical/30 dark:border-severity-critical/40';
         default: return 'bg-muted text-muted-foreground';
     }
 };
@@ -22,10 +22,10 @@ export const getSeverityLabel = (severity: IncidentSeverity | string) => {
 
 export const getUrgencyDot = (severity: IncidentSeverity | string) => {
     switch (severity) {
-        case 'leve': return 'bg-info';
-        case 'intermediaria': return 'bg-warning';
-        case 'grave': return 'bg-warning';
-        case 'gravissima': return 'bg-destructive';
+        case 'leve': return 'bg-severity-light';
+        case 'intermediaria': return 'bg-severity-intermediate';
+        case 'grave': return 'bg-severity-serious';
+        case 'gravissima': return 'bg-severity-critical';
         default: return 'bg-muted';
     }
 };

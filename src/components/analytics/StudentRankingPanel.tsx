@@ -437,8 +437,16 @@ export function StudentRankingPanel({
                       >
                         <TableCell className="font-medium">
                           <Badge
-                            variant={index < 3 ? 'default' : 'outline'}
-                            className={index === 0 ? 'bg-warning/100' : index === 1 ? 'bg-muted' : index === 2 ? 'bg-warning' : ''}
+                            variant={index < 3 ? 'secondary' : 'outline'}
+                            className={
+                              index === 0
+                                ? 'bg-warning/20 text-warning-foreground border-warning/50 dark:bg-warning/20 dark:text-warning'
+                                : index === 1
+                                  ? 'bg-muted text-muted-foreground border-border dark:bg-muted dark:text-muted-foreground'
+                                  : index === 2
+                                    ? 'bg-status-analysis/20 text-status-analysis border-status-analysis/50 dark:bg-status-analysis/20 dark:text-status-analysis'
+                                    : ''
+                            }
                           >
                             {index + 1}º
                           </Badge>

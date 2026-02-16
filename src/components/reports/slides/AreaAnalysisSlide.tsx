@@ -146,6 +146,14 @@ export const AreaAnalysisSlide = ({
 
     const hasData = chartData.length > 0;
 
+    // Dynamic bar configuration based on data count
+    const dynamicBarSize = useMemo(() => {
+        const count = chartData.length;
+        if (count > 20) return 24;
+        if (count > 12) return 32;
+        return 40;
+    }, [chartData.length]);
+
     return (
         <SlideLayout
             title={areaName}
@@ -188,7 +196,13 @@ export const AreaAnalysisSlide = ({
                     </div>
                     {hasData ? (
                         <div style={{ flex: 1, minHeight: 0 }}>
-                            <ReportBarChart data={chartData} height={550} layout="horizontal" colorByValue />
+                            <ReportBarChart
+                                data={chartData}
+                                height="100%"
+                                layout="horizontal"
+                                colorByValue
+                                barSize={dynamicBarSize}
+                            />
                         </div>
                     ) : (
                         <div
