@@ -215,14 +215,14 @@ export const UsersManage = () => {
         switch (role) {
             case 'admin':
                 return (
-                    <Badge className="bg-purple-500/10 text-purple-700 border-purple-500/30">
+                    <Badge className="bg-info/10 text-info border-info/30">
                         <Shield className="h-3 w-3 mr-1" />
                         Admin
                     </Badge>
                 );
             case 'diretor':
                 return (
-                    <Badge className="bg-blue-500/10 text-blue-700 border-blue-500/30">
+                    <Badge className="bg-info/10 text-info border-info/30">
                         <GraduationCap className="h-3 w-3 mr-1" />
                         Diretor
                     </Badge>
@@ -455,7 +455,7 @@ export const UsersManage = () => {
                                 <p>
                                     Tem certeza que deseja remover <strong>{deletingUser?.email}</strong> da lista de usuários autorizados?
                                 </p>
-                                <div className="bg-red-50 dark:bg-red-900/10 p-3 rounded-md text-sm text-red-800 dark:text-red-200 border border-red-200 dark:border-red-900/30">
+                                <div className="bg-destructive/10 dark:bg-destructive/20 p-3 rounded-md text-sm text-destructive dark:text-destructive border border-destructive/30 dark:border-destructive/40">
                                     <p className="font-semibold mb-1 flex items-center gap-1">
                                         <AlertTriangle className="h-4 w-4" />
                                         Atenção:
@@ -465,13 +465,13 @@ export const UsersManage = () => {
                                     </p>
                                 </div>
                                 <p className="text-sm font-medium pt-2">
-                                    Digite <span className="font-bold text-red-600">excluir</span> para confirmar:
+                                    Digite <span className="font-bold text-destructive">excluir</span> para confirmar:
                                 </p>
                                 <Input
                                     value={deleteConfirmationText}
                                     onChange={(e) => setDeleteConfirmationText(e.target.value)}
                                     placeholder="excluir"
-                                    className="border-red-200 focus-visible:ring-red-500"
+                                    className="border-destructive/30 focus-visible:ring-destructive"
                                 />
                             </div>
                         </AlertDialogDescription>

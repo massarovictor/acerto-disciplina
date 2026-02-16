@@ -397,7 +397,7 @@ export const StudentsRegister = () => {
               {/* Seção 1: Identificação */}
               <div className="md:col-span-2 space-y-4">
                 <div className="flex items-center gap-2 pb-2 border-b">
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400">
+                  <Badge variant="outline" className="bg-info/10 text-info border-info/30 dark:bg-info/20 dark:text-info">
                     Passo 1
                   </Badge>
                   <h3 className="text-sm font-medium text-muted-foreground">Identificação Básica</h3>
@@ -417,7 +417,7 @@ export const StudentsRegister = () => {
               {/* Seção 2: Dados Acadêmicos */}
               <div className="md:col-span-2 space-y-4">
                 <div className="flex items-center gap-2 pb-2 border-b mt-2">
-                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400">
+                  <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 dark:bg-warning/20 dark:text-warning">
                     Passo 2
                   </Badge>
                   <h3 className="text-sm font-medium text-muted-foreground">Dados Acadêmicos</h3>
@@ -443,7 +443,7 @@ export const StudentsRegister = () => {
               {/* Seção 3: Dados Pessoais */}
               <div className="md:col-span-2 space-y-4">
                 <div className="flex items-center gap-2 pb-2 border-b mt-2">
-                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400">
+                  <Badge variant="outline" className="bg-info/10 text-info border-info/30 dark:bg-info/20 dark:text-info">
                     Passo 3
                   </Badge>
                   <h3 className="text-sm font-medium text-muted-foreground">Dados Pessoais</h3>
@@ -480,7 +480,7 @@ export const StudentsRegister = () => {
               <div className="md:col-span-2 space-y-4">
                 <Collapsible open={isOfficialDataOpen} onOpenChange={setIsOfficialDataOpen}>
                   <div className="flex items-center gap-2 pb-2 border-b mt-2">
-                    <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400">
+                    <Badge variant="outline" className="bg-success/10 text-success border-success/30 dark:bg-success/20 dark:text-success">
                       Passo 4
                     </Badge>
                     <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
@@ -664,7 +664,7 @@ export const StudentsRegister = () => {
               </Card>
               <Card>
                 <CardContent className="pt-4">
-                  <div className="text-2xl font-bold text-green-600">
+                  <div className="text-2xl font-bold text-success">
                     {importPreview.filter(r => r.isValid).length}
                   </div>
                   <div className="text-sm text-muted-foreground">Válidas</div>
@@ -672,7 +672,7 @@ export const StudentsRegister = () => {
               </Card>
               <Card>
                 <CardContent className="pt-4">
-                  <div className="text-2xl font-bold text-red-600">
+                  <div className="text-2xl font-bold text-destructive">
                     {importPreview.filter(r => !r.isValid).length}
                   </div>
                   <div className="text-sm text-muted-foreground">Inválidas</div>
@@ -680,7 +680,7 @@ export const StudentsRegister = () => {
               </Card>
               <Card>
                 <CardContent className="pt-4">
-                  <div className="text-2xl font-bold text-yellow-600">
+                  <div className="text-2xl font-bold text-warning">
                     {importPreview.filter(r => r.warnings.length > 0).length}
                   </div>
                   <div className="text-sm text-muted-foreground">Com Avisos</div>
@@ -718,7 +718,7 @@ export const StudentsRegister = () => {
                         <TableCell>{row.data.gender || '-'}</TableCell>
                         <TableCell>
                           {row.isValid ? (
-                            <Badge className="bg-green-100 text-green-800 border-green-300">
+                            <Badge className="bg-success/15 text-success border-success/30">
                               <CheckCircle2 className="h-3 w-3 mr-1" />
                               Válida
                             </Badge>
@@ -752,12 +752,12 @@ export const StudentsRegister = () => {
                         <AlertDescription>
                           <strong>Linha {row.rowNumber}:</strong>{' '}
                           {row.errors.length > 0 && (
-                            <span className="text-red-600">
+                            <span className="text-destructive">
                               {row.errors.join('; ')}
                             </span>
                           )}
                           {row.warnings.length > 0 && (
-                            <span className="text-yellow-600">
+                            <span className="text-warning">
                               {row.warnings.join('; ')}
                             </span>
                           )}

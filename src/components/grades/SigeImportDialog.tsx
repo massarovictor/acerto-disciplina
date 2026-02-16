@@ -808,7 +808,7 @@ export const SigeImportDialog = ({
             <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-blue-600" />
+                        <FileText className="h-5 w-5 text-info" />
                         Importar Notas do SIGE
                     </DialogTitle>
                     <DialogDescription>
@@ -834,16 +834,16 @@ export const SigeImportDialog = ({
                         </div>
 
                         {/* Passo 2: Alunos */}
-                        <div className={`flex flex-col items-center gap-2 bg-background p-2 rounded-lg border-2 z-10 w-32 ${step === 'match-students' ? 'border-primary' : (['match-students', 'map-subjects', 'review-subjects', 'preview'].includes(step) ? 'border-green-500/50' : 'border-muted-foreground/20')}`}>
-                            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'match-students' ? 'bg-primary text-primary-foreground' : (['match-students', 'map-subjects', 'review-subjects', 'preview'].includes(step) ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground')}`}>
+                        <div className={`flex flex-col items-center gap-2 bg-background p-2 rounded-lg border-2 z-10 w-32 ${step === 'match-students' ? 'border-primary' : (['match-students', 'map-subjects', 'review-subjects', 'preview'].includes(step) ? 'border-success/30' : 'border-muted-foreground/20')}`}>
+                            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'match-students' ? 'bg-primary text-primary-foreground' : (['match-students', 'map-subjects', 'review-subjects', 'preview'].includes(step) ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground')}`}>
                                 <Users className="h-4 w-4" />
                             </div>
                             <span className={`text-xs font-medium ${step === 'match-students' ? 'text-primary' : 'text-muted-foreground'}`}>Validação</span>
                         </div>
 
                         {/* Passo 3: Disciplinas */}
-                        <div className={`flex flex-col items-center gap-2 bg-background p-2 rounded-lg border-2 z-10 w-32 ${step === 'map-subjects' || step === 'review-subjects' ? 'border-primary' : (['map-subjects', 'review-subjects', 'preview'].includes(step) ? 'border-green-500/50' : 'border-muted-foreground/20')}`}>
-                            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'map-subjects' || step === 'review-subjects' ? 'bg-primary text-primary-foreground' : (['map-subjects', 'review-subjects', 'preview'].includes(step) ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground')}`}>
+                        <div className={`flex flex-col items-center gap-2 bg-background p-2 rounded-lg border-2 z-10 w-32 ${step === 'map-subjects' || step === 'review-subjects' ? 'border-primary' : (['map-subjects', 'review-subjects', 'preview'].includes(step) ? 'border-success/30' : 'border-muted-foreground/20')}`}>
+                            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'map-subjects' || step === 'review-subjects' ? 'bg-primary text-primary-foreground' : (['map-subjects', 'review-subjects', 'preview'].includes(step) ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground')}`}>
                                 <BookOpen className="h-4 w-4" />
                             </div>
                             <span className={`text-xs font-medium ${step === 'map-subjects' || step === 'review-subjects' ? 'text-primary' : 'text-muted-foreground'}`}>Mapeamento</span>
@@ -913,8 +913,8 @@ export const SigeImportDialog = ({
                             </div>
 
                             {selectedClass && selectedClassData?.templateId && templateSubjectsForSelectedClass.length === 0 && (
-                                <Alert className="bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-800">
-                                    <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                <Alert className="bg-warning/10 dark:bg-warning/20 text-warning dark:text-warning border-warning/30 dark:border-warning/40">
+                                    <AlertTriangle className="h-4 w-4 text-warning dark:text-warning" />
                                     <AlertDescription>
                                         Nenhuma disciplina profissional cadastrada para o {selectedSchoolYear}º ano neste template.
                                         Apenas disciplinas da base comum serão consideradas.
@@ -951,9 +951,9 @@ export const SigeImportDialog = ({
                                         {isProcessing ? (
                                             <div className="flex flex-col items-center gap-4">
                                                 <div className="relative">
-                                                    <div className="absolute inset-0 bg-blue-500/20 rounded-full animate-ping" />
+                                                    <div className="absolute inset-0 bg-info/20 rounded-full animate-ping" />
                                                     <div className="bg-background rounded-full p-4 relative shadow-sm border">
-                                                        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                                                        <Loader2 className="h-8 w-8 animate-spin text-info" />
                                                     </div>
                                                 </div>
                                                 <div className="space-y-1">
@@ -1095,10 +1095,10 @@ export const SigeImportDialog = ({
                                                             <Badge
                                                                 variant="outline"
                                                                 className={`h-6 ${match.isManual
-                                                                    ? 'text-blue-600 border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400'
+                                                                    ? 'text-info border-info/30 bg-info/10 dark:bg-info/20 dark:text-info'
                                                                     : (match.similarity >= 0.9
-                                                                        ? 'text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-400'
-                                                                        : 'text-amber-600 border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400')
+                                                                        ? 'text-success border-success/30 bg-success/10 dark:bg-success/20 dark:text-success'
+                                                                        : 'text-warning border-warning/30 bg-warning/10 dark:bg-warning/20 dark:text-warning')
                                                                     }`}
                                                             >
                                                                 {match.isManual ? 'Manual' : `${Math.round(match.similarity * 100)}% Match`}
@@ -1176,7 +1176,7 @@ export const SigeImportDialog = ({
                                                                 {allowUnlistedSubjects && !validSubjects.some(vs => vs.original === mapping.excelSubject) && (
                                                                     <SelectItem
                                                                         value={mapping.excelSubject}
-                                                                        className="text-blue-600 font-medium"
+                                                                        className="text-info font-medium"
                                                                     >
                                                                         ➕ Usar "{mapping.excelSubject}" como está
                                                                     </SelectItem>
@@ -1188,8 +1188,8 @@ export const SigeImportDialog = ({
                                                                 <Badge
                                                                     variant="outline"
                                                                     className={`text-[10px] h-5 ${mapping.autoMatched
-                                                                        ? 'text-emerald-600 border-emerald-100 bg-emerald-50'
-                                                                        : 'text-blue-600 border-blue-100 bg-blue-50'
+                                                                        ? 'text-success border-success/30 bg-success/10'
+                                                                        : 'text-info border-info/30 bg-info/10'
                                                                         }`}
                                                                 >
                                                                     {mapping.autoMatched ? 'Auto Match' : 'Manual'}
@@ -1208,13 +1208,13 @@ export const SigeImportDialog = ({
                                 <h4 className="font-semibold mb-2">Resumo</h4>
                                 <div className="space-y-1 text-sm">
                                     <p>📊 Total de disciplinas: {subjectMappings.length}</p>
-                                    <p className="text-green-700 dark:text-green-400">
+                                    <p className="text-success dark:text-success">
                                         ✓ Mapeadas automaticamente: {subjectMappings.filter(m => m.autoMatched && m.systemSubject).length}
                                     </p>
-                                    <p className="text-blue-700 dark:text-blue-400">
+                                    <p className="text-info dark:text-info">
                                         ✓ Mapeadas manualmente: {subjectMappings.filter(m => !m.autoMatched && m.systemSubject).length}
                                     </p>
-                                    <p className="text-amber-700 dark:text-amber-400">
+                                    <p className="text-warning dark:text-warning">
                                         ⚠ Serão ignoradas: {subjectMappings.filter(m => !m.systemSubject).length}
                                     </p>
                                 </div>
@@ -1250,10 +1250,10 @@ export const SigeImportDialog = ({
                                 return (
                                     <div className="space-y-4">
                                         {/* Disciplinas Válidas */}
-                                        <div className="border rounded-lg p-4 bg-green-50 dark:bg-green-950/20">
+                                        <div className="border rounded-lg p-4 bg-success/10 dark:bg-success/20">
                                             <div className="flex items-center gap-2 mb-3">
-                                                <ArrowRight className="h-5 w-5 text-green-600" />
-                                                <h3 className="font-semibold text-green-900 dark:text-green-100">
+                                                <ArrowRight className="h-5 w-5 text-success" />
+                                                <h3 className="font-semibold text-success dark:text-success">
                                                     Disciplinas que serão importadas ({mappedSubjects.length})
                                                 </h3>
                                             </div>
@@ -1264,7 +1264,7 @@ export const SigeImportDialog = ({
                                                             <div className="flex items-center gap-2 text-sm overflow-hidden">
                                                                 <span className="font-medium truncate max-w-[120px]" title={m.excelSubject}>{m.excelSubject}</span>
                                                                 <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
-                                                                <span className="truncate max-w-[120px] text-green-700 dark:text-green-400" title={m.systemSubject!}>{m.systemSubject}</span>
+                                                                <span className="truncate max-w-[120px] text-success dark:text-success" title={m.systemSubject!}>{m.systemSubject}</span>
                                                             </div>
                                                             {!m.autoMatched && (
                                                                 <Badge variant="secondary" className="text-[10px] h-5 px-1 ml-1">Manual</Badge>
@@ -1281,10 +1281,10 @@ export const SigeImportDialog = ({
 
                                         {/* Disciplinas Ignoradas */}
                                         {unmappedSubjects.length > 0 && (
-                                            <div className="border rounded-lg p-4 bg-amber-50 dark:bg-amber-950/20">
+                                            <div className="border rounded-lg p-4 bg-warning/10 dark:bg-warning/20">
                                                 <div className="flex items-center gap-2 mb-3">
-                                                    <AlertTriangle className="h-5 w-5 text-amber-600" />
-                                                    <h3 className="font-semibold text-amber-900 dark:text-amber-100">
+                                                    <AlertTriangle className="h-5 w-5 text-warning" />
+                                                    <h3 className="font-semibold text-warning dark:text-warning">
                                                         Disciplinas ignoradas ({unmappedSubjects.length})
                                                     </h3>
                                                 </div>
@@ -1303,10 +1303,10 @@ export const SigeImportDialog = ({
 
                                         {/* Disciplinas do Sistema Nao Preenchidas */}
                                         {missingSystemSubjects.length > 0 && (
-                                            <div className="border rounded-lg p-4 bg-blue-50 dark:bg-blue-950/20">
+                                            <div className="border rounded-lg p-4 bg-info/10 dark:bg-info/20">
                                                 <div className="flex items-center gap-2 mb-3">
-                                                    <FileText className="h-5 w-5 text-blue-600" />
-                                                    <h3 className="font-semibold text-blue-900 dark:text-blue-100">
+                                                    <FileText className="h-5 w-5 text-info" />
+                                                    <h3 className="font-semibold text-info dark:text-info">
                                                         Disciplinas do sistema nao preenchidas ({missingSystemSubjects.length})
                                                     </h3>
                                                 </div>
@@ -1315,7 +1315,7 @@ export const SigeImportDialog = ({
                                                         <Badge
                                                             key={subject}
                                                             variant="outline"
-                                                            className="bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30"
+                                                            className="bg-info/10 text-info dark:text-info border-info/30"
                                                         >
                                                             {subject}
                                                         </Badge>
@@ -1332,16 +1332,16 @@ export const SigeImportDialog = ({
                                             <h4 className="font-semibold mb-2">Resumo da Importação</h4>
                                             <div className="space-y-1 text-sm">
                                                 <p>📊 Total de disciplinas no arquivo: {subjectMappings.length}</p>
-                                                <p className="text-green-700 dark:text-green-400">
+                                                <p className="text-success dark:text-success">
                                                     ✓ Serão importadas: {mappedSubjects.length}
                                                 </p>
                                                 {unmappedSubjects.length > 0 && (
-                                                    <p className="text-amber-700 dark:text-amber-400">
+                                                    <p className="text-warning dark:text-warning">
                                                         ⚠ Ignoradas: {unmappedSubjects.length}
                                                     </p>
                                                 )}
                                                 {missingSystemSubjects.length > 0 && (
-                                                    <p className="text-blue-700 dark:text-blue-400">
+                                                    <p className="text-info dark:text-info">
                                                         Disciplinas do sistema nao preenchidas: {missingSystemSubjects.length}
                                                     </p>
                                                 )}
@@ -1368,26 +1368,26 @@ export const SigeImportDialog = ({
                             {/* Estatísticas da Importação */}
                             {/* Estatísticas da Importação - Cards */}
                             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className="bg-blue-50/50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-800 flex flex-col items-center justify-center text-center">
-                                    <span className="text-3xl font-bold text-blue-700 dark:text-blue-400 mb-1">
+                                <div className="bg-info/10 dark:bg-info/20 p-4 rounded-xl border border-info/30 dark:border-info/40 flex flex-col items-center justify-center text-center">
+                                    <span className="text-3xl font-bold text-info dark:text-info mb-1">
                                         {parseResult.rows.length}
                                     </span>
                                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Alunos (Arq)</span>
                                 </div>
-                                <div className="bg-indigo-50/50 dark:bg-indigo-900/10 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800 flex flex-col items-center justify-center text-center">
-                                    <span className="text-3xl font-bold text-indigo-700 dark:text-indigo-400 mb-1">
+                                <div className="bg-info/10 dark:bg-info/20 p-4 rounded-xl border border-info/30 dark:border-info/40 flex flex-col items-center justify-center text-center">
+                                    <span className="text-3xl font-bold text-info dark:text-info mb-1">
                                         {studentMatches.filter(m => m.systemStudentId).length}
                                     </span>
                                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Identificados</span>
                                 </div>
-                                <div className="bg-emerald-50/50 dark:bg-emerald-900/10 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800 flex flex-col items-center justify-center text-center">
-                                    <span className="text-3xl font-bold text-emerald-700 dark:text-emerald-400 mb-1">
+                                <div className="bg-success/10 dark:bg-success/20 p-4 rounded-xl border border-success/30 dark:border-success/40 flex flex-col items-center justify-center text-center">
+                                    <span className="text-3xl font-bold text-success dark:text-success mb-1">
                                         {importableGrades.length}
                                     </span>
                                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notas Válidas</span>
                                 </div>
-                                <div className="bg-purple-50/50 dark:bg-purple-900/10 p-4 rounded-xl border border-purple-100 dark:border-purple-800 flex flex-col items-center justify-center text-center">
-                                    <span className="text-3xl font-bold text-purple-700 dark:text-purple-400 mb-1">
+                                <div className="bg-info/10 dark:bg-info/20 p-4 rounded-xl border border-info/30 dark:border-info/40 flex flex-col items-center justify-center text-center">
+                                    <span className="text-3xl font-bold text-info dark:text-info mb-1">
                                         {new Set(importableGrades.map(g => g.subject)).size}
                                     </span>
                                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Disciplinas</span>
@@ -1475,8 +1475,8 @@ export const SigeImportDialog = ({
                                                         <Badge
                                                             variant="outline"
                                                             className={`text-[10px] h-5 ${grade.similarity >= 0.9
-                                                                ? 'text-emerald-600 border-emerald-200 bg-emerald-50'
-                                                                : 'text-amber-600 border-amber-200 bg-amber-50'
+                                                                ? 'text-success border-success/30 bg-success/10'
+                                                                : 'text-warning border-warning/30 bg-warning/10'
                                                                 }`}
                                                         >
                                                             {Math.round(grade.similarity * 100)}%
@@ -1488,7 +1488,7 @@ export const SigeImportDialog = ({
                                                 </TableCell>
                                                 <TableCell className="py-2 text-sm text-muted-foreground">{grade.subject}</TableCell>
                                                 <TableCell className="py-2">
-                                                    <Badge variant="outline" className={`font-mono text-sm ${grade.grade < 6 ? 'text-red-500 border-red-200 bg-red-50' : 'text-slate-700 bg-slate-50'}`}>
+                                                    <Badge variant="outline" className={`font-mono text-sm ${grade.grade < 6 ? 'text-destructive border-destructive/30 bg-destructive/10' : 'text-muted-foreground bg-muted'}`}>
                                                         {grade.grade.toFixed(1)}
                                                     </Badge>
                                                 </TableCell>
@@ -1569,7 +1569,7 @@ export const SigeImportDialog = ({
                             <Button
                                 onClick={handleImport}
                                 disabled={selectedGradesCount === 0 || isImporting}
-                                className="bg-green-600 hover:bg-green-700"
+                                className="bg-success hover:bg-success"
                             >
                                 {isImporting ? (
                                     <>

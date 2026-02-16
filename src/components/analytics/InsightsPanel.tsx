@@ -22,28 +22,28 @@ const InsightIcon = ({ type }: { type: Insight['type'] }) => {
   const iconClass = 'h-5 w-5';
   switch (type) {
     case 'alert':
-      return <AlertTriangle className={`${iconClass} text-red-500`} />;
+      return <AlertTriangle className={`${iconClass} text-destructive`} />;
     case 'warning':
-      return <AlertCircle className={`${iconClass} text-amber-500`} />;
+      return <AlertCircle className={`${iconClass} text-warning`} />;
     case 'success':
-      return <CheckCircle2 className={`${iconClass} text-emerald-500`} />;
+      return <CheckCircle2 className={`${iconClass} text-success`} />;
     case 'info':
     default:
-      return <Info className={`${iconClass} text-blue-500`} />;
+      return <Info className={`${iconClass} text-info`} />;
   }
 };
 
 const getInsightStyles = (type: Insight['type']) => {
   switch (type) {
     case 'alert':
-      return 'border-l-red-500 bg-red-50/50';
+      return 'border-l-red-500 bg-destructive/10';
     case 'warning':
-      return 'border-l-amber-500 bg-amber-50/50';
+      return 'border-l-amber-500 bg-warning/10';
     case 'success':
-      return 'border-l-emerald-500 bg-emerald-50/50';
+      return 'border-l-emerald-500 bg-success/10';
     case 'info':
     default:
-      return 'border-l-blue-500 bg-blue-50/50';
+      return 'border-l-blue-500 bg-info/10';
   }
 };
 
@@ -58,7 +58,7 @@ export function InsightsPanel({ insights }: InsightsPanelProps) {
     <Card className="sticky top-6">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <Lightbulb className="h-5 w-5 text-amber-500" />
+          <Lightbulb className="h-5 w-5 text-warning" />
           <CardTitle>Insights</CardTitle>
         </div>
         <CardDescription>
@@ -112,7 +112,7 @@ export function InsightsPanel({ insights }: InsightsPanelProps) {
             <div className="space-y-1 text-xs text-muted-foreground">
               {sortedInsights.filter(i => i.type === 'alert').length > 0 && (
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-red-500" />
+                  <div className="w-2 h-2 rounded-full bg-destructive/100" />
                   <span>
                     {sortedInsights.filter(i => i.type === 'alert').length} alerta(s) crítico(s)
                   </span>
@@ -120,7 +120,7 @@ export function InsightsPanel({ insights }: InsightsPanelProps) {
               )}
               {sortedInsights.filter(i => i.type === 'warning').length > 0 && (
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-amber-500" />
+                  <div className="w-2 h-2 rounded-full bg-warning/100" />
                   <span>
                     {sortedInsights.filter(i => i.type === 'warning').length} ponto(s) de atenção
                   </span>
@@ -128,7 +128,7 @@ export function InsightsPanel({ insights }: InsightsPanelProps) {
               )}
               {sortedInsights.filter(i => i.type === 'success').length > 0 && (
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <div className="w-2 h-2 rounded-full bg-success/100" />
                   <span>
                     {sortedInsights.filter(i => i.type === 'success').length} destaque(s) positivo(s)
                   </span>

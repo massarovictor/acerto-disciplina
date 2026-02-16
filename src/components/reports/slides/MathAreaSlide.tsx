@@ -50,11 +50,11 @@ export const MathAreaSlide = ({ grades, period }: MathAreaSlideProps) => {
   const approvalRate = total > 0 ? ((total - distribution.poor) / total) * 100 : 0;
 
   return (
-    <div className="h-full p-8 bg-gradient-to-br from-orange-500/5 to-background flex flex-col">
+    <div className="h-full p-8 bg-gradient-to-br from-warning/5 to-background flex flex-col">
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
-            <BookOpen className="h-8 w-8 text-orange-600" />
+            <BookOpen className="h-8 w-8 text-warning" />
             <div>
               <h1 className="text-3xl font-bold">Matemática e suas Tecnologias</h1>
               <p className="text-sm text-muted-foreground">
@@ -105,8 +105,8 @@ export const MathAreaSlide = ({ grades, period }: MathAreaSlideProps) => {
                   <h3 className="font-semibold">Evolução por Bimestre</h3>
                   {trend && (
                     <div className="flex items-center gap-1">
-                      {trend.direction === 'up' && <TrendingUp className="h-4 w-4 text-green-600" />}
-                      {trend.direction === 'down' && <TrendingDown className="h-4 w-4 text-red-600" />}
+                      {trend.direction === 'up' && <TrendingUp className="h-4 w-4 text-success" />}
+                      {trend.direction === 'down' && <TrendingDown className="h-4 w-4 text-destructive" />}
                       <span className="text-xs text-muted-foreground">
                         {trend.direction === 'up' ? 'Melhoria' : trend.direction === 'down' ? 'Declínio' : 'Estável'}
                       </span>
@@ -133,11 +133,11 @@ export const MathAreaSlide = ({ grades, period }: MathAreaSlideProps) => {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm">Excelente (9.0 - 10.0)</span>
-                    <Badge className="bg-green-600">{distribution.excellent}</Badge>
+                    <Badge className="bg-success">{distribution.excellent}</Badge>
                   </div>
                   <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
                     <div 
-                      className="bg-green-600 h-full rounded-full"
+                      className="bg-success h-full rounded-full"
                       style={{ width: `${total > 0 ? (distribution.excellent / total) * 100 : 0}%` }}
                     />
                   </div>
@@ -146,11 +146,11 @@ export const MathAreaSlide = ({ grades, period }: MathAreaSlideProps) => {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm">Bom (7.0 - 8.9)</span>
-                    <Badge className="bg-blue-600">{distribution.good}</Badge>
+                    <Badge className="bg-info">{distribution.good}</Badge>
                   </div>
                   <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
                     <div 
-                      className="bg-blue-600 h-full rounded-full"
+                      className="bg-info h-full rounded-full"
                       style={{ width: `${total > 0 ? (distribution.good / total) * 100 : 0}%` }}
                     />
                   </div>
@@ -159,11 +159,11 @@ export const MathAreaSlide = ({ grades, period }: MathAreaSlideProps) => {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm">Satisfatório (6.0 - 6.9)</span>
-                    <Badge className="bg-yellow-600">{distribution.satisfactory}</Badge>
+                    <Badge className="bg-warning">{distribution.satisfactory}</Badge>
                   </div>
                   <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
                     <div 
-                      className="bg-yellow-600 h-full rounded-full"
+                      className="bg-warning h-full rounded-full"
                       style={{ width: `${total > 0 ? (distribution.satisfactory / total) * 100 : 0}%` }}
                     />
                   </div>
@@ -172,11 +172,11 @@ export const MathAreaSlide = ({ grades, period }: MathAreaSlideProps) => {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm">Abaixo da Média (&lt; 6.0)</span>
-                    <Badge className="bg-red-600">{distribution.poor}</Badge>
+                    <Badge className="bg-destructive">{distribution.poor}</Badge>
                   </div>
                   <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
                     <div 
-                      className="bg-red-600 h-full rounded-full"
+                      className="bg-destructive h-full rounded-full"
                       style={{ width: `${total > 0 ? (distribution.poor / total) * 100 : 0}%` }}
                     />
                   </div>

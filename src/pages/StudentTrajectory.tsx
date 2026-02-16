@@ -739,17 +739,17 @@ const StudentTrajectory = () => {
             trend = 'ascending';
             trendLabel = 'Em Ascensão';
             trendIcon = '↑';
-            trendColor = 'text-emerald-600';
+            trendColor = 'text-success';
         } else if (reg.slope < -0.15) {
             trend = 'descending';
             trendLabel = 'Em Declínio';
             trendIcon = '↓';
-            trendColor = 'text-red-600';
+            trendColor = 'text-destructive';
         } else {
             trend = 'stable';
             trendLabel = 'Estável';
             trendIcon = '→';
-            trendColor = 'text-amber-600';
+            trendColor = 'text-warning';
         }
 
         return {
@@ -1018,9 +1018,9 @@ const StudentTrajectory = () => {
             />
 
             {source === 'analytics' && (
-                <div className="mb-4 px-4 py-3 rounded-lg border border-blue-200 bg-blue-50/50 dark:bg-blue-900/10 dark:border-blue-800">
-                    <p className="font-semibold text-sm mb-1 text-blue-700 dark:text-blue-300">Filtro recebido do Analytics</p>
-                    <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-blue-700/80 dark:text-blue-300/80">
+                <div className="mb-4 px-4 py-3 rounded-lg border border-info/30 bg-info/10 dark:bg-info/20 dark:border-info/40">
+                    <p className="font-semibold text-sm mb-1 text-info dark:text-info">Filtro recebido do Analytics</p>
+                    <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-info dark:text-info">
                         <span>
                             Abrindo trajetória com disciplina{' '}
                             <strong>
@@ -1035,7 +1035,7 @@ const StudentTrajectory = () => {
                         <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 text-blue-700 hover:text-blue-800 hover:bg-blue-100 dark:text-blue-300 dark:hover:bg-blue-900/50"
+                            className="h-8 text-info hover:text-info hover:bg-info/15 dark:text-info dark:hover:bg-info"
                             onClick={() => setTrajectoryUI({ source: '', selectedSubject: '' })}
                         >
                             Limpar filtro
@@ -1045,9 +1045,9 @@ const StudentTrajectory = () => {
             )}
 
             {subjectFallbackNotice && (
-                <div className="mb-4 px-4 py-3 rounded-lg border border-amber-200 bg-amber-50/50 dark:bg-amber-900/10 dark:border-amber-800">
-                    <p className="font-semibold text-sm mb-1 text-amber-700 dark:text-amber-300">Sem notas registradas</p>
-                    <p className="text-sm text-amber-700/80 dark:text-amber-300/80">{subjectFallbackNotice}</p>
+                <div className="mb-4 px-4 py-3 rounded-lg border border-warning/30 bg-warning/10 dark:bg-warning/20 dark:border-warning/40">
+                    <p className="font-semibold text-sm mb-1 text-warning dark:text-warning">Sem notas registradas</p>
+                    <p className="text-sm text-warning dark:text-warning">{subjectFallbackNotice}</p>
                 </div>
             )}
 
@@ -1121,7 +1121,7 @@ const StudentTrajectory = () => {
                             ))}
                             {professionalSubjectsForSelect.length > 0 && (
                                 <SelectGroup>
-                                    <SelectLabel className="px-2 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-500/10 uppercase tracking-wider">
+                                    <SelectLabel className="px-2 py-1.5 text-xs font-bold text-success bg-success/10 uppercase tracking-wider">
                                         Profissionais
                                     </SelectLabel>
                                     {professionalSubjectsForSelect.map(subject => (
@@ -1132,7 +1132,7 @@ const StudentTrajectory = () => {
                             {/* Mostrar Histórico Fundamental se estiver no Ensino Médio, caso tenha dados */}
                             {!isStudentFundamental && (
                                 <SelectGroup>
-                                    <SelectLabel className="px-2 py-1.5 text-xs font-bold text-amber-600 bg-amber-500/10 uppercase tracking-wider">
+                                    <SelectLabel className="px-2 py-1.5 text-xs font-bold text-warning bg-warning/10 uppercase tracking-wider">
                                         Histórico Fundamental
                                     </SelectLabel>
                                     <SelectItem value="Ciências">
@@ -1178,12 +1178,12 @@ const StudentTrajectory = () => {
                                         <Card>
                                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                                 <CardTitle className="text-sm font-medium text-muted-foreground">Média Fundamental</CardTitle>
-                                                <div className="p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                                                <div className="p-2 rounded-lg bg-info/15 text-info dark:bg-info/20 dark:text-info">
                                                     <GraduationCap className="h-4 w-4" />
                                                 </div>
                                             </CardHeader>
                                             <CardContent>
-                                                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{holisticSummary.fundAvg.toFixed(1)}</div>
+                                                <div className="text-2xl font-bold text-info dark:text-info">{holisticSummary.fundAvg.toFixed(1)}</div>
                                                 <p className="text-xs text-muted-foreground mt-1">Média geral do ciclo básico</p>
                                             </CardContent>
                                         </Card>
@@ -1192,12 +1192,12 @@ const StudentTrajectory = () => {
                                         <Card>
                                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                                 <CardTitle className="text-sm font-medium text-muted-foreground">Média Ensino Médio</CardTitle>
-                                                <div className="p-2 rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
+                                                <div className="p-2 rounded-lg bg-info/15 text-info dark:bg-info/20 dark:text-info">
                                                     <School className="h-4 w-4" />
                                                 </div>
                                             </CardHeader>
                                             <CardContent>
-                                                <div className="text-2xl font-bold text-violet-600 dark:text-violet-400">{holisticSummary.emAvg.toFixed(1)}</div>
+                                                <div className="text-2xl font-bold text-info dark:text-info">{holisticSummary.emAvg.toFixed(1)}</div>
                                                 <p className="text-xs text-muted-foreground mt-1">Média geral do ciclo avançado</p>
                                             </CardContent>
                                         </Card>
@@ -1206,12 +1206,12 @@ const StudentTrajectory = () => {
                                         <Card>
                                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                                 <CardTitle className="text-sm font-medium text-muted-foreground">Avaliações Externas</CardTitle>
-                                                <div className="p-2 rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                                                <div className="p-2 rounded-lg bg-warning/15 text-warning dark:bg-warning/20 dark:text-warning">
                                                     <Target className="h-4 w-4" />
                                                 </div>
                                             </CardHeader>
                                             <CardContent>
-                                                <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{holisticSummary.extAvg.toFixed(1)}</div>
+                                                <div className="text-2xl font-bold text-warning dark:text-warning">{holisticSummary.extAvg.toFixed(1)}</div>
                                                 <p className="text-xs text-muted-foreground mt-1">Média de simulados e provas</p>
                                             </CardContent>
                                         </Card>
@@ -1220,12 +1220,12 @@ const StudentTrajectory = () => {
                                         <Card>
                                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                                 <CardTitle className="text-sm font-medium text-muted-foreground">Ocorrências</CardTitle>
-                                                <div className="p-2 rounded-lg bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                                                <div className="p-2 rounded-lg bg-destructive/15 text-destructive dark:bg-destructive/20 dark:text-destructive">
                                                     <AlertTriangle className="h-4 w-4" />
                                                 </div>
                                             </CardHeader>
                                             <CardContent>
-                                                <div className="text-2xl font-bold text-red-600 dark:text-red-400">{holisticSummary.incidentCount}</div>
+                                                <div className="text-2xl font-bold text-destructive dark:text-destructive">{holisticSummary.incidentCount}</div>
                                                 <p className="text-xs text-muted-foreground mt-1">
                                                     {holisticSummary.criticalIncidents > 0
                                                         ? `${holisticSummary.criticalIncidents} registros críticos`
@@ -1238,15 +1238,15 @@ const StudentTrajectory = () => {
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         {/* Potencialidades */}
-                                        <Card className="border-none shadow-none bg-emerald-50/30 dark:bg-emerald-900/5 border border-emerald-100 dark:border-emerald-800/50">
-                                            <CardHeader className="pb-2 border-b border-emerald-100 dark:border-emerald-800/50">
+                                        <Card className="border-none shadow-none bg-success/10 dark:bg-success/20 border border-success/30 dark:border-success/40">
+                                            <CardHeader className="pb-2 border-b border-success/30 dark:border-success/40">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="h-8 w-8 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
-                                                        <Zap className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                                    <div className="h-8 w-8 rounded-full bg-success/15 dark:bg-success/20 flex items-center justify-center">
+                                                        <Zap className="h-4 w-4 text-success dark:text-success" />
                                                     </div>
                                                     <div>
-                                                        <CardTitle className="text-base text-emerald-900 dark:text-emerald-300">Potencialidades</CardTitle>
-                                                        <CardDescription className="text-xs text-emerald-700/70 dark:text-emerald-400/70">Áreas de destaque e alto desempenho</CardDescription>
+                                                        <CardTitle className="text-base text-success dark:text-success">Potencialidades</CardTitle>
+                                                        <CardDescription className="text-xs text-success dark:text-success">Áreas de destaque e alto desempenho</CardDescription>
                                                     </div>
                                                 </div>
                                             </CardHeader>
@@ -1254,14 +1254,14 @@ const StudentTrajectory = () => {
                                                 {holisticSummary.strengths.length > 0 ? (
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                         {holisticSummary.strengths.map(s => (
-                                                            <div key={s.name} className="flex flex-col gap-1 p-3 rounded-lg bg-white dark:bg-gray-800/50 shadow-sm border border-emerald-100/50 dark:border-emerald-800/30">
-                                                                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{s.name}</span>
+                                                            <div key={s.name} className="flex flex-col gap-1 p-3 rounded-lg bg-white dark:bg-muted shadow-sm border border-success/30 dark:border-success/40">
+                                                                <span className="text-sm font-semibold text-muted-foreground dark:text-muted-foreground">{s.name}</span>
                                                                 <div className="flex items-center justify-between">
                                                                     <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Média Geral</span>
-                                                                    <span className="font-bold text-emerald-600 dark:text-emerald-400 text-lg">{s.avg.toFixed(1)}</span>
+                                                                    <span className="font-bold text-success dark:text-success text-lg">{s.avg.toFixed(1)}</span>
                                                                 </div>
-                                                                <div className="h-1 w-full bg-emerald-100 dark:bg-emerald-900/30 rounded-full overflow-hidden mt-1">
-                                                                    <div className="h-full bg-emerald-500" style={{ width: `${(s.avg / 10) * 100}%` }} />
+                                                                <div className="h-1 w-full bg-success/15 dark:bg-success/20 rounded-full overflow-hidden mt-1">
+                                                                    <div className="h-full bg-success/100" style={{ width: `${(s.avg / 10) * 100}%` }} />
                                                                 </div>
                                                             </div>
                                                         ))}
@@ -1271,15 +1271,15 @@ const StudentTrajectory = () => {
                                         </Card>
 
                                         {/* Dificuldades */}
-                                        <Card className="border-none shadow-none bg-red-50/30 dark:bg-red-900/5 border border-red-100 dark:border-red-800/50">
-                                            <CardHeader className="pb-2 border-b border-red-100 dark:border-red-800/50">
+                                        <Card className="border-none shadow-none bg-destructive/10 dark:bg-destructive/20 border border-destructive/30 dark:border-destructive/40">
+                                            <CardHeader className="pb-2 border-b border-destructive/30 dark:border-destructive/40">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="h-8 w-8 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center">
-                                                        <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                                    <div className="h-8 w-8 rounded-full bg-destructive/15 dark:bg-destructive/20 flex items-center justify-center">
+                                                        <AlertTriangle className="h-4 w-4 text-destructive dark:text-destructive" />
                                                     </div>
                                                     <div>
-                                                        <CardTitle className="text-base text-red-900 dark:text-red-300">Pontos de Atenção</CardTitle>
-                                                        <CardDescription className="text-xs text-red-700/70 dark:text-red-400/70">Disciplinas que requerem suporte prioritário</CardDescription>
+                                                        <CardTitle className="text-base text-destructive dark:text-destructive">Pontos de Atenção</CardTitle>
+                                                        <CardDescription className="text-xs text-destructive dark:text-destructive">Disciplinas que requerem suporte prioritário</CardDescription>
                                                     </div>
                                                 </div>
                                             </CardHeader>
@@ -1287,19 +1287,19 @@ const StudentTrajectory = () => {
                                                 {holisticSummary.difficulties.length > 0 ? (
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                         {holisticSummary.difficulties.map(d => (
-                                                            <div key={d.name} className="flex flex-col gap-1 p-3 rounded-lg bg-white dark:bg-gray-800/50 shadow-sm border border-red-100/50 dark:border-red-800/30">
-                                                                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{d.name}</span>
+                                                            <div key={d.name} className="flex flex-col gap-1 p-3 rounded-lg bg-white dark:bg-muted shadow-sm border border-destructive/30 dark:border-destructive/40">
+                                                                <span className="text-sm font-semibold text-muted-foreground dark:text-muted-foreground">{d.name}</span>
                                                                 <div className="flex items-center justify-between">
                                                                     <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Média Geral</span>
-                                                                    <span className="font-bold text-red-600 dark:text-red-400 text-lg">{d.avg.toFixed(1)}</span>
+                                                                    <span className="font-bold text-destructive dark:text-destructive text-lg">{d.avg.toFixed(1)}</span>
                                                                 </div>
-                                                                <div className="h-1 w-full bg-red-100 dark:bg-red-900/30 rounded-full overflow-hidden mt-1">
-                                                                    <div className="h-full bg-red-500" style={{ width: `${(d.avg / 10) * 100}%` }} />
+                                                                <div className="h-1 w-full bg-destructive/15 dark:bg-destructive/20 rounded-full overflow-hidden mt-1">
+                                                                    <div className="h-full bg-destructive/100" style={{ width: `${(d.avg / 10) * 100}%` }} />
                                                                 </div>
                                                             </div>
                                                         ))}
                                                     </div>
-                                                ) : <p className="text-sm text-green-600 dark:text-green-400 font-medium text-center py-8 flex flex-col items-center gap-2">
+                                                ) : <p className="text-sm text-success dark:text-success font-medium text-center py-8 flex flex-col items-center gap-2">
                                                     <CheckCircle2 className="h-8 w-8 opacity-50" />
                                                     Nenhum ponto de atenção identificado.
                                                 </p>}
@@ -1326,7 +1326,7 @@ const StudentTrajectory = () => {
                                     </TabsList>
 
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 px-3 py-1.5 rounded-full border">
-                                        <Info className="h-3 w-3 text-blue-500" />
+                                        <Info className="h-3 w-3 text-info" />
                                         <span>Use esta área apenas para dados anteriores à entrada no Ensino Médio.</span>
                                     </div>
                                 </div>
@@ -1411,7 +1411,7 @@ const StudentTrajectory = () => {
                                             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                                 <div>
                                                     <CardTitle className="flex items-center gap-2">
-                                                        <Target className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                                        <Target className="h-5 w-5 text-info dark:text-info" />
                                                         Gestão de Avaliações Externas
                                                     </CardTitle>
                                                     <CardDescription>
@@ -1474,7 +1474,7 @@ const StudentTrajectory = () => {
                                                                         <TableCell className="text-xs text-muted-foreground">{assessment.subject || 'Geral (Multidisciplinar)'}</TableCell>
                                                                         <TableCell className="text-center">
                                                                             <div className="flex flex-col items-center gap-1">
-                                                                                <span className={`font-bold text-sm px-2 py-0.5 rounded border ${assessment.score >= 6 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+                                                                                <span className={`font-bold text-sm px-2 py-0.5 rounded border ${assessment.score >= 6 ? 'bg-success/10 text-success border-success/30' : 'bg-destructive/10 text-destructive border-destructive/30'}`}>
                                                                                     {assessment.score.toFixed(1)}
                                                                                 </span>
                                                                                 <span className="text-[10px] text-muted-foreground">{percentage.toFixed(0)}% de {assessment.maxScore}</span>
@@ -1491,7 +1491,7 @@ const StudentTrajectory = () => {
                                                                                 <Button
                                                                                     variant="ghost"
                                                                                     size="icon"
-                                                                                    className="h-8 w-8 hover:text-blue-600 hover:bg-blue-50"
+                                                                                    className="h-8 w-8 hover:text-info hover:bg-info/10"
                                                                                     onClick={() => openExternalEdit(assessment)}
                                                                                 >
                                                                                     <Edit3 className="h-4 w-4" />
@@ -1499,7 +1499,7 @@ const StudentTrajectory = () => {
                                                                                 <Button
                                                                                     variant="ghost"
                                                                                     size="icon"
-                                                                                    className="h-8 w-8 hover:text-red-600 hover:bg-red-50"
+                                                                                    className="h-8 w-8 hover:text-destructive hover:bg-destructive/10"
                                                                                     onClick={() => deleteExternalAssessment(assessment.id)}
                                                                                 >
                                                                                     <Trash2 className="h-4 w-4" />
@@ -1532,19 +1532,19 @@ const StudentTrajectory = () => {
                                             <SelectContent>
                                                 <SelectItem value="optimistic">
                                                     <div className="flex items-center gap-2">
-                                                        <TrendingUp className="h-4 w-4 text-emerald-500" />
+                                                        <TrendingUp className="h-4 w-4 text-success" />
                                                         <span>Otimista (+10%)</span>
                                                     </div>
                                                 </SelectItem>
                                                 <SelectItem value="realistic">
                                                     <div className="flex items-center gap-2">
-                                                        <Activity className="h-4 w-4 text-blue-500" />
+                                                        <Activity className="h-4 w-4 text-info" />
                                                         <span>Realista (Tendência Atual)</span>
                                                     </div>
                                                 </SelectItem>
                                                 <SelectItem value="pessimistic">
                                                     <div className="flex items-center gap-2">
-                                                        <TrendingUp className="h-4 w-4 text-red-500 rotate-180" />
+                                                        <TrendingUp className="h-4 w-4 text-destructive rotate-180" />
                                                         <span>Pessimista (-10%)</span>
                                                     </div>
                                                 </SelectItem>
@@ -1590,9 +1590,9 @@ const StudentTrajectory = () => {
                                             <Card>
                                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                                     <CardTitle className="text-sm font-medium text-muted-foreground">Tendência</CardTitle>
-                                                    <div className={`p-2 rounded-lg ${trendAnalysis.trend === 'ascending' ? 'bg-emerald-100 text-emerald-600' :
-                                                        trendAnalysis.trend === 'descending' ? 'bg-red-100 text-red-600' :
-                                                            'bg-amber-100 text-amber-600'
+                                                    <div className={`p-2 rounded-lg ${trendAnalysis.trend === 'ascending' ? 'bg-success/15 text-success' :
+                                                        trendAnalysis.trend === 'descending' ? 'bg-destructive/15 text-destructive' :
+                                                            'bg-warning/15 text-warning'
                                                         }`}>
                                                         {trendAnalysis.trend === 'ascending' ? <TrendingUp className="h-4 w-4" /> :
                                                             trendAnalysis.trend === 'descending' ? <TrendingUp className="h-4 w-4 rotate-180" /> :
@@ -1611,12 +1611,12 @@ const StudentTrajectory = () => {
                                             <Card>
                                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                                     <CardTitle className="text-sm font-medium text-muted-foreground">Média Geral</CardTitle>
-                                                    <div className="p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                                                    <div className="p-2 rounded-lg bg-info/15 text-info dark:bg-info/20 dark:text-info">
                                                         <Activity className="h-4 w-4" />
                                                     </div>
                                                 </CardHeader>
                                                 <CardContent>
-                                                    <div className={`text-2xl font-bold ${enrichedMetrics.average >= 6 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                    <div className={`text-2xl font-bold ${enrichedMetrics.average >= 6 ? 'text-success' : 'text-destructive'}`}>
                                                         {enrichedMetrics.average.toFixed(1)}
                                                     </div>
                                                     <p className="text-xs text-muted-foreground mt-1">Média acumulada</p>
@@ -1627,12 +1627,12 @@ const StudentTrajectory = () => {
                                             <Card>
                                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                                     <CardTitle className="text-sm font-medium text-muted-foreground">Melhor Nota</CardTitle>
-                                                    <div className="p-2 rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                                    <div className="p-2 rounded-lg bg-success/15 text-success dark:bg-success/20 dark:text-success">
                                                         <ArrowUpRight className="h-4 w-4" />
                                                     </div>
                                                 </CardHeader>
                                                 <CardContent>
-                                                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                                                    <div className="text-2xl font-bold text-success dark:text-success">
                                                         {enrichedMetrics.maxGrade.toFixed(1)}
                                                     </div>
                                                     <p className="text-xs text-muted-foreground mt-1 truncate" title={enrichedMetrics.bestPeriod}>
@@ -1645,12 +1645,12 @@ const StudentTrajectory = () => {
                                             <Card>
                                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                                     <CardTitle className="text-sm font-medium text-muted-foreground">Pior Nota</CardTitle>
-                                                    <div className="p-2 rounded-lg bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                                                    <div className="p-2 rounded-lg bg-destructive/15 text-destructive dark:bg-destructive/20 dark:text-destructive">
                                                         <ArrowDownRight className="h-4 w-4" />
                                                     </div>
                                                 </CardHeader>
                                                 <CardContent>
-                                                    <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                                                    <div className="text-2xl font-bold text-destructive dark:text-destructive">
                                                         {enrichedMetrics.minGrade.toFixed(1)}
                                                     </div>
                                                     <p className="text-xs text-muted-foreground mt-1 truncate" title={enrichedMetrics.worstPeriod}>
@@ -1663,17 +1663,17 @@ const StudentTrajectory = () => {
                                             <Card>
                                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                                     <CardTitle className="text-sm font-medium text-muted-foreground">Consistência</CardTitle>
-                                                    <div className={`p-2 rounded-lg ${enrichedMetrics.consistency === 'alta' ? 'bg-emerald-100 text-emerald-600' :
-                                                        enrichedMetrics.consistency === 'baixa' ? 'bg-amber-100 text-amber-600' :
-                                                            'bg-blue-100 text-blue-600'
+                                                    <div className={`p-2 rounded-lg ${enrichedMetrics.consistency === 'alta' ? 'bg-success/15 text-success' :
+                                                        enrichedMetrics.consistency === 'baixa' ? 'bg-warning/15 text-warning' :
+                                                            'bg-info/15 text-info'
                                                         }`}>
                                                         <Target className="h-4 w-4" />
                                                     </div>
                                                 </CardHeader>
                                                 <CardContent>
-                                                    <div className={`text-2xl font-bold ${enrichedMetrics.consistency === 'alta' ? 'text-emerald-600' :
-                                                        enrichedMetrics.consistency === 'baixa' ? 'text-amber-600' :
-                                                            'text-blue-600'
+                                                    <div className={`text-2xl font-bold ${enrichedMetrics.consistency === 'alta' ? 'text-success' :
+                                                        enrichedMetrics.consistency === 'baixa' ? 'text-warning' :
+                                                            'text-info'
                                                         }`}>
                                                         {enrichedMetrics.consistencyLabel}
                                                     </div>
@@ -1682,15 +1682,15 @@ const StudentTrajectory = () => {
                                             </Card>
 
                                             {/* Projeção */}
-                                            <Card className={showSimulation ? 'bg-orange-50/30 hover:border-orange-200' : 'opacity-70 bg-muted/20'}>
+                                            <Card className={showSimulation ? 'bg-warning/10 hover:border-warning/30' : 'opacity-70 bg-muted/20'}>
                                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                                     <CardTitle className="text-sm font-medium text-muted-foreground">Projeção</CardTitle>
-                                                    <div className={`p-2 rounded-lg ${showSimulation ? 'bg-orange-100 text-orange-600' : 'bg-muted text-muted-foreground'}`}>
+                                                    <div className={`p-2 rounded-lg ${showSimulation ? 'bg-warning/15 text-warning' : 'bg-muted text-muted-foreground'}`}>
                                                         <Target className="h-4 w-4" />
                                                     </div>
                                                 </CardHeader>
                                                 <CardContent>
-                                                    <div className={`text-2xl font-bold ${showSimulation ? 'text-orange-600' : 'text-muted-foreground/30'}`}>
+                                                    <div className={`text-2xl font-bold ${showSimulation ? 'text-warning' : 'text-muted-foreground/30'}`}>
                                                         {showSimulation ? (simulationData[simulationData.length - 1]?.emGrade?.toFixed(1) || simulationData[simulationData.length - 1]?.simulatedGrade?.toFixed(1) || '-') : '-'}
                                                     </div>
                                                     <p className="text-xs text-muted-foreground mt-1">Nota final estimada</p>
@@ -1708,17 +1708,17 @@ const StudentTrajectory = () => {
                                                     key={idx}
                                                     className={`
                                                         px-4 py-3 rounded-lg border flex items-start gap-3 
-                                                        ${insight.type === 'positive' ? 'bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800' :
-                                                            insight.type === 'negative' ? 'bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-800' :
-                                                                insight.type === 'warning' ? 'bg-amber-50/50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800' :
-                                                                    'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800'
+                                                        ${insight.type === 'positive' ? 'bg-success/10 dark:bg-success/20 border-success/30 dark:border-success/40' :
+                                                            insight.type === 'negative' ? 'bg-destructive/10 dark:bg-destructive/20 border-destructive/30 dark:border-destructive/40' :
+                                                                insight.type === 'warning' ? 'bg-warning/10 dark:bg-warning/20 border-warning/30 dark:border-warning/40' :
+                                                                    'bg-info/10 dark:bg-info/20 border-info/30 dark:border-info/40'
                                                         }
                                                     `}
                                                 >
-                                                    <div className={`mt-0.5 ${insight.type === 'positive' ? 'text-emerald-600 dark:text-emerald-400' :
-                                                        insight.type === 'negative' ? 'text-red-600 dark:text-red-400' :
-                                                            insight.type === 'warning' ? 'text-amber-600 dark:text-amber-400' :
-                                                                'text-blue-600 dark:text-blue-400'
+                                                    <div className={`mt-0.5 ${insight.type === 'positive' ? 'text-success dark:text-success' :
+                                                        insight.type === 'negative' ? 'text-destructive dark:text-destructive' :
+                                                            insight.type === 'warning' ? 'text-warning dark:text-warning' :
+                                                                'text-info dark:text-info'
                                                         }`}>
                                                         <Lightbulb className="h-4 w-4" />
                                                     </div>
@@ -2314,7 +2314,7 @@ const StudentTrajectory = () => {
                                             {currentAssessments.map(assessment => (
                                                 <div key={assessment.id} className="flex items-center justify-between p-3 bg-card border rounded-lg hover:shadow-sm transition-all group">
                                                     <div className="flex items-center gap-3">
-                                                        <div className={`p-2 rounded-full ${assessment.assessmentType === 'SAEB' ? 'bg-blue-100 text-blue-600' : 'bg-muted text-muted-foreground'}`}>
+                                                        <div className={`p-2 rounded-full ${assessment.assessmentType === 'SAEB' ? 'bg-info/15 text-info' : 'bg-muted text-muted-foreground'}`}>
                                                             {assessment.assessmentType === 'SAEB' ? <Target className="h-4 w-4" /> : <FileSpreadsheet className="h-4 w-4" />}
                                                         </div>
                                                         <div>
@@ -2400,11 +2400,11 @@ const HistoryForm = ({ year, initialGrades, onSave, onCancel }: { year: number, 
                                         <div className="flex justify-between items-center px-1">
                                             <Label className="text-xs text-muted-foreground" title={subject}>{subject}</Label>
                                             {val && !isNaN(numVal) && (
-                                                <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                                                <CheckCircle2 className="h-3 w-3 text-success" />
                                             )}
                                         </div>
                                         <Input
-                                            className={`h-9 font-mono text-center transition-all ${val ? (isLow ? 'bg-red-50 text-red-700 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200') : ''
+                                            className={`h-9 font-mono text-center transition-all ${val ? (isLow ? 'bg-destructive/10 text-destructive border-destructive/30' : 'bg-success/10 text-success border-success/30') : ''
                                                 }`}
                                             placeholder="-"
                                             value={val}
@@ -2424,7 +2424,7 @@ const HistoryForm = ({ year, initialGrades, onSave, onCancel }: { year: number, 
 
             <DialogFooter className="gap-2 sm:gap-0">
                 <Button variant="ghost" onClick={onCancel} disabled={saving}>Cancelar</Button>
-                <Button onClick={handleSave} disabled={saving} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+                <Button onClick={handleSave} disabled={saving} className="gap-2 bg-success hover:bg-success text-white">
                     {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                     Salvar Histórico ({year}º Ano)
                 </Button>

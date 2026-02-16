@@ -71,9 +71,9 @@ export const StudentSlide1 = ({ student, grades, incidents }: StudentSlide1Props
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm text-muted-foreground">Tendência</p>
                 {trend >= 0 ? (
-                  <TrendingUp className="h-5 w-5 text-green-500" />
+                  <TrendingUp className="h-5 w-5 text-success" />
                 ) : (
-                  <TrendingDown className="h-5 w-5 text-red-500" />
+                  <TrendingDown className="h-5 w-5 text-destructive" />
                 )}
               </div>
               <p className="text-3xl font-bold mb-1">
@@ -118,12 +118,12 @@ export const StudentSlide1 = ({ student, grades, incidents }: StudentSlide1Props
                   
                   return (
                     <div key={index} className="flex-1 flex flex-col items-center">
-                      <div className={`text-xl font-bold mb-2 ${isLow ? 'text-red-500' : ''}`}>
+                      <div className={`text-xl font-bold mb-2 ${isLow ? 'text-destructive' : ''}`}>
                         {item.average > 0 ? item.average.toFixed(1) : '-'}
                       </div>
                       <div 
                         className={`w-full rounded-t-lg transition-all ${
-                          isLow ? 'bg-red-500' : 'bg-primary'
+                          isLow ? 'bg-destructive/100' : 'bg-primary'
                         }`}
                         style={{ height: `${height}%`, minHeight: '30px' }}
                       />
@@ -147,7 +147,7 @@ export const StudentSlide1 = ({ student, grades, incidents }: StudentSlide1Props
 
       {/* Footer - Alerts and Actions */}
       <div className="mt-6 grid grid-cols-2 gap-4">
-        <Card className={`${disciplinesBelow6 > 0 ? 'bg-red-500/10 border-red-500/20' : 'bg-green-500/10 border-green-500/20'}`}>
+        <Card className={`${disciplinesBelow6 > 0 ? 'bg-destructive/10 border-destructive/30' : 'bg-success/10 border-success/30'}`}>
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center justify-between">
               <div>
@@ -165,7 +165,7 @@ export const StudentSlide1 = ({ student, grades, incidents }: StudentSlide1Props
           </CardContent>
         </Card>
 
-        <Card className={`${studentIncidents.length > 0 ? 'bg-yellow-500/10 border-yellow-500/20' : 'bg-green-500/10 border-green-500/20'}`}>
+        <Card className={`${studentIncidents.length > 0 ? 'bg-warning/10 border-warning/30' : 'bg-success/10 border-success/30'}`}>
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center justify-between">
               <div>

@@ -251,10 +251,10 @@ export const CLASSIFICATION_LABELS: Record<StudentClassification, string> = {
 };
 
 export const CLASSIFICATION_BG_COLORS: Record<StudentClassification, string> = {
-  critico: 'bg-red-100 text-red-800 border-red-200',
-  atencao: 'bg-amber-100 text-amber-800 border-amber-200',
-  aprovado: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  excelencia: 'bg-blue-100 text-blue-800 border-blue-200',
+  critico: 'bg-destructive/15 text-destructive border-destructive/30',
+  atencao: 'bg-warning/15 text-warning border-warning/30',
+  aprovado: 'bg-success/15 text-success border-success/30',
+  excelencia: 'bg-info/15 text-info border-info/30',
 };
 
 // ============================================
@@ -2080,9 +2080,9 @@ export function formatNumber(num: number, decimals: number = 1): string {
 // Helper para obter cor do trend
 export function getTrendColor(trend: 'up' | 'down' | 'stable'): string {
   switch (trend) {
-    case 'up': return 'text-emerald-600';
-    case 'down': return 'text-red-600';
-    default: return 'text-gray-500';
+    case 'up': return 'text-success';
+    case 'down': return 'text-destructive';
+    default: return 'text-muted-foreground';
   }
 }
 

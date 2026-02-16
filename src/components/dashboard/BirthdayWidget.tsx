@@ -78,11 +78,11 @@ export function BirthdayWidget({ students, classes }: BirthdayWidgetProps) {
     }
 
     return (
-        <Card className="bg-gradient-to-br from-pink-50 to-orange-50 dark:from-pink-950/20 dark:to-orange-950/20 border-pink-200/50 dark:border-pink-800/30">
+        <Card className="bg-gradient-to-br from-info/10 to-warning/10 dark:from-info/20 dark:to-warning/20 border-info/30 dark:border-info/40">
             <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                    <div className="p-2 rounded-lg bg-pink-500/10">
-                        <Cake className="h-5 w-5 text-pink-500" />
+                    <div className="p-2 rounded-lg bg-info/10">
+                        <Cake className="h-5 w-5 text-info" />
                     </div>
                     Aniversariantes da Semana
                     <Badge variant="secondary" className="ml-auto">
@@ -95,13 +95,13 @@ export function BirthdayWidget({ students, classes }: BirthdayWidgetProps) {
                     <div
                         key={birthday.student.id}
                         className={`flex items-center justify-between p-3 rounded-lg transition-colors ${birthday.isToday
-                            ? 'bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 border border-amber-300 dark:border-amber-700'
+                            ? 'bg-gradient-to-r from-warning/15 to-warning/10 dark:from-warning/20 dark:to-warning/15 border border-warning/30 dark:border-warning/40'
                             : 'bg-white/60 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10'
                             }`}
                     >
                         <div className="flex items-center gap-3">
                             {birthday.isToday && (
-                                <PartyPopper className="h-5 w-5 text-amber-500 animate-bounce" />
+                                <PartyPopper className="h-5 w-5 text-warning animate-bounce" />
                             )}
                             <div>
                                 <p className="font-medium text-sm">{birthday.student.name}</p>
@@ -111,7 +111,7 @@ export function BirthdayWidget({ students, classes }: BirthdayWidgetProps) {
                         <div className="text-right">
                             <Badge
                                 variant={birthday.isToday ? 'default' : 'outline'}
-                                className={birthday.isToday ? 'bg-amber-500 hover:bg-amber-600' : ''}
+                                className={birthday.isToday ? 'bg-warning/100 hover:bg-warning' : ''}
                             >
                                 {birthday.dayLabel}
                             </Badge>

@@ -304,8 +304,8 @@ export const ExternalAssessmentBatchDialog = ({ open, onOpenChange, classId, sub
                     <div className="flex items-center justify-between relative max-w-sm mx-auto">
                         <div className="absolute left-0 top-1/2 w-full h-0.5 bg-muted-foreground/20 -z-10" />
 
-                        <div className={`flex flex-col items-center gap-2 bg-background p-2 rounded-lg border-2 z-10 w-32 ${step === 'config' ? 'border-primary' : 'border-emerald-500/50'}`}>
-                            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'config' ? 'bg-primary text-primary-foreground' : 'bg-emerald-100 text-emerald-700'}`}>
+                        <div className={`flex flex-col items-center gap-2 bg-background p-2 rounded-lg border-2 z-10 w-32 ${step === 'config' ? 'border-primary' : 'border-success/30'}`}>
+                            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'config' ? 'bg-primary text-primary-foreground' : 'bg-success/15 text-success'}`}>
                                 <Settings className="h-4 w-4" />
                             </div>
                             <span className={`text-xs font-medium ${step === 'config' ? 'text-primary' : 'text-muted-foreground'}`}>Configuração</span>
@@ -386,7 +386,7 @@ export const ExternalAssessmentBatchDialog = ({ open, onOpenChange, classId, sub
                                         </Select>
                                     </div>
                                     {selectedGroupKey && (
-                                        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-sm flex items-center gap-2">
+                                        <div className="p-3 bg-info/10 dark:bg-info/20 text-info dark:text-info rounded-lg text-sm flex items-center gap-2">
                                             <CheckCircle2 className="h-4 w-4" />
                                             Avaliação carregada. Clique em "Continuar" para editar as notas.
                                         </div>
@@ -520,10 +520,10 @@ export const ExternalAssessmentBatchDialog = ({ open, onOpenChange, classId, sub
                                     </div>
                                 </div>
                                 {completionStats.percent === 100 && (
-                                    <div className="md:col-span-1 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 rounded-xl flex flex-col items-center justify-center p-4 text-center">
-                                        <CheckCircle2 className="h-8 w-8 text-emerald-600 mb-2" />
-                                        <p className="font-bold text-emerald-700 dark:text-emerald-400">Completo!</p>
-                                        <p className="text-xs text-emerald-600/80">Todos os alunos com nota.</p>
+                                    <div className="md:col-span-1 bg-success/10 dark:bg-success/20 border border-success/30 rounded-xl flex flex-col items-center justify-center p-4 text-center">
+                                        <CheckCircle2 className="h-8 w-8 text-success mb-2" />
+                                        <p className="font-bold text-success dark:text-success">Completo!</p>
+                                        <p className="text-xs text-success">Todos os alunos com nota.</p>
                                     </div>
                                 )}
                             </div>
@@ -619,7 +619,7 @@ export const ExternalAssessmentBatchDialog = ({ open, onOpenChange, classId, sub
                                 Continuar <ArrowRight className="ml-2 h-4 w-4" />
                             </Button>
                         ) : (
-                            <Button onClick={handleSave} disabled={isSaving || classStudents.length === 0} className="bg-emerald-600 hover:bg-emerald-700 text-white px-8">
+                            <Button onClick={handleSave} disabled={isSaving || classStudents.length === 0} className="bg-success hover:bg-success text-white px-8">
                                 {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
                                 Salvar Lançamentos
                             </Button>

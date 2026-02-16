@@ -39,17 +39,17 @@ export const ClassSlide3 = ({ classData, students, grades }: ClassSlide3Props) =
       {/* Content */}
       <div className="flex-1 space-y-6">
         {/* High Performance */}
-        <Card className="bg-green-500/10 backdrop-blur border-green-500/20">
+        <Card className="bg-success/10 backdrop-blur border-success/30">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3 mb-4">
-              <Trophy className="h-6 w-6 text-green-500" />
+              <Trophy className="h-6 w-6 text-success" />
               <div className="flex-1">
                 <h3 className="text-lg font-semibold">Alto Desempenho (acima de 8.0)</h3>
                 <p className="text-sm text-muted-foreground">
                   {highPerformance.length} alunos ({Math.round((highPerformance.length / students.length) * 100)}% da turma)
                 </p>
               </div>
-              <Badge variant="default" className="bg-green-500">
+              <Badge variant="default" className="bg-success/100">
                 {highPerformance.length}
               </Badge>
             </div>
@@ -70,7 +70,7 @@ export const ClassSlide3 = ({ classData, students, grades }: ClassSlide3Props) =
                   {highPerformance.slice(0, 3).map(item => (
                     <div key={item.student.id} className="text-sm flex items-center justify-between">
                       <span className="truncate max-w-[180px]">{item.student.name}</span>
-                      <span className="text-green-500 font-medium">{item.average.toFixed(1)}</span>
+                      <span className="text-success font-medium">{item.average.toFixed(1)}</span>
                     </div>
                   ))}
                   {highPerformance.length > 3 && (
@@ -94,17 +94,17 @@ export const ClassSlide3 = ({ classData, students, grades }: ClassSlide3Props) =
         </Card>
 
         {/* Medium Performance */}
-        <Card className="bg-yellow-500/10 backdrop-blur border-yellow-500/20">
+        <Card className="bg-warning/10 backdrop-blur border-warning/30">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3 mb-4">
-              <Target className="h-6 w-6 text-yellow-500" />
+              <Target className="h-6 w-6 text-warning" />
               <div className="flex-1">
                 <h3 className="text-lg font-semibold">Desempenho Médio (6.0 - 7.9)</h3>
                 <p className="text-sm text-muted-foreground">
                   {mediumPerformance.length} alunos ({Math.round((mediumPerformance.length / students.length) * 100)}% da turma)
                 </p>
               </div>
-              <Badge variant="secondary" className="bg-yellow-500/20">
+              <Badge variant="secondary" className="bg-warning/20">
                 {mediumPerformance.length}
               </Badge>
             </div>
@@ -125,7 +125,7 @@ export const ClassSlide3 = ({ classData, students, grades }: ClassSlide3Props) =
                   {mediumPerformance.slice(0, 3).map(item => (
                     <div key={item.student.id} className="text-sm flex items-center justify-between">
                       <span className="truncate max-w-[180px]">{item.student.name}</span>
-                      <span className="text-yellow-500 font-medium">{item.average.toFixed(1)}</span>
+                      <span className="text-warning font-medium">{item.average.toFixed(1)}</span>
                     </div>
                   ))}
                   {mediumPerformance.length > 3 && (
@@ -149,10 +149,10 @@ export const ClassSlide3 = ({ classData, students, grades }: ClassSlide3Props) =
         </Card>
 
         {/* Low Performance */}
-        <Card className="bg-red-500/10 backdrop-blur border-red-500/20">
+        <Card className="bg-destructive/10 backdrop-blur border-destructive/30">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3 mb-4">
-              <AlertCircle className="h-6 w-6 text-red-500" />
+              <AlertCircle className="h-6 w-6 text-destructive" />
               <div className="flex-1">
                 <h3 className="text-lg font-semibold">Necessitam Intervenção (abaixo de 6.0)</h3>
                 <p className="text-sm text-muted-foreground">
@@ -180,7 +180,7 @@ export const ClassSlide3 = ({ classData, students, grades }: ClassSlide3Props) =
                   {lowPerformance.slice(0, 3).map(item => (
                     <div key={item.student.id} className="text-sm flex items-center justify-between">
                       <span className="truncate max-w-[180px]">{item.student.name}</span>
-                      <span className="text-red-500 font-medium">{item.average.toFixed(1)}</span>
+                      <span className="text-destructive font-medium">{item.average.toFixed(1)}</span>
                     </div>
                   ))}
                   {lowPerformance.length > 3 && (
@@ -192,8 +192,8 @@ export const ClassSlide3 = ({ classData, students, grades }: ClassSlide3Props) =
               </div>
             </div>
 
-            <div className="mt-4 p-3 bg-background/50 rounded border-l-4 border-red-500">
-              <p className="text-sm font-medium mb-1 text-red-500">Ações Urgentes:</p>
+            <div className="mt-4 p-3 bg-background/50 rounded border-l-4 border-destructive/30">
+              <p className="text-sm font-medium mb-1 text-destructive">Ações Urgentes:</p>
               <ul className="text-sm text-muted-foreground space-y-1">
                 <li>• Reunião imediata com responsáveis</li>
                 <li>• Plano de recuperação personalizado</li>

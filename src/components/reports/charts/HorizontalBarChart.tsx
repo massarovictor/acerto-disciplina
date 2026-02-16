@@ -18,9 +18,9 @@ export const HorizontalBarChart = ({
   height = 300,
   showValues = true,
   colorFunction = (value: number) => {
-    if (value >= 7) return 'bg-green-500';
-    if (value >= 6) return 'bg-yellow-500';
-    return 'bg-red-500';
+    if (value >= 7) return 'bg-success/100';
+    if (value >= 6) return 'bg-warning/100';
+    return 'bg-destructive/100';
   },
 }: HorizontalBarChartProps) => {
   if (data.length === 0) {

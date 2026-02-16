@@ -70,7 +70,7 @@ export const ClassSlide1 = ({ classData, students, grades }: ClassSlide1Props) =
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Tendência</p>
                   <p className="text-2xl font-bold flex items-center gap-2">
-                    <TrendingUp className={`h-6 w-6 ${trend >= 0 ? 'text-green-500' : 'text-red-500'}`} />
+                    <TrendingUp className={`h-6 w-6 ${trend >= 0 ? 'text-success' : 'text-destructive'}`} />
                     {trend >= 0 ? '+' : ''}{trend.toFixed(1)}
                   </p>
                 </div>

@@ -27,8 +27,8 @@ export function SchoolOverviewCards({
       value: overview.totalStudents.toString(),
       icon: Users,
       description: `${overview.totalClasses} turmas ativas`,
-      color: 'text-blue-600 dark:text-blue-400',
-      bgColor: 'bg-blue-100 dark:bg-blue-900/30',
+      color: 'text-info dark:text-info',
+      bgColor: 'bg-info/15 dark:bg-info/20',
     },
     {
       title: subjectMode ? 'Média do Recorte' : 'Média Geral',
@@ -40,10 +40,10 @@ export function SchoolOverviewCards({
           : overview.overallAverage >= 6 ? 'Acima da média' : 'Abaixo da média'
         : 'Sem notas lançadas no recorte',
       color: hasGrades
-        ? overview.overallAverage >= 6 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
+        ? overview.overallAverage >= 6 ? 'text-success dark:text-success' : 'text-destructive dark:text-destructive'
         : 'text-muted-foreground',
       bgColor: hasGrades
-        ? overview.overallAverage >= 6 ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-red-100 dark:bg-red-900/30'
+        ? overview.overallAverage >= 6 ? 'bg-success/15 dark:bg-success/20' : 'bg-destructive/15 dark:bg-destructive/20'
         : 'bg-muted',
     },
     // DISABLED: Frequência removida temporariamente
@@ -52,8 +52,8 @@ export function SchoolOverviewCards({
     //   value: `${overview.overallFrequency.toFixed(0)}%`,
     //   icon: Clock,
     //   description: overview.overallFrequency >= 75 ? 'Adequada' : 'Atenção necessária',
-    //   color: overview.overallFrequency >= 75 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400',
-    //   bgColor: overview.overallFrequency >= 75 ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-amber-100 dark:bg-amber-900/30',
+    //   color: overview.overallFrequency >= 75 ? 'text-success dark:text-success' : 'text-warning dark:text-warning',
+    //   bgColor: overview.overallFrequency >= 75 ? 'bg-success/15 dark:bg-success/20' : 'bg-warning/15 dark:bg-warning/20',
     // },
     ...(showBehavior
       ? [
@@ -62,8 +62,8 @@ export function SchoolOverviewCards({
           value: overview.totalIncidents.toString(),
           icon: AlertTriangle,
           description: 'Total registrado',
-          color: 'text-amber-600 dark:text-amber-400',
-          bgColor: 'bg-amber-100 dark:bg-amber-900/30',
+          color: 'text-warning dark:text-warning',
+          bgColor: 'bg-warning/15 dark:bg-warning/20',
         },
       ]
       : []),

@@ -512,7 +512,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                 variant={filterStatus === "without-director" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setFilterStatus("without-director")}
-                className={filterStatus === "without-director" ? "bg-amber-600 hover:bg-amber-700 text-white" : "text-muted-foreground"}
+                className={filterStatus === "without-director" ? "bg-warning hover:bg-warning text-white" : "text-muted-foreground"}
               >
                 <AlertTriangle className="h-3.5 w-3.5 mr-1" />
                 Sem Diretor
@@ -521,7 +521,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                 variant={filterStatus === "with-director" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setFilterStatus("with-director")}
-                className={filterStatus === "with-director" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "text-muted-foreground"}
+                className={filterStatus === "with-director" ? "bg-success hover:bg-success text-white" : "text-muted-foreground"}
               >
                 Com Diretor
               </Button>
@@ -610,8 +610,8 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                           <Badge
                             variant="outline"
                             className={cycleComplete
-                              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200"
-                              : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200"
+                              ? "bg-warning/15 text-warning dark:bg-warning/20 dark:text-warning border-warning/30"
+                              : "bg-info/15 text-info dark:bg-info/20 dark:text-info border-info/30"
                             }
                           >
                             {cycleComplete ? "Concluído" : `${computedSeries}º ano`}
@@ -620,7 +620,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                         <TableCell>
                           {(cls.directorId || cls.directorEmail) ? (
                             <div className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              <div className="w-1.5 h-1.5 rounded-full bg-success/100" />
                               <span className="text-sm font-medium truncate max-w-[120px]" title={getDirectorName(cls) || ''}>
                                 {getDirectorName(cls)}
                               </span>
@@ -628,7 +628,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                           ) : (
                             <Badge
                               variant="outline"
-                              className="bg-red-50 text-red-700 border-red-200 dark:bg-red-900/10 dark:text-red-400 dark:border-red-900/30"
+                              className="bg-destructive/10 text-destructive border-destructive/30 dark:bg-destructive/20 dark:text-destructive dark:border-destructive/40"
                             >
                               Sem diretor
                             </Badge>
@@ -645,7 +645,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                             variant="outline"
                             className={
                               cls.active
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/10 dark:text-emerald-400 dark:border-emerald-900/30"
+                                ? "bg-success/10 text-success border-success/30 dark:bg-success/20 dark:text-success dark:border-success/40"
                                 : "bg-muted text-muted-foreground border-border"
                             }
                           >
@@ -666,7 +666,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                              className="h-8 w-8 text-muted-foreground hover:text-info hover:bg-info/10 dark:hover:bg-info"
                               onClick={() => handleEditClick(cls)}
                               title="Editar Turma"
                             >
@@ -688,7 +688,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                                       setArchivingClass(cls);
                                     }}
                                     title="⚠️ Ciclo concluído - ARQUIVAR TURMA"
-                                    className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 animate-pulse"
+                                    className="text-warning hover:text-warning hover:bg-warning/10 dark:hover:bg-warning animate-pulse"
                                   >
                                     <Archive className="h-4 w-4" />
                                   </Button>
@@ -704,7 +704,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                                     setArchivingClass(cls);
                                   }}
                                   title="Arquivar turma"
-                                  className="text-muted-foreground hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                                  className="text-muted-foreground hover:text-warning hover:bg-warning/10 dark:hover:bg-warning"
                                 >
                                   <Archive className="h-4 w-4" />
                                 </Button>
@@ -715,7 +715,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleDeleteClick(cls)}
-                              className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive"
                               title="Excluir Turma"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -767,7 +767,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                   <Label className="text-muted-foreground">Ano Atual</Label>
                   <Badge
                     variant="outline"
-                    className="bg-blue-500/10 text-blue-700 border-blue-500/30"
+                    className="bg-info/10 text-info border-info/30"
                   >
                     {viewingClass.currentYear}º ano
                     {viewingClass.startYearDate &&
@@ -1013,14 +1013,14 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                             )}
                           </div>
                           <div
-                            className={`flex flex-wrap gap-2 p-3 border rounded-md ${isCurrent ? "bg-amber-50/50 border-amber-200" : "bg-muted/50"
+                            className={`flex flex-wrap gap-2 p-3 border rounded-md ${isCurrent ? "bg-warning/10 border-warning/30" : "bg-muted/50"
                               }`}
                           >
                             {yearData.subjects.map((subject, index) => (
                               <Badge
                                 key={`${yearData.year}-${index}`}
                                 variant="outline"
-                                className="bg-amber-500/10 text-amber-700 border-amber-500/30"
+                                className="bg-warning/10 text-warning border-warning/30"
                               >
                                 {subject}
                               </Badge>
@@ -1045,7 +1045,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                       </Label>
                     </div>
                     {syncTemplateSubjects && (
-                      <p className="text-sm text-amber-700">
+                      <p className="text-sm text-warning">
                         Isso substituirá as disciplinas profissionais atuais pela lista do ano corrente do template.
                       </p>
                     )}
@@ -1161,13 +1161,13 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
                   Esta ação não pode ser desfeita.
                 </p>
                 <p className="text-sm font-medium">
-                  Digite <span className="font-bold text-red-600">excluir</span> para confirmar:
+                  Digite <span className="font-bold text-destructive">excluir</span> para confirmar:
                 </p>
                 <Input
                   value={deleteConfirmationText}
                   onChange={(e) => setDeleteConfirmationText(e.target.value)}
                   placeholder="excluir"
-                  className="border-red-200 focus-visible:ring-red-500"
+                  className="border-destructive/30 focus-visible:ring-destructive"
                 />
               </div>
             </AlertDialogDescription>
@@ -1193,7 +1193,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <Archive className="h-5 w-5 text-amber-600" />
+              <Archive className="h-5 w-5 text-warning" />
               Confirmar Arquivamento
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-4">
@@ -1212,7 +1212,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleArchive}
-              className="bg-amber-600 hover:bg-amber-700"
+              className="bg-warning hover:bg-warning"
             >
               Arquivar Turma
             </AlertDialogAction>

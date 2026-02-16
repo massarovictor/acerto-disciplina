@@ -66,7 +66,7 @@ export const SubjectRankingSlide = ({ grades, classData, professionalSubjects }:
                         <span className="font-bold text-muted-foreground w-6 flex-shrink-0">#{index + 1}</span>
                         <span className="font-medium truncate">{subject.subject}</span>
                         {subject.isProfessional && (
-                          <Badge variant="outline" className="text-xs bg-amber-500/10">Técnica</Badge>
+                          <Badge variant="outline" className="text-xs bg-warning/10">Técnica</Badge>
                         )}
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
@@ -83,9 +83,9 @@ export const SubjectRankingSlide = ({ grades, classData, professionalSubjects }:
                     <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all ${
-                          subject.mean >= 7 ? 'bg-green-500' :
-                          subject.mean >= 6 ? 'bg-yellow-500' :
-                          'bg-red-500'
+                          subject.mean >= 7 ? 'bg-success/100' :
+                          subject.mean >= 6 ? 'bg-warning/100' :
+                          'bg-destructive/100'
                         }`}
                         style={{ width: `${percentage}%` }}
                       />
@@ -100,10 +100,10 @@ export const SubjectRankingSlide = ({ grades, classData, professionalSubjects }:
         {/* Análise Detalhada */}
         <div className="grid grid-cols-2 gap-4">
           {/* Top 3 Melhores */}
-          <Card className="bg-green-500/10 backdrop-blur border-green-500/20">
+          <Card className="bg-success/10 backdrop-blur border-success/30">
             <CardContent className="pt-4">
               <h4 className="font-semibold mb-3 flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-green-600" />
+                <TrendingUp className="h-5 w-5 text-success" />
                 Top 3 - Melhor Desempenho
               </h4>
               <div className="space-y-3">
@@ -111,10 +111,10 @@ export const SubjectRankingSlide = ({ grades, classData, professionalSubjects }:
                   <div key={subject.subject} className="p-2 bg-background/50 rounded">
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-green-600">#{index + 1}</span>
+                        <span className="font-bold text-success">#{index + 1}</span>
                         <span className="text-sm font-medium truncate">{subject.subject}</span>
                       </div>
-                      <Badge className="bg-green-600">{subject.mean.toFixed(1)}</Badge>
+                      <Badge className="bg-success">{subject.mean.toFixed(1)}</Badge>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                       <span>Desvio: {subject.stdDev.toFixed(2)}</span>
@@ -127,10 +127,10 @@ export const SubjectRankingSlide = ({ grades, classData, professionalSubjects }:
           </Card>
 
           {/* Top 3 Piores */}
-          <Card className="bg-red-500/10 backdrop-blur border-red-500/20">
+          <Card className="bg-destructive/10 backdrop-blur border-destructive/30">
             <CardContent className="pt-4">
               <h4 className="font-semibold mb-3 flex items-center gap-2">
-                <TrendingDown className="h-5 w-5 text-red-600" />
+                <TrendingDown className="h-5 w-5 text-destructive" />
                 Necessitam Atenção
               </h4>
               <div className="space-y-3">
@@ -138,7 +138,7 @@ export const SubjectRankingSlide = ({ grades, classData, professionalSubjects }:
                   <div key={subject.subject} className="p-2 bg-background/50 rounded">
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-red-600">#{subjectStats.length - index}</span>
+                        <span className="font-bold text-destructive">#{subjectStats.length - index}</span>
                         <span className="text-sm font-medium truncate">{subject.subject}</span>
                       </div>
                       <Badge variant="destructive">{subject.mean.toFixed(1)}</Badge>

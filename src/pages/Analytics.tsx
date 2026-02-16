@@ -89,10 +89,10 @@ const InlineInsights = ({
               className="group flex flex-col gap-2 p-3 rounded-md border border-border/50 hover:border-border transition-colors bg-background"
             >
               <div className="flex items-start gap-3">
-                <div className={`mt-0.5 p-1 rounded-full bg-muted shrink-0 ${insight.type === 'alert' ? 'text-red-600 dark:text-red-400' :
-                  insight.type === 'warning' ? 'text-amber-600 dark:text-amber-400' :
-                    insight.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' :
-                      'text-blue-600 dark:text-blue-400'
+                <div className={`mt-0.5 p-1 rounded-full bg-muted shrink-0 ${insight.type === 'alert' ? 'text-destructive dark:text-destructive' :
+                  insight.type === 'warning' ? 'text-warning dark:text-warning' :
+                    insight.type === 'success' ? 'text-success dark:text-success' :
+                      'text-info dark:text-info'
                   }`}>
                   {insight.type === 'alert' && <AlertTriangle className="h-3.5 w-3.5" />}
                   {insight.type === 'warning' && <AlertCircle className="h-3.5 w-3.5" />}
@@ -157,7 +157,7 @@ const SubjectComparisonCard = ({ subjects }: { subjects: SubjectAnalytics[] }) =
                 </div>
                 <div className="h-3 rounded-full bg-muted overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-blue-500"
+                    className="h-full rounded-full bg-info/100"
                     style={{ width: `${width}%` }}
                   />
                 </div>
@@ -397,8 +397,8 @@ const Analytics = () => {
         {/* ================= ABA 1: DASHBOARD ================= */}
         <TabsContent value="dashboard" className="space-y-8">
           {analyticsContext.gradeCount === 0 && analyticsContext.studentCount === 0 && !analyticsLoading && (
-            <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4 text-center">
-              <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+            <div className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-center">
+              <p className="text-sm font-medium text-warning dark:text-warning">
                 Nenhum dado encontrado para os filtros selecionados.
               </p>
               <p className="text-xs text-muted-foreground mt-1">

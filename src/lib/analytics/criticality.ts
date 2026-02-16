@@ -16,8 +16,8 @@ export const CRITICALITY_BUCKETS: CriticalityBucket[] = [
         label: 'Muito Crítico',
         min: 0,
         max: 5.0,
-        color: 'text-red-800',
-        bg: 'bg-red-100',
+        color: 'text-destructive',
+        bg: 'bg-destructive/15',
         description: 'Desempenho muito crítico (0 - 5.0)'
     },
     {
@@ -25,8 +25,8 @@ export const CRITICALITY_BUCKETS: CriticalityBucket[] = [
         label: 'Crítico',
         min: 5.0,
         max: 6.0,
-        color: 'text-amber-600',
-        bg: 'bg-amber-50',
+        color: 'text-warning',
+        bg: 'bg-warning/10',
         description: 'Desempenho crítico (5.0 - 6.0)'
     },
     {
@@ -34,8 +34,8 @@ export const CRITICALITY_BUCKETS: CriticalityBucket[] = [
         label: 'Intermediário',
         min: 6.0,
         max: 7.0,
-        color: 'text-emerald-600',
-        bg: 'bg-emerald-50',
+        color: 'text-success',
+        bg: 'bg-success/10',
         description: 'Desempenho intermediário (6.0 - 7.0)'
     },
     {
@@ -43,8 +43,8 @@ export const CRITICALITY_BUCKETS: CriticalityBucket[] = [
         label: 'Adequado',
         min: 7.0,
         max: 10.1, // To include 10
-        color: 'text-blue-600',
-        bg: 'bg-blue-50',
+        color: 'text-info',
+        bg: 'bg-info/10',
         description: 'Desempenho adequado (7.0 - 10)'
     }
 ];

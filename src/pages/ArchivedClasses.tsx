@@ -156,7 +156,7 @@ const ArchivedClasses = () => {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 font-normal">
+                        <Badge variant="secondary" className="bg-warning/10 text-warning border-warning/30 dark:bg-warning/20 dark:text-warning font-normal">
                           {cls.archivedReason || 'Motivo não informado'}
                         </Badge>
                       </TableCell>
@@ -174,7 +174,7 @@ const ArchivedClasses = () => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                            className="h-8 w-8 text-muted-foreground hover:text-info hover:bg-info/10 dark:hover:bg-info"
                             onClick={() => setUnarchivingClass(cls.id)}
                             title="Desarquivar (Restaurar)"
                           >
@@ -237,7 +237,7 @@ const ArchivedClasses = () => {
                     </div>
                     <div className="col-span-2">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Motivo do Arquivamento</p>
-                      <div className="p-2 bg-amber-50 border border-amber-100 rounded-md text-amber-800 text-sm">
+                      <div className="p-2 bg-warning/10 border border-warning/30 rounded-md text-warning text-sm">
                         {cls.archivedReason || 'Não informado'}
                       </div>
                     </div>
@@ -285,7 +285,7 @@ const ArchivedClasses = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleUnarchive} className="bg-blue-600 hover:bg-blue-700">
+            <AlertDialogAction onClick={handleUnarchive} className="bg-info hover:bg-info">
               Desarquivar Turma
             </AlertDialogAction>
           </AlertDialogFooter>

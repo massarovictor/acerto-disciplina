@@ -147,7 +147,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
 
       if (status.isPending) {
         return (
-          <Badge className="bg-gray-500/10 text-gray-700 border-gray-500/30">
+          <Badge className="bg-muted text-muted-foreground border-border">
             <Clock className="h-3 w-3 mr-1" />
             Pendente
           </Badge>
@@ -157,21 +157,21 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
       switch (status.status) {
         case 'approved':
           return (
-            <Badge className="bg-green-500/10 text-green-700 border-green-500/30">
+            <Badge className="bg-success/10 text-success border-success/30">
               <CheckCircle2 className="h-3 w-3 mr-1" />
               Aprovado
             </Badge>
           );
         case 'recovery':
           return (
-            <Badge className="bg-yellow-500/10 text-yellow-700 border-yellow-500/30">
+            <Badge className="bg-warning/10 text-warning border-warning/30">
               <AlertTriangle className="h-3 w-3 mr-1" />
               Recuperação
             </Badge>
           );
         case 'failed':
           return (
-            <Badge className="bg-red-500/10 text-red-700 border-red-500/30">
+            <Badge className="bg-destructive/10 text-destructive border-destructive/30">
               <XCircle className="h-3 w-3 mr-1" />
               Reprovado
             </Badge>
@@ -554,7 +554,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                         <TableCell>
                           <Badge variant="outline" className={
                             student.status === 'active'
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/10 dark:text-emerald-400 dark:border-emerald-900/30'
+                              ? 'bg-success/10 text-success border-success/30 dark:bg-success/20 dark:text-success dark:border-success/40'
                               : 'bg-muted text-muted-foreground border-border'
                           }>
                             {student.status === 'active' ? 'Ativo' : 'Inativo'}
@@ -578,7 +578,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                              className="h-8 w-8 text-muted-foreground hover:text-info hover:bg-info/10 dark:hover:bg-info"
                               onClick={() => handleEditClick(student)}
                             >
                               <Edit className="h-4 w-4" />
@@ -586,7 +586,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                              className="h-8 w-8 text-muted-foreground hover:text-info hover:bg-info/10 dark:hover:bg-info"
                               onClick={() => {
                                 setTransferringStudent(student);
                                 setTransferTargetClassId('');
@@ -598,7 +598,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive"
                               onClick={() => setDeletingStudent(student)}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -1050,7 +1050,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ArrowRightLeft className="h-5 w-5 text-blue-600" />
+              <ArrowRightLeft className="h-5 w-5 text-info" />
               Transferir Aluno
             </DialogTitle>
             <DialogDescription>
@@ -1093,7 +1093,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
             <Button
               onClick={handleTransfer}
               disabled={!transferTargetClassId}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-info hover:bg-info"
             >
               Confirmar Transferência
             </Button>
@@ -1111,7 +1111,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                 <p>
                   Tem certeza que deseja excluir o aluno <strong>{deletingStudent?.name}</strong>?
                 </p>
-                <div className="bg-red-50 dark:bg-red-900/10 p-3 rounded-md text-sm text-red-800 dark:text-red-200 border border-red-200 dark:border-red-900/30">
+                <div className="bg-destructive/10 dark:bg-destructive/20 p-3 rounded-md text-sm text-destructive dark:text-destructive border border-destructive/30 dark:border-destructive/40">
                   <p className="font-semibold mb-1 flex items-center gap-1">
                     <AlertTriangle className="h-4 w-4" />
                     Atenção:
@@ -1121,13 +1121,13 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                   </p>
                 </div>
                 <p className="text-sm font-medium pt-2">
-                  Digite <span className="font-bold text-red-600">excluir</span> para confirmar:
+                  Digite <span className="font-bold text-destructive">excluir</span> para confirmar:
                 </p>
                 <Input
                   value={deleteConfirmationText}
                   onChange={(e) => setDeleteConfirmationText(e.target.value)}
                   placeholder="excluir"
-                  className="border-red-200 focus-visible:ring-red-500"
+                  className="border-destructive/30 focus-visible:ring-destructive"
                 />
               </div>
             </AlertDialogDescription>
@@ -1137,7 +1137,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
             <AlertDialogAction
               onClick={handleDelete}
               disabled={deleteConfirmationText.toLowerCase() !== 'excluir'}
-              className="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-destructive hover:bg-destructive disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Excluir Aluno
             </AlertDialogAction>

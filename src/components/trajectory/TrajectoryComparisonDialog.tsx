@@ -129,13 +129,13 @@ export function TrajectoryComparisonDialog({
             <div className="py-3 px-2 text-sm font-medium text-muted-foreground border-b border-border/50">{label}</div>
 
             {/* Primary Class Column */}
-            <div className="py-3 px-2 text-center font-bold text-blue-600 bg-blue-50/30 border-b border-border/50">
+            <div className="py-3 px-2 text-center font-bold text-info bg-info/10 border-b border-border/50">
                 {statsByClass?.[primaryClassId] ? formatNumber(getter(statsByClass[primaryClassId])) + suffix : '-'}
             </div>
 
             {/* Comparison Columns */}
             {comparisonClassIds.map(id => (
-                <div key={id} className="py-3 px-2 text-center text-slate-700 dark:text-slate-300 border-b border-border/50">
+                <div key={id} className="py-3 px-2 text-center text-muted-foreground dark:text-muted-foreground border-b border-border/50">
                     {statsByClass?.[id] ? formatNumber(getter(statsByClass[id])) + suffix : '-'}
                 </div>
             ))}
@@ -163,7 +163,7 @@ export function TrajectoryComparisonDialog({
                             <div className="space-y-2">
                                 <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Turma de Referência</label>
                                 <Select value={primaryClassId} onValueChange={handlePrimaryChange}>
-                                    <SelectTrigger className="w-full bg-background font-medium text-blue-700 border-blue-200">
+                                    <SelectTrigger className="w-full bg-background font-medium text-info border-info/30">
                                         <SelectValue placeholder="Selecione a referência..." />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -206,7 +206,7 @@ export function TrajectoryComparisonDialog({
                                                 {cls?.name}
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); toggleComparison(id); }}
-                                                    className="ml-1 hover:text-red-500 hover:bg-red-100 rounded-full p-0.5 transition-colors"
+                                                    className="ml-1 hover:text-destructive hover:bg-destructive/15 rounded-full p-0.5 transition-colors"
                                                 >
                                                     <X className="h-3 w-3" />
                                                 </button>
@@ -245,11 +245,11 @@ export function TrajectoryComparisonDialog({
                                 <div className="p-3 text-xs font-semibold uppercase text-muted-foreground flex items-center">
                                     Indicador
                                 </div>
-                                <div className="p-3 text-center font-bold text-blue-700 border-l border-border/50 bg-blue-50/50">
+                                <div className="p-3 text-center font-bold text-info border-l border-border/50 bg-info/10">
                                     {primaryClass?.name}
                                 </div>
                                 {comparisonClassIds.map(id => (
-                                    <div key={id} className="p-3 text-center font-medium text-slate-700 dark:text-slate-300 border-l border-border/50">
+                                    <div key={id} className="p-3 text-center font-medium text-muted-foreground dark:text-muted-foreground border-l border-border/50">
                                         {classes.find(c => c.id === id)?.name}
                                     </div>
                                 ))}

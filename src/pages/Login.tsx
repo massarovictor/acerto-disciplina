@@ -103,13 +103,13 @@ const Login = () => {
       <Card className="w-full max-w-md shadow-lg border-t-4 border-t-primary">
         <CardHeader className="space-y-2 text-center pb-2">
           <div className="flex justify-center">
-            <div className="bg-primary text-primary-foreground p-3 rounded-full ring-4 ring-primary/5">
+            <div className="bg-brand-500 text-white p-3 rounded-full ring-4 ring-brand-500/15">
               <img src="/logo-white.svg" alt="MAVIC Logo" className="h-12 w-12" />
             </div>
           </div>
           <div className="space-y-1">
-            <CardTitle className="text-[28px] font-bold tracking-tighter lowercase text-slate-800 dark:text-slate-50 leading-none" style={{ fontFamily: 'Sora, sans-serif' }}>mavic</CardTitle>
-            <CardDescription className="text-xs font-normal leading-none" style={{ fontFamily: 'Inter, sans-serif' }}>
+            <CardTitle className="text-[28px] font-bold tracking-tighter lowercase text-foreground leading-none" style={{ fontFamily: 'Sora, sans-serif' }}>mavic</CardTitle>
+            <CardDescription className="text-xs font-normal leading-none" style={{ fontFamily: 'Geist, sans-serif' }}>
               Sistema de Acompanhamento Escolar
             </CardDescription>
           </div>

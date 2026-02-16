@@ -435,7 +435,7 @@ export const SubjectTemplatesManager = () => {
                           <div className="flex flex-col gap-1">
                             <span className="font-semibold text-foreground">{template.name}</span>
                             {usageCount > 0 && (
-                              <Badge variant="secondary" className="w-fit text-[10px] px-1.5 h-5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                              <Badge variant="secondary" className="w-fit text-[10px] px-1.5 h-5 bg-info/15 text-info dark:bg-info/20 dark:text-info">
                                 {usageCount} turma(s) em uso
                               </Badge>
                             )}
@@ -483,7 +483,7 @@ export const SubjectTemplatesManager = () => {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                              className="h-8 w-8 text-muted-foreground hover:text-info hover:bg-info/10 dark:hover:bg-info"
                               onClick={() => openEditDialog(template)}
                               title="Editar Template"
                             >
@@ -492,7 +492,7 @@ export const SubjectTemplatesManager = () => {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive"
                               onClick={() => setDeletingTemplate(template)}
                               title="Excluir Template"
                             >
@@ -532,7 +532,7 @@ export const SubjectTemplatesManager = () => {
                   <Label className="text-muted-foreground">{yearData.year}º Ano</Label>
                   <div className="flex flex-wrap gap-2 mt-2">
                     {yearData.subjects.map((subject, index) => (
-                      <Badge key={`${yearData.year}-${subject}-${index}`} variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/30">
+                      <Badge key={`${yearData.year}-${subject}-${index}`} variant="outline" className="bg-warning/10 text-warning border-warning/30">
                         {subject}
                       </Badge>
                     ))}
@@ -555,8 +555,8 @@ export const SubjectTemplatesManager = () => {
           <DialogContent className="max-w-2xl">
             <DialogHeader className="border-b pb-4 mb-4">
               <DialogTitle className="flex items-center gap-2 text-xl">
-                <div className="p-2 rounded-full bg-blue-100 dark:bg-blue-900/30">
-                  <Edit className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                <div className="p-2 rounded-full bg-info/15 dark:bg-info/20">
+                  <Edit className="h-5 w-5 text-info dark:text-info" />
                 </div>
                 Editar Template
               </DialogTitle>
@@ -674,13 +674,13 @@ export const SubjectTemplatesManager = () => {
                     Tem certeza que deseja excluir o template "<strong>{deletingTemplate?.name}</strong>"?
                   </p>
                   <p className="text-sm font-medium pt-2">
-                    Digite <span className="font-bold text-red-600">excluir</span> para confirmar:
+                    Digite <span className="font-bold text-destructive">excluir</span> para confirmar:
                   </p>
                   <Input
                     value={deleteConfirmationText}
                     onChange={(e) => setDeleteConfirmationText(e.target.value)}
                     placeholder="excluir"
-                    className="border-red-200 focus-visible:ring-red-500"
+                    className="border-destructive/30 focus-visible:ring-destructive"
                   />
                 </div>
               )}
@@ -692,7 +692,7 @@ export const SubjectTemplatesManager = () => {
               <AlertDialogAction
                 onClick={handleDelete}
                 disabled={deleteConfirmationText.toLowerCase() !== 'excluir'}
-                className="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-destructive hover:bg-destructive disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Excluir
               </AlertDialogAction>

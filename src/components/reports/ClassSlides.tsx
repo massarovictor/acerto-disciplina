@@ -1204,10 +1204,10 @@ export const ClassSlides = ({
                 <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
                   {situationOptions.map((option) => {
                     const count = studentsBySituation[option.value]?.length || 0;
-                    const bgColor = option.value === "critico" ? "bg-red-500/10 text-red-700"
-                      : option.value === "atencao" ? "bg-yellow-500/10 text-yellow-700"
-                        : option.value === "aprovado" ? "bg-green-500/10 text-green-700"
-                          : "bg-blue-500/10 text-blue-700";
+                    const bgColor = option.value === "critico" ? "bg-destructive/10 text-destructive"
+                      : option.value === "atencao" ? "bg-warning/10 text-warning"
+                        : option.value === "aprovado" ? "bg-success/10 text-success"
+                          : "bg-info/10 text-info";
                     return (
                       <div key={option.value} className={`px-3 py-1 rounded-full text-sm font-medium ${bgColor}`}>
                         {option.label}: {count}
@@ -1363,7 +1363,7 @@ export const ClassSlides = ({
           <div
             id="slide-container"
             ref={slideContainerRef}
-            className="aspect-[16/9] bg-slate-900 border-2 rounded-lg shadow-xl relative overflow-hidden"
+            className="aspect-[16/9] bg-muted border-2 rounded-lg shadow-xl relative overflow-hidden"
             onClick={(event) => {
               if (!isFullscreen || !activeSlides.length) return;
               if (event.shiftKey) {

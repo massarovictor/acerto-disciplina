@@ -167,7 +167,7 @@ export function ClassRankingTable({
     const formatted = formatNumber(Math.abs(value));
     if (value > 0.2) {
       return (
-        <span className="flex items-center justify-center gap-1 text-emerald-600">
+        <span className="flex items-center justify-center gap-1 text-success">
           <TrendingUp className="h-4 w-4" />
           +{formatted}
         </span>
@@ -175,7 +175,7 @@ export function ClassRankingTable({
     }
     if (value < -0.2) {
       return (
-        <span className="flex items-center justify-center gap-1 text-red-600">
+        <span className="flex items-center justify-center gap-1 text-destructive">
           <TrendingDown className="h-4 w-4" />
           -{formatted}
         </span>
@@ -263,7 +263,7 @@ export function ClassRankingTable({
                       <TableCell className="font-medium">
                         <Badge
                           variant={rank <= 3 ? 'default' : 'outline'}
-                          className={rank === 1 ? 'bg-amber-500' : rank === 2 ? 'bg-slate-400' : rank === 3 ? 'bg-amber-700' : ''}
+                          className={rank === 1 ? 'bg-warning/100' : rank === 2 ? 'bg-muted' : rank === 3 ? 'bg-warning' : ''}
                         >
                           {rank}º
                         </Badge>
@@ -292,13 +292,13 @@ export function ClassRankingTable({
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        <span className={cls.average >= 6 ? 'text-emerald-600' : 'text-red-600'}>
+                        <span className={cls.average >= 6 ? 'text-success' : 'text-destructive'}>
                           {formatNumber(cls.average)}
                         </span>
                       </TableCell>
                       {!subjectMode && (
                         <TableCell className="text-center">
-                          <span className={cls.frequency >= 75 ? 'text-emerald-600' : 'text-amber-600'}>
+                          <span className={cls.frequency >= 75 ? 'text-success' : 'text-warning'}>
                             {formatNumber(cls.frequency, 0)}%
                           </span>
                         </TableCell>

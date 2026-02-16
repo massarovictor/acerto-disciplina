@@ -312,7 +312,7 @@ export const StudentApprovalManager = () => {
   const getStatusBadge = (status: 'approved' | 'recovery' | 'failed', isPending?: boolean) => {
     if (isPending) {
       return (
-        <Badge className="bg-gray-500/10 text-gray-700 border-gray-500/30">
+        <Badge className="bg-muted text-muted-foreground border-border">
           <Clock className="h-3 w-3 mr-1" />
           Pendente
         </Badge>
@@ -322,21 +322,21 @@ export const StudentApprovalManager = () => {
     switch (status) {
       case 'approved':
         return (
-          <Badge className="bg-green-500/10 text-green-700 border-green-500/30">
+          <Badge className="bg-success/10 text-success border-success/30">
             <CheckCircle2 className="h-3 w-3 mr-1" />
             Aprovado
           </Badge>
         );
       case 'recovery':
         return (
-          <Badge className="bg-yellow-500/10 text-yellow-700 border-yellow-500/30">
+          <Badge className="bg-warning/10 text-warning border-warning/30">
             <AlertTriangle className="h-3 w-3 mr-1" />
             Recuperação
           </Badge>
         );
       case 'failed':
         return (
-          <Badge className="bg-red-500/10 text-red-700 border-red-500/30">
+          <Badge className="bg-destructive/10 text-destructive border-destructive/30">
             <XCircle className="h-3 w-3 mr-1" />
             Reprovado
           </Badge>
@@ -475,7 +475,7 @@ export const StudentApprovalManager = () => {
                   <CardHeader className="pb-3 border-b bg-muted/20">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        <AlertTriangle className="h-4 w-4 text-warning" />
                         Alunos com Baixo Rendimento ({selectedQuarter})
                       </CardTitle>
                       <Badge variant="destructive">{quarterResults.length}</Badge>
@@ -505,7 +505,7 @@ export const StudentApprovalManager = () => {
                                   <Badge
                                     key={subject}
                                     variant="outline"
-                                    className="bg-red-500/10 text-red-700 border-red-500/30 text-xs"
+                                    className="bg-destructive/10 text-destructive border-destructive/30 text-xs"
                                   >
                                     {subject}: {result.subjectGrades[subject]?.toFixed(1)}
                                   </Badge>
@@ -525,7 +525,7 @@ export const StudentApprovalManager = () => {
                   <CardHeader className="pb-3 border-b bg-muted/20">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-gray-600" />
+                        <Clock className="h-4 w-4 text-muted-foreground" />
                         Pendências de Notas ({selectedQuarter})
                       </CardTitle>
                       <Badge variant="outline">{pendingQuarterResults.length}</Badge>
@@ -557,7 +557,7 @@ export const StudentApprovalManager = () => {
                                   <Badge
                                     key={subject}
                                     variant="outline"
-                                    className="bg-gray-500/10 text-gray-700 border-gray-500/30 text-xs"
+                                    className="bg-muted text-muted-foreground border-border text-xs"
                                   >
                                     {subject}
                                   </Badge>
@@ -625,7 +625,7 @@ export const StudentApprovalManager = () => {
                                       <Badge
                                         key={subject}
                                         variant="outline"
-                                        className="bg-red-500/10 text-red-700 border-red-500/30"
+                                        className="bg-destructive/10 text-destructive border-destructive/30"
                                       >
                                         {subject}
                                       </Badge>
@@ -642,7 +642,7 @@ export const StudentApprovalManager = () => {
                                       <Badge
                                         key={subject}
                                         variant="outline"
-                                        className="bg-gray-500/10 text-gray-700 border-gray-500/30 text-xs"
+                                        className="bg-muted text-muted-foreground border-border text-xs"
                                       >
                                         {subject}: {(quarters as string[]).join(', ')}
                                       </Badge>

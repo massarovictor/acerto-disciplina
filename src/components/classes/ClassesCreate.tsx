@@ -269,7 +269,7 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
             {/* Seção 1: Configuração Base */}
             <div className="md:col-span-2 space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b">
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400">
+                <Badge variant="outline" className="bg-info/10 text-info border-info/30 dark:bg-info/20 dark:text-info">
                   Passo 1
                 </Badge>
                 <h3 className="text-sm font-medium text-muted-foreground">Configuração Base</h3>
@@ -306,7 +306,7 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
             {/* Seção 2: Período e Cronograma */}
             <div className="md:col-span-2 space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b mt-2">
-                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400">
+                <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 dark:bg-warning/20 dark:text-warning">
                   Passo 2
                 </Badge>
                 <h3 className="text-sm font-medium text-muted-foreground">Período e Cronograma</h3>
@@ -380,7 +380,7 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
                 <div className="space-y-2">
                   <Label>Série Atual</Label>
                   <div className="flex items-center h-10 px-3 border rounded-md bg-muted/30 text-sm gap-2">
-                    <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                    <Badge variant="secondary" className="bg-success/15 text-success dark:bg-success/20 dark:text-success">
                       {formData.currentSeries}º ano
                     </Badge>
                     <span className="text-muted-foreground text-xs">
@@ -394,7 +394,7 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
             {/* Seção 3: Detalhes da Turma */}
             <div className="md:col-span-2 space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b mt-2">
-                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400">
+                <Badge variant="outline" className="bg-info/10 text-info border-info/30 dark:bg-info/20 dark:text-info">
                   Passo 3
                 </Badge>
                 <h3 className="text-sm font-medium text-muted-foreground">Detalhes da Turma</h3>
@@ -450,7 +450,7 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
 
                 <div className="space-y-2 md:col-span-2 pt-2">
                   <Label htmlFor="directorEmail" className="flex items-center gap-1">
-                    Diretor de Turma <span className="text-red-500">*</span>
+                    Diretor de Turma <span className="text-destructive">*</span>
                   </Label>
                   <Select
                     value={formData.directorEmail || 'none'}
@@ -488,7 +488,7 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
                   </Select>
 
                   {showOverloadWarning && (
-                    <div className="flex items-center gap-2 p-3 mt-2 rounded-md bg-red-50 text-red-900 border border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-900/50">
+                    <div className="flex items-center gap-2 p-3 mt-2 rounded-md bg-destructive/10 text-destructive border border-destructive/30 dark:bg-destructive/20 dark:text-destructive dark:border-destructive/40">
                       <AlertCircle className="h-4 w-4 shrink-0" />
                       <p className="text-xs">
                         <strong>Atenção:</strong> Diretor com {selectedDirectorLoad} turmas. Considere redistribuir.

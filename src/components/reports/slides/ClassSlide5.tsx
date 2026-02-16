@@ -32,26 +32,26 @@ export const ClassSlide5 = ({ classData, students, incidents }: ClassSlide5Props
         <Card className="bg-card/50 backdrop-blur">
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 mb-4">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
+              <AlertTriangle className="h-5 w-5 text-destructive" />
               <h3 className="font-semibold">Alertas Prioritários</h3>
             </div>
 
             <div className="grid grid-cols-3 gap-4">
-              <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/20">
+              <div className="p-4 bg-destructive/10 rounded-lg border border-destructive/30">
                 <p className="text-sm text-muted-foreground mb-1">Ocorrências Críticas</p>
-                <p className="text-3xl font-bold text-red-500">{criticalIncidents.length}</p>
+                <p className="text-3xl font-bold text-destructive">{criticalIncidents.length}</p>
                 <p className="text-xs text-muted-foreground mt-1">Requerem atenção imediata</p>
               </div>
 
-              <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+              <div className="p-4 bg-warning/10 rounded-lg border border-warning/30">
                 <p className="text-sm text-muted-foreground mb-1">Ocorrências Abertas</p>
-                <p className="text-3xl font-bold text-yellow-500">{openIncidents.length}</p>
+                <p className="text-3xl font-bold text-warning">{openIncidents.length}</p>
                 <p className="text-xs text-muted-foreground mt-1">Em acompanhamento</p>
               </div>
 
-              <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+              <div className="p-4 bg-info/10 rounded-lg border border-info/30">
                 <p className="text-sm text-muted-foreground mb-1">Total de Alunos</p>
-                <p className="text-3xl font-bold text-blue-500">{students.length}</p>
+                <p className="text-3xl font-bold text-info">{students.length}</p>
                 <p className="text-xs text-muted-foreground mt-1">Matriculados na turma</p>
               </div>
             </div>
@@ -80,7 +80,7 @@ export const ClassSlide5 = ({ classData, students, incidents }: ClassSlide5Props
                       <span className="text-sm flex-1">{action.text}</span>
                       <Badge 
                         variant="outline" 
-                        className={action.priority === 'high' ? 'border-red-500' : 'border-yellow-500'}
+                        className={action.priority === 'high' ? 'border-destructive/30' : 'border-warning/30'}
                       >
                         {action.priority === 'high' ? 'Urgente' : 'Média'}
                       </Badge>
@@ -102,7 +102,7 @@ export const ClassSlide5 = ({ classData, students, incidents }: ClassSlide5Props
                       <span className="text-sm flex-1">{action.text}</span>
                       <Badge 
                         variant="outline"
-                        className={action.priority === 'medium' ? 'border-yellow-500' : 'border-blue-500'}
+                        className={action.priority === 'medium' ? 'border-warning/30' : 'border-info/30'}
                       >
                         {action.priority === 'medium' ? 'Média' : 'Baixa'}
                       </Badge>

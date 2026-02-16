@@ -78,7 +78,7 @@ export function AnalyticsFilters({
     return (
       <Badge
         variant="outline"
-        className="ml-1 border-amber-500/50 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-500"
+        className="ml-1 border-warning/30 bg-warning/10 text-[10px] text-warning dark:text-warning"
       >
         Auto
       </Badge>
@@ -352,13 +352,13 @@ export function AnalyticsFilters({
             variant={isHistoryActive ? 'secondary' : 'outline'}
             size="sm"
             onClick={() => onFilterChange({ calendarYear: 'all', schoolYear: 'all', series: [], classIds: [] })}
-            className={isHistoryActive ? 'border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-500' : 'text-muted-foreground'}
+            className={isHistoryActive ? 'border-warning/30 bg-warning/10 text-warning dark:text-warning' : 'text-muted-foreground'}
           >
             Histórico Global
           </Button>
         </div>
         {isHistoryActive && (
-          <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600 dark:text-amber-400">
+          <Badge variant="outline" className="text-xs border-warning/30 text-warning dark:text-warning">
             Modo Histórico Ativado
           </Badge>
         )}

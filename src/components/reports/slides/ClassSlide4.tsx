@@ -78,7 +78,7 @@ export const ClassSlide4 = ({ classData, students, incidents, grades }: ClassSli
                           {area.average.toFixed(1)}
                         </Badge>
                         {area.studentsAtRisk > 0 && (
-                          <Badge variant="outline" className="border-red-500">
+                          <Badge variant="outline" className="border-destructive/30">
                             {area.studentsAtRisk} em risco
                           </Badge>
                         )}
@@ -86,9 +86,9 @@ export const ClassSlide4 = ({ classData, students, incidents, grades }: ClassSli
                     </div>
                     <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
                       <div
-                        className={`h-full rounded-full ${area.average >= 7 ? 'bg-green-500' :
-                            area.average >= 6 ? 'bg-yellow-500' :
-                              'bg-red-500'
+                        className={`h-full rounded-full ${area.average >= 7 ? 'bg-success/100' :
+                            area.average >= 6 ? 'bg-warning/100' :
+                              'bg-destructive/100'
                           }`}
                         style={{ width: `${(area.average / 10) * 100}%` }}
                       />

@@ -183,7 +183,7 @@ export function StudentRankingPanel({
               <span className="font-semibold text-foreground truncate">{student.student.name}</span>
               <Badge
                 variant={isCritico ? 'destructive' : 'outline'}
-                className={!isCritico ? 'bg-amber-50 text-amber-700 border-amber-200' : ''}
+                className={!isCritico ? 'bg-warning/10 text-warning border-warning/30' : ''}
               >
                 {CLASSIFICATION_LABELS[student.classification.classification]}
               </Badge>
@@ -192,7 +192,7 @@ export function StudentRankingPanel({
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="font-medium text-foreground/80">{student.className}</span>
               <span>•</span>
-              <span>Média: <span className={isCritico ? "text-red-600 font-semibold" : "text-amber-600 font-semibold"}>{formatNumber(student.classification.average)}</span></span>
+              <span>Média: <span className={isCritico ? "text-destructive font-semibold" : "text-warning font-semibold"}>{formatNumber(student.classification.average)}</span></span>
             </div>
           </div>
         </div>
@@ -205,7 +205,7 @@ export function StudentRankingPanel({
             </p>
             <div className="flex flex-wrap gap-1.5">
               {student.classification.subjectsBelow6.slice(0, 5).map((s, i) => (
-                <Badge key={i} variant="outline" className="text-[10px] px-1.5 h-5 bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/30">
+                <Badge key={i} variant="outline" className="text-[10px] px-1.5 h-5 bg-destructive/10 text-destructive border-destructive/30 dark:bg-destructive/20 dark:text-destructive dark:border-destructive/40">
                   {s.subject.length > 15 ? s.subject.substring(0, 12) + '...' : s.subject}: {formatNumber(s.average)}
                 </Badge>
               ))}
@@ -219,7 +219,7 @@ export function StudentRankingPanel({
         )}
 
         {!subjectMode && student.incidentCount > 0 && (
-          <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-600 font-medium bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded w-fit">
+          <div className="mt-2 flex items-center gap-1.5 text-xs text-warning font-medium bg-warning/10 dark:bg-warning/20 px-2 py-1 rounded w-fit">
             <AlertCircle className="h-3 w-3" />
             {student.incidentCount} ocorrência(s) registrada(s)
           </div>
@@ -347,7 +347,7 @@ export function StudentRankingPanel({
         onClick={handleClick}
       >
         {label}
-        <ArrowUpDown className={`ml-1 h-3 w-3 ${isActive ? 'text-amber-600 dark:text-amber-400' : ''}`} />
+        <ArrowUpDown className={`ml-1 h-3 w-3 ${isActive ? 'text-warning dark:text-warning' : ''}`} />
       </Button>
     );
   };
@@ -438,7 +438,7 @@ export function StudentRankingPanel({
                         <TableCell className="font-medium">
                           <Badge
                             variant={index < 3 ? 'default' : 'outline'}
-                            className={index === 0 ? 'bg-amber-500' : index === 1 ? 'bg-slate-400' : index === 2 ? 'bg-amber-700' : ''}
+                            className={index === 0 ? 'bg-warning/100' : index === 1 ? 'bg-muted' : index === 2 ? 'bg-warning' : ''}
                           >
                             {index + 1}º
                           </Badge>
@@ -452,7 +452,7 @@ export function StudentRankingPanel({
                           {student.className}
                         </TableCell>
                         <TableCell className="text-center">
-                          <span className={student.classification.average >= 6 ? 'text-emerald-600 font-semibold' : 'text-red-600 font-semibold'}>
+                          <span className={student.classification.average >= 6 ? 'text-success font-semibold' : 'text-destructive font-semibold'}>
                             {formatNumber(student.classification.average)}
                           </span>
                         </TableCell>
@@ -507,7 +507,7 @@ export function StudentRankingPanel({
                       return (
                         <TableRow
                           key={student.student.id}
-                          className={`cursor-pointer ${isCritico ? 'bg-red-50/30 dark:bg-red-900/10 hover:bg-red-50/50 dark:hover:bg-red-900/20' : 'hover:bg-muted/50'}`}
+                          className={`cursor-pointer ${isCritico ? 'bg-destructive/10 dark:bg-destructive/20 hover:bg-destructive/10 dark:hover:bg-destructive' : 'hover:bg-muted/50'}`}
                           onClick={() => handleOpenStudent(student)}
                         >
                           <TableCell>
@@ -530,7 +530,7 @@ export function StudentRankingPanel({
                             {student.className}
                           </TableCell>
                           <TableCell className="text-center">
-                            <span className="text-red-600 font-semibold">
+                            <span className="text-destructive font-semibold">
                               {formatNumber(student.classification.average)}
                             </span>
                           </TableCell>
@@ -565,8 +565,8 @@ export function StudentRankingPanel({
         <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
           <DialogHeader className="border-b pb-4 mb-4">
             <DialogTitle className="flex items-center gap-2 text-xl">
-              <div className="p-2 rounded-full bg-amber-100 dark:bg-amber-900/30">
-                <Trophy className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <div className="p-2 rounded-full bg-warning/15 dark:bg-warning/20">
+                <Trophy className="h-5 w-5 text-warning dark:text-warning" />
               </div>
               Ranking completo
             </DialogTitle>
@@ -644,8 +644,8 @@ export function StudentRankingPanel({
         <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
           <DialogHeader className="border-b pb-4 mb-4">
             <DialogTitle className="flex items-center gap-2 text-xl">
-              <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
-                <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              <div className="p-2 rounded-full bg-destructive/15 dark:bg-destructive/20">
+                <AlertCircle className="h-5 w-5 text-destructive dark:text-destructive" />
               </div>
               {subjectMode ? 'Alunos com médias baixas' : 'Alunos em atenção ou críticos'}
             </DialogTitle>

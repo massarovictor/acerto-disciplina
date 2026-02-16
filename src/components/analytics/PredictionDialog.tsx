@@ -82,14 +82,14 @@ export function PredictionDialog({
       return <Badge variant="destructive">Alto</Badge>;
     }
     if (risk >= 40) {
-      return <Badge className="bg-amber-500">Médio</Badge>;
+      return <Badge className="bg-warning/100">Médio</Badge>;
     }
-    return <Badge className="bg-emerald-500">Baixo</Badge>;
+    return <Badge className="bg-success/100">Baixo</Badge>;
   };
 
   const getTrendIcon = (trend: string) => {
-    if (trend.includes('Melhoria')) return <TrendingUp className="h-4 w-4 text-emerald-600" />;
-    if (trend.includes('Declínio')) return <TrendingDown className="h-4 w-4 text-red-600" />;
+    if (trend.includes('Melhoria')) return <TrendingUp className="h-4 w-4 text-success" />;
+    if (trend.includes('Declínio')) return <TrendingDown className="h-4 w-4 text-destructive" />;
     return <Clock className="h-4 w-4 text-muted-foreground" />;
   };
 
@@ -106,19 +106,19 @@ export function PredictionDialog({
 
         <div className="flex flex-wrap gap-3">
           <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
-            <AlertTriangle className="h-4 w-4 text-red-500" />
+            <AlertTriangle className="h-4 w-4 text-destructive" />
             <span className="text-sm">Alto risco</span>
             <Badge variant="destructive">{summary.highRisk}</Badge>
           </div>
           <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <AlertTriangle className="h-4 w-4 text-warning" />
             <span className="text-sm">Médio risco</span>
-            <Badge className="bg-amber-500">{summary.mediumRisk}</Badge>
+            <Badge className="bg-warning/100">{summary.mediumRisk}</Badge>
           </div>
           <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            <CheckCircle2 className="h-4 w-4 text-success" />
             <span className="text-sm">Baixo risco</span>
-            <Badge className="bg-emerald-500">{summary.lowRisk}</Badge>
+            <Badge className="bg-success/100">{summary.lowRisk}</Badge>
           </div>
           <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
             <Clock className="h-4 w-4 text-muted-foreground" />

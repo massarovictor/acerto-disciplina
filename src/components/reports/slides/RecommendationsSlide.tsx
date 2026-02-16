@@ -63,10 +63,10 @@ export const RecommendationsSlide = ({ grades, students, classData, professional
       </div>
 
       {/* Seção 1: Recomendações Urgentes */}
-      <Card className="bg-red-500/10 backdrop-blur border-red-500/20 mb-4">
+      <Card className="bg-destructive/10 backdrop-blur border-destructive/30 mb-4">
         <CardContent className="pt-4">
           <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-red-600" />
+            <AlertTriangle className="h-5 w-5 text-destructive" />
             Ações Urgentes (Próxima Semana)
           </h3>
           
@@ -125,10 +125,10 @@ export const RecommendationsSlide = ({ grades, students, classData, professional
       {/* Grid com Seções 2 e 3 */}
       <div className="flex-1 grid grid-cols-[35%_65%] gap-4">
         {/* Seção 2: Ações Preventivas */}
-        <Card className="bg-yellow-500/10 backdrop-blur border-yellow-500/20">
+        <Card className="bg-warning/10 backdrop-blur border-warning/30">
           <CardContent className="pt-4">
             <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <TrendingDown className="h-5 w-5 text-yellow-600" />
+              <TrendingDown className="h-5 w-5 text-warning" />
               Ações Preventivas
             </h3>
             <p className="text-xs text-muted-foreground mb-3">(Próximo Mês)</p>
@@ -193,7 +193,7 @@ export const RecommendationsSlide = ({ grades, students, classData, professional
                   )}
 
                   {subjectStats.filter(s => s.mean >= 8).length > 0 && (
-                    <div className="p-2 bg-green-500/10 rounded">
+                    <div className="p-2 bg-success/10 rounded">
                       <p className="font-medium">Compartilhar Boas Práticas</p>
                       <p className="mt-1">
                         Disciplinas bem-sucedidas: {subjectStats.filter(s => s.mean >= 8).map(s => s.subject).join(', ')}

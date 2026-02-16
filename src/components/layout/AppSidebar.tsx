@@ -35,12 +35,12 @@ export const AppSidebar = () => {
     <Sidebar>
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
-          <div className="bg-primary text-primary-foreground rounded-full h-10 w-10 flex items-center justify-center flex-shrink-0">
+          <div className="bg-brand-500 text-white rounded-full h-10 w-10 flex items-center justify-center flex-shrink-0">
             <img src="/logo-white.svg" alt="MAVIC Logo" className="h-6 w-6" />
           </div>
           <div className="flex flex-col">
-            <span className="text-2xl font-bold leading-none lowercase tracking-tighter text-slate-800 dark:text-slate-50" style={{ fontFamily: 'Sora, sans-serif' }}>mavic</span>
-            <span className="text-xs font-normal text-muted-foreground leading-none mt-1" style={{ fontFamily: 'Inter, sans-serif' }}>Sistema de Acompanhamento Escolar</span>
+            <span className="text-2xl font-bold leading-none lowercase tracking-tighter text-foreground" style={{ fontFamily: 'Sora, sans-serif' }}>mavic</span>
+            <span className="text-xs font-normal text-muted-foreground leading-none mt-1" style={{ fontFamily: 'Geist, sans-serif' }}>Sistema de Acompanhamento Escolar</span>
           </div>
         </div>
       </SidebarHeader>

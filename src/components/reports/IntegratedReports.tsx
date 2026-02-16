@@ -647,7 +647,7 @@ export const IntegratedReports = ({
         >
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-lg">
-              <UserCheck className="h-5 w-5 text-emerald-600" />
+              <UserCheck className="h-5 w-5 text-success" />
               Relatório Individual
             </CardTitle>
             <CardDescription>
@@ -671,7 +671,7 @@ export const IntegratedReports = ({
         >
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-lg">
-              <GraduationCap className="h-5 w-5 text-violet-600" />
+              <GraduationCap className="h-5 w-5 text-info" />
               Relatório de Trajetória
               {trajectoryFeatureIncomplete && (
                 <Badge variant="outline" className="text-[11px]">
@@ -688,7 +688,7 @@ export const IntegratedReports = ({
               Gere um documento preliminar com histórico fundamental, avaliações externas e ensino médio.
             </p>
             {trajectoryFeatureIncomplete && (
-              <p className="text-xs text-amber-700 mb-3">
+              <p className="text-xs text-warning mb-3">
                 Algumas análises ainda podem variar enquanto o módulo é finalizado.
               </p>
             )}
@@ -771,7 +771,7 @@ export const IntegratedReports = ({
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <UserCheck className="h-5 w-5 text-emerald-600" />
+              <UserCheck className="h-5 w-5 text-success" />
               Gerar Relatório Individual
             </DialogTitle>
             <DialogDescription>
@@ -832,7 +832,7 @@ export const IntegratedReports = ({
             </div>
 
             {selectedStudentData && selectedStudentMetrics && (
-              <div className="rounded-lg border bg-emerald-50/50 p-4 text-sm space-y-3">
+              <div className="rounded-lg border bg-success/10 p-4 text-sm space-y-3">
                 <div className="flex items-center justify-between border-b pb-2">
                   <span className="font-bold text-lg">{selectedStudentData.name}</span>
                   <Badge variant={selectedStudentMetrics.average >= 6 ? "default" : "destructive"}>
@@ -851,7 +851,7 @@ export const IntegratedReports = ({
                 </div>
                 {selectedStudentMetrics.subjectsBelowAverage.length > 0 && (
                   <div className="pt-2 border-t">
-                    <p className="text-xs font-bold text-red-600 mb-1">Atenção em:</p>
+                    <p className="text-xs font-bold text-destructive mb-1">Atenção em:</p>
                     <p className="text-xs">{selectedStudentMetrics.subjectsBelowAverage.join(", ")}</p>
                   </div>
                 )}
@@ -860,7 +860,7 @@ export const IntegratedReports = ({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowIndividualReportDialog(false)}>Cancelar</Button>
-            <Button onClick={handleIndividualReport} disabled={!selectedStudent || isGenerating} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+            <Button onClick={handleIndividualReport} disabled={!selectedStudent || isGenerating} className="bg-success hover:bg-success text-white">
               <FileDown className="mr-2 h-4 w-4" />
               {isGenerating ? "Gerando PDF..." : "Baixar Relatório"}
             </Button>
@@ -873,7 +873,7 @@ export const IntegratedReports = ({
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <GraduationCap className="h-5 w-5 text-violet-600" />
+              <GraduationCap className="h-5 w-5 text-info" />
               Gerar Trajetória Completa
             </DialogTitle>
             <DialogDescription>
@@ -882,7 +882,7 @@ export const IntegratedReports = ({
           </DialogHeader>
           <div className="space-y-4 py-4">
             {trajectoryFeatureIncomplete && (
-              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
                 <p className="font-medium flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4" />
                   Relatório de Trajetória em construção
@@ -917,21 +917,21 @@ export const IntegratedReports = ({
             </div>
 
             {selectedStudentData && (
-              <div className="rounded-lg border bg-violet-50/50 p-4 text-sm space-y-2">
-                <div className="flex justify-between items-center text-violet-900 font-medium">
+              <div className="rounded-lg border bg-info/10 p-4 text-sm space-y-2">
+                <div className="flex justify-between items-center text-info font-medium">
                   <span>Registros Históricos</span>
-                  <Badge variant="outline" className="bg-white border-violet-200">{historicalGrades.filter(g => g.studentId === selectedStudentData.id).length} notas</Badge>
+                  <Badge variant="outline" className="bg-white border-info/30">{historicalGrades.filter(g => g.studentId === selectedStudentData.id).length} notas</Badge>
                 </div>
-                <div className="flex justify-between items-center text-violet-900 font-medium">
+                <div className="flex justify-between items-center text-info font-medium">
                   <span>Avaliações Externas</span>
-                  <Badge variant="outline" className="bg-white border-violet-200">{externalAssessments.filter(e => e.studentId === selectedStudentData.id).length} provas</Badge>
+                  <Badge variant="outline" className="bg-white border-info/30">{externalAssessments.filter(e => e.studentId === selectedStudentData.id).length} provas</Badge>
                 </div>
               </div>
             )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowTrajectoryReportDialog(false)}>Cancelar</Button>
-            <Button onClick={handleTrajectoryReport} disabled={!selectedStudent || isGenerating} className="bg-violet-600 hover:bg-violet-700 text-white">
+            <Button onClick={handleTrajectoryReport} disabled={!selectedStudent || isGenerating} className="bg-info hover:bg-info text-white">
               <FileDown className="mr-2 h-4 w-4" />
               {isGenerating ? "Gerando..." : "Baixar Trajetória"}
             </Button>

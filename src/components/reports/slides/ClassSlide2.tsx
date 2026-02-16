@@ -46,7 +46,7 @@ export const ClassSlide2 = ({ classData, students, incidents, grades }: ClassSli
           <Card className="bg-card/50 backdrop-blur">
             <CardContent className="pt-4">
               <div className="flex items-center gap-2 mb-3">
-                <TrendingUp className="h-5 w-5 text-green-500" />
+                <TrendingUp className="h-5 w-5 text-success" />
                 <h3 className="font-semibold">Melhores Desempenhos</h3>
               </div>
               <div className="space-y-2">
@@ -68,14 +68,14 @@ export const ClassSlide2 = ({ classData, students, incidents, grades }: ClassSli
           <Card className="bg-card/50 backdrop-blur">
             <CardContent className="pt-4">
               <div className="flex items-center gap-2 mb-3">
-                <TrendingDown className="h-5 w-5 text-red-500" />
+                <TrendingDown className="h-5 w-5 text-destructive" />
                 <h3 className="font-semibold">Necessitam Atenção</h3>
               </div>
               <div className="space-y-2">
                 {bottomStudents.map((item, index) => (
                   <div key={item.student.id} className="flex items-center justify-between p-2 bg-background/50 rounded">
                     <div className="flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-red-500" />
+                      <AlertTriangle className="h-4 w-4 text-destructive" />
                       <span className="text-sm font-medium truncate max-w-[200px]">
                         {item.student.name}
                       </span>
@@ -167,7 +167,7 @@ export const ClassSlide2 = ({ classData, students, incidents, grades }: ClassSli
                   </ul>
                 </div>
                 <div>
-                  <p className="font-medium text-red-500 mb-1">Pontos de Atenção:</p>
+                  <p className="font-medium text-destructive mb-1">Pontos de Atenção:</p>
                   <ul className="space-y-1 text-muted-foreground ml-4">
                     <li>• {bottomStudents.filter(s => s.average < 6).length} alunos com média abaixo de 6.0</li>
                     <li>• {incidents.filter(i => i.finalSeverity === 'grave' || i.finalSeverity === 'gravissima').length} ocorrências graves/gravíssimas</li>

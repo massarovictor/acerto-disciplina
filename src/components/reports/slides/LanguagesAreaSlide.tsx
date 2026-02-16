@@ -56,12 +56,12 @@ export const LanguagesAreaSlide = ({ grades, period }: LanguagesAreaSlideProps) 
   const lowPerformers = sorted.slice(-Math.min(3, sorted.length)).reverse();
 
   return (
-    <div className="h-full p-8 bg-gradient-to-br from-blue-500/5 to-background flex flex-col">
+    <div className="h-full p-8 bg-gradient-to-br from-info/5 to-background flex flex-col">
       {/* Cabeçalho */}
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
-            <BookOpen className="h-8 w-8 text-blue-600" />
+            <BookOpen className="h-8 w-8 text-info" />
             <div>
               <h1 className="text-3xl font-bold">Linguagens, Códigos e suas Tecnologias</h1>
               <p className="text-sm text-muted-foreground">
@@ -125,8 +125,8 @@ export const LanguagesAreaSlide = ({ grades, period }: LanguagesAreaSlideProps) 
                   <h3 className="font-semibold">Evolução por Bimestre</h3>
                   {trend && (
                     <div className="flex items-center gap-1">
-                      {trend.direction === 'up' && <TrendingUp className="h-4 w-4 text-green-600" />}
-                      {trend.direction === 'down' && <TrendingDown className="h-4 w-4 text-red-600" />}
+                      {trend.direction === 'up' && <TrendingUp className="h-4 w-4 text-success" />}
+                      {trend.direction === 'down' && <TrendingDown className="h-4 w-4 text-destructive" />}
                       <span className="text-xs text-muted-foreground">
                         {trend.direction === 'up' ? 'Melhoria' : trend.direction === 'down' ? 'Declínio' : 'Estável'}
                       </span>
@@ -147,7 +147,7 @@ export const LanguagesAreaSlide = ({ grades, period }: LanguagesAreaSlideProps) 
                   <p className="text-xs text-muted-foreground mb-1">Melhor Desempenho</p>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">{topPerformers[0]?.subject}</span>
-                    <Badge variant="default" className="bg-green-500">
+                    <Badge variant="default" className="bg-success/100">
                       {topPerformers[0]?.mean.toFixed(1)}
                     </Badge>
                   </div>

@@ -41,11 +41,11 @@ export const RiskAnalysisSlide = ({ grades, students, classData }: RiskAnalysisS
   const avgRisk = totalStudents > 0 ? studentAnalyses.reduce((sum, s) => sum + s.risk, 0) / totalStudents : 0;
 
   return (
-    <div className="h-full p-8 bg-gradient-to-br from-red-500/5 to-background flex flex-col">
+    <div className="h-full p-8 bg-gradient-to-br from-destructive/5 to-background flex flex-col">
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
-            <AlertTriangle className="h-8 w-8 text-red-600" />
+            <AlertTriangle className="h-8 w-8 text-destructive" />
             <div>
               <h1 className="text-3xl font-bold">{classData.name} - Análise de Risco</h1>
               <p className="text-sm text-muted-foreground">
@@ -68,10 +68,10 @@ export const RiskAnalysisSlide = ({ grades, students, classData }: RiskAnalysisS
       {/* Grid de 3 Colunas */}
       <div className="flex-1 grid grid-cols-3 gap-4">
         {/* Coluna 1: Alto Risco */}
-        <Card className="bg-red-500/10 backdrop-blur border-red-500/30">
+        <Card className="bg-destructive/10 backdrop-blur border-destructive/30">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-red-700 flex items-center gap-2">
+              <h3 className="font-semibold text-destructive flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5" />
                 Alto Risco
               </h3>
@@ -96,8 +96,8 @@ export const RiskAnalysisSlide = ({ grades, students, classData }: RiskAnalysisS
                       <p>Predição: {analysis.prediction.toFixed(1)}</p>
                       <p className="flex items-center gap-1">
                         Tendência:
-                        {analysis.trend === 'Declínio' && <TrendingDown className="h-3 w-3 text-red-600" />}
-                        {analysis.trend === 'Melhoria Constante' && <TrendingUp className="h-3 w-3 text-green-600" />}
+                        {analysis.trend === 'Declínio' && <TrendingDown className="h-3 w-3 text-destructive" />}
+                        {analysis.trend === 'Melhoria Constante' && <TrendingUp className="h-3 w-3 text-success" />}
                         <span className="text-xs">{analysis.trend}</span>
                       </p>
                     </div>
@@ -107,7 +107,7 @@ export const RiskAnalysisSlide = ({ grades, students, classData }: RiskAnalysisS
             </div>
 
             {highRisk.length > 0 && (
-              <div className="mt-3 p-2 bg-red-500/20 rounded text-xs">
+              <div className="mt-3 p-2 bg-destructive/20 rounded text-xs">
                 <p className="font-semibold">Ação Requerida:</p>
                 <ul className="list-disc list-inside space-y-1 mt-1">
                   <li>Reunião urgente com responsáveis</li>
@@ -120,14 +120,14 @@ export const RiskAnalysisSlide = ({ grades, students, classData }: RiskAnalysisS
         </Card>
 
         {/* Coluna 2: Médio Risco */}
-        <Card className="bg-yellow-500/10 backdrop-blur border-yellow-500/30">
+        <Card className="bg-warning/10 backdrop-blur border-warning/30">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-yellow-700 flex items-center gap-2">
+              <h3 className="font-semibold text-warning flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5" />
                 Médio Risco
               </h3>
-              <Badge className="bg-yellow-600">{mediumRisk.length}</Badge>
+              <Badge className="bg-warning">{mediumRisk.length}</Badge>
             </div>
             
             <div className="space-y-2 max-h-[300px] overflow-y-auto">
@@ -140,7 +140,7 @@ export const RiskAnalysisSlide = ({ grades, students, classData }: RiskAnalysisS
                   <div key={analysis.student.id} className="p-2 bg-background/50 rounded text-xs">
                     <div className="flex items-start justify-between mb-1">
                       <span className="font-medium flex-1 truncate">{analysis.student.name}</span>
-                      <Badge className="bg-yellow-600 text-xs">
+                      <Badge className="bg-warning text-xs">
                         {analysis.risk.toFixed(0)}%
                       </Badge>
                     </div>
@@ -156,7 +156,7 @@ export const RiskAnalysisSlide = ({ grades, students, classData }: RiskAnalysisS
             </div>
 
             {mediumRisk.length > 0 && (
-              <div className="mt-3 p-2 bg-yellow-500/20 rounded text-xs">
+              <div className="mt-3 p-2 bg-warning/20 rounded text-xs">
                 <p className="font-semibold">Ação Preventiva:</p>
                 <ul className="list-disc list-inside space-y-1 mt-1">
                   <li>Monitoramento quinzenal</li>
@@ -169,14 +169,14 @@ export const RiskAnalysisSlide = ({ grades, students, classData }: RiskAnalysisS
         </Card>
 
         {/* Coluna 3: Baixo Risco */}
-        <Card className="bg-green-500/10 backdrop-blur border-green-500/30">
+        <Card className="bg-success/10 backdrop-blur border-success/30">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-green-700 flex items-center gap-2">
+              <h3 className="font-semibold text-success flex items-center gap-2">
                 <CheckCircle className="h-5 w-5" />
                 Baixo Risco
               </h3>
-              <Badge className="bg-green-600">{lowRisk.length}</Badge>
+              <Badge className="bg-success">{lowRisk.length}</Badge>
             </div>
             
             <div className="space-y-2 max-h-[230px] overflow-y-auto">
@@ -184,7 +184,7 @@ export const RiskAnalysisSlide = ({ grades, students, classData }: RiskAnalysisS
                 <div key={analysis.student.id} className="p-2 bg-background/50 rounded text-xs">
                   <div className="flex items-start justify-between">
                     <span className="font-medium flex-1 truncate">{analysis.student.name}</span>
-                    <Badge className="bg-green-600 text-xs">
+                    <Badge className="bg-success text-xs">
                       {analysis.risk.toFixed(0)}%
                     </Badge>
                   </div>
@@ -197,7 +197,7 @@ export const RiskAnalysisSlide = ({ grades, students, classData }: RiskAnalysisS
               )}
             </div>
 
-            <div className="mt-3 p-2 bg-green-500/20 rounded text-xs">
+            <div className="mt-3 p-2 bg-success/20 rounded text-xs">
               <p className="font-semibold mb-1">Estatísticas:</p>
               <div className="space-y-1">
                 <p>{lowRisk.length} alunos ({((lowRisk.length / totalStudents) * 100).toFixed(0)}%)</p>
@@ -215,15 +215,15 @@ export const RiskAnalysisSlide = ({ grades, students, classData }: RiskAnalysisS
           <p className="text-sm font-semibold">Distribuição de Risco:</p>
           <div className="flex gap-4 text-xs">
             <span className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-red-600" />
+              <div className="w-3 h-3 rounded-full bg-destructive" />
               Alto: {highRisk.length} ({((highRisk.length / totalStudents) * 100).toFixed(0)}%)
             </span>
             <span className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-yellow-600" />
+              <div className="w-3 h-3 rounded-full bg-warning" />
               Médio: {mediumRisk.length} ({((mediumRisk.length / totalStudents) * 100).toFixed(0)}%)
             </span>
             <span className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-green-600" />
+              <div className="w-3 h-3 rounded-full bg-success" />
               Baixo: {lowRisk.length} ({((lowRisk.length / totalStudents) * 100).toFixed(0)}%)
             </span>
           </div>

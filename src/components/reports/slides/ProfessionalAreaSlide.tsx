@@ -57,11 +57,11 @@ export const ProfessionalAreaSlide = ({ grades, period, professionalSubjects }: 
   const lowPerformers = sorted.slice(-Math.min(3, sorted.length)).reverse();
 
   return (
-    <div className="h-full p-8 bg-gradient-to-br from-amber-500/5 to-background flex flex-col">
+    <div className="h-full p-8 bg-gradient-to-br from-warning/5 to-background flex flex-col">
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
-            <Briefcase className="h-8 w-8 text-amber-600" />
+            <Briefcase className="h-8 w-8 text-warning" />
             <div>
               <h1 className="text-3xl font-bold">Base Profissional / Técnica</h1>
               <p className="text-sm text-muted-foreground">
@@ -120,8 +120,8 @@ export const ProfessionalAreaSlide = ({ grades, period, professionalSubjects }: 
                   <h3 className="font-semibold">Evolução por Bimestre</h3>
                   {trend && (
                     <div className="flex items-center gap-1">
-                      {trend.direction === 'up' && <TrendingUp className="h-4 w-4 text-green-600" />}
-                      {trend.direction === 'down' && <TrendingDown className="h-4 w-4 text-red-600" />}
+                      {trend.direction === 'up' && <TrendingUp className="h-4 w-4 text-success" />}
+                      {trend.direction === 'down' && <TrendingDown className="h-4 w-4 text-destructive" />}
                       <span className="text-xs text-muted-foreground">
                         {trend.direction === 'up' ? 'Melhoria' : trend.direction === 'down' ? 'Declínio' : 'Estável'}
                       </span>
@@ -142,7 +142,7 @@ export const ProfessionalAreaSlide = ({ grades, period, professionalSubjects }: 
                     <p className="text-xs text-muted-foreground mb-1">Melhor Desempenho</p>
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium truncate">{topPerformers[0]?.subject}</span>
-                      <Badge variant="default" className="bg-green-500">
+                      <Badge variant="default" className="bg-success/100">
                         {topPerformers[0]?.mean.toFixed(1)}
                       </Badge>
                     </div>
@@ -165,7 +165,7 @@ export const ProfessionalAreaSlide = ({ grades, period, professionalSubjects }: 
         </div>
       </div>
 
-      <div className="mt-4 p-4 bg-amber-500/10 rounded-lg border border-amber-500/20">
+      <div className="mt-4 p-4 bg-warning/10 rounded-lg border border-warning/30">
         <p className="text-sm">
           <span className="font-semibold">Insights da Formação Técnica:</span>{' '}
           {areaStats.mean >= 7 

@@ -342,7 +342,7 @@ export const TrajectoryImportDialog = ({
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
                 <DialogHeader className="p-6 pb-4 border-b">
                     <DialogTitle className="flex items-center gap-2 text-xl">
-                        <BookOpen className="h-5 w-5 text-blue-600" />
+                        <BookOpen className="h-5 w-5 text-info" />
                         Importar Histórico Escolar
                     </DialogTitle>
                     <DialogDescription className="text-base mt-2">
@@ -364,8 +364,8 @@ export const TrajectoryImportDialog = ({
                         </div>
 
                         {/* Step 2 */}
-                        <div className={`flex flex-col items-center gap-2 bg-background p-2 rounded-lg border-2 z-10 w-32 ${step === 'match-students' ? 'border-primary' : (['match-students', 'preview'].includes(step) ? 'border-emerald-500/50' : 'border-muted-foreground/20')}`}>
-                            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'match-students' ? 'bg-primary text-primary-foreground' : (['match-students', 'preview'].includes(step) ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground')}`}>
+                        <div className={`flex flex-col items-center gap-2 bg-background p-2 rounded-lg border-2 z-10 w-32 ${step === 'match-students' ? 'border-primary' : (['match-students', 'preview'].includes(step) ? 'border-success/30' : 'border-muted-foreground/20')}`}>
+                            <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step === 'match-students' ? 'bg-primary text-primary-foreground' : (['match-students', 'preview'].includes(step) ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground')}`}>
                                 <Users className="h-4 w-4" />
                             </div>
                             <span className={`text-xs font-medium ${step === 'match-students' ? 'text-primary' : 'text-muted-foreground'}`}>Vinculação</span>
@@ -441,13 +441,13 @@ export const TrajectoryImportDialog = ({
                                         </div>
                                     </div>
 
-                                    <div className={`flex items-start space-x-3 border rounded-xl p-4 cursor-pointer transition-all ${replaceExisting ? 'border-orange-500 ring-1 ring-orange-500 bg-orange-50/50 dark:bg-orange-950/20' : 'hover:bg-orange-50/30 border-orange-200 dark:border-orange-800/30'}`} onClick={() => setReplaceExisting(true)}>
-                                        <RadioGroupItem value="replace" id="mode-replace" className="mt-1 border-orange-500 text-orange-600" />
+                                    <div className={`flex items-start space-x-3 border rounded-xl p-4 cursor-pointer transition-all ${replaceExisting ? 'border-warning/30 ring-1 ring-warning bg-warning/10 dark:bg-warning/20' : 'hover:bg-warning/10 border-warning/30 dark:border-warning/40'}`} onClick={() => setReplaceExisting(true)}>
+                                        <RadioGroupItem value="replace" id="mode-replace" className="mt-1 border-warning/30 text-warning" />
                                         <div className="space-y-1">
-                                            <Label htmlFor="mode-replace" className="text-base font-medium text-orange-900 dark:text-orange-200 cursor-pointer">
+                                            <Label htmlFor="mode-replace" className="text-base font-medium text-warning dark:text-warning cursor-pointer">
                                                 Substituição Total
                                             </Label>
-                                            <p className="text-sm text-orange-800/80 dark:text-orange-300/80 leading-relaxed">
+                                            <p className="text-sm text-warning dark:text-warning leading-relaxed">
                                                 ⚠️ <strong>Apaga todo o histórico</strong> (6º ao 9º ano) dos alunos vinculados antes de importar. Use apenas se quiser reescrever completamente os dados.
                                             </p>
                                         </div>
@@ -470,9 +470,9 @@ export const TrajectoryImportDialog = ({
                                     {isProcessing ? (
                                         <div className="flex flex-col items-center gap-4 py-4">
                                             <div className="relative">
-                                                <div className="absolute inset-0 bg-blue-500/20 rounded-full animate-ping" />
+                                                <div className="absolute inset-0 bg-info/20 rounded-full animate-ping" />
                                                 <div className="bg-background rounded-full p-4 relative shadow-sm border">
-                                                    <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                                                    <Loader2 className="h-8 w-8 animate-spin text-info" />
                                                 </div>
                                             </div>
                                             <div className="space-y-1">
@@ -505,8 +505,8 @@ export const TrajectoryImportDialog = ({
                         <div className="space-y-6">
                             <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-full">
-                                        <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                                    <div className="p-2 bg-success/15 dark:bg-success/20 rounded-full">
+                                        <CheckCircle2 className="h-5 w-5 text-success dark:text-success" />
                                     </div>
                                     <div>
                                         <p className="font-semibold text-sm">Resumo da Vinculação</p>
@@ -532,7 +532,7 @@ export const TrajectoryImportDialog = ({
                                     </TableHeader>
                                     <TableBody>
                                         {studentMatches.map((match, index) => (
-                                            <TableRow key={index} className={!match.systemStudentId ? 'bg-red-50/30 dark:bg-red-900/10' : ''}>
+                                            <TableRow key={index} className={!match.systemStudentId ? 'bg-destructive/10 dark:bg-destructive/20' : ''}>
                                                 <TableCell className="py-3">
                                                     <span className="font-medium text-sm">{match.fileStudentName}</span>
                                                 </TableCell>
@@ -567,15 +567,15 @@ export const TrajectoryImportDialog = ({
                                                 </TableCell>
                                                 <TableCell className="py-3">
                                                     {match.similarity >= 0.9 ? (
-                                                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                                                        <Badge variant="outline" className="bg-success/10 text-success border-success/30">
                                                             {Math.round(match.similarity * 100)}% Match
                                                         </Badge>
                                                     ) : match.similarity >= 0.6 ? (
-                                                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                                                        <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
                                                             {Math.round(match.similarity * 100)}% Incerto
                                                         </Badge>
                                                     ) : (
-                                                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                                        <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30">
                                                             Sem Match ({Math.round(match.similarity * 100)}%)
                                                         </Badge>
                                                     )}
@@ -593,26 +593,26 @@ export const TrajectoryImportDialog = ({
                         <div className="space-y-6">
                             {/* Stats Cards */}
                             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className="bg-blue-50/50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-800 flex flex-col items-center justify-center text-center">
-                                    <span className="text-3xl font-bold text-blue-700 dark:text-blue-400 mb-1">
+                                <div className="bg-info/10 dark:bg-info/20 p-4 rounded-xl border border-info/30 dark:border-info/40 flex flex-col items-center justify-center text-center">
+                                    <span className="text-3xl font-bold text-info dark:text-info mb-1">
                                         {importableGrades.length}
                                     </span>
                                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Notas</span>
                                 </div>
-                                <div className="bg-emerald-50/50 dark:bg-emerald-900/10 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800 flex flex-col items-center justify-center text-center">
-                                    <span className="text-3xl font-bold text-emerald-700 dark:text-emerald-400 mb-1">
+                                <div className="bg-success/10 dark:bg-success/20 p-4 rounded-xl border border-success/30 dark:border-success/40 flex flex-col items-center justify-center text-center">
+                                    <span className="text-3xl font-bold text-success dark:text-success mb-1">
                                         {stats.selectedGrades}
                                     </span>
                                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Selecionadas</span>
                                 </div>
-                                <div className="bg-indigo-50/50 dark:bg-indigo-900/10 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800 flex flex-col items-center justify-center text-center">
-                                    <span className="text-3xl font-bold text-indigo-700 dark:text-indigo-400 mb-1">
+                                <div className="bg-info/10 dark:bg-info/20 p-4 rounded-xl border border-info/30 dark:border-info/40 flex flex-col items-center justify-center text-center">
+                                    <span className="text-3xl font-bold text-info dark:text-info mb-1">
                                         {new Set(importableGrades.filter(g => g.selected).map(g => g.studentId)).size}
                                     </span>
                                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Alunos</span>
                                 </div>
-                                <div className="bg-purple-50/50 dark:bg-purple-900/10 p-4 rounded-xl border border-purple-100 dark:border-purple-800 flex flex-col items-center justify-center text-center">
-                                    <span className="text-3xl font-bold text-purple-700 dark:text-purple-400 mb-1">
+                                <div className="bg-info/10 dark:bg-info/20 p-4 rounded-xl border border-info/30 dark:border-info/40 flex flex-col items-center justify-center text-center">
+                                    <span className="text-3xl font-bold text-info dark:text-info mb-1">
                                         {new Set(importableGrades.filter(g => g.selected).map(g => g.subject)).size}
                                     </span>
                                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Disciplinas</span>
@@ -665,7 +665,7 @@ export const TrajectoryImportDialog = ({
                                                 <TableCell className="text-sm text-muted-foreground">{grade.gradeYear}º ano ({grade.calendarYear})</TableCell>
                                                 <TableCell className="text-sm">{grade.subject}</TableCell>
                                                 <TableCell className="text-right">
-                                                    <Badge variant="outline" className={`font-mono ${grade.grade < 6 ? 'text-red-500 border-red-200 bg-red-50' : 'text-slate-700 bg-slate-50'}`}>
+                                                    <Badge variant="outline" className={`font-mono ${grade.grade < 6 ? 'text-destructive border-destructive/30 bg-destructive/10' : 'text-muted-foreground bg-muted'}`}>
                                                         {grade.grade.toFixed(1)}
                                                     </Badge>
                                                 </TableCell>
@@ -679,9 +679,9 @@ export const TrajectoryImportDialog = ({
 
                     {/* Progress */}
                     {isImporting && (
-                        <div className="mt-6 p-4 border rounded-xl bg-blue-50/50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-800">
+                        <div className="mt-6 p-4 border rounded-xl bg-info/10 dark:bg-info/20 border-info/30 dark:border-info/40">
                             <div className="flex justify-between items-center text-sm font-medium mb-2">
-                                <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                                <div className="flex items-center gap-2 text-info dark:text-info">
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                     <span>
                                         {importPhase === 'deleting' ? 'Limpando dados antigos...' : 'Importando notas...'}
@@ -689,7 +689,7 @@ export const TrajectoryImportDialog = ({
                                 </div>
                                 <span className="text-xs text-muted-foreground">{importProgress.current} / {importProgress.total}</span>
                             </div>
-                            <Progress value={importProgress.total > 0 ? (importProgress.current / importProgress.total) * 100 : 0} className="h-2 bg-blue-100 dark:bg-blue-900/30" />
+                            <Progress value={importProgress.total > 0 ? (importProgress.current / importProgress.total) * 100 : 0} className="h-2 bg-info/15 dark:bg-info/20" />
                         </div>
                     )}
                 </div>
@@ -719,7 +719,7 @@ export const TrajectoryImportDialog = ({
                         )}
 
                         {step === 'preview' && (
-                            <Button onClick={handleImport} disabled={isImporting || stats.selectedGrades === 0} className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[150px]">
+                            <Button onClick={handleImport} disabled={isImporting || stats.selectedGrades === 0} className="bg-success hover:bg-success text-white min-w-[150px]">
                                 {isImporting ? (
                                     <>
                                         <Loader2 className="h-4 w-4 animate-spin mr-2" />

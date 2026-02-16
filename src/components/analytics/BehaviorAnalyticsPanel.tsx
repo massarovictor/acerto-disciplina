@@ -66,13 +66,13 @@ const InsightIcon = ({ type }: { type: Insight['type'] }) => {
     const iconClass = 'h-4 w-4';
     switch (type) {
         case 'alert':
-            return <AlertTriangle className={`${iconClass} text-red-500`} />;
+            return <AlertTriangle className={`${iconClass} text-destructive`} />;
         case 'warning':
-            return <AlertCircle className={`${iconClass} text-amber-500`} />;
+            return <AlertCircle className={`${iconClass} text-warning`} />;
         case 'success':
-            return <CheckCircle2 className={`${iconClass} text-emerald-500`} />;
+            return <CheckCircle2 className={`${iconClass} text-success`} />;
         default:
-            return <AlertCircle className={`${iconClass} text-blue-500`} />;
+            return <AlertCircle className={`${iconClass} text-info`} />;
     }
 };
 
@@ -104,8 +104,8 @@ export function BehaviorAnalyticsPanel({
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-amber-500/10">
-                                    <AlertTriangle className="h-5 w-5 text-amber-500" />
+                                <div className="p-2 rounded-lg bg-warning/10">
+                                    <AlertTriangle className="h-5 w-5 text-warning" />
                                 </div>
                                 <div>
                                     <p className="text-2xl font-bold">{totalIncidents}</p>
@@ -118,8 +118,8 @@ export function BehaviorAnalyticsPanel({
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-orange-500/10">
-                                    <Clock className="h-5 w-5 text-orange-500" />
+                                <div className="p-2 rounded-lg bg-warning/10">
+                                    <Clock className="h-5 w-5 text-warning" />
                                 </div>
                                 <div>
                                     <p className="text-2xl font-bold">{openIncidentsCount}</p>
@@ -132,8 +132,8 @@ export function BehaviorAnalyticsPanel({
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-blue-500/10">
-                                    <CheckCircle2 className="h-5 w-5 text-blue-500" />
+                                <div className="p-2 rounded-lg bg-info/10">
+                                    <CheckCircle2 className="h-5 w-5 text-info" />
                                 </div>
                                 <div>
                                     <p className="text-2xl font-bold">{resolvedIncidentsCount}</p>
@@ -146,8 +146,8 @@ export function BehaviorAnalyticsPanel({
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-violet-500/10">
-                                    <Users className="h-5 w-5 text-violet-500" />
+                                <div className="p-2 rounded-lg bg-info/10">
+                                    <Users className="h-5 w-5 text-info" />
                                 </div>
                                 <div>
                                     <p className="text-2xl font-bold">{averageIncidentsPerStudent.toFixed(1)}</p>
@@ -318,12 +318,12 @@ export function BehaviorAnalyticsPanel({
                                             <div className="flex items-center gap-2">
                                                 <div className="flex gap-1">
                                                     {item.severities.gravissima > 0 && (
-                                                        <Badge variant="outline" className="text-[10px] px-1 bg-red-100 text-red-700 border-red-200">
+                                                        <Badge variant="outline" className="text-[10px] px-1 bg-destructive/15 text-destructive border-destructive/30">
                                                             {item.severities.gravissima}G
                                                         </Badge>
                                                     )}
                                                     {item.severities.grave > 0 && (
-                                                        <Badge variant="outline" className="text-[10px] px-1 bg-orange-100 text-orange-700 border-orange-200">
+                                                        <Badge variant="outline" className="text-[10px] px-1 bg-warning/15 text-warning border-warning/30">
                                                             {item.severities.grave}g
                                                         </Badge>
                                                     )}
@@ -356,7 +356,7 @@ export function BehaviorAnalyticsPanel({
                     <Card>
                         <CardHeader className="pb-3">
                             <CardTitle className="text-base flex items-center gap-2">
-                                <AlertCircle className="h-4 w-4 text-amber-500" />
+                                <AlertCircle className="h-4 w-4 text-warning" />
                                 Insights Comportamentais
                             </CardTitle>
                         </CardHeader>
@@ -365,10 +365,10 @@ export function BehaviorAnalyticsPanel({
                                 {behavioralInsights.map(insight => (
                                     <div
                                         key={insight.id}
-                                        className={`p-3 rounded-lg border-l-4 ${insight.type === 'alert' ? 'border-l-red-500 bg-red-50/50' :
-                                            insight.type === 'warning' ? 'border-l-amber-500 bg-amber-50/50' :
-                                                insight.type === 'success' ? 'border-l-emerald-500 bg-emerald-50/50' :
-                                                    'border-l-blue-500 bg-blue-50/50'
+                                        className={`p-3 rounded-lg border-l-4 ${insight.type === 'alert' ? 'border-l-red-500 bg-destructive/10' :
+                                            insight.type === 'warning' ? 'border-l-amber-500 bg-warning/10' :
+                                                insight.type === 'success' ? 'border-l-emerald-500 bg-success/10' :
+                                                    'border-l-blue-500 bg-info/10'
                                             }`}
                                     >
                                         <div className="flex items-start gap-2">
@@ -414,10 +414,10 @@ export function BehaviorAnalyticsPanel({
                                         <TableHead className="w-16 text-center">Posição</TableHead>
                                         <TableHead>Turma</TableHead>
                                         <TableHead className="text-center">Total</TableHead>
-                                        <TableHead className="text-center text-blue-600">Leve</TableHead>
-                                        <TableHead className="text-center text-amber-600">Intermed.</TableHead>
-                                        <TableHead className="text-center text-orange-600">Grave</TableHead>
-                                        <TableHead className="text-center text-red-600">Gravíssima</TableHead>
+                                        <TableHead className="text-center text-info">Leve</TableHead>
+                                        <TableHead className="text-center text-warning">Intermed.</TableHead>
+                                        <TableHead className="text-center text-warning">Grave</TableHead>
+                                        <TableHead className="text-center text-destructive">Gravíssima</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -426,7 +426,7 @@ export function BehaviorAnalyticsPanel({
                                             <TableCell className="text-center font-medium">
                                                 <Badge
                                                     variant={index < 3 ? 'default' : 'outline'}
-                                                    className={index === 0 ? 'bg-amber-500' : index === 1 ? 'bg-slate-400' : index === 2 ? 'bg-amber-700' : ''}
+                                                    className={index === 0 ? 'bg-warning/100' : index === 1 ? 'bg-muted' : index === 2 ? 'bg-warning' : ''}
                                                 >
                                                     {index + 1}º
                                                 </Badge>
@@ -440,16 +440,16 @@ export function BehaviorAnalyticsPanel({
                                             <TableCell className="text-center font-bold text-lg">{item.incidentCount}</TableCell>
                                             <TableCell className="text-center text-muted-foreground">{item.severities.leve || '-'}</TableCell>
                                             <TableCell className="text-center text-muted-foreground">{item.severities.intermediaria || '-'}</TableCell>
-                                            <TableCell className="text-center font-medium text-orange-600">
+                                            <TableCell className="text-center font-medium text-warning">
                                                 {item.severities.grave > 0 ? (
-                                                    <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                                                    <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
                                                         {item.severities.grave}
                                                     </Badge>
                                                 ) : '-'}
                                             </TableCell>
-                                            <TableCell className="text-center font-medium text-red-600">
+                                            <TableCell className="text-center font-medium text-destructive">
                                                 {item.severities.gravissima > 0 ? (
-                                                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                                    <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30">
                                                         {item.severities.gravissima}
                                                     </Badge>
                                                 ) : '-'}
@@ -489,10 +489,10 @@ export function BehaviorAnalyticsPanel({
                                         <TableHead className="w-16 text-center">Posição</TableHead>
                                         <TableHead>Aluno</TableHead>
                                         <TableHead className="text-center">Total</TableHead>
-                                        <TableHead className="text-center text-blue-600">Leve</TableHead>
-                                        <TableHead className="text-center text-amber-600">Intermed.</TableHead>
-                                        <TableHead className="text-center text-orange-600">Grave</TableHead>
-                                        <TableHead className="text-center text-red-600">Gravíssima</TableHead>
+                                        <TableHead className="text-center text-info">Leve</TableHead>
+                                        <TableHead className="text-center text-warning">Intermed.</TableHead>
+                                        <TableHead className="text-center text-warning">Grave</TableHead>
+                                        <TableHead className="text-center text-destructive">Gravíssima</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -501,7 +501,7 @@ export function BehaviorAnalyticsPanel({
                                             <TableCell className="text-center font-medium">
                                                 <Badge
                                                     variant={index < 3 ? 'default' : 'outline'}
-                                                    className={index === 0 ? 'bg-amber-500' : index === 1 ? 'bg-slate-400' : index === 2 ? 'bg-amber-700' : ''}
+                                                    className={index === 0 ? 'bg-warning/100' : index === 1 ? 'bg-muted' : index === 2 ? 'bg-warning' : ''}
                                                 >
                                                     {index + 1}º
                                                 </Badge>
@@ -515,16 +515,16 @@ export function BehaviorAnalyticsPanel({
                                             <TableCell className="text-center font-bold text-lg">{item.incidentCount}</TableCell>
                                             <TableCell className="text-center text-muted-foreground">{item.severities.leve || '-'}</TableCell>
                                             <TableCell className="text-center text-muted-foreground">{item.severities.intermediaria || '-'}</TableCell>
-                                            <TableCell className="text-center font-medium text-orange-600">
+                                            <TableCell className="text-center font-medium text-warning">
                                                 {item.severities.grave > 0 ? (
-                                                    <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                                                    <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
                                                         {item.severities.grave}
                                                     </Badge>
                                                 ) : '-'}
                                             </TableCell>
-                                            <TableCell className="text-center font-medium text-red-600">
+                                            <TableCell className="text-center font-medium text-destructive">
                                                 {item.severities.gravissima > 0 ? (
-                                                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                                    <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30">
                                                         {item.severities.gravissima}
                                                     </Badge>
                                                 ) : '-'}

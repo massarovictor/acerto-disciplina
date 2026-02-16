@@ -151,7 +151,7 @@ export const CriticalityAnalysis = ({ studentsData, className, externalFilter, c
                                                     rel="noopener noreferrer"
                                                     className="text-xs flex justify-between items-center group hover:bg-muted/50 p-1.5 rounded transition-colors cursor-pointer text-decoration-none text-foreground"
                                                 >
-                                                    <span className="text-slate-700 dark:text-slate-300 truncate max-w-[180px] group-hover:underline decoration-slate-400 underline-offset-2" title={s.name}>
+                                                    <span className="text-muted-foreground dark:text-muted-foreground truncate max-w-[180px] group-hover:underline decoration-slate-400 underline-offset-2" title={s.name}>
                                                         {s.name}
                                                     </span>
                                                     <span className={`font-mono font-medium ${bucket.color}`}>
@@ -174,7 +174,7 @@ export const CriticalityAnalysis = ({ studentsData, className, externalFilter, c
         <div className={`space-y-6 ${className}`}>
             <div>
                 <h3 className="text-lg font-semibold flex items-center gap-2 mb-1">
-                    <AlertTriangle className="h-5 w-5 text-amber-600" />
+                    <AlertTriangle className="h-5 w-5 text-warning" />
                     Análise Comparativa de Criticidade
                 </h3>
                 <p className="text-sm text-muted-foreground">Distribuição e lista nominal dos alunos por níveis de desempenho.</p>

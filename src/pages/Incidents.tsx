@@ -229,7 +229,7 @@ const Incidents = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 w-8 p-0 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 z-10"
+                    className="h-8 w-8 p-0 hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive z-10"
                     onClick={(e) => {
                       e.stopPropagation();
                       setDeletingIncident(incident);
@@ -266,12 +266,12 @@ const Incidents = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Em Aberto</CardTitle>
-            <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
+            <div className="p-2 rounded-lg bg-destructive/15 dark:bg-destructive/20 text-destructive dark:text-destructive">
               <AlertTriangle className="h-4 w-4" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400">{openIncidents.length}</div>
+            <div className="text-2xl font-bold text-destructive dark:text-destructive">{openIncidents.length}</div>
             <p className="text-xs text-muted-foreground mt-1">Requerem atenção imediata</p>
           </CardContent>
         </Card>
@@ -279,12 +279,12 @@ const Incidents = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Acompanhamento</CardTitle>
-            <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">
+            <div className="p-2 rounded-lg bg-warning/15 dark:bg-warning/20 text-warning dark:text-warning">
               <Clock className="h-4 w-4" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{followUpIncidents.length}</div>
+            <div className="text-2xl font-bold text-warning dark:text-warning">{followUpIncidents.length}</div>
             <p className="text-xs text-muted-foreground mt-1">Casos em monitoramento</p>
           </CardContent>
         </Card>
@@ -292,12 +292,12 @@ const Incidents = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Resolvidas</CardTitle>
-            <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
+            <div className="p-2 rounded-lg bg-success/15 dark:bg-success/20 text-success dark:text-success">
               <CheckCircle2 className="h-4 w-4" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{resolvedIncidents.length}</div>
+            <div className="text-2xl font-bold text-success dark:text-success">{resolvedIncidents.length}</div>
             <p className="text-xs text-muted-foreground mt-1">Casos fechados com sucesso</p>
           </CardContent>
         </Card>
@@ -410,12 +410,12 @@ const Incidents = () => {
             <AlertDialogDescription className="space-y-4">
               <p>Tem certeza que deseja excluir esta ocorrência? Esta ação não pode ser desfeita.</p>
               <div className="space-y-2">
-                <p className="text-sm font-medium">Digite <span className="font-bold text-red-600">excluir</span> para confirmar:</p>
+                <p className="text-sm font-medium">Digite <span className="font-bold text-destructive">excluir</span> para confirmar:</p>
                 <Input
                   value={deleteConfirmationText}
                   onChange={(e) => setDeleteConfirmationText(e.target.value)}
                   placeholder="excluir"
-                  className="border-red-200 focus-visible:ring-red-500"
+                  className="border-destructive/30 focus-visible:ring-destructive"
                 />
               </div>
             </AlertDialogDescription>
@@ -424,7 +424,7 @@ const Incidents = () => {
             <AlertDialogCancel onClick={() => setDeleteConfirmationText('')}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               disabled={deleteConfirmationText.toLowerCase() !== 'excluir'}
-              className="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-destructive hover:bg-destructive disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={async () => {
                 if (deletingIncident) {
                   try {
@@ -455,8 +455,8 @@ const Incidents = () => {
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="border-b pb-4 mb-4">
             <DialogTitle className="flex items-center gap-2 text-xl">
-              <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
-                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              <div className="p-2 rounded-full bg-destructive/15 dark:bg-destructive/20">
+                <AlertTriangle className="h-5 w-5 text-destructive dark:text-destructive" />
               </div>
               Registrar Nova Ocorrência
             </DialogTitle>

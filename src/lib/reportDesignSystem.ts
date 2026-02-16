@@ -3,51 +3,52 @@
  * Paleta de cores, tipografia e espaçamentos padronizados
  * para PDFs, Slides e componentes visuais.
  */
+import { chartPalette, scales, semanticPalette } from '@/theme/palette';
 
 // ================ COLOR PALETTE ================
 
 export const REPORT_COLORS = {
     // Primary Brand
-    primary: '#2563EB',       // Blue 600
-    primaryDark: '#1D4ED8',   // Blue 700
-    primaryLight: '#3B82F6',  // Blue 500
+    primary: semanticPalette.primary.hex,
+    primaryDark: scales.brand[700],
+    primaryLight: scales.brand[400],
 
     // Semantic Colors
-    success: '#059669',       // Emerald 600
-    successLight: '#10B981',  // Emerald 500
-    warning: '#D97706',       // Amber 600
-    warningLight: '#F59E0B',  // Amber 500
-    danger: '#DC2626',        // Red 600
-    dangerLight: '#EF4444',   // Red 500
+    success: scales.success[600],
+    successLight: scales.success[500],
+    warning: scales.warning[600],
+    warningLight: scales.warning[500],
+    danger: scales.danger[600],
+    dangerLight: scales.danger[500],
 
     // Neutral Palette
     text: {
-        primary: '#0F172A',     // Slate 900
-        secondary: '#475569',   // Slate 600
-        tertiary: '#94A3B8',    // Slate 400
+        primary: scales.neutral[900],
+        secondary: scales.neutral[700],
+        tertiary: scales.neutral[500],
         inverted: '#FFFFFF',
     },
 
     background: {
-        page: '#FFFFFF',
-        surface: '#F8FAFC',     // Slate 50
-        card: '#FFFFFF',
-        header: '#0F172A',      // Slate 900 (dark headers)
-        muted: '#F1F5F9',       // Slate 100
+        page: semanticPalette.background.hex,
+        surface: scales.neutral[100],
+        card: semanticPalette.card.hex,
+        header: scales.brand[900],
+        muted: scales.neutral[200],
     },
 
-    border: '#E2E8F0',        // Slate 200
+    border: semanticPalette.border.hex,
 
     // Chart-specific Palette (accessible, distinct)
     chart: [
-        '#3B82F6', // Blue
-        '#10B981', // Emerald
-        '#F59E0B', // Amber
-        '#EF4444', // Red
-        '#8B5CF6', // Violet
-        '#EC4899', // Pink
-        '#14B8A6', // Teal
-        '#F97316', // Orange
+        chartPalette[1].hex,
+        chartPalette[2].hex,
+        chartPalette[3].hex,
+        chartPalette[4].hex,
+        chartPalette[5].hex,
+        scales.success[500],
+        scales.warning[500],
+        scales.brand[300],
     ],
 };
 
@@ -112,11 +113,11 @@ export const REPORT_RADIUS = {
 // ================ GRADIENTS ================
 
 export const REPORT_GRADIENTS = {
-    primary: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
-    success: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-    danger: 'linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)',
-    dark: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
-    surface: 'linear-gradient(180deg, #F8FAFC 0%, #F1F5F9 100%)',
+    primary: `linear-gradient(135deg, ${scales.brand[500]} 0%, ${scales.brand[700]} 100%)`,
+    success: `linear-gradient(135deg, ${scales.success[600]} 0%, ${scales.success[800]} 100%)`,
+    danger: `linear-gradient(135deg, ${scales.danger[600]} 0%, ${scales.danger[800]} 100%)`,
+    dark: `linear-gradient(135deg, ${scales.brand[900]} 0%, ${scales.brand[700]} 100%)`,
+    surface: `linear-gradient(180deg, ${scales.neutral[100]} 0%, ${scales.neutral[200]} 100%)`,
 };
 
 // ================ CHART CONFIG ================
@@ -162,34 +163,34 @@ export const CHART_CONFIG = {
 
 export const STATUS_COLORS = {
     excellence: {
-        bg: '#DBEAFE',      // Blue 100
-        text: '#1E40AF',    // Blue 800
-        border: '#93C5FD',  // Blue 300
-        solid: '#3B82F6',   // Blue 500
+        bg: scales.accent[100],
+        text: scales.brand[800],
+        border: scales.accent[300],
+        solid: scales.brand[500],
     },
     approved: {
-        bg: '#D1FAE5',      // Emerald 100
-        text: '#065F46',    // Emerald 800
-        border: '#6EE7B7',  // Emerald 300
-        solid: '#10B981',   // Emerald 500
+        bg: scales.success[100],
+        text: scales.success[800],
+        border: scales.success[300],
+        solid: scales.success[500],
     },
     attention: {
-        bg: '#FEF3C7',      // Amber 100
-        text: '#92400E',    // Amber 800
-        border: '#FCD34D',  // Amber 300
-        solid: '#F59E0B',   // Amber 500
+        bg: scales.warning[100],
+        text: scales.warning[800],
+        border: scales.warning[300],
+        solid: scales.warning[500],
     },
     critical: {
-        bg: '#FEE2E2',      // Red 100
-        text: '#991B1B',    // Red 800
-        border: '#FCA5A5',  // Red 300
-        solid: '#EF4444',   // Red 500
+        bg: scales.danger[100],
+        text: scales.danger[800],
+        border: scales.danger[300],
+        solid: scales.danger[500],
     },
     neutral: {
-        bg: '#F1F5F9',      // Slate 100
-        text: '#475569',    // Slate 600
-        border: '#CBD5E1',  // Slate 300
-        solid: '#64748B',   // Slate 500
+        bg: scales.neutral[100],
+        text: scales.neutral[700],
+        border: scales.neutral[300],
+        solid: scales.neutral[500],
     },
 };
 

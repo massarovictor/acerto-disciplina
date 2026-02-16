@@ -110,9 +110,9 @@ export const QuarterComparisonSlide = ({ grades, classData }: QuarterComparisonS
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Tendência Geral:</span>
                   <div className="flex items-center gap-2">
-                    {trend.direction === 'up' && <TrendingUp className="h-5 w-5 text-green-600" />}
-                    {trend.direction === 'down' && <TrendingDown className="h-5 w-5 text-red-600" />}
-                    {trend.direction === 'stable' && <Minus className="h-5 w-5 text-gray-600" />}
+                    {trend.direction === 'up' && <TrendingUp className="h-5 w-5 text-success" />}
+                    {trend.direction === 'down' && <TrendingDown className="h-5 w-5 text-destructive" />}
+                    {trend.direction === 'stable' && <Minus className="h-5 w-5 text-muted-foreground" />}
                     <span className="text-sm">
                       {trend.direction === 'up' ? 'Melhoria Progressiva' : 
                        trend.direction === 'down' ? 'Declínio Progressivo' : 
@@ -143,7 +143,7 @@ export const QuarterComparisonSlide = ({ grades, classData }: QuarterComparisonS
                         {q.average.toFixed(1)}
                       </Badge>
                       {i > 0 && (
-                        <span className={`text-xs ${variations[i].absolute >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <span className={`text-xs ${variations[i].absolute >= 0 ? 'text-success' : 'text-destructive'}`}>
                           {variations[i].absolute >= 0 ? '+' : ''}{variations[i].absolute.toFixed(1)}
                         </span>
                       )}
@@ -163,7 +163,7 @@ export const QuarterComparisonSlide = ({ grades, classData }: QuarterComparisonS
                   <p className="text-xs text-muted-foreground mb-1">Melhor Bimestre</p>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">{bestQuarter.quarter}</span>
-                    <Badge className="bg-green-500">{bestQuarter.average.toFixed(1)}</Badge>
+                    <Badge className="bg-success/100">{bestQuarter.average.toFixed(1)}</Badge>
                   </div>
                 </div>
                 <div>
@@ -181,17 +181,17 @@ export const QuarterComparisonSlide = ({ grades, classData }: QuarterComparisonS
 
       {/* Rodapé - Disciplinas com Maior Variação */}
       <div className="mt-4 grid grid-cols-2 gap-4">
-        <Card className="bg-green-500/10 backdrop-blur border-green-500/20">
+        <Card className="bg-success/10 backdrop-blur border-success/30">
           <CardContent className="pt-4">
             <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-green-600" />
+              <TrendingUp className="h-4 w-4 text-success" />
               Maior Crescimento
             </h4>
             <div className="space-y-1">
               {topGrowers.slice(0, 3).map(s => (
                 <div key={s.subject} className="flex items-center justify-between text-xs">
                   <span className="truncate flex-1">{s.subject}</span>
-                  <span className="text-green-600 font-medium ml-2">+{s.change.toFixed(1)}</span>
+                  <span className="text-success font-medium ml-2">+{s.change.toFixed(1)}</span>
                 </div>
               ))}
               {topGrowers.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma melhoria significativa</p>}
@@ -199,17 +199,17 @@ export const QuarterComparisonSlide = ({ grades, classData }: QuarterComparisonS
           </CardContent>
         </Card>
 
-        <Card className="bg-red-500/10 backdrop-blur border-red-500/20">
+        <Card className="bg-destructive/10 backdrop-blur border-destructive/30">
           <CardContent className="pt-4">
             <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-              <TrendingDown className="h-4 w-4 text-red-600" />
+              <TrendingDown className="h-4 w-4 text-destructive" />
               Maior Declínio
             </h4>
             <div className="space-y-1">
               {topDecliners.slice(0, 3).map(s => (
                 <div key={s.subject} className="flex items-center justify-between text-xs">
                   <span className="truncate flex-1">{s.subject}</span>
-                  <span className="text-red-600 font-medium ml-2">{s.change.toFixed(1)}</span>
+                  <span className="text-destructive font-medium ml-2">{s.change.toFixed(1)}</span>
                 </div>
               ))}
               {topDecliners.length === 0 && <p className="text-xs text-muted-foreground">Nenhum declínio significativo</p>}

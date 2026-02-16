@@ -97,7 +97,7 @@ export function ClassComparisonDialog({
         return (
           <div
             key={index}
-            className={`text-center py-2 rounded ${isBest ? 'bg-emerald-50 text-emerald-700 font-semibold' : ''}`}
+            className={`text-center py-2 rounded ${isBest ? 'bg-success/10 text-success font-semibold' : ''}`}
           >
             {format(value)}{suffix}
           </div>
@@ -130,7 +130,7 @@ export function ClassComparisonDialog({
         return (
           <div
             key={index}
-            className={`text-center py-2 rounded ${isBest && bestValue !== 0 ? 'bg-emerald-50 text-emerald-700 font-semibold' : ''
+            className={`text-center py-2 rounded ${isBest && bestValue !== 0 ? 'bg-success/10 text-success font-semibold' : ''
               }`}
           >
             {value}
@@ -360,13 +360,13 @@ export function ClassComparisonDialog({
                         <div key={cls.classData.id} className="space-y-1">
                           <div className="flex items-center justify-between text-sm">
                             <span>{cls.classData.name}</span>
-                            <span className={isBest ? 'font-semibold text-emerald-600' : ''}>
+                            <span className={isBest ? 'font-semibold text-success' : ''}>
                               {formatNumber(cls.average)}
                             </span>
                           </div>
                           <div className="h-4 bg-muted rounded-full overflow-hidden">
                             <div
-                              className={`h-full rounded-full transition-all duration-500 ${isBest ? 'bg-emerald-500' : 'bg-blue-500'
+                              className={`h-full rounded-full transition-all duration-500 ${isBest ? 'bg-success/100' : 'bg-info/100'
                                 }`}
                               style={{ width: `${width}%` }}
                             />
@@ -389,7 +389,7 @@ export function ClassComparisonDialog({
                           <div key={cls.classData.id} className="space-y-1">
                             <div className="flex items-center justify-between text-sm">
                               <span>{cls.classData.name}</span>
-                              <span className={isBest ? 'font-semibold text-blue-600' : ''}>
+                              <span className={isBest ? 'font-semibold text-info' : ''}>
                                 {formatNumber(rate, 0)}%
                               </span>
                             </div>
@@ -424,7 +424,7 @@ export function ClassComparisonDialog({
                         <div key={cls.classData.id} className="space-y-1">
                           <div className="flex items-center justify-between text-sm">
                             <span>{cls.classData.name}</span>
-                            <span className={isBest ? 'font-semibold text-emerald-600' : 'text-red-600'}>
+                            <span className={isBest ? 'font-semibold text-success' : 'text-destructive'}>
                               {formatNumber(rate, 0)}%
                             </span>
                           </div>

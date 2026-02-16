@@ -36,14 +36,14 @@ export function CohortComparisonTable({
     }
     if (value > 0.2) {
       return (
-        <span className="flex items-center justify-center gap-1 text-emerald-600">
+        <span className="flex items-center justify-center gap-1 text-success">
           <TrendingUp className="h-4 w-4" />+{value.toFixed(1)}
         </span>
       );
     }
     if (value < -0.2) {
       return (
-        <span className="flex items-center justify-center gap-1 text-red-600">
+        <span className="flex items-center justify-center gap-1 text-destructive">
           <TrendingDown className="h-4 w-4" />-{Math.abs(value).toFixed(1)}
         </span>
       );
@@ -102,8 +102,8 @@ export function CohortComparisonTable({
                       <span
                         className={
                           cohort.average >= 6
-                            ? "text-emerald-600"
-                            : "text-red-600"
+                            ? "text-success"
+                            : "text-destructive"
                         }
                       >
                         {cohort.average.toFixed(1)}
@@ -111,7 +111,7 @@ export function CohortComparisonTable({
                     </TableCell>
                     {/* DISABLED: Frequência removida temporariamente */}
                     {/* <TableCell className="text-center">
-                      <span className={cohort.frequency >= 75 ? 'text-emerald-600' : 'text-amber-600'}>
+                      <span className={cohort.frequency >= 75 ? 'text-success' : 'text-warning'}>
                         {cohort.frequency.toFixed(0)}%
                       </span>
                     </TableCell> */}

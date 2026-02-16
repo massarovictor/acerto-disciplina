@@ -60,6 +60,20 @@ npm run dev
 - `npm run dev`: Inicia o servidor de desenvolvimento.
 - `npm run build`: Gera a build de produção.
 - `npm run preview`: Visualiza a build geradagetLocalmente.
+- `npm run lint:colors`: Bloqueia classes Tailwind com cores hardcoded (`red-*`, `blue-*`, etc.) no `src/`.
+
+## 🎨 Theming
+
+- Fonte única da paleta: `src/theme/palette.ts`.
+- Contrato de tokens globais (light/dark): `src/index.css`.
+- Integração com Tailwind e escalas (`primary/brand/neutral/accent`): `tailwind.config.ts`.
+- Documentação de tokens: `src/theme/color-tokens.md`.
+
+### Regras
+
+- Preferir tokens semânticos: `primary`, `secondary`, `muted`, `accent`, `destructive`, `success`, `warning`, `info`.
+- Para data-viz, usar `chart-1` a `chart-5`.
+- Evitar classes de cores hardcoded (`text-red-600`, `bg-blue-50`, etc.).
 
 ---
 Desenvolvido para otimizar a gestão escolar e promover o sucesso do aluno.

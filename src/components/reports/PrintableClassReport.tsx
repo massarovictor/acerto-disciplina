@@ -86,7 +86,7 @@ export const PrintableClassReport = ({
     <div className="space-y-6">
       <div className="flex justify-end gap-3">
         <button
-          className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+          className="rounded-md border border-border bg-white px-4 py-2 text-sm font-medium text-muted-foreground shadow-sm hover:bg-muted"
           onClick={handleDownload}
           disabled={isGenerating}
         >
@@ -94,26 +94,26 @@ export const PrintableClassReport = ({
         </button>
       </div>
 
-      <div ref={containerRef} className="rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm">
-        <div className="rounded-t-xl bg-slate-900 px-10 py-10 text-white">
-          <p className="text-sm uppercase tracking-[0.2em] text-slate-300">Instituição de Ensino</p>
+      <div ref={containerRef} className="rounded-xl border border-border bg-white text-muted-foreground shadow-sm">
+        <div className="rounded-t-xl bg-muted px-10 py-10 text-white">
+          <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Instituição de Ensino</p>
           <h1 className="mt-2 text-3xl font-semibold">Boletim da Turma</h1>
-          <p className="text-slate-300">{classData.name} • Ano letivo {new Date().getFullYear()}</p>
+          <p className="text-muted-foreground">{classData.name} • Ano letivo {new Date().getFullYear()}</p>
         </div>
 
         <div className="space-y-8 px-8 py-8">
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-900">Resumo</h2>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              <p className="font-medium text-slate-800">Disciplinas em atenção</p>
+            <h2 className="text-xl font-semibold text-muted-foreground">Resumo</h2>
+            <div className="rounded-lg border border-border bg-muted p-4 text-sm text-muted-foreground">
+              <p className="font-medium text-muted-foreground">Disciplinas em atenção</p>
               <p>{attentionSubjects.length > 0 ? attentionSubjects.join(', ') : 'Nenhuma'}</p>
               <div className="mt-3 grid gap-2 md:grid-cols-2">
                 <div>
-                  <p className="font-medium text-slate-800">Ocorrências</p>
+                  <p className="font-medium text-muted-foreground">Ocorrências</p>
                   <p>{incidents.length} registro(s)</p>
                 </div>
                 <div>
-                  <p className="font-medium text-slate-800">Total de alunos</p>
+                  <p className="font-medium text-muted-foreground">Total de alunos</p>
                   <p>{students.length} aluno(s)</p>
                 </div>
               </div>
@@ -121,13 +121,13 @@ export const PrintableClassReport = ({
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-900">Notas do Ano</h2>
+            <h2 className="text-xl font-semibold text-muted-foreground">Notas do Ano</h2>
             {students.length === 0 || subjectList.length === 0 ? (
-              <p className="text-sm text-slate-500">Nenhuma nota registrada no período.</p>
+              <p className="text-sm text-muted-foreground">Nenhuma nota registrada no período.</p>
             ) : (
-              <div className="overflow-x-auto rounded-lg border border-slate-200">
+              <div className="overflow-x-auto rounded-lg border border-border">
                 <table className="min-w-full text-left text-xs">
-                  <thead className="bg-slate-100 text-slate-600">
+                  <thead className="bg-muted text-muted-foreground">
                     <tr>
                       <th className="px-3 py-2">Aluno</th>
                       {subjectList.map((subject) => (
@@ -145,9 +145,9 @@ export const PrintableClassReport = ({
                         return (
                           <tr
                             key={student.id}
-                            className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}
+                            className={index % 2 === 0 ? 'bg-white' : 'bg-muted'}
                           >
-                            <td className="px-3 py-2 font-medium text-slate-800">{student.name}</td>
+                            <td className="px-3 py-2 font-medium text-muted-foreground">{student.name}</td>
                             {subjectList.map((subject) => {
                               const values = studentGrades.get(subject) || [];
                               const average = calculateAverage(values);

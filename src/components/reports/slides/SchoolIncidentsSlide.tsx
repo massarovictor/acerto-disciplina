@@ -328,10 +328,10 @@ export const SchoolIncidentsSlide = ({
                                         <TableHead className="w-16 text-center">Posição</TableHead>
                                         <TableHead>Turma</TableHead>
                                         <TableHead className="text-center">Total</TableHead>
-                                        <TableHead className="text-center text-blue-600">Leve</TableHead>
-                                        <TableHead className="text-center text-amber-600">Intermed.</TableHead>
-                                        <TableHead className="text-center text-orange-600">Grave</TableHead>
-                                        <TableHead className="text-center text-red-600">Gravíssima</TableHead>
+                                        <TableHead className="text-center text-info">Leve</TableHead>
+                                        <TableHead className="text-center text-warning">Intermed.</TableHead>
+                                        <TableHead className="text-center text-warning">Grave</TableHead>
+                                        <TableHead className="text-center text-destructive">Gravíssima</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -340,7 +340,7 @@ export const SchoolIncidentsSlide = ({
                                             <TableCell className="text-center font-medium">
                                                 <Badge
                                                     variant={index < 3 ? 'default' : 'outline'}
-                                                    className={index === 0 ? 'bg-red-600' : index === 1 ? 'bg-red-500' : index === 2 ? 'bg-orange-500' : ''}
+                                                    className={index === 0 ? 'bg-destructive' : index === 1 ? 'bg-destructive/100' : index === 2 ? 'bg-warning/100' : ''}
                                                 >
                                                     {index + 1}º
                                                 </Badge>
@@ -349,16 +349,16 @@ export const SchoolIncidentsSlide = ({
                                             <TableCell className="text-center font-bold text-lg">{cls.total}</TableCell>
                                             <TableCell className="text-center text-muted-foreground">{cls.leve || '-'}</TableCell>
                                             <TableCell className="text-center text-muted-foreground">{cls.intermediaria || '-'}</TableCell>
-                                            <TableCell className="text-center font-medium text-orange-600">
+                                            <TableCell className="text-center font-medium text-warning">
                                                 {cls.grave > 0 ? (
-                                                    <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                                                    <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
                                                         {cls.grave}
                                                     </Badge>
                                                 ) : '-'}
                                             </TableCell>
-                                            <TableCell className="text-center font-medium text-red-600">
+                                            <TableCell className="text-center font-medium text-destructive">
                                                 {cls.gravissima > 0 ? (
-                                                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                                    <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30">
                                                         {cls.gravissima}
                                                     </Badge>
                                                 ) : '-'}

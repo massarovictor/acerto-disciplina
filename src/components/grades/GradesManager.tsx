@@ -503,7 +503,7 @@ export const GradesManager = () => {
           )}
 
           {selectedClass && selectedQuarter && !isClassLocked && (
-            <div className="mt-4 p-3 bg-blue-50 text-blue-800 border border-blue-200 rounded-md text-sm dark:bg-blue-900/10 dark:text-blue-300 dark:border-blue-800/30 flex items-center gap-2">
+            <div className="mt-4 p-3 bg-info/10 text-info border border-info/30 rounded-md text-sm dark:bg-info/20 dark:text-info dark:border-info/40 flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4" />
               <span>
                 Lançando notas do <strong>{selectedQuarter}</strong> para o <strong>{selectedSchoolYear}º ano</strong>{' '}
@@ -632,7 +632,7 @@ export const GradesManager = () => {
                               {area.name}
                             </Badge>
                             {isComplete && (
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              <CheckCircle2 className="h-4 w-4 text-success" />
                             )}
                           </div>
                           <span className="text-sm text-muted-foreground">
@@ -653,7 +653,7 @@ export const GradesManager = () => {
                                 <div className="flex items-center gap-2">
                                   <Label className="text-sm">{subject}</Label>
                                   {hasGrade && (
-                                    <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                    <CheckCircle2 className="h-3 w-3 text-success" />
                                   )}
                                 </div>
                                 <Input
@@ -689,7 +689,7 @@ export const GradesManager = () => {
                       <AccordionTrigger className="hover:no-underline">
                         <div className="flex items-center justify-between w-full pr-4">
                           <div className="flex items-center gap-3">
-                            <Badge variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/30">
+                            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
                               Base Profissional - {selectedSchoolYear}º ano
                               {selectedClassData?.course && ` (${selectedClassData.course})`}
                               <span className="ml-1 font-normal opacity-75">
@@ -697,7 +697,7 @@ export const GradesManager = () => {
                               </span>
                             </Badge>
                             {professionalProgress.filled === professionalProgress.total && professionalProgress.total > 0 && (
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              <CheckCircle2 className="h-4 w-4 text-success" />
                             )}
                           </div>
                           <span className="text-sm text-muted-foreground">
@@ -720,7 +720,7 @@ export const GradesManager = () => {
                                   <div className="flex items-center gap-2">
                                     <Label className="text-sm">{subject}</Label>
                                     {hasGrade && (
-                                      <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                      <CheckCircle2 className="h-3 w-3 text-success" />
                                     )}
                                   </div>
                                 </div>

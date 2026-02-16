@@ -79,9 +79,9 @@ export const StudentSlide2 = ({ student, grades, incidents, attendance }: Studen
                     <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
                       <div 
                         className={`h-full rounded-full ${
-                          area.average >= 7 ? 'bg-green-500' :
-                          area.average >= 6 ? 'bg-yellow-500' :
-                          'bg-red-500'
+                          area.average >= 7 ? 'bg-success/100' :
+                          area.average >= 6 ? 'bg-warning/100' :
+                          'bg-destructive/100'
                         }`}
                         style={{ width: `${area.average > 0 ? (area.average / 10) * 100 : 0}%` }}
                       />
@@ -94,7 +94,7 @@ export const StudentSlide2 = ({ student, grades, incidents, attendance }: Studen
 
           {/* Best/Worst Subjects */}
           <div className="grid grid-cols-2 gap-4">
-            <Card className="bg-green-500/10 backdrop-blur border-green-500/20">
+            <Card className="bg-success/10 backdrop-blur border-success/30">
               <CardContent className="pt-4">
                 <h4 className="text-sm font-semibold mb-3">Melhores Disciplinas</h4>
                 <div className="space-y-2">
@@ -108,7 +108,7 @@ export const StudentSlide2 = ({ student, grades, incidents, attendance }: Studen
               </CardContent>
             </Card>
 
-            <Card className="bg-red-500/10 backdrop-blur border-red-500/20">
+            <Card className="bg-destructive/10 backdrop-blur border-destructive/30">
               <CardContent className="pt-4">
                 <h4 className="text-sm font-semibold mb-3 flex items-center gap-1">
                   <AlertTriangle className="h-4 w-4" />
@@ -181,7 +181,7 @@ export const StudentSlide2 = ({ student, grades, incidents, attendance }: Studen
                   </ul>
                 </div>
                 <div>
-                  <p className="font-medium text-red-500 mb-1">Atenção:</p>
+                  <p className="font-medium text-destructive mb-1">Atenção:</p>
                   <ul className="text-muted-foreground space-y-0.5 ml-3">
                     <li>• Necessita reforço em {worstSubjects[0]?.subject || 'algumas áreas'}</li>
                     {totalAbsences > 10 && <li>• Taxa de faltas elevada</li>}

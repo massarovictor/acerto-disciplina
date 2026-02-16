@@ -150,9 +150,9 @@ export function SubjectAnalysisPanel({
                       {previewBest.map((subject, index) => (
                         <TableRow key={subject.subject}>
                           <TableCell className="font-medium text-center">
-                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white ${index === 0 ? 'bg-amber-500' :
-                              index === 1 ? 'bg-gray-400' :
-                                index === 2 ? 'bg-orange-600' :
+                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white ${index === 0 ? 'bg-warning/100' :
+                              index === 1 ? 'bg-muted' :
+                                index === 2 ? 'bg-warning' :
                                   'bg-muted'
                               }`}>
                               {index + 1}
@@ -165,12 +165,12 @@ export function SubjectAnalysisPanel({
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                            <span className="font-semibold text-success dark:text-success">
                               {formatNumber(subject.average)}
                             </span>
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className="text-emerald-600 dark:text-emerald-400">
+                            <span className="text-success dark:text-success">
                               {formatNumber(subject.studentsBelow6Percent, 0)}%
                             </span>
                           </TableCell>
@@ -219,9 +219,9 @@ export function SubjectAnalysisPanel({
                       {previewWorst.map((subject, index) => (
                         <TableRow key={subject.subject}>
                           <TableCell className="font-medium text-center">
-                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white ${index === 0 ? 'bg-red-500' :
-                              index === 1 ? 'bg-red-400' :
-                                index === 2 ? 'bg-orange-500' :
+                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white ${index === 0 ? 'bg-destructive/100' :
+                              index === 1 ? 'bg-destructive/20' :
+                                index === 2 ? 'bg-warning/100' :
                                   'bg-muted'
                               }`}>
                               {index + 1}
@@ -234,12 +234,12 @@ export function SubjectAnalysisPanel({
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className="font-semibold text-red-600 dark:text-red-400">
+                            <span className="font-semibold text-destructive dark:text-destructive">
                               {formatNumber(subject.average)}
                             </span>
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className="text-red-600 dark:text-red-400">
+                            <span className="text-destructive dark:text-destructive">
                               {formatNumber(subject.studentsBelow6Percent, 0)}%
                             </span>
                           </TableCell>
@@ -333,10 +333,10 @@ export function SubjectAnalysisPanel({
                           {subject.area}
                         </Badge>
                       </TableCell>
-                      <TableCell className={`text-right font-semibold ${sortOrder === 'best' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                      <TableCell className={`text-right font-semibold ${sortOrder === 'best' ? 'text-success dark:text-success' : 'text-destructive dark:text-destructive'}`}>
                         {formatNumber(subject.average)}
                       </TableCell>
-                      <TableCell className={`text-right ${sortOrder === 'best' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                      <TableCell className={`text-right ${sortOrder === 'best' ? 'text-success dark:text-success' : 'text-destructive dark:text-destructive'}`}>
                         {formatNumber(subject.studentsBelow6Percent, 0)}%
                       </TableCell>
                     </TableRow>

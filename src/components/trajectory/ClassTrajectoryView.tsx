@@ -51,7 +51,7 @@ export const ClassTrajectoryView = ({ classId, selectedSubject }: ClassTrajector
             {/* Header / Title */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex flex-col gap-2">
-                    <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    <h2 className="text-2xl font-bold text-muted-foreground dark:text-muted-foreground flex items-center gap-2">
                         <Users className="h-6 w-6 text-primary" />
                         Visão Geral da Turma
                     </h2>
@@ -77,12 +77,12 @@ export const ClassTrajectoryView = ({ classId, selectedSubject }: ClassTrajector
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground">Média Fundamental</CardTitle>
-                        <div className="p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                        <div className="p-2 rounded-lg bg-info/15 text-info dark:bg-info/20 dark:text-info">
                             <GraduationCap className="h-4 w-4" />
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        <div className="text-2xl font-bold text-info dark:text-info">
                             {aggregatedData.averages.fund.toFixed(1)}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">Média histórica da turma</p>
@@ -92,12 +92,12 @@ export const ClassTrajectoryView = ({ classId, selectedSubject }: ClassTrajector
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground">Média Ensino Médio</CardTitle>
-                        <div className="p-2 rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
+                        <div className="p-2 rounded-lg bg-info/15 text-info dark:bg-info/20 dark:text-info">
                             <School className="h-4 w-4" />
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-violet-600 dark:text-violet-400">
+                        <div className="text-2xl font-bold text-info dark:text-info">
                             {aggregatedData.averages.hs.toFixed(1)}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">Média acum. atual</p>
@@ -107,12 +107,12 @@ export const ClassTrajectoryView = ({ classId, selectedSubject }: ClassTrajector
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground">Média Aval. Externas</CardTitle>
-                        <div className="p-2 rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                        <div className="p-2 rounded-lg bg-warning/15 text-warning dark:bg-warning/20 dark:text-warning">
                             <Target className="h-4 w-4" />
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                        <div className="text-2xl font-bold text-warning dark:text-warning">
                             {aggregatedData.averages.ext.toFixed(1)}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
@@ -235,7 +235,7 @@ export const ClassTrajectoryView = ({ classId, selectedSubject }: ClassTrajector
                     <Card className="border-none shadow-sm bg-card/60">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-lg flex items-center gap-2">
-                                <Activity className="h-5 w-5 text-blue-600" />
+                                <Activity className="h-5 w-5 text-info" />
                                 Pulso de Performance - Turma
                             </CardTitle>
                             <CardDescription>
