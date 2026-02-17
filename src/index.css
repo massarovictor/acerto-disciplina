@@ -233,6 +233,13 @@
   }
 }
 
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
 #slide-container:fullscreen {
   width: 100vw;
   height: 100vh;

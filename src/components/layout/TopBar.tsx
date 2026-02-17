@@ -26,6 +26,17 @@ export const TopBar = () => {
     navigate('/login');
   };
 
+  const handleToggleTheme = () => {
+    const root = document.documentElement;
+    root.classList.add('theme-switching');
+    setTheme(isDark ? 'light' : 'dark');
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        root.classList.remove('theme-switching');
+      });
+    });
+  };
+
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -42,7 +53,7 @@ export const TopBar = () => {
       <Button
         variant="ghost"
         size="icon"
-        onClick={() => setTheme(isDark ? 'light' : 'dark')}
+        onClick={handleToggleTheme}
         aria-label="Alternar tema"
       >
         {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}

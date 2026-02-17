@@ -80,7 +80,10 @@ export const RecentActivity = ({ incidents, students }: RecentActivityProps) => 
                                                 {incident.finalSeverity}
                                             </span>
                                             {incident.status === 'resolvida' && (
-                                                <Badge variant="outline" className="text-[10px] h-4 px-1 py-0 ml-auto border-green-200 text-green-700 bg-green-50">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="text-[10px] h-4 px-1 py-0 ml-auto border-[#10B981]/35 text-[#10B981] bg-[#10B981]/10 dark:bg-[#10B981]/20"
+                                                >
                                                     Resolvida
                                                 </Badge>
                                             )}

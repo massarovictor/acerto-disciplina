@@ -1,11 +1,15 @@
 import { IncidentSeverity, IncidentStatus } from "@/types";
+import {
+    INCIDENT_SEVERITY_BADGE_CLASS,
+    INCIDENT_SEVERITY_DOT_CLASS,
+} from "@/lib/statusPalette";
 
 export const getSeverityColor = (severity: IncidentSeverity | string) => {
     switch (severity) {
-        case 'leve': return 'bg-severity-light/15 text-severity-light dark:bg-severity-light/20 dark:text-severity-light border-severity-light/30 dark:border-severity-light/40';
-        case 'intermediaria': return 'bg-severity-intermediate/15 text-severity-intermediate dark:bg-severity-intermediate/20 dark:text-severity-intermediate border-severity-intermediate/30 dark:border-severity-intermediate/40';
-        case 'grave': return 'bg-severity-serious/15 text-severity-serious dark:bg-severity-serious/20 dark:text-severity-serious border-severity-serious/30 dark:border-severity-serious/40';
-        case 'gravissima': return 'bg-severity-critical/15 text-severity-critical dark:bg-severity-critical/20 dark:text-severity-critical border-severity-critical/30 dark:border-severity-critical/40';
+        case 'leve': return INCIDENT_SEVERITY_BADGE_CLASS.leve;
+        case 'intermediaria': return INCIDENT_SEVERITY_BADGE_CLASS.intermediaria;
+        case 'grave': return INCIDENT_SEVERITY_BADGE_CLASS.grave;
+        case 'gravissima': return INCIDENT_SEVERITY_BADGE_CLASS.gravissima;
         default: return 'bg-muted text-muted-foreground';
     }
 };
@@ -22,10 +26,10 @@ export const getSeverityLabel = (severity: IncidentSeverity | string) => {
 
 export const getUrgencyDot = (severity: IncidentSeverity | string) => {
     switch (severity) {
-        case 'leve': return 'bg-severity-light';
-        case 'intermediaria': return 'bg-severity-intermediate';
-        case 'grave': return 'bg-severity-serious';
-        case 'gravissima': return 'bg-severity-critical';
+        case 'leve': return INCIDENT_SEVERITY_DOT_CLASS.leve;
+        case 'intermediaria': return INCIDENT_SEVERITY_DOT_CLASS.intermediaria;
+        case 'grave': return INCIDENT_SEVERITY_DOT_CLASS.grave;
+        case 'gravissima': return INCIDENT_SEVERITY_DOT_CLASS.gravissima;
         default: return 'bg-muted';
     }
 };

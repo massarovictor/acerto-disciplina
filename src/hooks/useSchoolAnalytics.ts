@@ -12,6 +12,7 @@ import { analyzeStudentPerformance } from '@/lib/performancePrediction';
 import { getSubjectArea, SUBJECT_AREAS } from '@/lib/subjects';
 import { QUARTERS } from '@/lib/subjects';
 import { perfTimer } from '@/lib/perf';
+import { CLASSIFICATION_COLOR_HEX } from '@/lib/statusPalette';
 
 // ============================================
 // TIPOS
@@ -119,7 +120,7 @@ export interface Insight {
   title: string;
   description: string;
   actionLabel?: string;
-  actionData?: any;
+  actionData?: unknown;
 }
 
 // Novo: Analytics comportamentais
@@ -237,10 +238,10 @@ export interface SchoolAnalyticsResult {
 // ============================================
 
 export const CLASSIFICATION_COLORS: Record<StudentClassification, string> = {
-  critico: '#DC2626',
-  atencao: '#F59E0B',
-  aprovado: '#10B981',
-  excelencia: '#2563EB',
+  critico: CLASSIFICATION_COLOR_HEX.critico,
+  atencao: CLASSIFICATION_COLOR_HEX.atencao,
+  aprovado: CLASSIFICATION_COLOR_HEX.aprovado,
+  excelencia: CLASSIFICATION_COLOR_HEX.excelencia,
 };
 
 export const CLASSIFICATION_LABELS: Record<StudentClassification, string> = {

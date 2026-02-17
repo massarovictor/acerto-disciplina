@@ -47,6 +47,12 @@ import { getSchoolConfig, getDefaultConfig } from "@/lib/schoolConfig";
 
 // Tipos para classificação por situação
 type SituationType = "critico" | "atencao" | "aprovado" | "excelencia";
+type ViewMode = "class" | "individual" | "situation" | "school";
+
+const VIEW_MODES: ViewMode[] = ["class", "individual", "situation", "school"];
+
+const isViewMode = (value: string): value is ViewMode =>
+  VIEW_MODES.includes(value as ViewMode);
 
 interface ClassSlidesProps {
   classes: Class[];
@@ -95,8 +101,8 @@ export const ClassSlides = ({
       hasUrlParams = true;
     }
 
-    if (viewParam && ['class', 'individual', 'situation', 'school'].includes(viewParam)) {
-      setViewMode(viewParam as any);
+    if (viewParam && isViewMode(viewParam)) {
+      setViewMode(viewParam);
       hasUrlParams = true;
     }
 
@@ -122,7 +128,7 @@ export const ClassSlides = ({
   }, [searchParams, classes, students]);
 
   const [currentSlide, setCurrentSlide] = useState(1);
-  const [viewMode, setViewMode] = useState<"class" | "individual" | "situation" | "school">("class");
+  const [viewMode, setViewMode] = useState<ViewMode>("class");
   const [selectedSituation, setSelectedSituation] = useState<SituationType | "">("");
   const [schoolName, setSchoolName] = useState("Instituição de Ensino");
   const [schoolPeriod, setSchoolPeriod] = useState("all");
@@ -194,12 +200,6 @@ export const ClassSlides = ({
   }, { enabled: enabled && viewMode === "school" });
 
   const schoolGrades = useMemo(() => {
-    // Debug log
-    if (viewMode === 'school') {
-      console.log(`[ClassSlides] Filtering for year: ${selectedCalendarYear}`);
-      console.log(`[ClassSlides] Total raw grades: ${rawSchoolGrades.length}`);
-    }
-
     const filtered = rawSchoolGrades.filter(g => {
       // 1. Try to filter by School Year (Series) logic first - most robust for longitudinal data
       const cls = classes.find(c => c.id === g.classId);
@@ -222,19 +222,15 @@ export const ClassSlides = ({
       try {
         const yearStr = g.recordedAt.substring(0, 4);
         gradeYear = parseInt(yearStr, 10);
-      } catch (e) {
+      } catch {
         const date = new Date(g.recordedAt);
         gradeYear = date.getFullYear();
       }
 
       return gradeYear === Number(selectedCalendarYear);
     });
-
-    if (viewMode === 'school') {
-      console.log(`[ClassSlides] Filtered grades: ${filtered.length} / ${rawSchoolGrades.length}`);
-    }
     return filtered;
-  }, [rawSchoolGrades, selectedCalendarYear, viewMode, classes]);
+  }, [rawSchoolGrades, selectedCalendarYear, classes]);
 
   const classData = classes.find((c) => c.id === selectedClass);
   useEffect(() => {
@@ -908,7 +904,7 @@ export const ClassSlides = ({
     setIsExporting(true);
     setExportingIndex(0);
 
-    const toast_id = toast({
+    toast({
       title: "Iniciando exportação...",
       description: "Preparando os slides para o PDF.",
     });
@@ -920,7 +916,11 @@ export const ClassSlides = ({
       const fileName =
         viewMode === "class"
           ? `apresentacao-turma-${classData?.name || "turma"}.pdf`
-          : `apresentacao-aluno-${studentData?.name || "aluno"}.pdf`;
+          : viewMode === "individual"
+            ? `apresentacao-aluno-${studentData?.name || "aluno"}.pdf`
+            : viewMode === "situation"
+              ? `apresentacao-situacao-${selectedSituation || "filtro"}-${classData?.name || "turma"}.pdf`
+              : `apresentacao-escola-${schoolName || "escola"}.pdf`;
 
       startSequentialPDF();
 
@@ -985,7 +985,7 @@ export const ClassSlides = ({
           <Tabs
             value={viewMode}
             onValueChange={(v) => {
-              setViewMode(v as "class" | "individual" | "situation" | "school");
+              setViewMode(v as ViewMode);
               setCurrentSlide(1);
               if (v === "situation") {
                 setSelectedSituation("");

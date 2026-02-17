@@ -414,11 +414,11 @@ export const StudentApprovalManager = () => {
           {/* Abas */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2 bg-muted p-1">
-              <TabsTrigger value="quarter" className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+              <TabsTrigger value="quarter">
                 <BookOpen className="h-4 w-4 mr-2" />
                 Por Bimestre
               </TabsTrigger>
-              <TabsTrigger value="final" className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+              <TabsTrigger value="final">
                 <Users className="h-4 w-4 mr-2" />
                 Final do Ano
               </TabsTrigger>

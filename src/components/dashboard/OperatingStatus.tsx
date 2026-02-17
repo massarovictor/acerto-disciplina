@@ -1,10 +1,11 @@
+import type { ComponentType } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Users, GraduationCap, AlertTriangle } from "lucide-react";
 
 interface StatusCardProps {
     label: string;
     value: number | string;
-    icon: any;
+    icon: ComponentType<{ className?: string }>;
     colorClass: string;
     bgClass: string;
     description?: string;
@@ -40,8 +41,8 @@ export const OperatingStatus = ({ studentsCount, classesCount, pendingIncidentsC
                 label="Alunos Ativos"
                 value={studentsCount}
                 icon={Users}
-                colorClass="text-blue-600 dark:text-blue-400"
-                bgClass="bg-blue-100 dark:bg-blue-900/30"
+                colorClass="text-blue-600 dark:text-[#2563EB]"
+                bgClass="bg-blue-100 dark:bg-[#2563EB]/20"
                 description="Matriculados"
             />
 
@@ -50,8 +51,8 @@ export const OperatingStatus = ({ studentsCount, classesCount, pendingIncidentsC
                 value={pendingIncidentsCount}
                 icon={AlertTriangle}
                 // Destaque visual apenas se houver pendências
-                colorClass={pendingIncidentsCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"}
-                bgClass={pendingIncidentsCount > 0 ? "bg-amber-100 dark:bg-amber-900/30" : "bg-green-100 dark:bg-green-900/30"}
+                colorClass={pendingIncidentsCount > 0 ? "text-amber-600 dark:text-[#F59E0B]" : "text-green-600 dark:text-[#10B981]"}
+                bgClass={pendingIncidentsCount > 0 ? "bg-amber-100 dark:bg-[#F59E0B]/20" : "bg-green-100 dark:bg-[#10B981]/20"}
                 description={pendingIncidentsCount === 1 ? "Requer atenção" : pendingIncidentsCount > 1 ? "Requerem atenção" : "Tudo em dia!"}
             />
 
@@ -59,8 +60,8 @@ export const OperatingStatus = ({ studentsCount, classesCount, pendingIncidentsC
                 label="Turmas Ativas"
                 value={classesCount}
                 icon={GraduationCap}
-                colorClass="text-indigo-600 dark:text-indigo-400"
-                bgClass="bg-indigo-100 dark:bg-indigo-900/30"
+                colorClass="text-indigo-600 dark:text-[#2563EB]"
+                bgClass="bg-indigo-100 dark:bg-[#2563EB]/20"
                 description="Em andamento"
             />
         </div>

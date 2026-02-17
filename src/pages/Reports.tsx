@@ -43,7 +43,7 @@ const Reports = () => {
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 bg-muted/20 p-1">
+        <TabsList className="grid w-full grid-cols-2 bg-muted p-1">
           <TabsTrigger value="integrated">Relatórios Integrados</TabsTrigger>
           <TabsTrigger value="slides">Slides de Apresentação</TabsTrigger>
         </TabsList>

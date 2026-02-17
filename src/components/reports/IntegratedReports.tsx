@@ -7,6 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -19,6 +20,8 @@ import { Badge } from "@/components/ui/badge";
 import {
   Users,
   FileDown,
+  FileSpreadsheet,
+  Trophy,
   UserCheck,
   GraduationCap,
   AlertTriangle,
@@ -29,6 +32,7 @@ import {
   useProfessionalSubjects,
   useProfessionalSubjectTemplates,
   useGradesScoped,
+  useGradesAnalytics,
   useHistoricalGradesScoped,
   useExternalAssessmentsScoped,
 } from "@/hooks/useData";
@@ -43,6 +47,8 @@ import {
 import { generateStudentReportPDF } from "@/lib/studentReportPdfExport";
 import { generateProfessionalClassReportPDF } from "@/lib/classReportPdfExport";
 import { generateTrajectoryReportPDF } from "@/lib/trajectoryReportPdfExport";
+import { exportClassRankingsWorkbook, exportClassRankingsPdf, type RankingType } from "@/lib/excelExport";
+import { getSchoolConfig, getDefaultConfig } from "@/lib/schoolConfig";
 import { SUBJECT_AREAS, QUARTERS, FUNDAMENTAL_SUBJECT_AREAS } from "@/lib/subjects";
 import { calculateCurrentYearFromCalendar } from "@/lib/classYearCalculator";
 
@@ -52,6 +58,24 @@ interface IntegratedReportsProps {
   incidents: Incident[];
   enabled?: boolean;
 }
+
+const normalizeSubjectToken = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
+const getDefaultSchoolYearForClass = (classInfo: Class): 1 | 2 | 3 => {
+  if (classInfo.startCalendarYear) {
+    return calculateCurrentYearFromCalendar(classInfo.startCalendarYear);
+  }
+
+  const defaultYear = classInfo.currentYear ?? 1;
+  return [1, 2, 3].includes(defaultYear as number)
+    ? (defaultYear as 1 | 2 | 3)
+    : 1;
+};
 
 export const IntegratedReports = ({
   classes,
@@ -65,13 +89,22 @@ export const IntegratedReports = ({
   const [selectedIndividualPeriod, setSelectedIndividualPeriod] =
     useState<string>("anual");
   const [selectedSchoolYear, setSelectedSchoolYear] = useState<1 | 2 | 3>(1);
+  const [selectedRankingSchoolYears, setSelectedRankingSchoolYears] = useState<Array<1 | 2 | 3>>([1]);
+  const [selectedRankingType, setSelectedRankingType] = useState<RankingType>("general");
+  const [includeRankingIncidents, setIncludeRankingIncidents] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isExportingRankingXls, setIsExportingRankingXls] = useState(false);
+  const [isExportingRankingPdf, setIsExportingRankingPdf] = useState(false);
   const trajectoryFeatureIncomplete = true;
   const { toast } = useToast();
   const { grades, loading: isGradesLoading } = useGradesScoped({
     classId: selectedClass || undefined,
     schoolYear: selectedSchoolYear,
   }, { enabled });
+  const { grades: classGradesAllYears, loading: isClassGradesAllYearsLoading } = useGradesAnalytics(
+    { classId: selectedClass || undefined },
+    { enabled: enabled && !!selectedClass },
+  );
   const { historicalGrades } = useHistoricalGradesScoped(
     selectedStudent || undefined,
     { enabled }
@@ -89,6 +122,23 @@ export const IntegratedReports = ({
     { value: 1, label: "1º ano" },
     { value: 2, label: "2º ano" },
     { value: 3, label: "3º ano" },
+  ];
+  const rankingTypeOptions: Array<{
+    value: RankingType;
+    label: string;
+  }> = [
+    {
+      value: "general",
+      label: "Ranking Geral",
+    },
+    {
+      value: "common",
+      label: "Ranking Base Comum",
+    },
+    {
+      value: "technical",
+      label: "Ranking Base Técnica",
+    },
   ];
 
   const selectedClassData = useMemo(
@@ -108,20 +158,22 @@ export const IntegratedReports = ({
       return;
     }
 
-    // Usar startCalendarYear para cálculo simples: anoAtual - anoInício + 1
-    if (classInfo.startCalendarYear) {
-      const calculatedYear = calculateCurrentYearFromCalendar(
-        classInfo.startCalendarYear,
-      );
-      setSelectedSchoolYear(calculatedYear);
-    } else {
-      // Fallback para currentYear armazenado
-      const defaultYear = classInfo.currentYear ?? 1;
-      const normalizedYear = [1, 2, 3].includes(defaultYear as number)
-        ? (defaultYear as 1 | 2 | 3)
-        : 1;
-      setSelectedSchoolYear(normalizedYear);
+    setSelectedSchoolYear(getDefaultSchoolYearForClass(classInfo));
+  }, [selectedClass, classes]);
+
+  useEffect(() => {
+    if (!selectedClass) {
+      setSelectedRankingSchoolYears([1]);
+      return;
     }
+
+    const classInfo = classes.find((cls) => cls.id === selectedClass);
+    if (!classInfo) {
+      setSelectedRankingSchoolYears([1]);
+      return;
+    }
+
+    setSelectedRankingSchoolYears([getDefaultSchoolYearForClass(classInfo)]);
   }, [selectedClass, classes]);
 
   const parseLocalDate = (value: string) => new Date(`${value}T00:00:00`);
@@ -347,6 +399,38 @@ export const IntegratedReports = ({
       ),
     [classIncidents, individualPeriodRange],
   );
+  const rankingSchoolYearRanges = useMemo(
+    () =>
+      selectedRankingSchoolYears
+        .map((year) => getSchoolYearRange(effectiveStartYearDate, year))
+        .filter((range): range is { start: Date; end: Date } => range !== null),
+    [effectiveStartYearDate, selectedRankingSchoolYears],
+  );
+  const rankingIncidentsForExport = useMemo(() => {
+    if (!selectedClass || !includeRankingIncidents) return [];
+
+    return incidents
+      .filter((incident) => incident.classId === selectedClass)
+      .filter((incident) => {
+        if (rankingSchoolYearRanges.length === 0) return true;
+        return rankingSchoolYearRanges.some((range) =>
+          isDateInRange(incident.date, range),
+        );
+      });
+  }, [
+    incidents,
+    includeRankingIncidents,
+    selectedClass,
+    rankingSchoolYearRanges,
+  ]);
+  const rankingStudentsWithIncidentsCount = useMemo(() => {
+    if (!includeRankingIncidents) return 0;
+    const studentIds = new Set<string>();
+    rankingIncidentsForExport.forEach((incident) => {
+      incident.studentIds.forEach((studentId) => studentIds.add(studentId));
+    });
+    return studentIds.size;
+  }, [includeRankingIncidents, rankingIncidentsForExport]);
 
   // DISABLED: Attendance feature temporarily removed
   // const classAttendance = useMemo(
@@ -360,7 +444,7 @@ export const IntegratedReports = ({
   //       : [],
   //   [attendance, selectedClass, schoolYearRange]
   // );
-  const classAttendance: any[] = []; // Empty array - attendance disabled
+  const classAttendance: Array<{ date: string }> = []; // Empty array - attendance disabled
   const classAttendanceForPeriod = useMemo(
     () =>
       classAttendance.filter((record) =>
@@ -392,6 +476,29 @@ export const IntegratedReports = ({
     [selectedClass, getProfessionalSubjects],
   );
 
+  const rankingTemplateSubjects = useMemo(() => {
+    if (!selectedClassData?.templateId) return [];
+    const template = templates.find((t) => t.id === selectedClassData.templateId);
+    if (!template) return [];
+
+    return template.subjectsByYear
+      .filter((yearData) => selectedRankingSchoolYears.includes(yearData.year))
+      .flatMap((yearData) => yearData.subjects || []);
+  }, [templates, selectedClassData?.templateId, selectedRankingSchoolYears]);
+  const rankingGradeSubjectsBySelectedYears = useMemo(() => {
+    const selectedYearsSet = new Set(selectedRankingSchoolYears);
+    const subjects = new Set<string>();
+
+    classGradesAllYears
+      .filter((grade) => selectedYearsSet.has((grade.schoolYear ?? 1) as 1 | 2 | 3))
+      .forEach((grade) => {
+        const normalized = normalizeSubjectToken(grade.subject);
+        if (normalized) subjects.add(normalized);
+      });
+
+    return subjects;
+  }, [classGradesAllYears, selectedRankingSchoolYears]);
+
   const professionalSubjects = useMemo(() => {
     const unique = new Set<string>();
     [...templateSubjects, ...manualSubjects].forEach((subject) => {
@@ -401,6 +508,26 @@ export const IntegratedReports = ({
     });
     return Array.from(unique);
   }, [templateSubjects, manualSubjects]);
+
+  const rankingTechnicalSubjects = useMemo(() => {
+    const unique = new Set<string>();
+    const templateSubjectSet = new Set(
+      rankingTemplateSubjects.map((subject) => normalizeSubjectToken(subject)),
+    );
+
+    [...rankingTemplateSubjects, ...manualSubjects].forEach((subject) => {
+      if (subject?.trim()) {
+        const normalized = normalizeSubjectToken(subject);
+        const belongsToSelectedYears =
+          templateSubjectSet.has(normalized) ||
+          rankingGradeSubjectsBySelectedYears.has(normalized);
+        if (belongsToSelectedYears) {
+          unique.add(subject.trim());
+        }
+      }
+    });
+    return Array.from(unique);
+  }, [rankingTemplateSubjects, manualSubjects, rankingGradeSubjectsBySelectedYears]);
   const individualReportSubjects = useMemo(() => {
     if (!selectedClassData) return [];
     const gradeSubjects = [
@@ -472,8 +599,134 @@ export const IntegratedReports = ({
     selectedStudentData,
     individualGradesForPeriod,
     individualIncidentsForPeriod,
-    individualAttendanceForPeriod,
   ]);
+
+  const toggleRankingSchoolYear = (year: 1 | 2 | 3, checked: boolean) => {
+    setSelectedRankingSchoolYears((prev) => {
+      if (checked) {
+        return Array.from(new Set([...prev, year])).sort((a, b) => a - b) as Array<1 | 2 | 3>;
+      }
+
+      if (prev.length === 1) {
+        toast({
+          variant: "destructive",
+          title: "Selecione ao menos um ano",
+          description: "O ranking precisa de pelo menos um ano de curso.",
+        });
+        return prev;
+      }
+
+      return prev.filter((currentYear) => currentYear !== year);
+    });
+  };
+
+  const validateRankingExport = () => {
+    if (!selectedClassData) return false;
+    if (selectedRankingSchoolYears.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Selecione os anos",
+        description: "Marque pelo menos um ano de curso para exportar o ranking.",
+      });
+      return;
+    }
+    if (isClassGradesAllYearsLoading) {
+      toast({
+        variant: "destructive",
+        title: "Aguarde o carregamento",
+        description: "As notas da turma ainda estão sendo carregadas para exportação.",
+      });
+      return false;
+    }
+    return true;
+  };
+
+  const loadSchoolName = async () => {
+    let schoolName = getDefaultConfig().schoolName;
+    try {
+      const config = await getSchoolConfig();
+      schoolName = config.schoolName || schoolName;
+    } catch {
+      // Fallback silencioso para configuração padrão da escola.
+    }
+    return schoolName;
+  };
+
+  const handleExportClassRankingXls = async () => {
+    if (!selectedClassData) return;
+    if (!validateRankingExport()) return;
+
+    setIsExportingRankingXls(true);
+    try {
+      const schoolName = await loadSchoolName();
+
+      exportClassRankingsWorkbook({
+        schoolName,
+        classData: selectedClassData,
+        students: classStudents,
+        grades: classGradesAllYears,
+        selectedSchoolYears: selectedRankingSchoolYears,
+        technicalSubjects: rankingTechnicalSubjects,
+        rankingType: selectedRankingType,
+        rankingIncidents: {
+          includeIncidents: includeRankingIncidents,
+          incidents: includeRankingIncidents ? rankingIncidentsForExport : [],
+        },
+      });
+
+      toast({
+        title: "Ranking XLS gerado",
+        description: `Planilha da turma ${selectedClassData.name} exportada com sucesso.`,
+      });
+    } catch (error) {
+      console.error("Erro ao exportar ranking XLS:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro na exportação",
+        description: "Não foi possível gerar a planilha XLS do ranking.",
+      });
+    } finally {
+      setIsExportingRankingXls(false);
+    }
+  };
+
+  const handleExportClassRankingPdf = async () => {
+    if (!selectedClassData) return;
+    if (!validateRankingExport()) return;
+
+    setIsExportingRankingPdf(true);
+    try {
+      const schoolName = await loadSchoolName();
+
+      await exportClassRankingsPdf({
+        schoolName,
+        classData: selectedClassData,
+        students: classStudents,
+        grades: classGradesAllYears,
+        selectedSchoolYears: selectedRankingSchoolYears,
+        technicalSubjects: rankingTechnicalSubjects,
+        rankingType: selectedRankingType,
+        rankingIncidents: {
+          includeIncidents: includeRankingIncidents,
+          incidents: includeRankingIncidents ? rankingIncidentsForExport : [],
+        },
+      });
+
+      toast({
+        title: "Ranking PDF gerado",
+        description: `Relatório em PDF da turma ${selectedClassData.name} exportado com sucesso.`,
+      });
+    } catch (error) {
+      console.error("Erro ao exportar ranking PDF:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro na exportação",
+        description: "Não foi possível gerar o PDF do ranking.",
+      });
+    } finally {
+      setIsExportingRankingPdf(false);
+    }
+  };
 
   const handleGenerateClassReport = async () => {
     if (!selectedClassData) return;
@@ -604,15 +857,16 @@ export const IntegratedReports = ({
 
   // Dialog Control States
   const [showClassReportDialog, setShowClassReportDialog] = useState(false);
+  const [showClassRankingDialog, setShowClassRankingDialog] = useState(false);
   const [showIndividualReportDialog, setShowIndividualReportDialog] = useState(false);
   const [showTrajectoryReportDialog, setShowTrajectoryReportDialog] = useState(false);
 
   return (
     <>
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         {/* Card 1: Relatório de Turma (Entry Point) */}
         <Card
-          className="cursor-pointer hover:shadow-md transition-all h-full"
+          className="cursor-pointer hover:shadow-md transition-all h-full flex flex-col"
           onClick={() => {
             setSelectedPeriod("anual");
             setShowClassReportDialog(true);
@@ -624,22 +878,40 @@ export const IntegratedReports = ({
               Relatório de Turma
             </CardTitle>
             <CardDescription>
-              Boletim geral da turma com médias e ocorrências.
+              Síntese da turma com desempenho acadêmico e indicadores disciplinares.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Gere um PDF compilado com o desempenho de todos os alunos da turma selecionada.
-            </p>
-            <Button variant="outline" className="w-full">
+          <CardContent className="flex flex-1 flex-col">
+            <Button variant="outline" className="w-full mt-auto">
               Configurar e Gerar
             </Button>
           </CardContent>
         </Card>
 
-        {/* Card 2: Relatório Individual (Entry Point) */}
+        {/* Card 2: Ranking de Turma (Entry Point) */}
         <Card
-          className="cursor-pointer hover:shadow-md transition-all h-full"
+          className="cursor-pointer hover:shadow-md transition-all h-full flex flex-col"
+          onClick={() => setShowClassRankingDialog(true)}
+        >
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Trophy className="h-5 w-5 text-primary" />
+              Ranking de Turma
+            </CardTitle>
+            <CardDescription>
+              Ranking acadêmico com comparação por médias e filtros de ocorrências.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-1 flex-col">
+            <Button variant="outline" className="w-full mt-auto">
+              Configurar Ranking
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Relatório Individual (Entry Point) */}
+        <Card
+          className="cursor-pointer hover:shadow-md transition-all h-full flex flex-col"
           onClick={() => {
             setSelectedIndividualPeriod("anual");
             setShowIndividualReportDialog(true);
@@ -651,22 +923,19 @@ export const IntegratedReports = ({
               Relatório Individual
             </CardTitle>
             <CardDescription>
-              Boletim detalhado por aluno.
+              Análise individual com foco em desempenho, risco e acompanhamento.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Visualize indicadores de atenção e gere um relatório focado em um único aluno.
-            </p>
-            <Button variant="outline" className="w-full">
+          <CardContent className="flex flex-1 flex-col">
+            <Button variant="outline" className="w-full mt-auto">
               Selecionar Aluno
             </Button>
           </CardContent>
         </Card>
 
-        {/* Card 3: Relatório de Trajetória (Entry Point) */}
+        {/* Card 4: Relatório de Trajetória (Entry Point) */}
         <Card
-          className="cursor-pointer hover:shadow-md transition-all h-full"
+          className="cursor-pointer hover:shadow-md transition-all h-full flex flex-col"
           onClick={() => setShowTrajectoryReportDialog(true)}
         >
           <CardHeader className="pb-2">
@@ -680,19 +949,11 @@ export const IntegratedReports = ({
               )}
             </CardTitle>
             <CardDescription>
-              Histórico escolar consolidado (parcial).
+              Histórico consolidado do aluno com evolução acadêmica longitudinal.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Gere um documento preliminar com histórico fundamental, avaliações externas e ensino médio.
-            </p>
-            {trajectoryFeatureIncomplete && (
-              <p className="text-xs text-warning mb-3">
-                Algumas análises ainda podem variar enquanto o módulo é finalizado.
-              </p>
-            )}
-            <Button variant="outline" className="w-full">
+          <CardContent className="flex flex-1 flex-col">
+            <Button variant="outline" className="w-full mt-auto">
               Gerar Trajetória (beta)
             </Button>
           </CardContent>
@@ -759,8 +1020,157 @@ export const IntegratedReports = ({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowClassReportDialog(false)}>Cancelar</Button>
-            <Button onClick={handleGenerateClassReport} disabled={!selectedClass || isGenerating}>
+            <Button
+              onClick={handleGenerateClassReport}
+              disabled={!selectedClass || isGenerating}
+            >
               {isGenerating ? "Gerando..." : "Baixar Relatório"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIALOG: Ranking XLS de Turma */}
+      <Dialog open={showClassRankingDialog} onOpenChange={setShowClassRankingDialog}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5 text-primary" />
+              Exportar Ranking de Turma
+            </DialogTitle>
+            <DialogDescription>
+              Gere ranking acadêmico em XLS ou PDF com médias e ocorrências conforme a configuração selecionada.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
+                <div className="space-y-2">
+                  <Label>Turma</Label>
+                  <Select
+                    value={selectedClass}
+                    onValueChange={(value) => {
+                      setSelectedClass(value);
+                      setSelectedStudent("");
+                    }}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Escolha a turma" /></SelectTrigger>
+                    <SelectContent>
+                      {classes.filter(c => !c.archived).map(cls => (
+                        <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Anos considerados</Label>
+                  <div className="rounded-lg border bg-background p-3 space-y-2">
+                    {schoolYearOptions.map((option) => (
+                      <label
+                        key={option.value}
+                        className="flex items-center gap-2 text-sm cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={selectedRankingSchoolYears.includes(option.value)}
+                          onCheckedChange={(checked) =>
+                            toggleRankingSchoolYear(option.value, checked === true)
+                          }
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    O cálculo usa todas as notas disponíveis dos anos selecionados.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Tipo de ranking</Label>
+                  <Select
+                    value={selectedRankingType}
+                    onValueChange={(value) =>
+                      setSelectedRankingType(value as RankingType)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {rankingTypeOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
+                <div className="space-y-2">
+                  <Label>Ocorrências</Label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={includeRankingIncidents}
+                      onCheckedChange={(checked) =>
+                        setIncludeRankingIncidents(checked === true)
+                      }
+                    />
+                    <span>Computar ocorrências no ranking</span>
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Quando ativado, conta todas as ocorrências do período selecionado, sem filtrar tipo ou status.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {selectedClassData && (
+              <div className="rounded-lg border bg-muted/40 p-4 text-sm grid gap-2 sm:grid-cols-2">
+                <div className="flex justify-between"><span>Alunos na turma:</span><span className="font-bold">{classStudents.length}</span></div>
+                <div className="flex justify-between"><span>Disciplinas técnicas detectadas:</span><span className="font-bold">{rankingTechnicalSubjects.length}</span></div>
+                <div className="flex justify-between"><span>Tipo selecionado:</span><span className="font-bold">{rankingTypeOptions.find((option) => option.value === selectedRankingType)?.label ?? "-"}</span></div>
+                <div className="flex justify-between"><span>Ocorrências computadas:</span><span className="font-bold">{includeRankingIncidents ? rankingIncidentsForExport.length : 0}</span></div>
+                <div className="flex justify-between"><span>Alunos com ocorrência:</span><span className="font-bold">{includeRankingIncidents ? rankingStudentsWithIncidentsCount : 0}</span></div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowClassRankingDialog(false)}>Cancelar</Button>
+            <Button
+              variant="outline"
+              onClick={handleExportClassRankingPdf}
+              disabled={
+                !selectedClass ||
+                isGenerating ||
+                isExportingRankingXls ||
+                isExportingRankingPdf ||
+                isClassGradesAllYearsLoading ||
+                selectedRankingSchoolYears.length === 0 ||
+                !selectedRankingType
+              }
+            >
+              <FileDown className="mr-2 h-4 w-4" />
+              {isExportingRankingPdf ? "Exportando PDF..." : "Exportar PDF"}
+            </Button>
+            <Button
+              onClick={handleExportClassRankingXls}
+              disabled={
+                !selectedClass ||
+                isGenerating ||
+                isExportingRankingXls ||
+                isExportingRankingPdf ||
+                isClassGradesAllYearsLoading ||
+                selectedRankingSchoolYears.length === 0 ||
+                !selectedRankingType
+              }
+            >
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              {isExportingRankingXls ? "Exportando XLS..." : "Exportar Ranking XLS"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -103,7 +103,7 @@ const Login = () => {
       <Card className="w-full max-w-md shadow-lg border-t-4 border-t-primary">
         <CardHeader className="space-y-2 text-center pb-2">
           <div className="flex justify-center">
-            <div className="bg-brand-500 text-white p-3 rounded-full ring-4 ring-brand-500/15">
+            <div className="bg-brand-500 text-white p-3 rounded-full">
               <img src="/logo-white.svg" alt="MAVIC Logo" className="h-12 w-12" />
             </div>
           </div>

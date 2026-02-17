@@ -44,9 +44,9 @@ const Classes = () => {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3 bg-muted p-1">
-          <TabsTrigger value="manage" className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">Gerenciar Turmas</TabsTrigger>
-          <TabsTrigger value="create" className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">Criar Nova Turma</TabsTrigger>
-          <TabsTrigger value="templates" className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">Templates</TabsTrigger>
+          <TabsTrigger value="manage">Gerenciar Turmas</TabsTrigger>
+          <TabsTrigger value="create">Criar Nova Turma</TabsTrigger>
+          <TabsTrigger value="templates">Templates</TabsTrigger>
         </TabsList>
 
         <TabsContent value="manage" className="space-y-6 mt-6">

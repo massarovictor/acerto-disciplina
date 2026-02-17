@@ -266,12 +266,12 @@ const Incidents = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Em Aberto</CardTitle>
-            <div className="p-2 rounded-lg bg-destructive/15 dark:bg-destructive/20 text-destructive dark:text-destructive">
+            <div className="p-2 rounded-lg bg-[#DC2626]/15 dark:bg-[#DC2626]/20 text-[#DC2626]">
               <AlertTriangle className="h-4 w-4" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive dark:text-destructive">{openIncidents.length}</div>
+            <div className="text-2xl font-bold text-[#DC2626]">{openIncidents.length}</div>
             <p className="text-xs text-muted-foreground mt-1">Requerem atenção imediata</p>
           </CardContent>
         </Card>
@@ -279,12 +279,12 @@ const Incidents = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Acompanhamento</CardTitle>
-            <div className="p-2 rounded-lg bg-warning/15 dark:bg-warning/20 text-warning dark:text-warning">
+            <div className="p-2 rounded-lg bg-[#F59E0B]/15 dark:bg-[#F59E0B]/20 text-[#F59E0B]">
               <Clock className="h-4 w-4" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-warning dark:text-warning">{followUpIncidents.length}</div>
+            <div className="text-2xl font-bold text-[#F59E0B]">{followUpIncidents.length}</div>
             <p className="text-xs text-muted-foreground mt-1">Casos em monitoramento</p>
           </CardContent>
         </Card>
@@ -292,12 +292,12 @@ const Incidents = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Resolvidas</CardTitle>
-            <div className="p-2 rounded-lg bg-success/15 dark:bg-success/20 text-success dark:text-success">
+            <div className="p-2 rounded-lg bg-[#10B981]/15 dark:bg-[#10B981]/20 text-[#10B981]">
               <CheckCircle2 className="h-4 w-4" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success dark:text-success">{resolvedIncidents.length}</div>
+            <div className="text-2xl font-bold text-[#10B981]">{resolvedIncidents.length}</div>
             <p className="text-xs text-muted-foreground mt-1">Casos fechados com sucesso</p>
           </CardContent>
         </Card>
@@ -332,7 +332,7 @@ const Incidents = () => {
 
       {/* Tabs by Status */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'aberta' | 'acompanhamento' | 'resolvida')} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-muted/20 p-1">
+        <TabsList className="grid w-full grid-cols-3 bg-muted p-1">
           <TabsTrigger value="aberta">
             Abertas ({filteredOpenIncidents.length})
           </TabsTrigger>
@@ -455,8 +455,8 @@ const Incidents = () => {
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="border-b pb-4 mb-4">
             <DialogTitle className="flex items-center gap-2 text-xl">
-              <div className="p-2 rounded-full bg-destructive/15 dark:bg-destructive/20">
-                <AlertTriangle className="h-5 w-5 text-destructive dark:text-destructive" />
+              <div className="p-2 rounded-full bg-[#DC2626]/15 dark:bg-[#DC2626]/20">
+                <AlertTriangle className="h-5 w-5 text-[#DC2626]" />
               </div>
               Registrar Nova Ocorrência
             </DialogTitle>

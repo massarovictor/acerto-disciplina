@@ -10,7 +10,6 @@
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import {
     AlertTriangle,
     Users,
@@ -58,10 +57,9 @@ interface BehaviorAnalyticsPanelProps {
 }
 
 import {
-    getSeverityColor,
     getSeverityLabel,
-    getUrgencyDot
 } from '@/lib/incidentUtils';
+import { INCIDENT_SEVERITY_COLOR_HEX } from '@/lib/statusPalette';
 
 const InsightIcon = ({ type }: { type: Insight['type'] }) => {
     const iconClass = 'h-4 w-4';
@@ -168,11 +166,15 @@ export function BehaviorAnalyticsPanel({
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {incidentsBySeverity.map((item) => {
+                                const severityColor = INCIDENT_SEVERITY_COLOR_HEX[item.severity];
                                 return (
                                     <div key={item.severity} className="space-y-2">
                                         <div className="flex items-center justify-between text-sm">
                                             <div className="flex items-center gap-2">
-                                                <div className={`w-3 h-3 rounded-full ${getUrgencyDot(item.severity)}`} />
+                                                <div
+                                                    className="w-3 h-3 rounded-full"
+                                                    style={{ backgroundColor: severityColor }}
+                                                />
                                                 <span>{getSeverityLabel(item.severity)}</span>
                                             </div>
                                             <div className="flex items-center gap-2">
@@ -180,11 +182,15 @@ export function BehaviorAnalyticsPanel({
                                                 <span className="text-muted-foreground">({item.percent.toFixed(0)}%)</span>
                                             </div>
                                         </div>
-                                        <Progress
-                                            value={item.percent}
-                                            className="h-2"
-                                            indicatorClassName={getUrgencyDot(item.severity)}
-                                        />
+                                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full rounded-full transition-all duration-500"
+                                                style={{
+                                                    width: `${item.percent}%`,
+                                                    backgroundColor: severityColor,
+                                                }}
+                                            />
+                                        </div>
                                     </div>
                                 );
                             })}
