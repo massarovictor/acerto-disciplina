@@ -1,5 +1,6 @@
 import { Incident, IncidentSeverity, Student } from '@/types';
 import { isPerformanceConvocationIncident } from './incidentClassification';
+import { getCurrentBrasiliaYear, getBrasiliaYear } from './brasiliaDate';
 
 /**
  * Action levels based on accumulation rules:
@@ -10,25 +11,52 @@ import { isPerformanceConvocationIncident } from './incidentClassification';
  */
 export type ActionLevel = 'conversa_registro' | 'comunicado_pais' | 'suspensao_1_dia' | 'suspensao_3_dias';
 
+const actionLevelPriority: Record<ActionLevel, number> = {
+  conversa_registro: 0,
+  comunicado_pais: 1,
+  suspensao_1_dia: 2,
+  suspensao_3_dias: 3,
+};
+
+const getActionLevelFromCounts = (counts: {
+  leve: number;
+  intermediaria: number;
+  grave: number;
+  gravissima: number;
+}): ActionLevel => {
+  if (counts.gravissima >= 1) {
+    return 'suspensao_3_dias';
+  }
+
+  if (counts.grave >= 1 || counts.intermediaria >= 2 || counts.leve >= 3) {
+    return 'suspensao_1_dia';
+  }
+
+  if (counts.intermediaria >= 1 || counts.leve >= 2) {
+    return 'comunicado_pais';
+  }
+
+  return 'conversa_registro';
+};
+
 /**
  * Get incident counts for a student, filtered by current school year
+ * considering all disciplinary occurrences regardless of workflow status.
  */
 export function getStudentIncidentCounts(
   studentId: string,
   allIncidents: Incident[],
   currentSchoolYear?: number
 ): { leve: number; intermediaria: number; grave: number; gravissima: number } {
-  const now = new Date();
-  const schoolYear = currentSchoolYear ?? now.getFullYear();
+  const schoolYear = currentSchoolYear ?? getCurrentBrasiliaYear();
 
-  // Filter incidents: only validated/resolved, belonging to student, within school year
+  // Filter incidents: disciplinary incidents belonging to student within school year.
   const studentIncidents = allIncidents.filter(incident => {
     if (!incident.studentIds.includes(studentId)) return false;
-    if (incident.status === 'aberta') return false; // Only count validated incidents
     if (isPerformanceConvocationIncident(incident)) return false;
 
     // Filter by school year (incidents from current academic year)
-    const incidentYear = new Date(incident.date).getFullYear();
+    const incidentYear = getBrasiliaYear(incident.date);
     return incidentYear === schoolYear;
   });
 
@@ -48,8 +76,8 @@ export function getStudentIncidentCounts(
  * Rules:
  * - 1 leve: conversa_registro
  * - 2 leves OR 1 intermediária: comunicado_pais
- * - 3 leves OR 2 intermediárias OR 1 grave: suspensao_1_dia
- * - 1 gravíssima: suspensao_3_dias
+ * - 3 leves OR 2 intermediárias OR 1 grave (atual ou histórico): suspensao_1_dia
+ * - 1 gravíssima (atual ou histórico): suspensao_3_dias
  */
 export function getRequiredActionLevel(
   studentIds: string[],
@@ -57,30 +85,22 @@ export function getRequiredActionLevel(
   allIncidents: Incident[],
   currentSchoolYear?: number
 ): ActionLevel {
-  // Gravíssima always requires 3-day suspension
-  if (currentSeverity === 'gravissima') {
-    return 'suspensao_3_dias';
-  }
+  const idsToEvaluate = studentIds.length > 0 ? studentIds : ['__virtual__'];
 
-  // Get max counts across all involved students
-  const counts = studentIds.map(id => getStudentIncidentCounts(id, allIncidents, currentSchoolYear));
-  const maxLeve = Math.max(0, ...counts.map(c => c.leve));
-  const maxIntermediaria = Math.max(0, ...counts.map(c => c.intermediaria));
+  // Simulate the new incident in each student's history and enforce the highest required action.
+  return idsToEvaluate.reduce<ActionLevel>((highestLevel, studentId) => {
+    const baseCounts = studentId === '__virtual__'
+      ? { leve: 0, intermediaria: 0, grave: 0, gravissima: 0 }
+      : getStudentIncidentCounts(studentId, allIncidents, currentSchoolYear);
 
-  // Current incident is GRAVE, or accumulated thresholds reached
-  // 3 leves OR 2 intermediárias OR 1 grave → suspensão 1 dia
-  if (currentSeverity === 'grave' || maxIntermediaria >= 2 || maxLeve >= 3) {
-    return 'suspensao_1_dia';
-  }
+    const simulatedCounts = { ...baseCounts };
+    simulatedCounts[currentSeverity] += 1;
 
-  // Current is INTERMEDIÁRIA, or 2+ leves accumulated → comunicado pais
-  // 2 leves OR 1 intermediária → comunicado pais
-  if (currentSeverity === 'intermediaria' || maxLeve >= 2) {
-    return 'comunicado_pais';
-  }
-
-  // Default: first leve
-  return 'conversa_registro';
+    const requiredForStudent = getActionLevelFromCounts(simulatedCounts);
+    return actionLevelPriority[requiredForStudent] > actionLevelPriority[highestLevel]
+      ? requiredForStudent
+      : highestLevel;
+  }, 'conversa_registro');
 }
 
 /**

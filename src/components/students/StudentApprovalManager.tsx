@@ -8,13 +8,18 @@ import { useClasses, useStudents, useGradesScoped, useProfessionalSubjects, useP
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle2, XCircle, AlertTriangle, RefreshCw, Clock, Users, BookOpen } from 'lucide-react';
-import { calculateClassAcademicStatus, QuarterCheckResult } from '@/lib/approvalCalculator';
+import {
+  calculateClassAcademicStatus,
+  QuarterCheckResult,
+  StudentAcademicStatusWithPending,
+} from '@/lib/approvalCalculator';
 import { getAcademicYear, calculateCurrentYearFromCalendar } from '@/lib/classYearCalculator';
 import { generateQuarterIncidents, checkLowPerformanceStudents } from '@/lib/autoIncidentGenerator';
 import { useIncidents } from '@/hooks/useData';
 import { useAuth } from '@/contexts/AuthContext';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { QUARTERS, SUBJECT_AREAS } from '@/lib/subjects';
+import { getCurrentBrasiliaYear } from '@/lib/brasiliaDate';
 
 export const StudentApprovalManager = () => {
   const { classes } = useClasses();
@@ -29,7 +34,7 @@ export const StudentApprovalManager = () => {
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedQuarter, setSelectedQuarter] = useState('1º Bimestre');
   const [selectedSchoolYear, setSelectedSchoolYear] = useState<1 | 2 | 3>(1);
-  const [academicStatuses, setAcademicStatuses] = useState<Record<string, any>>({});
+  const [academicStatuses, setAcademicStatuses] = useState<Record<string, StudentAcademicStatusWithPending>>({});
   const [quarterResults, setQuarterResults] = useState<(QuarterCheckResult & { studentName: string })[]>([]);
   const [pendingQuarterResults, setPendingQuarterResults] = useState<
     { studentId: string; studentName: string; missingSubjects: string[] }[]
@@ -38,7 +43,7 @@ export const StudentApprovalManager = () => {
     classId: selectedClass || undefined,
     schoolYear: selectedSchoolYear,
   });
-  const currentCalendarYear = new Date().getFullYear();
+  const currentCalendarYear = getCurrentBrasiliaYear();
 
   const classStudents = students
     .filter((s) => s.classId === selectedClass)
@@ -296,7 +301,7 @@ export const StudentApprovalManager = () => {
       selectedSchoolYear
     );
 
-    const statusesMap: Record<string, any> = {};
+    const statusesMap: Record<string, StudentAcademicStatusWithPending> = {};
     statuses.forEach((status) => {
       statusesMap[status.studentId] = status;
     });

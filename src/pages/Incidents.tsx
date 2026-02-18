@@ -30,6 +30,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
+import { formatBrasiliaDate } from '@/lib/brasiliaDate';
 
 const Incidents = () => {
   const { user, profile } = useAuth();
@@ -44,9 +45,9 @@ const Incidents = () => {
   const classFilter = incidentsUI.classFilter;
   const activeTab = incidentsUI.activeTab;
 
-  const setSearchTerm = (value: string) => setIncidentsUI({ searchTerm: value });
-  const setClassFilter = (value: string) => setIncidentsUI({ classFilter: value });
-  const setActiveTab = (value: 'aberta' | 'acompanhamento' | 'resolvida') => setIncidentsUI({ activeTab: value });
+  const setSearchTerm = useCallback((value: string) => setIncidentsUI({ searchTerm: value }), [setIncidentsUI]);
+  const setClassFilter = useCallback((value: string) => setIncidentsUI({ classFilter: value }), [setIncidentsUI]);
+  const setActiveTab = useCallback((value: 'aberta' | 'acompanhamento' | 'resolvida') => setIncidentsUI({ activeTab: value }), [setIncidentsUI]);
 
 
   const [managingIncident, setManagingIncident] = useState<Incident | null>(null);
@@ -162,8 +163,10 @@ const Incidents = () => {
     return (
       <div className="space-y-3">
         {incidentsList.map((incident) => {
-          const incidentClass = classes.find(c => c.id === incident.classId);
-          const incidentStudents = students.filter(s => incident.studentIds.includes(s.id));
+          const incidentClass = classMap.get(incident.classId);
+          const incidentStudents = incident.studentIds
+            .map((studentId) => studentMap.get(studentId))
+            .filter((student): student is NonNullable<typeof student> => Boolean(student));
           const canManage = canManageIncident(incident);
 
           return (
@@ -194,7 +197,7 @@ const Incidents = () => {
                   <span>•</span>
                   <span>{incident.episodes.length} registro(s)</span>
                   <span>•</span>
-                  <span>{new Date(incident.createdAt).toLocaleDateString('pt-BR')}</span>
+                  <span>{formatBrasiliaDate(incident.createdAt)}</span>
                 </div>
 
                 {incident.description && (
@@ -209,7 +212,8 @@ const Incidents = () => {
                   variant="ghost"
                   size="sm"
                   className="h-8 w-8 p-0"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     if (incident.status === 'acompanhamento') {
                       setInitialTab('followup');
                     } else {

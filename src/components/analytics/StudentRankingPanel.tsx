@@ -75,6 +75,7 @@ export function StudentRankingPanel({
   const [criticalSort, setCriticalSort] = useState<'risk' | 'average-asc' | 'average-desc' | 'name-asc' | 'name-desc'>('risk');
   const [criticalPage, setCriticalPage] = useState(1);
   const pageSize = 20;
+  type SortField = 'average' | 'name';
 
   useEffect(() => {
     if (focusTab) {
@@ -308,14 +309,14 @@ export function StudentRankingPanel({
     setCriticalPage(1);
   };
 
-  const SortButton = ({ label, field, isActive }: { label: string; field: 'average' | 'name'; isActive: boolean }) => {
+  const SortButton = ({ label, field, isActive }: { label: string; field: SortField; isActive: boolean }) => {
     const handleClick = () => {
       if (tabValue === 'top') {
         // Para top students: alterna entre asc e desc no campo selecionado
-        if (topSort === `${field}-asc`) {
-          setTopSort(`${field}-desc` as any);
+        if (field === 'average') {
+          setTopSort(topSort === 'average-asc' ? 'average-desc' : 'average-asc');
         } else {
-          setTopSort(`${field}-asc` as any);
+          setTopSort(topSort === 'name-asc' ? 'name-desc' : 'name-asc');
         }
       } else {
         // Para critical students: 

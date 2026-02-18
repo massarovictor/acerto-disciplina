@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Incident, IncidentStatus, FollowUpType } from '@/types';
+import { FollowUpRecord, Incident, IncidentStatus, FollowUpType } from '@/types';
 import { useIncidents, useClasses, useStudents } from '@/hooks/useData';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -34,6 +34,11 @@ import { sendIncidentEmail } from '@/lib/emailService';
 import { isPerformanceConvocationIncident } from '@/lib/incidentClassification';
 import { AddStudentsDialog } from './AddStudentsDialog';
 import { X } from 'lucide-react';
+import {
+  formatBrasiliaDate,
+  formatBrasiliaDateTime,
+  getBrasiliaISODate,
+} from '@/lib/brasiliaDate';
 
 interface IncidentManagementDialogProps {
   incident: Incident;
@@ -73,7 +78,7 @@ export const IncidentManagementDialog = ({
 
   // Campos do acompanhamento
   const [followUpType, setFollowUpType] = useState<FollowUpType>('conversa_individual');
-  const [followUpDate, setFollowUpDate] = useState(new Date().toISOString().split('T')[0]);
+  const [followUpDate, setFollowUpDate] = useState(getBrasiliaISODate());
   const [followUpResponsavel, setFollowUpResponsavel] = useState('');
   const [followUpMotivo, setFollowUpMotivo] = useState('');
   const [followUpAssuntosTratados, setFollowUpAssuntosTratados] = useState('');
@@ -84,6 +89,16 @@ export const IncidentManagementDialog = ({
   const [followUpDescricaoSituacao, setFollowUpDescricaoSituacao] = useState('');
   const [followUpNomeResponsavelPai, setFollowUpNomeResponsavelPai] = useState('');
   const [followUpGrauParentesco, setFollowUpGrauParentesco] = useState('');
+
+  const getLatestFollowUp = (followUps?: FollowUpRecord[]) => {
+    if (!followUps || followUps.length === 0) return null;
+    const sorted = [...followUps].sort((a, b) => {
+      const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+      if (dateDiff !== 0) return dateDiff;
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
+    return sorted[sorted.length - 1];
+  };
 
   // Sempre pega a versão mais recente dos incidents
   const currentIncident = incidents.find(i => i.id === incident.id) || incident;
@@ -99,13 +114,15 @@ export const IncidentManagementDialog = ({
   // Auto-preencher acompanhamento quando mudar para status acompanhamento
   useEffect(() => {
     if (currentIncident.status === 'acompanhamento' && !currentIncident.followUps?.length) {
+      const historicalIncidents = incidents.filter((item) => item.id !== currentIncident.id);
+
       // Calculate required action level based on severity + accumulated history
       const requiredLevel = isPerformanceConvocation
         ? 'comunicado_pais'
         : getRequiredActionLevel(
             currentIncident.studentIds,
             currentIncident.finalSeverity,
-            incidents
+            historicalIncidents
           );
       const requiredType = getRequiredFollowUpType(requiredLevel);
 
@@ -114,7 +131,7 @@ export const IncidentManagementDialog = ({
         : calculateSuggestedAction(
             currentIncident.studentIds,
             currentIncident.finalSeverity,
-            incidents,
+            historicalIncidents,
             students
           );
 
@@ -136,7 +153,8 @@ export const IncidentManagementDialog = ({
 
     // Se já tem acompanhamento, carregar os dados
     if (currentIncident.followUps?.length > 0) {
-      const followUp = currentIncident.followUps[0];
+      const followUp = getLatestFollowUp(currentIncident.followUps);
+      if (!followUp) return;
       setFollowUpType(followUp.type);
       setFollowUpDate(followUp.date);
       setFollowUpResponsavel(followUp.responsavel || '');
@@ -150,7 +168,7 @@ export const IncidentManagementDialog = ({
       setFollowUpNomeResponsavelPai(followUp.nomeResponsavelPai || '');
       setFollowUpGrauParentesco(followUp.grauParentesco || '');
     }
-  }, [currentIncident.status, currentIncident.followUps, incidents, students, currentIncident.studentIds, currentIncident.finalSeverity, isPerformanceConvocation]);
+  }, [currentIncident.id, currentIncident.status, currentIncident.followUps, incidents, students, currentIncident.studentIds, currentIncident.finalSeverity, isPerformanceConvocation]);
 
   const incidentClass = classes.find(c => c.id === currentIncident.classId);
   const incidentStudents = students.filter(s => currentIncident.studentIds.includes(s.id));
@@ -177,7 +195,9 @@ export const IncidentManagementDialog = ({
     (currentIncident.followUps?.length || 0) > 0 &&
     canManage;
   const canDownloadParentNotification =
-    currentIncident.status === 'acompanhamento' && canManage;
+    (currentIncident.status === 'acompanhamento' || currentIncident.status === 'resolvida') &&
+    canManage;
+  const canDownloadFinalReport = currentIncident.status === 'resolvida';
 
   const canAddStudents = canManage && currentIncident.status === 'acompanhamento';
 
@@ -238,18 +258,22 @@ export const IncidentManagementDialog = ({
     }
 
     const newStudentIds = currentIncident.studentIds.filter(id => id !== studentId);
+    try {
+      await updateIncident(currentIncident.id, {
+        studentIds: newStudentIds
+      });
 
-    // Se o removido era o único no followUp (caso raro de inconsistência), limpo? 
-    // Por simplicidade, apenas atualizamos a lista da ocorrência.
-
-    await updateIncident(currentIncident.id, {
-      studentIds: newStudentIds
-    });
-
-    toast({
-      title: 'Aluno removido',
-      description: 'O aluno foi removido da ocorrência com sucesso.'
-    });
+      toast({
+        title: 'Aluno removido',
+        description: 'O aluno foi removido da ocorrência com sucesso.'
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível remover o aluno desta ocorrência.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -312,7 +336,7 @@ export const IncidentManagementDialog = ({
 
       // Enviar email de acompanhamento ao diretor
       if (incidentClass?.directorEmail) {
-        sendIncidentEmail('incident_followup', incident, incidentClass, students)
+        sendIncidentEmail('incident_followup', currentIncident, incidentClass, students)
           .catch(err => console.error('Erro ao enviar email:', err));
       }
 
@@ -335,7 +359,7 @@ export const IncidentManagementDialog = ({
   const handleSaveFollowUp = async () => {
     if (!user || !canEditFollowUp) return;
 
-    const followUp: any = {
+    const followUp: Omit<FollowUpRecord, "id" | "incidentId" | "createdAt"> = {
       type: followUpType,
       date: followUpDate,
       responsavel: followUpResponsavel || user.email,
@@ -360,7 +384,7 @@ export const IncidentManagementDialog = ({
       followUp.descricaoSituacao = followUpDescricaoSituacao;
     }
 
-    const existingFollowUpId = currentIncident.followUps?.[0]?.id;
+    const existingFollowUpId = getLatestFollowUp(currentIncident.followUps)?.id;
     try {
       setIsSaving(true);
       await saveFollowUp(incident.id, followUp, existingFollowUpId);
@@ -393,7 +417,7 @@ export const IncidentManagementDialog = ({
 
       // Enviar email de resolução ao diretor
       if (incidentClass?.directorEmail) {
-        sendIncidentEmail('incident_resolved', incident, incidentClass, students)
+        sendIncidentEmail('incident_resolved', currentIncident, incidentClass, students)
           .catch(err => console.error('Erro ao enviar email:', err));
       }
 
@@ -413,6 +437,58 @@ export const IncidentManagementDialog = ({
         description: 'Não foi possível resolver a ocorrência.',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleDownloadParentNotification = async (showToast = true): Promise<boolean> => {
+    try {
+      await generateIncidentParentNotificationPDF(
+        currentIncident,
+        incidentClass,
+        incidentStudents,
+        incidents,
+      );
+
+      if (showToast) {
+        toast({
+          title: 'Notificacao gerada',
+          description: 'O PDF de notificacao para os responsaveis foi baixado.',
+        });
+      }
+      return true;
+    } catch (error) {
+      console.error('Erro ao gerar notificacao em PDF:', error);
+      if (showToast) {
+        toast({
+          title: 'Erro',
+          description: 'Nao foi possivel gerar o PDF de notificacao.',
+          variant: 'destructive',
+        });
+      }
+      return false;
+    }
+  };
+
+  const handleDownloadFinalReport = async (showToast = true): Promise<boolean> => {
+    try {
+      await generateIncidentPDF(currentIncident, incidentClass, incidentStudents);
+      if (showToast) {
+        toast({
+          title: 'Relatorio final gerado',
+          description: 'O PDF de finalizacao foi baixado.',
+        });
+      }
+      return true;
+    } catch (error) {
+      console.error('Erro ao gerar PDF final da ocorrencia:', error);
+      if (showToast) {
+        toast({
+          title: 'Erro',
+          description: 'Nao foi possivel gerar o PDF de finalizacao.',
+          variant: 'destructive',
+        });
+      }
+      return false;
     }
   };
 
@@ -445,26 +521,8 @@ export const IncidentManagementDialog = ({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={async () => {
-                      try {
-                        await generateIncidentParentNotificationPDF(
-                          currentIncident,
-                          incidentClass,
-                          incidentStudents,
-                          incidents,
-                        );
-                        toast({
-                          title: 'Notificacao gerada',
-                          description: 'O PDF de notificacao para os responsaveis foi baixado.',
-                        });
-                      } catch (error) {
-                        console.error('Erro ao gerar notificacao em PDF:', error);
-                        toast({
-                          title: 'Erro',
-                          description: 'Nao foi possivel gerar o PDF de notificacao.',
-                          variant: 'destructive',
-                        });
-                      }
+                    onClick={() => {
+                      void handleDownloadParentNotification();
                     }}
                     className="gap-2"
                   >
@@ -473,21 +531,17 @@ export const IncidentManagementDialog = ({
                   </Button>
                 )}
 
-                {currentIncident.status === 'resolvida' && (
+                {canDownloadFinalReport && (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={async () => {
-                      try {
-                        await generateIncidentPDF(currentIncident, incidentClass, incidentStudents);
-                      } catch (error) {
-                        console.error('Erro ao gerar PDF:', error);
-                      }
+                    onClick={() => {
+                      void handleDownloadFinalReport();
                     }}
                     className="gap-2"
                   >
                     <FileText className="h-4 w-4" />
-                    Exportar PDF
+                    Baixar Relatorio Final
                   </Button>
                 )}
               </div>
@@ -499,7 +553,7 @@ export const IncidentManagementDialog = ({
               </div>
               <div>
                 <span className="font-medium">Data:</span>{' '}
-                {new Date(currentIncident.createdAt).toLocaleDateString('pt-BR')}
+                {formatBrasiliaDate(currentIncident.createdAt)}
               </div>
               <div className="col-span-2">
                 <div className="flex items-center justify-between">
@@ -741,8 +795,10 @@ export const IncidentManagementDialog = ({
                             <span className="font-medium">{comment.userName}</span>
                             <Clock className="h-3 w-3 text-muted-foreground" />
                             <span className="text-muted-foreground text-xs">
-                              {new Date(comment.createdAt).toLocaleDateString('pt-BR')} às{' '}
-                              {new Date(comment.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              {formatBrasiliaDateTime(comment.createdAt, {
+                                dateStyle: 'short',
+                                timeStyle: 'short',
+                              })}
                             </span>
                           </div>
                           <p className="text-sm">{comment.text}</p>

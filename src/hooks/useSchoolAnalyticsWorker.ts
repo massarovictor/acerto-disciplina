@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   AnalyticsFilters,
   SchoolAnalyticsResult,
@@ -63,16 +63,20 @@ export function useSchoolAnalyticsWorker(
       new URL("../workers/schoolAnalytics.worker.ts", import.meta.url),
       { type: "module" },
     );
+    const requestCacheMap = requestCacheKeyRef.current;
     workerRef.current = worker;
 
     const handleMessage = (event: MessageEvent<WorkerResponse>) => {
-      if (event.data.requestId !== requestIdRef.current) return;
+      if (event.data.requestId !== requestIdRef.current) {
+        requestCacheMap.delete(event.data.requestId);
+        return;
+      }
       setAnalytics(event.data.result);
       setLoading(false);
-      const cachedKey = requestCacheKeyRef.current.get(event.data.requestId);
+      const cachedKey = requestCacheMap.get(event.data.requestId);
       if (cachedKey) {
         lastAppliedKeyRef.current = cachedKey;
-        requestCacheKeyRef.current.delete(event.data.requestId);
+        requestCacheMap.delete(event.data.requestId);
         void setCachedAnalytics(cachedKey, event.data.result);
       }
     };
@@ -82,7 +86,7 @@ export function useSchoolAnalyticsWorker(
       worker.removeEventListener("message", handleMessage);
       worker.terminate();
       workerRef.current = null;
-      requestCacheKeyRef.current.clear();
+      requestCacheMap.clear();
     };
   }, []);
 
@@ -113,7 +117,7 @@ export function useSchoolAnalyticsWorker(
     return buildAnalyticsCacheKey(dataSignature, filters);
   }, [dataSignature, filters]);
 
-  const requestCompute = (currentFilters: AnalyticsFilters) => {
+  const requestCompute = useCallback((currentFilters: AnalyticsFilters) => {
     if (!workerRef.current || !dataSignature) return;
     const currentCacheKey = buildAnalyticsCacheKey(
       dataSignature,
@@ -128,6 +132,7 @@ export function useSchoolAnalyticsWorker(
     lastRequestKeyRef.current = currentCacheKey;
     requestIdRef.current += 1;
     setLoading(true);
+    requestCacheKeyRef.current.clear();
     requestCacheKeyRef.current.set(requestIdRef.current, currentCacheKey);
     const payload: WorkerFiltersPayload = {
       type: "setFilters",
@@ -135,7 +140,7 @@ export function useSchoolAnalyticsWorker(
       filters: currentFilters,
     };
     workerRef.current.postMessage(payload);
-  };
+  }, [dataSignature]);
 
   useEffect(() => {
     let cancelled = false;
@@ -160,6 +165,7 @@ export function useSchoolAnalyticsWorker(
       lastDataSignatureRef.current = "";
       lastAppliedKeyRef.current = "";
       lastRequestKeyRef.current = "";
+      requestCacheKeyRef.current.clear();
       return;
     }
     if (!dataSignature || dataSignature === lastDataSignatureRef.current) {
@@ -178,12 +184,12 @@ export function useSchoolAnalyticsWorker(
     requestCompute(filtersRef.current);
     // REMOVIDO: skipNextFiltersComputeRef causava race condition onde a atualização 
     // de filtros (ex: normalização após novos dados) era ignorada.
-  }, [dataSignature, hasData, students, classes, grades, attendance, incidents]);
+  }, [dataSignature, hasData, students, classes, grades, attendance, incidents, requestCompute]);
 
   useEffect(() => {
     if (!workerRef.current || !hasData) return;
     requestCompute(filters);
-  }, [filters, hasData]);
+  }, [filters, hasData, requestCompute]);
 
   return { analytics, loading };
 }

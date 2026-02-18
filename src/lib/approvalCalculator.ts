@@ -1,6 +1,11 @@
 import { Grade, StudentAcademicStatus } from '@/types';
 import { QUARTERS } from '@/lib/subjects';
 
+export type StudentAcademicStatusWithPending = StudentAcademicStatus & {
+  isPending?: boolean;
+  pendingSubjects?: Record<string, string[]>;
+};
+
 const normalizeSchoolYear = (schoolYear?: number): 1 | 2 | 3 => {
   if (schoolYear === 1 || schoolYear === 2 || schoolYear === 3) {
     return schoolYear;
@@ -107,7 +112,7 @@ export function calculateStudentStatus(
   classId: string,
   academicYear: string,
   schoolYear?: number
-): StudentAcademicStatus & { isPending?: boolean; pendingSubjects?: Record<string, string[]> } {
+): StudentAcademicStatusWithPending {
   const targetSchoolYear = normalizeSchoolYear(schoolYear);
   // Filtrar apenas notas deste aluno e desta turma
   const studentGrades = grades.filter(
@@ -189,7 +194,7 @@ export function calculateClassAcademicStatus(
   classId: string,
   academicYear: string,
   schoolYear?: number
-): StudentAcademicStatus[] {
+): StudentAcademicStatusWithPending[] {
   return studentIds.map((studentId) =>
     calculateStudentStatus(grades, studentId, classId, academicYear, schoolYear)
   );

@@ -1,8 +1,10 @@
+import JSZip from 'jszip';
 import { Class, FollowUpRecord, Incident, Student } from '@/types';
 import { INCIDENT_EPISODES } from '@/data/mockData';
 import { BasePDFGenerator } from './basePdfExport';
 import { ActionLevel, getRequiredActionLevel } from './incidentActions';
 import { isPerformanceConvocationIncident } from './incidentClassification';
+import { formatBrasiliaDate, getBrasiliaYear } from './brasiliaDate';
 
 const EPISODE_MAP = new Map(
   INCIDENT_EPISODES.map((episode) => [episode.id, episode.description]),
@@ -22,6 +24,33 @@ const ACTION_LEVEL_SHORT_TEXT: Record<ActionLevel, string> = {
     'Suspensão das atividades escolares por 1 dia, com retorno mediante responsável.',
   suspensao_3_dias:
     'Suspensão das atividades escolares por 3 dias, com retorno mediante responsável.',
+};
+
+const sanitizeFileNamePart = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+const getStudentFirstName = (student?: Student) =>
+  (student?.name || 'Aluno').split(' ')[0] || 'Aluno';
+
+const getNotificationPdfFileName = (incident: Incident, student?: Student) =>
+  `Notificacao_Acompanhamento_${incident.id.substring(0, 6)}_${sanitizeFileNamePart(getStudentFirstName(student))}.pdf`;
+
+const getNotificationZipFileName = (incident: Incident) =>
+  `Notificacoes_Ocorrencia_${incident.id.substring(0, 6)}.zip`;
+
+const downloadBlob = (blob: Blob, fileName: string) => {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
 class IncidentParentNotificationPDF extends BasePDFGenerator {
@@ -137,7 +166,7 @@ class IncidentParentNotificationPDF extends BasePDFGenerator {
 
     this.renderField(
       'Data do fato',
-      new Date(incident.date).toLocaleDateString('pt-BR'),
+      formatBrasiliaDate(incident.date),
       col1,
       startY + 9,
       this.colWidth(6) - 8,
@@ -203,13 +232,14 @@ class IncidentParentNotificationPDF extends BasePDFGenerator {
     const targetStudent = singleStudent || students[0];
     const targetStudentIds = targetStudent ? [targetStudent.id] : incident.studentIds;
     const isPerformanceConvocation = isPerformanceConvocationIncident(incident);
-    const incidentSchoolYear = new Date(incident.date).getFullYear();
+    const incidentSchoolYear = getBrasiliaYear(incident.date);
+    const historicalIncidents = allIncidents.filter((item) => item.id !== incident.id);
     const actionLevel = isPerformanceConvocation
       ? 'comunicado_pais'
       : getRequiredActionLevel(
           targetStudentIds,
           incident.finalSeverity,
-          allIncidents,
+          historicalIncidents,
           Number.isFinite(incidentSchoolYear) ? incidentSchoolYear : undefined,
         );
 
@@ -219,7 +249,7 @@ class IncidentParentNotificationPDF extends BasePDFGenerator {
 
     this.setFont('2xs', 'normal', '#666666');
     this.drawText(
-      `Protocolo: ${incident.id.substring(0, 8).toUpperCase()}  |  Emissão: ${new Date().toLocaleDateString('pt-BR')}`,
+      `Protocolo: ${incident.id.substring(0, 8).toUpperCase()}  |  Emissão: ${formatBrasiliaDate(new Date())}`,
       this.margin,
       this.y,
     );
@@ -265,8 +295,9 @@ class IncidentParentNotificationPDF extends BasePDFGenerator {
       this.getResponsibleName(incident, incidentClass),
     );
 
-    const firstName = (targetStudent?.name || 'Aluno').split(' ')[0];
-    this.save(`Notificacao_Acompanhamento_${incident.id.substring(0, 6)}_${firstName}.pdf`);
+    const fileName = getNotificationPdfFileName(incident, targetStudent);
+    const blob = this.outputBlob();
+    return { blob, fileName };
   }
 }
 
@@ -282,19 +313,29 @@ export async function generateIncidentParentNotificationPDF(
       : students;
 
   if (scopedStudents.length > 1) {
+    const zip = new JSZip();
     for (const student of scopedStudents) {
       const generator = new IncidentParentNotificationPDF();
-      await generator.generate(
+      const { blob, fileName } = await generator.generate(
         incident,
         incidentClass,
         scopedStudents,
         allIncidents,
         student,
       );
+      zip.file(fileName, blob);
     }
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    downloadBlob(zipBlob, getNotificationZipFileName(incident));
     return;
   }
 
   const generator = new IncidentParentNotificationPDF();
-  await generator.generate(incident, incidentClass, scopedStudents, allIncidents);
+  const { blob, fileName } = await generator.generate(
+    incident,
+    incidentClass,
+    scopedStudents,
+    allIncidents,
+  );
+  downloadBlob(blob, fileName);
 }

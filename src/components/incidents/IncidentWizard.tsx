@@ -13,9 +13,9 @@ import { useIncidents, useClasses, useStudents } from "@/hooks/useData";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle } from "lucide-react";
-import { format } from "date-fns";
 import { getSeverityColor, getSeverityLabel } from "@/lib/incidentUtils";
 import { sendIncidentEmail } from "@/lib/emailService";
+import { getBrasiliaISODate } from "@/lib/brasiliaDate";
 
 export interface IncidentFormData {
   classId: string;
@@ -45,7 +45,7 @@ interface IncidentWizardProps {
 export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<Partial<IncidentFormData>>({
-    date: format(new Date(), "yyyy-MM-dd"),
+    date: getBrasiliaISODate(),
     studentIds: [],
     episodes: [],
   });
@@ -117,7 +117,7 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
     try {
       const newIncident = await addIncident({
         classId: formData.classId,
-        date: formData.date || new Date().toISOString().split("T")[0],
+        date: formData.date || getBrasiliaISODate(),
         studentIds: formData.studentIds,
         episodes: formData.episodes,
         calculatedSeverity,

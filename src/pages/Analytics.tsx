@@ -21,7 +21,7 @@
  *    - Insights de risco
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -174,6 +174,11 @@ const SubjectComparisonCard = ({ subjects }: { subjects: SubjectAnalytics[] }) =
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // ... (InlineInsights e SubjectComparisonCard mantidos como estavam ou movidos para arquivos separados futuramente)
+const ANALYTICS_TABS = ['dashboard', 'subjects', 'classes', 'ranking-alunos', 'behavior'] as const;
+type AnalyticsTab = (typeof ANALYTICS_TABS)[number];
+
+const isAnalyticsTab = (value: unknown): value is AnalyticsTab =>
+  typeof value === 'string' && ANALYTICS_TABS.includes(value as AnalyticsTab);
 
 const Analytics = () => {
   const { toast } = useToast();
@@ -181,7 +186,7 @@ const Analytics = () => {
   const { students } = useStudents();
   const { professionalSubjects } = useProfessionalSubjects();
   const { templates } = useProfessionalSubjectTemplates();
-  const { analyticsUI, setAnalyticsFilters } = useUIStore();
+  const { analyticsUI, setAnalyticsFilters, setAnalyticsUI } = useUIStore();
   const filters = analyticsUI.filters as AnalyticsFilters;
   const { incidents } = useIncidents();
 
@@ -226,9 +231,38 @@ const Analytics = () => {
 
   const rankingRef = useRef<HTMLDivElement | null>(null);
   const [rankingFocus, setRankingFocus] = useState<'top' | 'critical' | null>(null);
+  const [shouldScrollToRanking, setShouldScrollToRanking] = useState(false);
+  const activeTab: AnalyticsTab = isAnalyticsTab(analyticsUI.activeTab)
+    ? analyticsUI.activeTab
+    : 'dashboard';
 
-  // Controle de Tabs Ativa
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const setActiveTab = useCallback(
+    (value: string) => {
+      if (!isAnalyticsTab(value)) return;
+      setAnalyticsUI({ activeTab: value });
+    },
+    [setAnalyticsUI],
+  );
+
+  useEffect(() => {
+    if (!isAnalyticsTab(analyticsUI.activeTab)) {
+      setAnalyticsUI({ activeTab: 'dashboard' });
+    }
+  }, [analyticsUI.activeTab, setAnalyticsUI]);
+
+  useEffect(() => {
+    if (activeTab === 'ranking-alunos') return;
+    if (rankingFocus !== null) setRankingFocus(null);
+  }, [activeTab, rankingFocus]);
+
+  useEffect(() => {
+    if (!shouldScrollToRanking || activeTab !== 'ranking-alunos') return;
+    const rafId = window.requestAnimationFrame(() => {
+      rankingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setShouldScrollToRanking(false);
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [activeTab, shouldScrollToRanking]);
 
   useEffect(() => {
     const nextSubjects = (filters.subjects ?? []).filter((subject) =>
@@ -250,6 +284,7 @@ const Analytics = () => {
       | undefined;
     if (!actionData) return;
 
+    let shouldNavigateToRanking = false;
     if (actionData.classId) {
       applyFilters({ classIds: [actionData.classId] });
       toast({
@@ -271,6 +306,7 @@ const Analytics = () => {
     if (actionData.filter === 'critico') {
       setActiveTab('ranking-alunos');
       setRankingFocus('critical');
+      shouldNavigateToRanking = true;
       toast({
         title: "Navegando...",
         description: "Exibindo alunos em situação crítica",
@@ -279,6 +315,7 @@ const Analytics = () => {
     } else if (actionData.filter === 'excelencia') {
       setActiveTab('ranking-alunos');
       setRankingFocus('top');
+      shouldNavigateToRanking = true;
       toast({
         title: "Navegando...",
         description: "Exibindo alunos em destaque",
@@ -286,10 +323,9 @@ const Analytics = () => {
       });
     }
 
-    // Scroll suave após mudança de aba (timeout para permitir render)
-    setTimeout(() => {
-      rankingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 300);
+    if (shouldNavigateToRanking) {
+      setShouldScrollToRanking(true);
+    }
   };
 
   const handleFilterChange = (newFilters: Partial<AnalyticsFilters>) => {
@@ -313,7 +349,7 @@ const Analytics = () => {
 
   // Helper Contexto Limpo (Sem asteriscos, retorno ReactNode puro)
   const getContextDescription = () => {
-    const filtersLabel = [];
+    const filtersLabel: ReactNode[] = [];
 
     // Turma(s)
     if (filters.classIds.length === 1) {
@@ -339,10 +375,13 @@ const Analytics = () => {
       filtersLabel.push(<span key="q-all">no acumulado Anual</span>);
     }
 
-    // Join with spaces
+    const content = filtersLabel.flatMap((item, index) =>
+      index === 0 ? [item] : [<span key={`sep-${index}`}>•</span>, item],
+    );
+
     return (
       <span className="flex flex-wrap gap-1 items-baseline font-normal text-muted-foreground dark:text-muted-foreground/80 dark:opacity-90">
-        {filtersLabel.reduce((prev, curr, index) => [prev, <span key={`sep-${index}`}> </span>, curr] as any)}
+        {content}
       </span>
     );
   };

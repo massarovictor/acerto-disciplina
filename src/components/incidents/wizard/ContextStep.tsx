@@ -27,7 +27,7 @@ interface ContextStepProps {
 
 export const ContextStep = ({ formData, updateFormData }: ContextStepProps) => {
   const { classes } = useClasses();
-  var selectedDate = formData.date
+  const selectedDate = formData.date
     ? parse(formData.date, "yyyy-MM-dd", new Date())
     : undefined;
 

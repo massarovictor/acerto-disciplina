@@ -3,9 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useClasses, useStudents } from '@/hooks/useData';
 import { INCIDENT_EPISODES } from '@/data/mockData';
 import { IncidentFormData } from '../IncidentWizard';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/contexts/AuthContext';
+import { formatBrasiliaDate } from '@/lib/brasiliaDate';
 
 interface ReviewStepProps {
   formData: Partial<IncidentFormData>;
@@ -20,11 +19,17 @@ import {
 export const ReviewStep = ({ formData }: ReviewStepProps) => {
   const { classes } = useClasses();
   const { students } = useStudents();
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
 
   const selectedClass = classes.find((c) => c.id === formData.classId);
   const selectedStudents = students.filter((s) => formData.studentIds?.includes(s.id));
-  const selectedEpisodes = INCIDENT_EPISODES.filter((e) => formData.episodes?.includes(e.id));
+  const selectedEpisodes = formData.episodes || [];
+  const listedEpisodes = INCIDENT_EPISODES.filter((episode) =>
+    selectedEpisodes.includes(episode.id),
+  );
+  const customEpisodes = selectedEpisodes.filter(
+    (episode) => !INCIDENT_EPISODES.some((item) => item.id === episode),
+  );
 
   return (
     <div className="space-y-6">
@@ -48,7 +53,7 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
             <div className="flex justify-between">
               <span className="text-muted-foreground">Data:</span>
               <span className="font-medium">
-                {formData.date && format(new Date(formData.date), 'PPP', { locale: ptBR })}
+                {formData.date && formatBrasiliaDate(formData.date, { dateStyle: 'long' })}
               </span>
             </div>
             <div className="flex justify-between">
@@ -68,7 +73,7 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
                 <div key={student.id} className="flex items-center justify-between py-2 border-b last:border-0">
                   <span className="font-medium">{student.name}</span>
                   <span className="text-sm text-muted-foreground">
-                    {new Date(student.birthDate).toLocaleDateString('pt-BR')}
+                    {formatBrasiliaDate(student.birthDate)}
                   </span>
                 </div>
               ))}
@@ -87,19 +92,27 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {selectedEpisodes.map((episode) => (
-                <div key={episode.id} className="flex items-start gap-2 py-2 border-b last:border-0">
-                  <Badge variant="outline" className="shrink-0 mt-0.5">
-                    {episode.category}
-                  </Badge>
-                  <span className="text-sm">{episode.description}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+            <CardContent>
+              <div className="space-y-2">
+                {listedEpisodes.map((episode) => (
+                  <div key={episode.id} className="flex items-start gap-2 py-2 border-b last:border-0">
+                    <Badge variant="outline" className="shrink-0 mt-0.5">
+                      {episode.category}
+                    </Badge>
+                    <span className="text-sm">{episode.description}</span>
+                  </div>
+                ))}
+                {customEpisodes.map((episode) => (
+                  <div key={episode} className="flex items-start gap-2 py-2 border-b last:border-0">
+                    <Badge variant="outline" className="shrink-0 mt-0.5">
+                      Customizado
+                    </Badge>
+                    <span className="text-sm">{episode}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
         {formData.finalSeverity && (
           <Card>

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { useStudents } from '@/hooks/useData';
 import { IncidentFormData } from '../IncidentWizard';
 import { Search } from 'lucide-react';
+import { formatBrasiliaDate } from '@/lib/brasiliaDate';
 
 interface StudentsStepProps {
   formData: Partial<IncidentFormData>;
@@ -71,7 +72,7 @@ export const StudentsStep = ({ formData, updateFormData }: StudentsStepProps) =>
             >
               <div className="font-medium">{student.name}</div>
               <div className="text-sm text-muted-foreground">
-                Data de nascimento: {new Date(student.birthDate).toLocaleDateString('pt-BR')}
+                Data de nascimento: {formatBrasiliaDate(student.birthDate)}
               </div>
             </label>
           </div>

@@ -230,4 +230,9 @@ export class BasePDFGenerator {
     this.renderFooter();
     this.pdf.save(filename);
   }
+
+  protected outputBlob(): Blob {
+    this.renderFooter();
+    return this.pdf.output('blob');
+  }
 }

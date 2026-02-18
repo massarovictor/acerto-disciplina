@@ -2,17 +2,14 @@
  * Painel de Análise de Disciplinas
  */
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   TrendingUp,
   TrendingDown,
-  BookOpen,
-  Layers,
   List,
-  Search
 } from 'lucide-react';
 import {
   SubjectAnalytics,
@@ -25,7 +22,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogDescription
 } from '@/components/ui/dialog';
 import {
@@ -50,6 +46,8 @@ interface SubjectAnalysisPanelProps {
   areaAnalytics: AreaAnalytics[];
 }
 
+type SortOrder = 'best' | 'worst';
+
 export function SubjectAnalysisPanel({
   allSubjects,
   areaAnalytics
@@ -57,57 +55,35 @@ export function SubjectAnalysisPanel({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [areaFilter, setAreaFilter] = useState('all');
-  const [sortOrder, setSortOrder] = useState<'best' | 'worst'>('best');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('best');
 
   // Filter Logic
-  const filterSubjects = (list: SubjectAnalytics[]) => {
+  const filterSubjects = useCallback((list: SubjectAnalytics[]) => {
     return list.filter(item => {
       const matchesSearch = item.subject.toLowerCase().includes(search.toLowerCase());
       const matchesArea = areaFilter === 'all' || item.area === areaFilter;
       return matchesSearch && matchesArea;
     });
-  };
+  }, [areaFilter, search]);
 
   const availableAreas = Array.from(new Set(allSubjects.map(s => s.area))).sort();
 
   // Sort helpers
   const sortedByBest = [...allSubjects].sort((a, b) => b.average - a.average);
   const sortedByWorst = [...allSubjects].sort((a, b) => a.average - b.average);
-  const sortedByArea = [...areaAnalytics].sort((a, b) => b.average - a.average);
 
   // Preview de 5 para as abas iniciais
   const previewBest = sortedByBest.slice(0, 5);
   const previewWorst = sortedByWorst.slice(0, 5);
 
-  // DEBUG: log counts para investigação do diálogo completo
-  useEffect(() => {
-    try {
-      // eslint-disable-next-line no-console
-      console.info('[DEBUG] SubjectAnalysisPanel sortedByBest=', sortedByBest.length, 'sortedByWorst=', sortedByWorst.length);
-      const currentList = filterSubjects(sortOrder === 'best' ? sortedByBest : sortedByWorst);
-      // eslint-disable-next-line no-console
-      console.info('[DEBUG] SubjectAnalysisPanel filtered length=', currentList.length, 'sortOrder=', sortOrder, 'areaFilter=', areaFilter, 'search=', search);
-    } catch (e) {
-      // ignore
-    }
-  }, [sortedByBest.length, sortedByWorst.length, sortOrder, areaFilter, search]);
-
-  const dialogBodyRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!isDialogOpen) return;
-    // pequeno timeout para aguardar o DOM renderizar linhas
-    const t = setTimeout(() => {
-      try {
-        const count = dialogBodyRef.current?.querySelectorAll('tbody tr').length ?? 0;
-        // eslint-disable-next-line no-console
-        console.info('[DEBUG] DOM rendered table rows in dialog =', count);
-      } catch (e) {
-        // ignore
-      }
-    }, 50);
-    return () => clearTimeout(t);
-  }, [isDialogOpen, sortedByBest.length, sortedByWorst.length, search, areaFilter, sortOrder]);
+  const rankedSubjects = useMemo(
+    () => (sortOrder === 'best' ? sortedByBest : sortedByWorst),
+    [sortOrder, sortedByBest, sortedByWorst],
+  );
+  const filteredSubjects = useMemo(
+    () => filterSubjects(rankedSubjects),
+    [filterSubjects, rankedSubjects],
+  );
 
 
 
@@ -300,7 +276,10 @@ export function SubjectAnalysisPanel({
                 ))}
               </SelectContent>
             </Select>
-            <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as 'best' | 'worst')}>
+            <Select
+              value={sortOrder}
+              onValueChange={(value) => setSortOrder(value === 'worst' ? 'worst' : 'best')}
+            >
               <SelectTrigger className="h-9 w-full md:w-56">
                 <SelectValue placeholder="Ordenar por" />
               </SelectTrigger>
@@ -324,7 +303,7 @@ export function SubjectAnalysisPanel({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filterSubjects(sortOrder === 'best' ? sortedByBest : sortedByWorst).map((subject, idx) => (
+                  {filteredSubjects.map((subject, idx) => (
                     <TableRow key={subject.subject}>
                       <TableCell className="font-medium text-center w-12">{idx + 1}º</TableCell>
                       <TableCell>{subject.subject}</TableCell>
@@ -347,8 +326,8 @@ export function SubjectAnalysisPanel({
           </div>
 
           <div className="flex items-center justify-between text-xs text-muted-foreground shrink-0 pt-2 border-t">
-            <span>
-              {filterSubjects(sortOrder === 'best' ? sortedByBest : sortedByWorst).length} disciplinas encontradas
+              <span>
+              {filteredSubjects.length} disciplinas encontradas
             </span>
           </div>
         </DialogContent>

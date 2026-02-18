@@ -1,5 +1,13 @@
 import { Grade, Student, Class, Incident } from '@/types';
 import { checkQuarterGrades, QuarterCheckResult } from './approvalCalculator';
+import { isPerformanceConvocationIncident } from './incidentClassification';
+import { getBrasiliaISODate, getBrasiliaYear } from './brasiliaDate';
+
+const normalizeText = (value?: string | null) =>
+  (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 
 /**
  * Verifica alunos com baixo rendimento em um bimestre específico
@@ -67,16 +75,60 @@ export function generateQuarterIncidents(
     B2: '2º Bimestre',
     B3: '3º Bimestre',
     B4: '4º Bimestre',
+    '1o Bimestre': '1º Bimestre',
+    '2o Bimestre': '2º Bimestre',
+    '3o Bimestre': '3º Bimestre',
+    '4o Bimestre': '4º Bimestre',
+    '1º Bimestre': '1º Bimestre',
+    '2º Bimestre': '2º Bimestre',
+    '3º Bimestre': '3º Bimestre',
+    '4º Bimestre': '4º Bimestre',
   };
+
+  const quarterDefaultDates: Record<string, string> = {
+    '1º Bimestre': '03-31',
+    '2º Bimestre': '05-31',
+    '3º Bimestre': '08-31',
+    '4º Bimestre': '10-31',
+  };
+
+  const targetCalendarYear = (() => {
+    if (classData.startCalendarYear) {
+      return classData.startCalendarYear + ((schoolYear ?? 1) - 1);
+    }
+    if (classData.startYearDate) {
+      const yearFromDate = /^(\d{4})-\d{2}-\d{2}$/.exec(classData.startYearDate)?.[1];
+      if (yearFromDate) {
+        return Number(yearFromDate) + ((schoolYear ?? 1) - 1);
+      }
+    }
+    return undefined;
+  })();
 
   lowPerformanceStudents.forEach((result) => {
     // Verificar se já existe ocorrência para este aluno neste bimestre
     const existingIncident = existingIncidents.find(
-      (incident) =>
-        incident.studentIds.includes(result.studentId) &&
-        incident.classId === classData.id &&
-        incident.description?.toLowerCase().includes(quarter.toLowerCase()) &&
-        incident.description?.toLowerCase().includes('convocação')
+      (incident) => {
+        if (!incident.studentIds.includes(result.studentId)) return false;
+        if (incident.classId !== classData.id) return false;
+        if (!isPerformanceConvocationIncident(incident)) return false;
+
+        const incidentYear = getBrasiliaYear(incident.date);
+        if (targetCalendarYear && incidentYear !== targetCalendarYear) return false;
+
+        const quarterLabel = quarterNames[quarter] || quarter;
+        const normalizedDescription = normalizeText(incident.description);
+        const normalizedSuggestedAction = normalizeText(incident.suggestedAction);
+        const normalizedQuarterLabel = normalizeText(quarterLabel);
+        const normalizedQuarter = normalizeText(quarter);
+        const hasQuarterReference =
+          normalizedDescription.includes(normalizedQuarterLabel) ||
+          normalizedDescription.includes(normalizedQuarter) ||
+          normalizedSuggestedAction.includes(normalizedQuarterLabel) ||
+          normalizedSuggestedAction.includes(normalizedQuarter);
+
+        return hasQuarterReference;
+      }
     );
 
     if (!existingIncident) {
@@ -92,12 +144,16 @@ export function generateQuarterIncidents(
         .join(', ');
 
       const quarterLabel = quarterNames[quarter] || quarter;
+      const incidentDate =
+        targetCalendarYear && quarterDefaultDates[quarterLabel]
+          ? `${targetCalendarYear}-${quarterDefaultDates[quarterLabel]}`
+          : getBrasiliaISODate();
       const description = `CONVOCAÇÃO DE PAIS - ${quarterLabel}: Convocação por baixo rendimento no ${quarterLabel}. Critério institucional: estudante com 3 ou mais disciplinas abaixo da média no bimestre. Situação identificada: ${result.subjectsBelowAverage.length} disciplina(s) abaixo da média (${subjectsDetail}).`;
 
       const newIncident: Omit<Incident, 'id' | 'createdAt' | 'updatedAt'> = {
         classId: classData.id,
         studentIds: [result.studentId],
-        date: new Date().toISOString().split('T')[0],
+        date: incidentDate,
         episodes: [],
         calculatedSeverity: severity,
         finalSeverity: severity,

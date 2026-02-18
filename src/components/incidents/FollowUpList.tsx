@@ -2,8 +2,7 @@ import { FollowUpRecord } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, User, FileText, MessageSquare, Users, ClipboardList } from 'lucide-react';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { formatBrasiliaDate, formatBrasiliaDateTime } from '@/lib/brasiliaDate';
 
 interface FollowUpListProps {
   followUps: FollowUpRecord[];
@@ -62,7 +61,7 @@ export const FollowUpList = ({ followUps }: FollowUpListProps) => {
                   </CardTitle>
                 </div>
                 <Badge variant="outline">
-                  {format(new Date(followUp.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                  {formatBrasiliaDate(followUp.date, { dateStyle: 'long' })}
                 </Badge>
               </div>
             </CardHeader>
@@ -141,7 +140,11 @@ export const FollowUpList = ({ followUps }: FollowUpListProps) => {
               <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t">
                 <Calendar className="h-3 w-3" />
                 <span>
-                  Registrado em {format(new Date(followUp.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                  Registrado em{' '}
+                  {formatBrasiliaDateTime(followUp.createdAt, {
+                    dateStyle: 'short',
+                    timeStyle: 'short',
+                  })}
                 </span>
               </div>
             </CardContent>

@@ -54,24 +54,24 @@ export function useAnalyticsFiltersLogic({
 
     const getQuarterIndex = (quarter: string) => QUARTERS.indexOf(quarter);
 
-    const normalizeSubjectName = (value: string) =>
+    const normalizeSubjectName = useCallback((value: string) =>
         value
             .normalize('NFD')
             .replace(/[\u0300-\u036f]/g, '')
             .toLowerCase()
-            .trim();
+            .trim(), []);
 
-    const normalizeSubjectTokens = (value: string) =>
+    const normalizeSubjectTokens = useCallback((value: string) =>
         normalizeSubjectName(value)
             .split(/[^a-z0-9]+/g)
-            .filter((token) => token.length >= 3);
+            .filter((token) => token.length >= 3), [normalizeSubjectName]);
 
-    const normalizeCourseName = (value: string) =>
+    const normalizeCourseName = useCallback((value: string) =>
         value
             .normalize('NFD')
             .replace(/[\u0300-\u036f]/g, '')
             .toLowerCase()
-            .trim();
+            .trim(), []);
 
     const parseSeriesYear = (value: string) => {
         const match = value.match(/\d+/);
@@ -88,8 +88,8 @@ export function useAnalyticsFiltersLogic({
         return courseYear;
     }, [getStartCalendarYear]);
 
-    const normalizeList = (values: string[]) =>
-        Array.from(new Set(values)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const normalizeList = useCallback((values: string[]) =>
+        Array.from(new Set(values)).sort((a, b) => a.localeCompare(b, 'pt-BR')), []);
 
 
     // ===========================================
@@ -241,7 +241,7 @@ export function useAnalyticsFiltersLogic({
         });
 
         return map;
-    }, [templates]);
+    }, [templates, normalizeCourseName, normalizeSubjectName]);
 
     const templateSubjectsByClassId = useMemo(() => {
         const map = new Map<
@@ -301,7 +301,7 @@ export function useAnalyticsFiltersLogic({
         });
 
         return map;
-    }, [classes, templatesById, templateSubjectsByCourse]);
+    }, [classes, templatesById, templateSubjectsByCourse, normalizeCourseName, normalizeSubjectName]);
 
     const professionalSubjectsByClassId = useMemo(() => {
         const map = new Map<string, { all: Set<string>; labels: Map<string, string> }>();
@@ -318,7 +318,7 @@ export function useAnalyticsFiltersLogic({
             }
         });
         return map;
-    }, [professionalSubjects]);
+    }, [professionalSubjects, normalizeSubjectName]);
 
 
     // ===========================================
@@ -423,7 +423,8 @@ export function useAnalyticsFiltersLogic({
         classes,
         professionalSubjects,
         templateSubjectsByClassId,
-        getStartCalendarYear
+        getStartCalendarYear,
+        normalizeSubjectName,
     ]);
 
 
@@ -559,7 +560,9 @@ export function useAnalyticsFiltersLogic({
         professionalSubjectsByClassId,
         templateSubjectsByClassId,
         filterClassesBySeries,
-        getStartCalendarYear
+        getStartCalendarYear,
+        normalizeSubjectName,
+        normalizeSubjectTokens,
     ]);
 
     const subjectEligibleClassIds = useMemo(() => {
@@ -716,7 +719,14 @@ export function useAnalyticsFiltersLogic({
         }
 
         return next;
-    }, [classes, grades, professionalSubjectsByClassId, templateSubjectsByClassId]);
+    }, [
+        classes,
+        computeEligibleClassIdsForSubjects,
+        filterClassesBySeries,
+        getCalendarYearsForSchoolYear,
+        getStartCalendarYear,
+        normalizeList,
+    ]);
 
     const filtersEqual = useCallback((a: AnalyticsFilters, b: AnalyticsFilters) => {
         const listEqual = (left: string[], right: string[]) =>

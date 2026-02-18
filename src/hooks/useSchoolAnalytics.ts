@@ -629,25 +629,78 @@ export function computeSchoolAnalytics(
       ? classifyStudentByAverage(gradesList, attendanceList)
       : classifyStudent(gradesList, attendanceList);
 
+  const applyQuarterFilter = (gradesList: Grade[]) => {
+    let scopedGrades = gradesList;
+    if (hasQuarterRange) {
+      const startIndex = getQuarterIndex(filters.quarterRangeStart!);
+      const endIndex = getQuarterIndex(filters.quarterRangeEnd!);
+      if (startIndex >= 0 && endIndex >= 0) {
+        const minIndex = Math.min(startIndex, endIndex);
+        const maxIndex = Math.max(startIndex, endIndex);
+        scopedGrades = scopedGrades.filter((grade) => {
+          const quarterIndex = getQuarterIndex(grade.quarter);
+          return quarterIndex >= minIndex && quarterIndex <= maxIndex;
+        });
+      }
+    } else if (filters.quarter !== 'all') {
+      scopedGrades = scopedGrades.filter((grade) => grade.quarter === filters.quarter);
+    }
+    return scopedGrades;
+  };
+
+  const buildClassStudentGradesMap = (gradesList: Grade[]) => {
+    const map = new Map<string, Map<string, Grade[]>>();
+    gradesList.forEach((grade) => {
+      let classMap = map.get(grade.classId);
+      if (!classMap) {
+        classMap = new Map<string, Grade[]>();
+        map.set(grade.classId, classMap);
+      }
+      let studentGrades = classMap.get(grade.studentId);
+      if (!studentGrades) {
+        studentGrades = [];
+        classMap.set(grade.studentId, studentGrades);
+      }
+      studentGrades.push(grade);
+    });
+    return map;
+  };
+
+  const computeClassAverageFromStudentGrades = (
+    classStudents: Array<{ student: Student }>,
+    classGradesByStudentId: Map<string, Grade[]> | undefined,
+  ) => {
+    let totalStudentAverages = 0;
+    let studentCountWithGrades = 0;
+
+    classStudents.forEach((entry) => {
+      const studentGrades = classGradesByStudentId?.get(entry.student.id) ?? [];
+      if (studentGrades.length > 0) {
+        const studentAverage =
+          studentGrades.reduce((sum, grade) => sum + grade.grade, 0) / studentGrades.length;
+        totalStudentAverages += studentAverage;
+        studentCountWithGrades += 1;
+      }
+    });
+
+    return studentCountWithGrades > 0 ? totalStudentAverages / studentCountWithGrades : 0;
+  };
+
+  const countClassifications = (
+    entries: Array<Pick<StudentAnalytics, 'classification' | 'hasGrades'>>,
+  ) => ({
+    critico: entries.filter((entry) => entry.hasGrades && entry.classification.classification === 'critico').length,
+    atencao: entries.filter((entry) => entry.hasGrades && entry.classification.classification === 'atencao').length,
+    aprovado: entries.filter((entry) => entry.hasGrades && entry.classification.classification === 'aprovado').length,
+    excelencia: entries.filter((entry) => entry.hasGrades && entry.classification.classification === 'excelencia').length,
+  });
+
   let filteredGrades = useAllYears ? allGrades : yearGrades;
   const hasQuarterRange =
     filters.useQuarterRange &&
     filters.quarterRangeStart &&
     filters.quarterRangeEnd;
-  if (hasQuarterRange) {
-    const startIndex = getQuarterIndex(filters.quarterRangeStart!);
-    const endIndex = getQuarterIndex(filters.quarterRangeEnd!);
-    if (startIndex >= 0 && endIndex >= 0) {
-      const minIndex = Math.min(startIndex, endIndex);
-      const maxIndex = Math.max(startIndex, endIndex);
-      filteredGrades = filteredGrades.filter((g) => {
-        const qIndex = getQuarterIndex(g.quarter);
-        return qIndex >= minIndex && qIndex <= maxIndex;
-      });
-    }
-  } else if (filters.quarter !== 'all') {
-    filteredGrades = filteredGrades.filter(g => g.quarter === filters.quarter);
-  }
+  filteredGrades = applyQuarterFilter(filteredGrades);
 
   let filteredGradesForClassification = filteredGrades;
 
@@ -676,21 +729,7 @@ export function computeSchoolAnalytics(
       (grade) => (grade.schoolYear ?? 1) === courseYear,
     );
 
-    let comparisonGrades = comparisonYearGrades;
-    if (hasQuarterRange) {
-      const startIndex = getQuarterIndex(filters.quarterRangeStart!);
-      const endIndex = getQuarterIndex(filters.quarterRangeEnd!);
-      if (startIndex >= 0 && endIndex >= 0) {
-        const minIndex = Math.min(startIndex, endIndex);
-        const maxIndex = Math.max(startIndex, endIndex);
-        comparisonGrades = comparisonGrades.filter((grade) => {
-          const qIndex = getQuarterIndex(grade.quarter);
-          return qIndex >= minIndex && qIndex <= maxIndex;
-        });
-      }
-    } else if (filters.quarter !== 'all') {
-      comparisonGrades = comparisonGrades.filter((grade) => grade.quarter === filters.quarter);
-    }
+    let comparisonGrades = applyQuarterFilter(comparisonYearGrades);
 
     const comparisonGradesForClassification = comparisonGrades;
 
@@ -729,7 +768,6 @@ export function computeSchoolAnalytics(
     const comparisonStudents = comparisonStudentsAll.filter((student) =>
       comparisonStudentIdsWithGrades.has(student.id),
     );
-    const comparisonGradesByClassId = groupById(comparisonGrades, (grade) => grade.classId);
     const comparisonGradesByStudentId = groupById(comparisonGrades, (grade) => grade.studentId);
     const comparisonGradesForClassificationByStudentId = groupById(
       comparisonGradesForClassification,
@@ -738,22 +776,7 @@ export function computeSchoolAnalytics(
     const comparisonClassificationGradesByStudentId = subjectSet
       ? comparisonGradesByStudentId
       : comparisonGradesForClassificationByStudentId;
-    const comparisonGradesByClassStudentId = new Map<string, Map<string, Grade[]>>();
-    comparisonGrades.forEach((grade) => {
-      let classMap = comparisonGradesByClassStudentId.get(grade.classId);
-      if (!classMap) {
-        classMap = new Map<string, Grade[]>();
-        comparisonGradesByClassStudentId.set(grade.classId, classMap);
-      }
-      let studentGrades = classMap.get(grade.studentId);
-      if (!studentGrades) {
-        studentGrades = [];
-        classMap.set(grade.studentId, studentGrades);
-      }
-      studentGrades.push(grade);
-    });
-
-    const comparisonStudentsByClassId = groupById(comparisonStudents, (student) => student.classId);
+    const comparisonGradesByClassStudentId = buildClassStudentGradesMap(comparisonGrades);
     const comparisonAttendanceByClassId = groupById(comparisonAttendance, (record) => record.classId);
     const comparisonAttendanceByStudentId = groupById(comparisonAttendance, (record) => record.studentId);
     const comparisonIncidentsByClassId = groupById(comparisonIncidents, (incident) => incident.classId);
@@ -769,6 +792,7 @@ export function computeSchoolAnalytics(
         className: studentClass?.name || 'Sem turma',
         incidentCount: 0,
         trend: 'stable' as const,
+        hasGrades: studentGrades.length > 0,
       };
     });
 
@@ -787,38 +811,18 @@ export function computeSchoolAnalytics(
 
     return comparisonClasses.map((cls) => {
       const classStudents = comparisonStudentAnalyticsByClassId.get(cls.id) ?? [];
-      const classGrades = comparisonGradesByClassId.get(cls.id) ?? [];
       const classYearGrades = comparisonYearGradesByClassId.get(cls.id) ?? [];
       const classAttendance = comparisonAttendanceByClassId.get(cls.id) ?? [];
       const classIncidents = comparisonIncidentsByClassId.get(cls.id) ?? [];
       const classGradesByStudentId = comparisonGradesByClassStudentId.get(cls.id);
 
-      let totalStudentAverages = 0;
-      let studentCountWithGrades = 0;
-
-      classStudents.forEach((studentAnalytics) => {
-        const studentGrades = classGradesByStudentId?.get(studentAnalytics.student.id) ?? [];
-        if (studentGrades.length > 0) {
-          const studentAvg =
-            studentGrades.reduce((sum, grade) => sum + grade.grade, 0) /
-            studentGrades.length;
-          totalStudentAverages += studentAvg;
-          studentCountWithGrades += 1;
-        }
-      });
-
-      const average = studentCountWithGrades > 0 ? totalStudentAverages / studentCountWithGrades : 0;
+      const average = computeClassAverageFromStudentGrades(classStudents, classGradesByStudentId);
 
       const present = classAttendance.filter((record) => record.status === 'presente').length;
       const frequency =
         classAttendance.length > 0 ? (present / classAttendance.length) * 100 : 100;
 
-      const classifications = {
-        critico: classStudents.filter((student) => student.classification.classification === 'critico').length,
-        atencao: classStudents.filter((student) => student.classification.classification === 'atencao').length,
-        aprovado: classStudents.filter((student) => student.classification.classification === 'aprovado').length,
-        excelencia: classStudents.filter((student) => student.classification.classification === 'excelencia').length,
-      };
+      const classifications = countClassifications(classStudents);
 
       const quarterAverages = QUARTERS.map((quarter) => {
         const quarterGrades = classYearGrades.filter((grade) => grade.quarter === quarter);
@@ -877,21 +881,7 @@ export function computeSchoolAnalytics(
       ? comparisonGradesAll
       : comparisonGradesAll.filter((grade) => (grade.schoolYear ?? 1) === targetSchoolYear);
 
-    let comparisonGrades = comparisonGradesBase;
-    if (hasQuarterRange) {
-      const startIndex = getQuarterIndex(filters.quarterRangeStart!);
-      const endIndex = getQuarterIndex(filters.quarterRangeEnd!);
-      if (startIndex >= 0 && endIndex >= 0) {
-        const minIndex = Math.min(startIndex, endIndex);
-        const maxIndex = Math.max(startIndex, endIndex);
-        comparisonGrades = comparisonGrades.filter((grade) => {
-          const qIndex = getQuarterIndex(grade.quarter);
-          return qIndex >= minIndex && qIndex <= maxIndex;
-        });
-      }
-    } else if (filters.quarter !== 'all') {
-      comparisonGrades = comparisonGrades.filter((grade) => grade.quarter === filters.quarter);
-    }
+    let comparisonGrades = applyQuarterFilter(comparisonGradesBase);
 
     let comparisonGradesForClassification = comparisonGrades;
 
@@ -992,7 +982,6 @@ export function computeSchoolAnalytics(
       comparisonStudentIdsWithGrades.has(student.id),
     );
 
-    const comparisonGradesByClassId = groupById(comparisonGrades, (grade) => grade.classId);
     const comparisonGradesByStudentId = groupById(comparisonGrades, (grade) => grade.studentId);
     const comparisonGradesForClassificationByStudentId = groupById(
       comparisonGradesForClassification,
@@ -1001,22 +990,7 @@ export function computeSchoolAnalytics(
     const comparisonClassificationGradesByStudentId = subjectSet
       ? comparisonGradesByStudentId
       : comparisonGradesForClassificationByStudentId;
-    const comparisonGradesByClassStudentId = new Map<string, Map<string, Grade[]>>();
-    comparisonGrades.forEach((grade) => {
-      let classMap = comparisonGradesByClassStudentId.get(grade.classId);
-      if (!classMap) {
-        classMap = new Map<string, Grade[]>();
-        comparisonGradesByClassStudentId.set(grade.classId, classMap);
-      }
-      let studentGrades = classMap.get(grade.studentId);
-      if (!studentGrades) {
-        studentGrades = [];
-        classMap.set(grade.studentId, studentGrades);
-      }
-      studentGrades.push(grade);
-    });
-
-    const comparisonStudentsByClassId = groupById(comparisonStudents, (student) => student.classId);
+    const comparisonGradesByClassStudentId = buildClassStudentGradesMap(comparisonGrades);
     const comparisonAttendanceByClassId = groupById(comparisonAttendance, (record) => record.classId);
     const comparisonAttendanceByStudentId = groupById(comparisonAttendance, (record) => record.studentId);
     const comparisonIncidentsByClassId = groupById(comparisonIncidents, (incident) => incident.classId);
@@ -1051,38 +1025,18 @@ export function computeSchoolAnalytics(
 
     return comparisonClasses.map((cls) => {
       const classStudents = comparisonStudentAnalyticsByClassId.get(cls.id) ?? [];
-      const classGrades = comparisonGradesByClassId.get(cls.id) ?? [];
       const classYearGrades = comparisonYearGradesByClassId.get(cls.id) ?? [];
       const classAttendance = comparisonAttendanceByClassId.get(cls.id) ?? [];
       const classIncidents = comparisonIncidentsByClassId.get(cls.id) ?? [];
       const classGradesByStudentId = comparisonGradesByClassStudentId.get(cls.id);
 
-      let totalStudentAverages = 0;
-      let studentCountWithGrades = 0;
-
-      classStudents.forEach((studentAnalytics) => {
-        const studentGrades = classGradesByStudentId?.get(studentAnalytics.student.id) ?? [];
-        if (studentGrades.length > 0) {
-          const studentAvg =
-            studentGrades.reduce((sum, grade) => sum + grade.grade, 0) /
-            studentGrades.length;
-          totalStudentAverages += studentAvg;
-          studentCountWithGrades += 1;
-        }
-      });
-
-      const average = studentCountWithGrades > 0 ? totalStudentAverages / studentCountWithGrades : 0;
+      const average = computeClassAverageFromStudentGrades(classStudents, classGradesByStudentId);
 
       const present = classAttendance.filter((record) => record.status === 'presente').length;
       const frequency =
         classAttendance.length > 0 ? (present / classAttendance.length) * 100 : 100;
 
-      const classifications = {
-        critico: classStudents.filter((student) => student.hasGrades && student.classification.classification === 'critico').length,
-        atencao: classStudents.filter((student) => student.hasGrades && student.classification.classification === 'atencao').length,
-        aprovado: classStudents.filter((student) => student.hasGrades && student.classification.classification === 'aprovado').length,
-        excelencia: classStudents.filter((student) => student.hasGrades && student.classification.classification === 'excelencia').length,
-      };
+      const classifications = countClassifications(classStudents);
 
       const quarterAverages = QUARTERS.map((quarter) => {
         const quarterGrades = classYearGrades.filter((grade) => grade.quarter === quarter);
@@ -1247,20 +1201,7 @@ export function computeSchoolAnalytics(
     filteredGradesForClassification,
     (grade) => grade.studentId,
   );
-  const gradesByClassStudentId = new Map<string, Map<string, Grade[]>>();
-  filteredGrades.forEach((grade) => {
-    let classMap = gradesByClassStudentId.get(grade.classId);
-    if (!classMap) {
-      classMap = new Map<string, Grade[]>();
-      gradesByClassStudentId.set(grade.classId, classMap);
-    }
-    let studentGrades = classMap.get(grade.studentId);
-    if (!studentGrades) {
-      studentGrades = [];
-      classMap.set(grade.studentId, studentGrades);
-    }
-    studentGrades.push(grade);
-  });
+  const gradesByClassStudentId = buildClassStudentGradesMap(filteredGrades);
   const yearGradesForTrends = subjectSet
     ? yearGrades.filter((grade) => matchesSelectedSubject(grade.subject))
     : yearGrades;
@@ -1340,40 +1281,17 @@ export function computeSchoolAnalytics(
 
   const classAnalyticsList: ClassAnalytics[] = filteredClasses.map(cls => {
     const classStudents = studentAnalyticsByClassId.get(cls.id) ?? [];
-    const classGrades = gradesByClassId.get(cls.id) ?? [];
     const classYearGrades = yearGradesByClassId.get(cls.id) ?? [];
     const classAttendance = attendanceByClassId.get(cls.id) ?? [];
     const classIncidents = incidentsByClassId.get(cls.id) ?? [];
     const classGradesByStudentId = gradesByClassStudentId.get(cls.id);
 
-    // Calcular média da turma: Média das médias dos alunos
-    let totalStudentAverages = 0;
-    let studentCountWithGrades = 0;
-
-    classStudents.forEach(studentAnalytics => {
-      const student = studentAnalytics.student;
-      const studentGrades = classGradesByStudentId?.get(student.id) ?? [];
-
-      if (studentGrades.length > 0) {
-        // Média do aluno = Soma das notas / Quantidade de notas
-        // Nota: Assumindo que todas as notas têm o mesmo peso
-        const studentAvg = studentGrades.reduce((s, g) => s + g.grade, 0) / studentGrades.length;
-        totalStudentAverages += studentAvg;
-        studentCountWithGrades++;
-      }
-    });
-
-    const average = studentCountWithGrades > 0 ? totalStudentAverages / studentCountWithGrades : 0;
+    const average = computeClassAverageFromStudentGrades(classStudents, classGradesByStudentId);
 
     const present = classAttendance.filter(a => a.status === 'presente').length;
     const frequency = classAttendance.length > 0 ? (present / classAttendance.length) * 100 : 100;
 
-    const classifications = {
-      critico: classStudents.filter(s => s.hasGrades && s.classification.classification === 'critico').length,
-      atencao: classStudents.filter(s => s.hasGrades && s.classification.classification === 'atencao').length,
-      aprovado: classStudents.filter(s => s.hasGrades && s.classification.classification === 'aprovado').length,
-      excelencia: classStudents.filter(s => s.hasGrades && s.classification.classification === 'excelencia').length,
-    };
+    const classifications = countClassifications(classStudents);
 
     // Calcular tendência da turma (média mensal)
     const quarterAverages = QUARTERS.map(q => {
@@ -1651,12 +1569,7 @@ export function computeSchoolAnalytics(
   // OVERVIEW
   // ============================================
 
-  const totalClassifications = {
-    critico: studentAnalyticsList.filter(s => s.hasGrades && s.classification.classification === 'critico').length,
-    atencao: studentAnalyticsList.filter(s => s.hasGrades && s.classification.classification === 'atencao').length,
-    aprovado: studentAnalyticsList.filter(s => s.hasGrades && s.classification.classification === 'aprovado').length,
-    excelencia: studentAnalyticsList.filter(s => s.hasGrades && s.classification.classification === 'excelencia').length,
-  };
+  const totalClassifications = countClassifications(studentAnalyticsList);
 
   const overallAverage = filteredGrades.length > 0
     ? filteredGrades.reduce((s, g) => s + g.grade, 0) / filteredGrades.length

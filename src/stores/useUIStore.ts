@@ -27,6 +27,7 @@ interface IncidentsUIState {
 }
 
 interface AnalyticsUIState {
+    activeTab: 'dashboard' | 'subjects' | 'classes' | 'ranking-alunos' | 'behavior';
     filters: {
         series: string[];
         classIds: string[];
@@ -150,6 +151,7 @@ const initialIncidentsUI: IncidentsUIState = {
 const currentCalendarYear = new Date().getFullYear();
 
 const initialAnalyticsUI: AnalyticsUIState = {
+    activeTab: 'dashboard',
     filters: {
         series: [],
         classIds: [],

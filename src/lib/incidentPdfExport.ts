@@ -1,8 +1,10 @@
-import { Incident, Student, Class, FollowUpRecord, Comment } from '@/types';
+import JSZip from 'jszip';
+import { Incident, Student, Class, Comment } from '@/types';
 import { INCIDENT_EPISODES } from '@/data/mockData';
 import { BasePDFGenerator } from './basePdfExport';
 import { supabase } from '@/services/supabase/client';
 import { perfTimer } from '@/lib/perf';
+import { formatBrasiliaDate } from './brasiliaDate';
 
 /**
  * Gerador de PDF de Ocorrências Disciplinares
@@ -23,6 +25,33 @@ const STATUS_LABELS: Record<string, string> = {
   acompanhamento: 'Em Acompanhamento',
   resolvida: 'Resolvida',
 };
+
+const sanitizeFileNamePart = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+const getStudentFirstName = (student?: Student) =>
+  (student?.name || 'Aluno').split(' ')[0] || 'Aluno';
+
+const getIncidentPdfFileName = (incident: Incident, student?: Student) =>
+  `Ocorrencia_${incident.id.substring(0, 6)}_${sanitizeFileNamePart(getStudentFirstName(student))}.pdf`;
+
+const downloadBlob = (blob: Blob, fileName: string) => {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+const getIncidentZipFileName = (incident: Incident) =>
+  `Ocorrencias_${incident.id.substring(0, 6)}.zip`;
 
 class IncidentPDF extends BasePDFGenerator {
   private responsibleName: string = '';
@@ -94,7 +123,7 @@ class IncidentPDF extends BasePDFGenerator {
 
       // Protocolo e Meta - formato compacto
       this.setFont('2xs', 'normal', '#666666');
-      this.drawText(`Protocolo: ${incident.id.substring(0, 8).toUpperCase()}  |  Data do Registro: ${new Date(incident.createdAt).toLocaleDateString('pt-BR')}`, this.margin, this.y);
+      this.drawText(`Protocolo: ${incident.id.substring(0, 8).toUpperCase()}  |  Data do Registro: ${formatBrasiliaDate(incident.createdAt)}`, this.margin, this.y);
       this.y += 8;
 
       // Identificação (Grid 2 colunas)
@@ -146,7 +175,7 @@ class IncidentPDF extends BasePDFGenerator {
 
           sorted.forEach((fu, index) => {
             this.checkPageBreak(15);
-            const dateStr = new Date(fu.date).toLocaleDateString('pt-BR');
+            const dateStr = formatBrasiliaDate(fu.date);
 
             // Subtítulo do combinado
             this.setFont('xs', 'bold', '#000000');
@@ -180,8 +209,10 @@ class IncidentPDF extends BasePDFGenerator {
 
       this.renderSignatures(singleStudent || (students.length === 1 ? students[0] : undefined), legalGuardianName);
 
-      const name = (singleStudent || students[0])?.name || 'Aluno';
-      this.save(`Ocorrencia_${incident.id.substring(0, 6)}_${name.split(' ')[0]}.pdf`);
+      const targetStudent = singleStudent || students[0];
+      const fileName = getIncidentPdfFileName(incident, targetStudent);
+      const blob = this.outputBlob();
+      return { blob, fileName };
     } catch (error) {
       console.error('Erro fatal ao gerar PDF de ocorrência:', error);
       throw error;
@@ -200,7 +231,7 @@ class IncidentPDF extends BasePDFGenerator {
     this.renderField('Turma', incidentClass?.name || 'Não informado', col2, startY, this.colWidth(6) - 8);
 
     this.renderField('Matrícula(s)', singleStudent ? (singleStudent.enrollment || 'N/A') : students.map(s => s.enrollment || 'N/A').join(', '), col1, startY + 9, this.colWidth(6) - 8);
-    this.renderField('Data do Fato', new Date(incident.date).toLocaleDateString('pt-BR'), col2, startY + 9, this.colWidth(6) - 8);
+    this.renderField('Data do Fato', formatBrasiliaDate(incident.date), col2, startY + 9, this.colWidth(6) - 8);
 
     this.y += 25;
   }
@@ -251,7 +282,7 @@ class IncidentPDF extends BasePDFGenerator {
     comments.forEach(c => {
       this.checkPageBreak(15);
       this.setFont('xs', 'bold', '#000000');
-      this.drawText(`${c.userName} em ${new Date(c.createdAt).toLocaleDateString('pt-BR')}`, this.margin, this.y + 3);
+      this.drawText(`${c.userName} em ${formatBrasiliaDate(c.createdAt)}`, this.margin, this.y + 3);
       this.y += 4;
 
       this.setFont('xs', 'normal', '#000000');
@@ -302,7 +333,9 @@ class IncidentPDF extends BasePDFGenerator {
     if (this.config.signatureBase64) {
       try {
         this.pdf.addImage(this.config.signatureBase64, 'PNG', this.margin + 5, sigY - 12, 25, 10);
-      } catch (e) { }
+      } catch (error) {
+        console.warn('Falha ao renderizar assinatura digital no PDF de ocorrência.', error);
+      }
     }
   }
 }
@@ -317,12 +350,26 @@ export async function generateIncidentPDF(
     : students;
 
   if (scopedStudents.length > 1) {
+    const zip = new JSZip();
     for (const student of scopedStudents) {
       const generator = new IncidentPDF();
-      await generator.generate(incident, incidentClass, scopedStudents, student);
+      const { blob, fileName } = await generator.generate(
+        incident,
+        incidentClass,
+        scopedStudents,
+        student,
+      );
+      zip.file(fileName, blob);
     }
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    downloadBlob(zipBlob, getIncidentZipFileName(incident));
   } else {
     const generator = new IncidentPDF();
-    await generator.generate(incident, incidentClass, scopedStudents);
+    const { blob, fileName } = await generator.generate(
+      incident,
+      incidentClass,
+      scopedStudents,
+    );
+    downloadBlob(blob, fileName);
   }
 }

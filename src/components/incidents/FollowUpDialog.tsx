@@ -6,17 +6,21 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Incident, FollowUpType } from '@/types';
+import { FollowUpRecord, Incident, FollowUpType } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useIncidents, useStudents } from '@/hooks/useData';
 import { calculateSuggestedAction, suggestFollowUpType } from '@/lib/incidentActions';
+import { getBrasiliaISODate } from '@/lib/brasiliaDate';
 
 interface FollowUpDialogProps {
   incident: Incident;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAddFollowUp: (incidentId: string, followUp: any) => void;
+  onAddFollowUp: (
+    incidentId: string,
+    followUp: Omit<FollowUpRecord, 'id' | 'incidentId' | 'createdAt'>,
+  ) => void;
 }
 
 export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: FollowUpDialogProps) => {
@@ -25,7 +29,7 @@ export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: 
   const { incidents } = useIncidents();
   const { students } = useStudents();
   const [type, setType] = useState<FollowUpType>('conversa_individual');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getBrasiliaISODate());
   const [responsavel, setResponsavel] = useState('');
   
   // Conversa Individual/Pais fields
@@ -42,11 +46,13 @@ export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: 
   // Auto-preencher tipo e providências ao abrir (SEMPRE recalcula)
   useEffect(() => {
     if (open) {
+      const historicalIncidents = incidents.filter((item) => item.id !== incident.id);
+
       // Calcular automaticamente com base na gravidade e histórico REAL
       const suggested = calculateSuggestedAction(
         incident.studentIds,
         incident.finalSeverity,
-        incidents,
+        historicalIncidents,
         students
       );
       const autoType = suggestFollowUpType(suggested, incident.finalSeverity);
@@ -63,7 +69,7 @@ export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: 
       }
 
       // Reset dos outros campos (mantém os auto-preenchidos)
-      setDate(new Date().toISOString().split('T')[0]);
+      setDate(getBrasiliaISODate());
       setResponsavel('');
       setAssuntosTratados('');
       setEncaminhamentos('');
@@ -71,7 +77,7 @@ export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: 
       setTipoSituacao('');
       setDescricaoSituacao('');
     }
-  }, [open, incidents, students, incident.studentIds, incident.finalSeverity]);
+  }, [open, incidents, students, incident.id, incident.studentIds, incident.finalSeverity]);
 
   const motivoOptions = [
     '1 - Comportamento inadequado',
@@ -101,7 +107,7 @@ export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: 
   const handleSubmit = () => {
     if (!user) return;
 
-    const followUp: any = {
+    const followUp: Omit<FollowUpRecord, 'id' | 'incidentId' | 'createdAt'> = {
       type,
       date,
       responsavel,
@@ -134,7 +140,7 @@ export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: 
 
   const resetForm = () => {
     setType('conversa_individual');
-    setDate(new Date().toISOString().split('T')[0]);
+    setDate(getBrasiliaISODate());
     setResponsavel('');
     setMotivo('');
     setProvidencias('');
@@ -290,7 +296,6 @@ export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: 
               Registrar Acompanhamento
             </Button>
           </div>
-        </div>
       </DialogContent>
     </Dialog>
   );

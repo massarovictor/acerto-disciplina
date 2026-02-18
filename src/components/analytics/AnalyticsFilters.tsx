@@ -2,7 +2,7 @@
  * Barra de Filtros do Analytics
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -103,7 +103,7 @@ export function AnalyticsFilters({
     return Number.isFinite(parsed) ? parsed : null;
   };
 
-  const getStartCalendarYear = (cls: Class) => {
+  const getStartCalendarYear = useCallback((cls: Class) => {
     const currentCalendarYear = new Date().getFullYear();
     return (
       cls.startCalendarYear ||
@@ -112,15 +112,15 @@ export function AnalyticsFilters({
         ? currentCalendarYear - (cls.currentYear - 1)
         : undefined)
     );
-  };
+  }, []);
 
-  const getCourseYearForCalendarYear = (cls: Class, targetYear: number) => {
+  const getCourseYearForCalendarYear = useCallback((cls: Class, targetYear: number) => {
     const startYear = getStartCalendarYear(cls);
     if (!startYear) return null;
     const courseYear = targetYear - startYear + 1;
     if (courseYear < 1 || courseYear > 3) return null;
     return courseYear;
-  };
+  }, [getStartCalendarYear]);
 
   const subjectOptions = useMemo(() => {
     return [...subjects].sort((a, b) => a.localeCompare(b, 'pt-BR'));
@@ -165,7 +165,15 @@ export function AnalyticsFilters({
       scoped = scoped.filter((cls) => eligibleClassSet.has(cls.id));
     }
     return scoped;
-  }, [activeClasses, filters.series, filters.calendarYear, filters.schoolYear, eligibleClassSet]);
+  }, [
+    activeClasses,
+    filters.series,
+    filters.calendarYear,
+    filters.schoolYear,
+    eligibleClassSet,
+    getCourseYearForCalendarYear,
+    getStartCalendarYear,
+  ]);
 
   const filteredClassOptions = useMemo(() => {
     const query = normalizeSearch(classSearch);
@@ -290,25 +298,42 @@ export function AnalyticsFilters({
   const isHistoryActive = filters.calendarYear === 'all' && filters.schoolYear === 'all';
 
   // Handlers para presets
+  const getValidClassIdsForCalendarYear = useCallback((year: number) => {
+    if (filters.classIds.length === 0) return [];
+    const validClassIds = new Set(
+      activeClasses
+        .filter((cls) => {
+          const startYear = getStartCalendarYear(cls);
+          if (!startYear) return false;
+          const endYear = cls.endCalendarYear ?? (startYear + 2);
+          return startYear <= year && year <= endYear;
+        })
+        .map((cls) => cls.id),
+    );
+    return filters.classIds.filter((classId) => validClassIds.has(classId));
+  }, [activeClasses, filters.classIds, getStartCalendarYear]);
+
   const handlePresetCurrentYear = () => {
-    const hadClasses = filters.classIds.length > 0;
-    onFilterChange({ calendarYear: currentYear, schoolYear: 'all', classIds: [] });
-    if (hadClasses) {
+    const nextClassIds = getValidClassIdsForCalendarYear(currentYear);
+    const removedCount = filters.classIds.length - nextClassIds.length;
+    onFilterChange({ calendarYear: currentYear, schoolYear: 'all', classIds: nextClassIds });
+    if (removedCount > 0) {
       toast({
         title: 'Filtros atualizados',
-        description: 'A seleção de turmas foi limpa ao trocar de período.',
+        description: `${removedCount} turma(s) removida(s) por não estarem ativas em ${currentYear}.`,
         duration: 3000,
       });
     }
   };
 
   const handlePresetLastYear = () => {
-    const hadClasses = filters.classIds.length > 0;
-    onFilterChange({ calendarYear: lastYear, schoolYear: 'all', classIds: [] });
-    if (hadClasses) {
+    const nextClassIds = getValidClassIdsForCalendarYear(lastYear);
+    const removedCount = filters.classIds.length - nextClassIds.length;
+    onFilterChange({ calendarYear: lastYear, schoolYear: 'all', classIds: nextClassIds });
+    if (removedCount > 0) {
       toast({
         title: 'Filtros atualizados',
-        description: 'A seleção de turmas foi limpa ao trocar de período.',
+        description: `${removedCount} turma(s) removida(s) por não estarem ativas em ${lastYear}.`,
         duration: 3000,
       });
     }
@@ -351,7 +376,7 @@ export function AnalyticsFilters({
           <Button
             variant={isHistoryActive ? 'secondary' : 'outline'}
             size="sm"
-            onClick={() => onFilterChange({ calendarYear: 'all', schoolYear: 'all', series: [], classIds: [] })}
+            onClick={handlePresetHistory}
             className={isHistoryActive ? 'border-warning/30 bg-warning/10 text-warning dark:text-warning' : 'text-muted-foreground'}
           >
             Histórico Global

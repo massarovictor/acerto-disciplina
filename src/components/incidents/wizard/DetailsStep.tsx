@@ -57,13 +57,25 @@ export const DetailsStep = ({ formData, updateFormData }: DetailsStepProps) => {
       students
     );
 
-    // Atualiza a sugestão e pré-preenche as providências se estiver vazio
-    updateFormData({
-      suggestedAction: suggested,
-      actions: formData.actions || suggested
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.studentIds, formData.finalSeverity, formData.suggestedAction]);
+    const hasManualActions = (formData.actions ?? '').trim().length > 0;
+    const shouldUpdateSuggested = formData.suggestedAction !== suggested;
+    const shouldPrefillActions = !hasManualActions && formData.actions !== suggested;
+
+    if (shouldUpdateSuggested || shouldPrefillActions) {
+      updateFormData({
+        suggestedAction: suggested,
+        actions: hasManualActions ? formData.actions : suggested,
+      });
+    }
+  }, [
+    formData.actions,
+    formData.finalSeverity,
+    formData.studentIds,
+    formData.suggestedAction,
+    incidents,
+    students,
+    updateFormData,
+  ]);
 
   return (
     <div className="space-y-6">
