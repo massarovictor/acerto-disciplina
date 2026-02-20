@@ -2,7 +2,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Login from '@/pages/Login';
@@ -43,6 +43,21 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const LegacyIncidentsRedirect = () => {
+  const location = useLocation();
+
+  return (
+    <Navigate
+      to={{
+        pathname: '/acompanhamentos',
+        search: location.search,
+        hash: location.hash,
+      }}
+      replace
+    />
+  );
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="system" disableTransitionOnChange>
@@ -67,7 +82,8 @@ const App = () => (
                 }
               >
                 <Route index element={<Dashboard />} />
-                <Route path="ocorrencias" element={<Incidents />} />
+                <Route path="acompanhamentos" element={<Incidents />} />
+                <Route path="ocorrencias" element={<LegacyIncidentsRedirect />} />
                 <Route path="turmas" element={<Classes />} />
                 <Route path="turmas-arquivadas" element={<ArchivedClasses />} />
                 <Route path="alunos" element={<Students />} />

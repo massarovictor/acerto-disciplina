@@ -1,16 +1,21 @@
 import JSZip from 'jszip';
 import { Incident, Student, Class, Comment } from '@/types';
 import { INCIDENT_EPISODES } from '@/data/mockData';
+import { FAMILY_FOLLOW_UP_EPISODES } from '@/data/familyFollowUpEpisodes';
 import { BasePDFGenerator } from './basePdfExport';
 import { supabase } from '@/services/supabase/client';
 import { perfTimer } from '@/lib/perf';
 import { formatBrasiliaDate } from './brasiliaDate';
+import { isFamilyIncident } from './incidentType';
 
 /**
- * Gerador de PDF de Ocorrências Disciplinares
+ * Gerador de PDF de Acompanhamentos Disciplinares
  */
 
 const EPISODE_MAP = new Map(INCIDENT_EPISODES.map((episode) => [episode.id, episode.description]));
+const FAMILY_EPISODE_MAP = new Map(
+  FAMILY_FOLLOW_UP_EPISODES.map((episode) => [episode.id, episode.description]),
+);
 
 // Mapeamento de gravidade para texto formatado (sem cores)
 const SEVERITY_LABELS: Record<string, string> = {
@@ -18,6 +23,13 @@ const SEVERITY_LABELS: Record<string, string> = {
   intermediaria: 'Intermediária',
   grave: 'Grave',
   gravissima: 'Gravíssima',
+};
+
+const FAMILY_ATTENTION_LABELS: Record<string, string> = {
+  leve: 'Baixa',
+  intermediaria: 'Média',
+  grave: 'Alta',
+  gravissima: 'Crítica',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -115,10 +127,17 @@ class IncidentPDF extends BasePDFGenerator {
         incidentClass,
       );
       this.renderHeader();
+      const isFamilyFlow = isFamilyIncident(incident);
 
       // Título do Documento - formato profissional
       this.setFont('md', 'bold', '#000000');
-      this.drawText('Registro de Ocorrência Disciplinar', this.margin, this.y);
+      this.drawText(
+        isFamilyFlow
+          ? 'Registro de Acompanhamento Familiar'
+          : 'Registro de Ocorrência Disciplinar',
+        this.margin,
+        this.y,
+      );
       this.y += 6;
 
       // Protocolo e Meta - formato compacto
@@ -130,15 +149,17 @@ class IncidentPDF extends BasePDFGenerator {
       this.renderIdentification(incident, incidentClass, students, singleStudent);
 
       // Status e Gravidade
-      this.renderStatusInfo(incident);
+      this.renderStatusInfo(incident, isFamilyFlow);
 
       // Episódios
-      this.renderEpisodes(incident.episodes);
+      this.renderEpisodes(incident.episodes, isFamilyFlow);
 
       // Descrição
       if (incident.description) {
         this.checkPageBreak(35); // Orphan control: Garante título + ~3-4 linhas
-        this.renderSectionTitle('Descrição dos Fatos');
+        this.renderSectionTitle(
+          isFamilyFlow ? 'Contexto do acompanhamento' : 'Descrição dos Fatos',
+        );
         this.setFont('xs', 'normal', '#000000');
         const lines = this.pdf.splitTextToSize(incident.description, this.contentWidth);
         lines.forEach((line: string) => {
@@ -155,7 +176,11 @@ class IncidentPDF extends BasePDFGenerator {
 
       if (hasActions || followUpsWithEncaminhamentos.length > 0) {
         this.checkPageBreak(35); // Orphan control
-        this.renderSectionTitle('Providências Tomadas / Combinados');
+        this.renderSectionTitle(
+          isFamilyFlow
+            ? 'Plano de acompanhamento / combinados'
+            : 'Providências Tomadas / Combinados',
+        );
 
         // 1. Ações Iniciais (Campo "Providências" do registro principal)
         if (hasActions) {
@@ -179,7 +204,11 @@ class IncidentPDF extends BasePDFGenerator {
 
             // Subtítulo do combinado
             this.setFont('xs', 'bold', '#000000');
-            this.drawText(`Combinado em ${dateStr}:`, this.margin, this.y + 4);
+            this.drawText(
+              `${isFamilyFlow ? 'Registro' : 'Combinado'} em ${dateStr}:`,
+              this.margin,
+              this.y + 4,
+            );
             this.y += 5;
 
             // Conteúdo do combinado
@@ -236,36 +265,59 @@ class IncidentPDF extends BasePDFGenerator {
     this.y += 25;
   }
 
-  private renderStatusInfo(incident: Incident) {
+  private renderStatusInfo(incident: Incident, isFamilyFlow: boolean) {
     // Gravidade e Status - preto e branco, formato profissional
+    const severityTitle = isFamilyFlow ? 'Nível de atenção:' : 'Gravidade:';
+    const severityLabel = isFamilyFlow
+      ? (FAMILY_ATTENTION_LABELS[incident.finalSeverity] || incident.finalSeverity)
+      : (SEVERITY_LABELS[incident.finalSeverity] || incident.finalSeverity);
+
     this.setFont('xs', 'normal', '#000000');
-    this.drawText('Gravidade:', this.margin, this.y + 4);
+    this.drawText(severityTitle, this.margin, this.y + 4);
+
+    const severityTitleWidth = this.pdf.getTextWidth(severityTitle);
+    this.setFont('xs', 'bold', '#000000');
+    const severityLabelWidth = this.pdf.getTextWidth(severityLabel);
+    const severityBoxWidth = Math.max(28, severityLabelWidth + 12);
+    const severityBoxX = this.margin + severityTitleWidth + 4;
 
     // Caixa com borda preta (sem cor de fundo)
-    this.drawRect(this.margin + 20, this.y, 35, 6, { stroke: '#000000', radius: 1 });
-    this.setFont('xs', 'bold', '#000000');
-    const severityLabel = SEVERITY_LABELS[incident.finalSeverity] || incident.finalSeverity;
-    this.drawText(severityLabel, this.margin + 37.5, this.y + 4.2, { align: 'center' });
+    this.drawRect(severityBoxX, this.y, severityBoxWidth, 6, {
+      stroke: '#000000',
+      radius: 1,
+    });
+    this.drawText(severityLabel, severityBoxX + severityBoxWidth / 2, this.y + 4.2, {
+      align: 'center',
+    });
 
+    const statusTitle = 'Status:';
+    const statusTitleX = severityBoxX + severityBoxWidth + 10;
     this.setFont('xs', 'normal', '#000000');
-    this.drawText('Status:', this.margin + 60, this.y + 4);
+    this.drawText(statusTitle, statusTitleX, this.y + 4);
     this.setFont('xs', 'bold', '#000000');
     const statusLabel = STATUS_LABELS[incident.status] || incident.status;
-    this.drawText(statusLabel, this.margin + 75, this.y + 4);
+    const statusValueX = statusTitleX + this.pdf.getTextWidth(statusTitle) + 3;
+    this.drawText(statusLabel, statusValueX, this.y + 4);
 
     this.y += 10;
   }
 
-  private renderEpisodes(episodes: string[]) {
+  private renderEpisodes(episodes: string[], isFamilyFlow: boolean) {
     if (!episodes || episodes.length === 0) return;
 
     this.setFont('xs', 'normal', '#000000');
-    this.drawText('Episódios / Infrações:', this.margin, this.y);
+    this.drawText(
+      isFamilyFlow ? 'Pontos de acompanhamento:' : 'Episódios / Infrações:',
+      this.margin,
+      this.y,
+    );
     this.y += 4;
 
     // Lista simples, sem caixas coloridas
     episodes.forEach((ep, index) => {
-      const label = EPISODE_MAP.get(ep) ?? ep;
+      const label = isFamilyFlow
+        ? FAMILY_EPISODE_MAP.get(ep) ?? ep
+        : EPISODE_MAP.get(ep) ?? ep;
       this.setFont('xs', 'normal', '#000000');
       this.drawText(`${index + 1}. ${label}`, this.margin + 2, this.y + 3.5);
       this.y += 5;

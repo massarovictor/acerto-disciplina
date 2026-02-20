@@ -47,7 +47,7 @@ export const OperatingStatus = ({ studentsCount, classesCount, pendingIncidentsC
             />
 
             <StatusCard
-                label="Ocorrências Pendentes"
+                label="Acompanhamentos Pendentes"
                 value={pendingIncidentsCount}
                 icon={AlertTriangle}
                 // Destaque visual apenas se houver pendências

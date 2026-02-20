@@ -200,10 +200,10 @@ export const SchoolOverviewSlide = ({
 
                     <KPICard
                         icon={AlertTriangle}
-                        label="Ocorrências Críticas"
+                        label="Acompanhamentos Críticos"
                         value={metrics.criticalIncidents}
                         color={REPORT_COLORS.danger}
-                        subtext="Graves registradas"
+                        subtext="Graves registrados"
                     />
                 </div>
 

@@ -23,6 +23,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { BirthdayWidget } from '@/components/dashboard/BirthdayWidget';
 import { OperatingStatus } from '@/components/dashboard/OperatingStatus';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
+import { isDisciplinaryIncident } from '@/lib/incidentType';
 
 interface NavigationCard {
   title: string;
@@ -47,8 +48,11 @@ const Dashboard = () => {
   // Calculate badges and counts
   const activeClasses = classes.filter(c => !c.archived);
   const activeStudents = students.filter(s => s.status === 'active');
+  const disciplinaryIncidents = incidents.filter((incident) =>
+    isDisciplinaryIncident(incident),
+  );
   const activeClassIds = new Set(activeClasses.map((c) => c.id));
-  const pendingIncidents = incidents.filter(
+  const pendingIncidents = disciplinaryIncidents.filter(
     (i) => i.status !== 'resolvida' && activeClassIds.has(i.classId),
   );
 
@@ -78,10 +82,10 @@ const Dashboard = () => {
       iconColor: 'text-emerald-600 dark:text-emerald-400',
     },
     {
-      title: 'Ocorrências',
+      title: 'Acompanhamentos',
       description: 'Registro disciplinar',
       icon: AlertTriangle,
-      path: '/ocorrencias',
+      path: '/acompanhamentos',
       iconBg: 'bg-amber-50 dark:bg-amber-900/20',
       iconColor: 'text-amber-600 dark:text-amber-400',
       badge: pendingIncidents.length > 0 ? pendingIncidents.length : undefined,
@@ -147,7 +151,7 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Left Column (2/3): Recent Activity */}
         <div className="lg:col-span-2 h-full">
-          <RecentActivity incidents={incidents} students={students} />
+          <RecentActivity incidents={disciplinaryIncidents} students={students} />
         </div>
 
         {/* Right Column (1/3): Birthdays */}

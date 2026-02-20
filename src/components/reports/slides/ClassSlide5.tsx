@@ -38,13 +38,13 @@ export const ClassSlide5 = ({ classData, students, incidents }: ClassSlide5Props
 
             <div className="grid grid-cols-3 gap-4">
               <div className="p-4 bg-destructive/10 rounded-lg border border-destructive/30">
-                <p className="text-sm text-muted-foreground mb-1">Ocorrências Críticas</p>
+                <p className="text-sm text-muted-foreground mb-1">Acompanhamentos Críticos</p>
                 <p className="text-3xl font-bold text-destructive">{criticalIncidents.length}</p>
                 <p className="text-xs text-muted-foreground mt-1">Requerem atenção imediata</p>
               </div>
 
               <div className="p-4 bg-warning/10 rounded-lg border border-warning/30">
-                <p className="text-sm text-muted-foreground mb-1">Ocorrências Abertas</p>
+                <p className="text-sm text-muted-foreground mb-1">Acompanhamentos Abertos</p>
                 <p className="text-3xl font-bold text-warning">{openIncidents.length}</p>
                 <p className="text-xs text-muted-foreground mt-1">Em acompanhamento</p>
               </div>
@@ -72,7 +72,7 @@ export const ClassSlide5 = ({ classData, students, incidents }: ClassSlide5Props
                 <div className="space-y-2">
                   {[
                     { text: 'Reunião com responsáveis de alunos em risco', priority: 'high' },
-                    { text: 'Análise de casos de ocorrências graves', priority: 'high' },
+                    { text: 'Análise de casos de acompanhamentos graves', priority: 'high' },
                     { text: 'Planejamento de reforço escolar', priority: 'medium' },
                   ].map((action, index) => (
                     <div key={index} className="flex items-start gap-3 p-2 bg-background/50 rounded">

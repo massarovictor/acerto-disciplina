@@ -451,7 +451,7 @@ export const StudentMetricsSlide = ({
                     textTransform: "uppercase",
                   }}
                 >
-                  Ocorrências
+                  Acompanhamentos
                 </p>
                 <p
                   style={{

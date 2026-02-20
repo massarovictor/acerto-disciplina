@@ -7,7 +7,7 @@ const normalize = (value?: string | null) =>
     .toLowerCase();
 
 /**
- * Identifica ocorrências de convocação pedagógica por rendimento.
+ * Identifica acompanhamentos de convocação pedagógica por rendimento.
  * Esse tipo de ocorrência deve gerar comparecimento de responsáveis
  * para alinhamento pedagógico, sem sanção de suspensão.
  */

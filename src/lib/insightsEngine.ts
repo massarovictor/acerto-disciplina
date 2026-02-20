@@ -386,19 +386,19 @@ export function generateActionableRecommendations(
       category: 'comportamento',
       priority: mostImpactful.averageGradeDrop > 1 ? 'alta' : 'media',
       title: 'Programa de Acompanhamento Comportamental',
-      description: `Ocorrências associadas a queda de ${mostImpactful.averageGradeDrop.toFixed(1)} ponto(s) na média. ` +
+      description: `Acompanhamentos associados a queda de ${mostImpactful.averageGradeDrop.toFixed(1)} ponto(s) na média. ` +
         `${mostImpactful.affectedStudents.length} aluno(s) afetado(s).`,
       target: 'Turma',
-      expectedImpact: 'Redução de ocorrências e melhoria no desempenho acadêmico',
+      expectedImpact: 'Redução de acompanhamentos e melhoria no desempenho acadêmico',
       steps: [
-        'Mapear padrões de ocorrências (horário, disciplina, contexto)',
+        'Mapear padrões de acompanhamentos (horário, disciplina, contexto)',
         'Implementar programa de mediação de conflitos',
         'Criar canal de comunicação com famílias',
         'Estabelecer sistema de reconhecimento positivo',
         'Acompanhar desempenho pós-ocorrência',
       ],
       timeline: 'Contínuo',
-      metrics: ['Número de ocorrências/mês', 'Média dos alunos com ocorrências', 'Tempo de recuperação'],
+      metrics: ['Número de acompanhamentos/mês', 'Média dos alunos com acompanhamentos', 'Tempo de recuperação'],
     });
   }
 

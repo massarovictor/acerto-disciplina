@@ -10,9 +10,9 @@
  *    - Insights acadêmicos
  * 
  * 2. COMPORTAMENTO E DISCIPLINA
- *    - Resumo de ocorrências por severidade
- *    - Ranking de turmas (por ocorrências)
- *    - Alunos com mais ocorrências
+ *    - Resumo de acompanhamentos por severidade
+ *    - Ranking de turmas (por acompanhamentos)
+ *    - Alunos com mais acompanhamentos
  *    - Tendência mensal
  *    - Insights comportamentais
  * 
@@ -61,6 +61,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useAnalyticsFiltersLogic } from '@/hooks/useAnalyticsFiltersLogic';
+import { isDisciplinaryIncident } from '@/lib/incidentType';
 
 // Componente de Insights Inline (Neutralizado)
 const InlineInsights = ({
@@ -189,6 +190,9 @@ const Analytics = () => {
   const { analyticsUI, setAnalyticsFilters, setAnalyticsUI } = useUIStore();
   const filters = analyticsUI.filters as AnalyticsFilters;
   const { incidents } = useIncidents();
+  const disciplinaryIncidents = incidents.filter((incident) =>
+    isDisciplinaryIncident(incident),
+  );
 
   const {
     grades,
@@ -211,7 +215,7 @@ const Analytics = () => {
     classes,
     grades,
     [], // DISABLED: Attendance temporarily removed
-    incidents,
+    disciplinaryIncidents,
     filters
   );
 

@@ -335,11 +335,11 @@ class ClassReportPDFGenerator {
       const graveCount = studentIncidents.filter(i => i.finalSeverity === 'grave' || i.finalSeverity === 'gravissima').length;
       const desc = graveCount > 0
         ? `Constam ${studentIncidents.length} registros, sendo ${graveCount} de maior complexidade, requerendo alinhamento regimental.`
-        : `Registram-se ${studentIncidents.length} ocorrências pontuais sob monitoramento para assegurar a conformidade.`;
+        : `Registram-se ${studentIncidents.length} acompanhamentos pontuais sob monitoramento para assegurar a conformidade.`;
       contents.push({ text: 'CAMPO DISCIPLINAR:', fontSize: 8, bold: true, margin: [0, 4, 0, 2] });
       contents.push({ text: desc, fontSize: 9, margin: [0, 0, 0, 8] });
     } else {
-      contents.push({ text: 'CAMPO DISCIPLINAR: Ausência de ocorrências registradas.', fontSize: 8, bold: true, margin: [0, 4, 0, 8] });
+      contents.push({ text: 'CAMPO DISCIPLINAR: Ausência de acompanhamentos registrados.', fontSize: 8, bold: true, margin: [0, 4, 0, 8] });
     }
 
     // 5. ENCAMINHAMENTO
@@ -830,12 +830,12 @@ class ClassReportPDFGenerator {
 
     // Texto Disciplinar
     const studentIncidents = this.incidents.filter(i => i.studentIds.includes(profile.studentId));
-    let incidentText = 'Ausência de ocorrências registradas.';
+    let incidentText = 'Ausência de acompanhamentos registrados.';
     if (studentIncidents.length > 0) {
       const graveCount = studentIncidents.filter(i => i.finalSeverity === 'grave' || i.finalSeverity === 'gravissima').length;
       incidentText = graveCount > 0
         ? `Constam ${studentIncidents.length} registros, sendo ${graveCount} de maior complexidade.`
-        : `Registram-se ${studentIncidents.length} ocorrências pontuais sob monitoramento.`;
+        : `Registram-se ${studentIncidents.length} acompanhamentos pontuais sob monitoramento.`;
     }
 
     // Encaminhamento

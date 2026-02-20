@@ -23,6 +23,7 @@ interface StudentsUIState {
 interface IncidentsUIState {
     activeTab: 'aberta' | 'acompanhamento' | 'resolvida';
     classFilter: string;
+    typeFilter: 'all' | 'disciplinar' | 'acompanhamento_familiar';
     searchTerm: string;
 }
 
@@ -144,6 +145,7 @@ const initialStudentsUI: StudentsUIState = {
 const initialIncidentsUI: IncidentsUIState = {
     activeTab: 'aberta',
     classFilter: 'all',
+    typeFilter: 'all',
     searchTerm: '',
 };
 

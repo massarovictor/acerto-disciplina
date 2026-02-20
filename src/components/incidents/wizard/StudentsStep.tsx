@@ -6,13 +6,19 @@ import { useStudents } from '@/hooks/useData';
 import { IncidentFormData } from '../IncidentWizard';
 import { Search } from 'lucide-react';
 import { formatBrasiliaDate } from '@/lib/brasiliaDate';
+import { IncidentType } from '@/types';
 
 interface StudentsStepProps {
   formData: Partial<IncidentFormData>;
   updateFormData: (data: Partial<IncidentFormData>) => void;
+  incidentType: IncidentType;
 }
 
-export const StudentsStep = ({ formData, updateFormData }: StudentsStepProps) => {
+export const StudentsStep = ({
+  formData,
+  updateFormData,
+  incidentType,
+}: StudentsStepProps) => {
   const { students } = useStudents();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -36,7 +42,9 @@ export const StudentsStep = ({ formData, updateFormData }: StudentsStepProps) =>
       <div>
         <h2 className="text-2xl font-bold">Alunos Envolvidos</h2>
         <p className="text-muted-foreground mt-1">
-          Selecione os alunos envolvidos na ocorrência
+          {incidentType === 'acompanhamento_familiar'
+            ? 'Selecione os alunos que receberão acompanhamento familiar'
+            : 'Selecione os alunos envolvidos na ocorrência'}
         </p>
       </div>
 

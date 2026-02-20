@@ -548,7 +548,7 @@ export function analyzeBehaviorImpact(
         averageGradeDrop: gradeDrop,
         recoveryTime: severity === 'leve' ? 1 : severity === 'intermediaria' ? 2 : 3,
         affectedStudents: affectedStudents.map(s => s.name),
-        insight: `Ocorrências ${severityLabel.toLowerCase()}s associadas a queda média de ${gradeDrop.toFixed(1)} ponto(s) nas notas.`,
+        insight: `Acompanhamentos ${severityLabel.toLowerCase()}s associados a queda média de ${gradeDrop.toFixed(1)} ponto(s) nas notas.`,
       });
     }
   });
@@ -561,12 +561,12 @@ export function analyzeBehaviorImpact(
   
   if (studentsWithMultipleIncidents.length > 0) {
     patterns.push(
-      `${studentsWithMultipleIncidents.length} aluno(s) com ocorrências recorrentes. ` +
+      `${studentsWithMultipleIncidents.length} aluno(s) com acompanhamentos recorrentes. ` +
       `Intervenção comportamental sistemática recomendada.`
     );
   }
   
-  // Analisar se queda de notas precede ou sucede ocorrências
+  // Analisar se queda de notas precede ou sucede acompanhamentos
   let dropPrecedesIncident = 0;
   let incidentPrecedesDrop = 0;
   
@@ -603,12 +603,12 @@ export function analyzeBehaviorImpact(
   if (dropPrecedesIncident + incidentPrecedesDrop > 0) {
     if (dropPrecedesIncident > incidentPrecedesDrop) {
       patterns.push(
-        'Padrão identificado: queda de desempenho tende a PRECEDER ocorrências disciplinares. ' +
+        'Padrão identificado: queda de desempenho tende a PRECEDER acompanhamentos disciplinares. ' +
         'Monitorar notas como indicador de risco comportamental.'
       );
     } else {
       patterns.push(
-        'Padrão identificado: ocorrências tendem a PRECEDER queda de desempenho. ' +
+        'Padrão identificado: acompanhamentos tendem a PRECEDER queda de desempenho. ' +
         'Acompanhamento acadêmico pós-ocorrência é crítico.'
       );
     }
@@ -682,7 +682,7 @@ export function analyzeStudentProfiles(
       
       if (avgGrade >= 7.5 && avgFreq >= 90 && avgIncidents < 0.5) {
         name = 'Excelência';
-        chars = ['Alto desempenho', 'Boa frequência', 'Sem ocorrências'];
+        chars = ['Alto desempenho', 'Boa frequência', 'Sem acompanhamentos'];
       } else if (avgGrade >= 6 && avgBelow <= 2) {
         name = 'Regular';
         chars = ['Desempenho satisfatório', 'Poucas dificuldades'];

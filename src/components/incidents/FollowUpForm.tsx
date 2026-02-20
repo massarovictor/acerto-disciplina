@@ -2,7 +2,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FollowUpType } from '@/types';
+import { FollowUpType, IncidentType } from '@/types';
 
 interface FollowUpFormProps {
   type: FollowUpType;
@@ -29,6 +29,7 @@ interface FollowUpFormProps {
   setNomeResponsavelPai: (nome: string) => void;
   grauParentesco: string;
   setGrauParentesco: (grau: string) => void;
+  incidentType?: IncidentType;
 }
 
 export const FollowUpForm = ({
@@ -56,31 +57,57 @@ export const FollowUpForm = ({
   setNomeResponsavelPai,
   grauParentesco,
   setGrauParentesco,
+  incidentType = 'disciplinar',
 }: FollowUpFormProps) => {
-  const motivoOptions = [
-    '1 - Comportamento inadequado',
-    '2 - Conflitos/Relação interpessoal',
-    '3 - Atrasos ou faltas não justificados',
-    '4 - Apoio pedagógico',
-    '5 - Infrequência/Risco de abandono',
-    '6 - Rendimento (Intervenções por baixo rendimento/Elogios/Reconhecimento)',
-    '7 - Problemas de saúde',
-    '8 - Questões socioemocionais',
-    '9 - Desengajamento com atividades',
-    '10 - Desinteresse/Desmotivação',
-    '11 - Outros...',
-  ];
+  const isFamilyFlow = incidentType === 'acompanhamento_familiar';
+  const motivoOptions = isFamilyFlow
+    ? [
+        '1 - Apoio pedagógico com a família',
+        '2 - Apoio socioemocional ao estudante',
+        '3 - Rotina de estudos e organização',
+        '4 - Frequência e permanência escolar',
+        '5 - Engajamento e vínculo com a escola',
+        '6 - Articulação com rede de apoio',
+        '7 - Saúde e bem-estar',
+        '8 - Ajustes no plano de acompanhamento',
+        '9 - Devolutiva de evolução',
+        '10 - Outros contextos familiares',
+      ]
+    : [
+        '1 - Comportamento inadequado',
+        '2 - Conflitos/Relação interpessoal',
+        '3 - Atrasos ou faltas não justificados',
+        '4 - Apoio pedagógico',
+        '5 - Infrequência/Risco de abandono',
+        '6 - Rendimento (Intervenções por baixo rendimento/Elogios/Reconhecimento)',
+        '7 - Problemas de saúde',
+        '8 - Questões socioemocionais',
+        '9 - Desengajamento com atividades',
+        '10 - Desinteresse/Desmotivação',
+        '11 - Outros...',
+      ];
 
-  const tipoSituacaoOptions = [
-    '1 - Indisciplina',
-    '2 - Infrequência',
-    '3 - Faltas por transporte',
-    '4 - Atrasos',
-    '5 - Problemas de saúde',
-    '6 - Saídas da escola/sala',
-    '7 - Desrespeito às normas da escola',
-    '8 - Realização/não-entrega de atividades',
-  ];
+  const tipoSituacaoOptions = isFamilyFlow
+    ? [
+        '1 - Queda de rendimento',
+        '2 - Dificuldade de aprendizagem',
+        '3 - Desorganização de rotina de estudos',
+        '4 - Baixa participação em aula',
+        '5 - Questões socioemocionais',
+        '6 - Infrequência',
+        '7 - Vulnerabilidade familiar',
+        '8 - Encaminhamento para rede de apoio',
+      ]
+    : [
+        '1 - Indisciplina',
+        '2 - Infrequência',
+        '3 - Faltas por transporte',
+        '4 - Atrasos',
+        '5 - Problemas de saúde',
+        '6 - Saídas da escola/sala',
+        '7 - Desrespeito às normas da escola',
+        '8 - Realização/não-entrega de atividades',
+      ];
 
   return (
     <div className="space-y-4">
@@ -91,9 +118,21 @@ export const FollowUpForm = ({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="conversa_individual">Conversa Individual com Estudante</SelectItem>
-            <SelectItem value="conversa_pais">Conversa com Pais/Responsáveis</SelectItem>
-            <SelectItem value="situacoes_diversas">Registro de Situações Diversas</SelectItem>
+            <SelectItem value="conversa_individual">
+              {isFamilyFlow
+                ? 'Atendimento Individual com Estudante'
+                : 'Conversa Individual com Estudante'}
+            </SelectItem>
+            <SelectItem value="conversa_pais">
+              {isFamilyFlow
+                ? 'Atendimento com Família/Responsáveis'
+                : 'Conversa com Pais/Responsáveis'}
+            </SelectItem>
+            <SelectItem value="situacoes_diversas">
+              {isFamilyFlow
+                ? 'Registro Pedagógico/Emocional'
+                : 'Registro de Situações Diversas'}
+            </SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -166,16 +205,27 @@ export const FollowUpForm = ({
           <div className="space-y-2">
             <Label>Providências Tomadas / Sugeridas</Label>
             <div className="mb-2 p-3 bg-primary/5 border border-primary/20 rounded-md">
-              <p className="text-xs font-medium text-primary mb-1">✓ Sugestão Automática (baseada na gravidade e histórico):</p>
+              <p className="text-xs font-medium text-primary mb-1">
+                ✓ Sugestão Automática
+                {isFamilyFlow
+                  ? ' (baseada no nível de atenção e no contexto do acompanhamento):'
+                  : ' (baseada na gravidade e histórico):'}
+              </p>
               <p className="text-sm font-medium">{providencias}</p>
             </div>
             <p className="text-xs text-muted-foreground">
-              A providência acima foi calculada automaticamente. Você pode editá-la se necessário.
+              {isFamilyFlow
+                ? 'A recomendação acima considera o contexto pedagógico e emocional e pode ser ajustada.'
+                : 'A providência acima foi calculada automaticamente. Você pode editá-la se necessário.'}
             </p>
             <Textarea
               value={providencias}
               onChange={(e) => setProvidencias(e.target.value)}
-              placeholder="Edite as providências se necessário..."
+              placeholder={
+                isFamilyFlow
+                  ? 'Edite o plano de apoio, os combinados e os encaminhamentos...'
+                  : 'Edite as providências se necessário...'
+              }
               rows={3}
             />
           </div>
@@ -205,11 +255,17 @@ export const FollowUpForm = ({
       {type === 'situacoes_diversas' && (
         <>
           <div className="space-y-2">
-            <Label>Disciplina/Professor</Label>
+            <Label>
+              {isFamilyFlow ? 'Área/Profissional de Referência' : 'Disciplina/Professor'}
+            </Label>
             <Input
               value={disciplina}
               onChange={(e) => setDisciplina(e.target.value)}
-              placeholder="Ex: Matemática - Prof. João"
+              placeholder={
+                isFamilyFlow
+                  ? 'Ex: Matemática - Coordenação Pedagógica'
+                  : 'Ex: Matemática - Prof. João'
+              }
             />
           </div>
 

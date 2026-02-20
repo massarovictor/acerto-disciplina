@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { FollowUpList } from './FollowUpList';
 import { FollowUpForm } from './FollowUpForm';
 import {
@@ -32,6 +32,11 @@ import { generateIncidentParentNotificationPDF } from '@/lib/incidentParentNotif
 import { getSeverityColor, getStatusColor } from '@/lib/incidentUtils';
 import { sendIncidentEmail } from '@/lib/emailService';
 import { isPerformanceConvocationIncident } from '@/lib/incidentClassification';
+import {
+  getIncidentSeverityLabel,
+  getIncidentTypeLabel,
+  isFamilyIncident,
+} from '@/lib/incidentType';
 import { AddStudentsDialog } from './AddStudentsDialog';
 import { X } from 'lucide-react';
 import {
@@ -102,7 +107,22 @@ export const IncidentManagementDialog = ({
 
   // Sempre pega a versão mais recente dos incidents
   const currentIncident = incidents.find(i => i.id === incident.id) || incident;
-  const isPerformanceConvocation = isPerformanceConvocationIncident(currentIncident);
+  const isFamilyFlow = isFamilyIncident(currentIncident);
+  const isPerformanceConvocation =
+    !isFamilyFlow && isPerformanceConvocationIncident(currentIncident);
+
+  const getFamilyFollowUpSuggestion = useCallback(() => {
+    switch (currentIncident.finalSeverity) {
+      case 'gravissima':
+        return 'Priorizar atendimento com responsáveis, equipe gestora e rede de apoio para plano protetivo imediato.';
+      case 'grave':
+        return 'Realizar reunião prioritária com responsáveis e equipe pedagógica para alinhamento intensivo.';
+      case 'intermediaria':
+        return 'Registrar atendimento com responsáveis e plano de intervenção pedagógica e socioemocional.';
+      default:
+        return 'Promover escuta inicial com estudante e família, com combinados de acompanhamento contínuo.';
+    }
+  }, [currentIncident.finalSeverity]);
 
   // Inicializa campos editáveis quando incident muda
   useEffect(() => {
@@ -114,40 +134,46 @@ export const IncidentManagementDialog = ({
   // Auto-preencher acompanhamento quando mudar para status acompanhamento
   useEffect(() => {
     if (currentIncident.status === 'acompanhamento' && !currentIncident.followUps?.length) {
-      const historicalIncidents = incidents.filter((item) => item.id !== currentIncident.id);
+      if (isFamilyFlow) {
+        setFollowUpType('conversa_pais');
+        setFollowUpProvidencias(getFamilyFollowUpSuggestion());
+        setFollowUpMotivo('1 - Apoio pedagógico com a família');
+      } else {
+        const historicalIncidents = incidents.filter((item) => item.id !== currentIncident.id);
 
-      // Calculate required action level based on severity + accumulated history
-      const requiredLevel = isPerformanceConvocation
-        ? 'comunicado_pais'
-        : getRequiredActionLevel(
-            currentIncident.studentIds,
-            currentIncident.finalSeverity,
-            historicalIncidents
-          );
-      const requiredType = getRequiredFollowUpType(requiredLevel);
+        // Calculate required action level based on severity + accumulated history
+        const requiredLevel = isPerformanceConvocation
+          ? 'comunicado_pais'
+          : getRequiredActionLevel(
+              currentIncident.studentIds,
+              currentIncident.finalSeverity,
+              historicalIncidents
+            );
+        const requiredType = getRequiredFollowUpType(requiredLevel);
 
-      const suggested = isPerformanceConvocation
-        ? 'Convocar responsáveis para comparecimento à escola e alinhamentos pedagógicos sobre o rendimento bimestral.'
-        : calculateSuggestedAction(
-            currentIncident.studentIds,
-            currentIncident.finalSeverity,
-            historicalIncidents,
-            students
-          );
+        const suggested = isPerformanceConvocation
+          ? 'Convocar responsáveis para comparecimento à escola e alinhamentos pedagógicos sobre o rendimento bimestral.'
+          : calculateSuggestedAction(
+              currentIncident.studentIds,
+              currentIncident.finalSeverity,
+              historicalIncidents,
+              students
+            );
 
-      // Force the required follow-up type based on accumulation rules
-      setFollowUpType(requiredType);
-      setFollowUpProvidencias(suggested);
+        // Force the required follow-up type based on accumulation rules
+        setFollowUpType(requiredType);
+        setFollowUpProvidencias(suggested);
 
-      if (isPerformanceConvocation) {
-        setFollowUpMotivo('6 - Rendimento (Intervenções por baixo rendimento/Elogios/Reconhecimento)');
-      } else if (currentIncident.finalSeverity === 'grave' || currentIncident.finalSeverity === 'gravissima') {
-        setFollowUpMotivo('1 - Comportamento inadequado');
-      } else if (currentIncident.finalSeverity === 'intermediaria') {
-        setFollowUpMotivo('2 - Conflitos/Relação interpessoal');
-      } else if (requiredType === 'conversa_pais') {
-        // Accumulated leves requiring parent contact
-        setFollowUpMotivo('6 - Rendimento (Intervenções por baixo rendimento/Elogios/Reconhecimento)');
+        if (isPerformanceConvocation) {
+          setFollowUpMotivo('6 - Rendimento (Intervenções por baixo rendimento/Elogios/Reconhecimento)');
+        } else if (currentIncident.finalSeverity === 'grave' || currentIncident.finalSeverity === 'gravissima') {
+          setFollowUpMotivo('1 - Comportamento inadequado');
+        } else if (currentIncident.finalSeverity === 'intermediaria') {
+          setFollowUpMotivo('2 - Conflitos/Relação interpessoal');
+        } else if (requiredType === 'conversa_pais') {
+          // Accumulated leves requiring parent contact
+          setFollowUpMotivo('6 - Rendimento (Intervenções por baixo rendimento/Elogios/Reconhecimento)');
+        }
       }
     }
 
@@ -168,15 +194,26 @@ export const IncidentManagementDialog = ({
       setFollowUpNomeResponsavelPai(followUp.nomeResponsavelPai || '');
       setFollowUpGrauParentesco(followUp.grauParentesco || '');
     }
-  }, [currentIncident.id, currentIncident.status, currentIncident.followUps, incidents, students, currentIncident.studentIds, currentIncident.finalSeverity, isPerformanceConvocation]);
+  }, [
+    currentIncident.id,
+    currentIncident.status,
+    currentIncident.followUps,
+    incidents,
+    students,
+    currentIncident.studentIds,
+    currentIncident.finalSeverity,
+    getFamilyFollowUpSuggestion,
+    isPerformanceConvocation,
+    isFamilyFlow,
+  ]);
 
   const incidentClass = classes.find(c => c.id === currentIncident.classId);
   const incidentStudents = students.filter(s => currentIncident.studentIds.includes(s.id));
   const normalizeEmail = (value?: string | null) => (value || '').trim().toLowerCase();
 
   // Permissões:
-  // - Admin pode gerenciar TODAS as ocorrências
-  // - Diretor pode gerenciar apenas ocorrências da turma sob sua responsabilidade
+  // - Admin pode gerenciar TODAS as acompanhamentos
+  // - Diretor pode gerenciar apenas acompanhamentos da turma sob sua responsabilidade
   // - Professor somente registra ocorrência (não gerencia acompanhamento/resolução)
   const isAdmin = profile?.role === 'admin';
   const isDirectorRole = profile?.role === 'diretor';
@@ -204,32 +241,6 @@ export const IncidentManagementDialog = ({
 
   // Permite edição se for admin/diretor E (status aberta OU acompanhamento)
   const isEditableInfo = canManage && (['aberta', 'acompanhamento'].includes(currentIncident.status));
-
-
-  const motivoOptions = [
-    '1 - Comportamento inadequado',
-    '2 - Conflitos/Relação interpessoal',
-    '3 - Atrasos ou faltas não justificados',
-    '4 - Apoio pedagógico',
-    '5 - Infrequência/Risco de abandono',
-    '6 - Rendimento (Intervenções por baixo rendimento/Elogios/Reconhecimento)',
-    '7 - Problemas de saúde',
-    '8 - Questões socioemocionais',
-    '9 - Desengajamento com atividades',
-    '10 - Desinteresse/Desmotivação',
-    '11 - Outros...',
-  ];
-
-  const tipoSituacaoOptions = [
-    '1 - Indisciplina',
-    '2 - Infrequência',
-    '3 - Faltas por transporte',
-    '4 - Atrasos',
-    '5 - Problemas de saúde',
-    '6 - Saídas da escola/sala',
-    '7 - Desrespeito às normas da escola',
-    '8 - Realização/não-entrega de atividades',
-  ];
 
   const statusOptions = [
     { value: 'aberta', label: 'Aberta' },
@@ -424,8 +435,12 @@ export const IncidentManagementDialog = ({
       onStatusChange?.('resolvida');
 
       toast({
-        title: 'Ocorrência resolvida',
-        description: 'A ocorrência foi marcada como resolvida com sucesso.',
+        title: isFamilyFlow
+          ? 'Acompanhamento concluído'
+          : 'Ocorrência resolvida',
+        description: isFamilyFlow
+          ? 'O acompanhamento familiar foi concluído com sucesso.'
+          : 'A ocorrência foi marcada como resolvida com sucesso.',
       });
 
       setTimeout(() => {
@@ -495,11 +510,17 @@ export const IncidentManagementDialog = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Gerenciar Ocorrência</DialogTitle>
+            <DialogTitle>
+              {isFamilyFlow
+                ? 'Gerenciar Acompanhamento Familiar'
+                : 'Gerenciar Ocorrência'}
+            </DialogTitle>
             <DialogDescription>
-              Altere o status, adicione comentários e registre acompanhamentos
+              {isFamilyFlow
+                ? 'Atualize status, registre atendimentos e adicione observações pedagógicas.'
+                : 'Altere o status, adicione comentários e registre acompanhamentos.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -510,10 +531,14 @@ export const IncidentManagementDialog = ({
                 <Badge variant="outline" className={getStatusColor(currentIncident.status)}>
                   {statusOptions.find(s => s.value === currentIncident.status)?.label}
                 </Badge>
+                <Badge variant="secondary">
+                  {getIncidentTypeLabel(currentIncident.incidentType)}
+                </Badge>
                 <Badge variant="outline" className={getSeverityColor(currentIncident.finalSeverity)}>
-                  {currentIncident.finalSeverity === 'leve' ? 'Leve' :
-                    currentIncident.finalSeverity === 'intermediaria' ? 'Intermediária' :
-                      currentIncident.finalSeverity === 'grave' ? 'Grave' : 'Gravíssima'}
+                  {getIncidentSeverityLabel(
+                    currentIncident.finalSeverity,
+                    currentIncident.incidentType,
+                  )}
                 </Badge>
               </div>
               <div className="flex items-center gap-2">
@@ -591,6 +616,10 @@ export const IncidentManagementDialog = ({
                   ))}
                 </div>
               </div>
+              <div className="col-span-2">
+                <span className="font-medium">Tipo:</span>{' '}
+                {getIncidentTypeLabel(currentIncident.incidentType)}
+              </div>
             </div>
 
             {/* Dialog para adicionar alunos */}
@@ -633,7 +662,11 @@ export const IncidentManagementDialog = ({
                       value={editDescription}
                       onChange={(e) => setEditDescription(e.target.value)}
                       rows={3}
-                      placeholder="Descrição da ocorrência..."
+                      placeholder={
+                        isFamilyFlow
+                          ? 'Descrição do acompanhamento...'
+                          : 'Descrição da ocorrência...'
+                      }
                       className="resize-none"
                     />
                   ) : (
@@ -644,13 +677,19 @@ export const IncidentManagementDialog = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Providência Sugerida</Label>
+                  <Label>
+                    {isFamilyFlow ? 'Plano Sugerido' : 'Providência Sugerida'}
+                  </Label>
                   {isEditableInfo ? (
                     <Textarea
                       value={editSuggestedAction}
                       onChange={(e) => setEditSuggestedAction(e.target.value)}
                       rows={3}
-                      placeholder="Ação sugerida..."
+                      placeholder={
+                        isFamilyFlow
+                          ? 'Plano de apoio sugerido...'
+                          : 'Ação sugerida...'
+                      }
                       className="resize-none"
                     />
                   ) : (
@@ -663,13 +702,21 @@ export const IncidentManagementDialog = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Providências Tomadas</Label>
+                  <Label>
+                    {isFamilyFlow
+                      ? 'Plano de Acompanhamento'
+                      : 'Providências Tomadas'}
+                  </Label>
                   {isEditableInfo ? (
                     <Textarea
                       value={editActions}
                       onChange={(e) => setEditActions(e.target.value)}
                       rows={3}
-                      placeholder="Providências já realizadas..."
+                      placeholder={
+                        isFamilyFlow
+                          ? 'Ações de acompanhamento já realizadas...'
+                          : 'Providências já realizadas...'
+                      }
                       className="resize-none"
                     />
                   ) : (
@@ -714,6 +761,7 @@ export const IncidentManagementDialog = ({
                 {canEditFollowUp ? (
                   <>
                     <FollowUpForm
+                      incidentType={currentIncident.incidentType}
                       type={followUpType}
                       setType={setFollowUpType}
                       date={followUpDate}
@@ -748,7 +796,7 @@ export const IncidentManagementDialog = ({
                           className="gap-2"
                         >
                           <CheckCircle className="h-4 w-4" />
-                          Resolver Ocorrência
+                          {isFamilyFlow ? 'Concluir Acompanhamento' : 'Resolver Ocorrência'}
                         </Button>
                       )}
                       <Button onClick={handleSaveFollowUp} className="ml-auto" disabled={isSaving}>
@@ -759,7 +807,10 @@ export const IncidentManagementDialog = ({
                 ) : (
                   <div className="space-y-4 mt-2">
                     {currentIncident.followUps && currentIncident.followUps.length > 0 ? (
-                      <FollowUpList followUps={currentIncident.followUps} />
+                      <FollowUpList
+                        followUps={currentIncident.followUps}
+                        incidentType={currentIncident.incidentType}
+                      />
                     ) : (
                       <div className="text-center py-8">
                         <p className="text-muted-foreground">

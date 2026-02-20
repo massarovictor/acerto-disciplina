@@ -72,7 +72,7 @@ export function CohortComparisonTable({
                 <TableHead className="text-center">Média</TableHead>
                 {/* DISABLED: Frequência removida temporariamente */}
                 {/* <TableHead className="text-center">Frequência</TableHead> */}
-                <TableHead className="text-center">Ocorrências</TableHead>
+                <TableHead className="text-center">Acompanhamentos</TableHead>
                 <TableHead className="text-center">Crescimento</TableHead>
               </TableRow>
             </TableHeader>

@@ -112,7 +112,7 @@ export const ClassSlide2 = ({ classData, students, incidents, grades }: ClassSli
         <div className="space-y-4 overflow-auto">
           <Card className="bg-card/50 backdrop-blur">
             <CardContent className="pt-4">
-              <h3 className="font-semibold mb-3">Ocorrências Recentes</h3>
+              <h3 className="font-semibold mb-3">Acompanhamentos Recentes</h3>
               {recentIncidents.length > 0 ? (
                 <div className="space-y-3">
                   {recentIncidents.map((incident) => {
@@ -170,7 +170,7 @@ export const ClassSlide2 = ({ classData, students, incidents, grades }: ClassSli
                   <p className="font-medium text-destructive mb-1">Pontos de Atenção:</p>
                   <ul className="space-y-1 text-muted-foreground ml-4">
                     <li>• {bottomStudents.filter(s => s.average < 6).length} alunos com média abaixo de 6.0</li>
-                    <li>• {incidents.filter(i => i.finalSeverity === 'grave' || i.finalSeverity === 'gravissima').length} ocorrências graves/gravíssimas</li>
+                    <li>• {incidents.filter(i => i.finalSeverity === 'grave' || i.finalSeverity === 'gravissima').length} acompanhamentos graves/gravíssimos</li>
                   </ul>
                 </div>
               </div>

@@ -2,33 +2,37 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useClasses, useStudents } from '@/hooks/useData';
 import { INCIDENT_EPISODES } from '@/data/mockData';
+import { FAMILY_FOLLOW_UP_EPISODES } from '@/data/familyFollowUpEpisodes';
 import { IncidentFormData } from '../IncidentWizard';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatBrasiliaDate } from '@/lib/brasiliaDate';
+import { getSeverityColor } from '@/lib/incidentUtils';
+import { IncidentType } from '@/types';
+import { getIncidentSeverityLabel } from '@/lib/incidentType';
 
 interface ReviewStepProps {
   formData: Partial<IncidentFormData>;
   updateFormData: (data: Partial<IncidentFormData>) => void;
+  incidentType: IncidentType;
 }
 
-import {
-  getSeverityColor,
-  getSeverityLabel
-} from '@/lib/incidentUtils';
-
-export const ReviewStep = ({ formData }: ReviewStepProps) => {
+export const ReviewStep = ({ formData, incidentType }: ReviewStepProps) => {
   const { classes } = useClasses();
   const { students } = useStudents();
   const { user } = useAuth();
+  const episodesCatalog =
+    incidentType === 'acompanhamento_familiar'
+      ? FAMILY_FOLLOW_UP_EPISODES
+      : INCIDENT_EPISODES;
 
   const selectedClass = classes.find((c) => c.id === formData.classId);
   const selectedStudents = students.filter((s) => formData.studentIds?.includes(s.id));
   const selectedEpisodes = formData.episodes || [];
-  const listedEpisodes = INCIDENT_EPISODES.filter((episode) =>
+  const listedEpisodes = episodesCatalog.filter((episode) =>
     selectedEpisodes.includes(episode.id),
   );
   const customEpisodes = selectedEpisodes.filter(
-    (episode) => !INCIDENT_EPISODES.some((item) => item.id === episode),
+    (episode) => !episodesCatalog.some((item) => item.id === episode),
   );
 
   return (
@@ -36,7 +40,9 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
       <div>
         <h2 className="text-2xl font-bold">Revisão Final</h2>
         <p className="text-muted-foreground mt-1">
-          Revise todas as informações antes de registrar a ocorrência
+          {incidentType === 'acompanhamento_familiar'
+            ? 'Revise as informações antes de registrar o acompanhamento familiar'
+            : 'Revise todas as informações antes de registrar a ocorrência'}
         </p>
       </div>
 
@@ -46,6 +52,14 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
             <CardTitle className="text-base">Informações Gerais</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Tipo:</span>
+              <span className="font-medium">
+                {incidentType === 'acompanhamento_familiar'
+                  ? 'Acompanhamento Familiar'
+                  : 'Ocorrência Disciplinar'}
+              </span>
+            </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Turma:</span>
               <span className="font-medium">{selectedClass?.name}</span>
@@ -84,10 +98,17 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center justify-between">
-              <span>Episódios Selecionados</span>
+              <span>
+                {incidentType === 'acompanhamento_familiar'
+                  ? 'Pontos de Acompanhamento'
+                  : 'Episódios Selecionados'}
+              </span>
               {formData.calculatedSeverity && (
                 <Badge className={getSeverityColor(formData.calculatedSeverity)}>
-                  {getSeverityLabel(formData.calculatedSeverity)}
+                  {getIncidentSeverityLabel(
+                    formData.calculatedSeverity,
+                    incidentType,
+                  )}
                 </Badge>
               )}
             </CardTitle>
@@ -117,21 +138,26 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
         {formData.finalSeverity && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Grau Final</CardTitle>
+              <CardTitle className="text-base">
+                {incidentType === 'acompanhamento_familiar'
+                  ? 'Nível Final de Atenção'
+                  : 'Grau Final'}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Calculado:</span>
                 <span className="font-medium">
-                  {formData.calculatedSeverity
-                    ? getSeverityLabel(formData.calculatedSeverity)
-                    : '-'}
+                  {getIncidentSeverityLabel(
+                    formData.calculatedSeverity,
+                    incidentType,
+                  )}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Final:</span>
                 <span className="font-medium">
-                  {getSeverityLabel(formData.finalSeverity || '')}
+                  {getIncidentSeverityLabel(formData.finalSeverity, incidentType)}
                 </span>
               </div>
               {formData.severityOverrideReason && (

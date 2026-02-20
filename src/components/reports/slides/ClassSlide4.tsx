@@ -54,7 +54,7 @@ export const ClassSlide4 = ({ classData, students, incidents, grades }: ClassSli
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-1">{classData.name} - Correlação Comportamento x Aprendizagem</h1>
-        <p className="text-sm text-muted-foreground">Análise do impacto de ocorrências no desempenho acadêmico</p>
+        <p className="text-sm text-muted-foreground">Análise do impacto de acompanhamentos no desempenho acadêmico</p>
       </div>
 
       {/* Content */}
@@ -103,7 +103,7 @@ export const ClassSlide4 = ({ classData, students, incidents, grades }: ClassSli
             <CardContent className="pt-6">
               <div className="flex items-center gap-2 mb-4">
                 <AlertTriangle className="h-5 w-5 text-primary" />
-                <h3 className="font-semibold">Distribuição de Ocorrências</h3>
+                <h3 className="font-semibold">Distribuição de Acompanhamentos</h3>
               </div>
 
               <div className="space-y-3">
@@ -120,7 +120,7 @@ export const ClassSlide4 = ({ classData, students, incidents, grades }: ClassSli
 
               <div className="mt-4 pt-4 border-t">
                 <div className="text-sm">
-                  <p className="font-medium mb-2">Total de Ocorrências</p>
+                  <p className="font-medium mb-2">Total de Acompanhamentos</p>
                   <p className="text-3xl font-bold">{incidents.length}</p>
                 </div>
               </div>
@@ -138,7 +138,7 @@ export const ClassSlide4 = ({ classData, students, incidents, grades }: ClassSli
                 <div className="p-3 bg-primary/5 rounded">
                   <p className="font-medium mb-2">📊 Padrão Identificado:</p>
                   <p className="text-muted-foreground">
-                    Alunos com 3+ ocorrências apresentam média {
+                    Alunos com 3+ acompanhamentos apresentam média {
                       classGrades.length > 0 ?
                         ((classGrades.filter(g => {
                           const studentIncidents = incidents.filter(i => i.studentIds.includes(g.studentId));
@@ -154,7 +154,7 @@ export const ClassSlide4 = ({ classData, students, incidents, grades }: ClassSli
                   <p className="text-muted-foreground">
                     {areaAnalysis.reduce((prev, current) =>
                       current.studentsAtRisk > prev.studentsAtRisk ? current : prev
-                    ).area} apresenta maior correlação entre ocorrências e baixo desempenho.
+                    ).area} apresenta maior correlação entre acompanhamentos e baixo desempenho.
                   </p>
                 </div>
 
@@ -162,7 +162,7 @@ export const ClassSlide4 = ({ classData, students, incidents, grades }: ClassSli
                   <p className="font-medium mb-2">⚠️ Alertas:</p>
                   <ul className="text-muted-foreground space-y-1 ml-4">
                     <li>• {areaAnalysis.reduce((sum, area) => sum + area.studentsAtRisk, 0)} alunos em situação de risco combinado</li>
-                    <li>• {incidents.filter(i => i.finalSeverity === 'grave' || i.finalSeverity === 'gravissima').length} ocorrências graves ou gravíssimas requerem atenção</li>
+                    <li>• {incidents.filter(i => i.finalSeverity === 'grave' || i.finalSeverity === 'gravissima').length} acompanhamentos graves ou gravíssimos requerem atenção</li>
                   </ul>
                 </div>
               </div>
@@ -205,7 +205,7 @@ export const ClassSlide4 = ({ classData, students, incidents, grades }: ClassSli
                   <div>
                     <p className="font-medium">Acompanhamento Comportamental</p>
                     <p className="text-muted-foreground">
-                      Estratégias para reduzir ocorrências e melhorar clima da turma
+                      Estratégias para reduzir acompanhamentos e melhorar clima da turma
                     </p>
                   </div>
                 </div>

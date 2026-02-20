@@ -638,7 +638,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="info">Informações</TabsTrigger>
                 <TabsTrigger value="incidents">
-                  Ocorrências ({incidents.filter(i => i.studentIds.includes(viewingStudent.id)).length})
+                  Acompanhamentos ({incidents.filter(i => i.studentIds.includes(viewingStudent.id)).length})
                 </TabsTrigger>
               </TabsList>
 
@@ -731,7 +731,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                           <h4 className="font-medium mb-3">Estatísticas</h4>
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <p className="text-sm text-muted-foreground">Ocorrências</p>
+                              <p className="text-sm text-muted-foreground">Acompanhamentos</p>
                               <p className="text-2xl font-bold">{links.incidentsCount}</p>
                             </div>
                             <div>
@@ -763,7 +763,7 @@ export const StudentsManage = ({ highlightId }: StudentsManageProps) => {
                           <CheckCircle2 className="h-12 w-12 text-severity-light mx-auto mb-4" />
                           <h3 className="text-lg font-medium mb-2">Nenhuma ocorrência</h3>
                           <p className="text-muted-foreground">
-                            Este aluno não possui ocorrências registradas.
+                            Este aluno não possui acompanhamentos registrados.
                           </p>
                         </div>
                       );

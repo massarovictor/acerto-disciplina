@@ -91,6 +91,7 @@ export interface AttendanceRow {
 export interface IncidentRow {
   id: string;
   owner_id: string;
+  incident_type?: string | null;
   class_id: string;
   date: string;
   student_ids: string[];
@@ -319,6 +320,10 @@ export const mapAttendanceToDb = (
 
 export const mapIncidentFromDb = (row: IncidentRow): Incident => ({
   id: row.id,
+  incidentType:
+    row.incident_type === "acompanhamento_familiar"
+      ? "acompanhamento_familiar"
+      : "disciplinar",
   date: row.date,
   classId: row.class_id,
   studentIds: row.student_ids ?? [],
@@ -346,6 +351,7 @@ export const mapIncidentToDb = (
   options: { includeOwnerId?: boolean } = {},
 ) => ({
   ...(options.includeOwnerId === false ? {} : { owner_id: ownerId }),
+  incident_type: data.incidentType ?? 'disciplinar',
   class_id: data.classId,
   date: data.date,
   student_ids: data.studentIds,

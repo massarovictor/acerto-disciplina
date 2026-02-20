@@ -155,7 +155,7 @@ export const ClassesCreate = ({ onSuccess }: ClassesCreateProps) => {
     if (!normalizedDirectorEmail) {
       toast({
         title: 'Erro',
-        description: 'O email do diretor de turma é obrigatório para receber notificações de ocorrências.',
+        description: 'O email do diretor de turma é obrigatório para receber notificações de acompanhamentos.',
         variant: 'destructive',
       });
       return;

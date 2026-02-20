@@ -438,10 +438,10 @@ export function clusterStudents(
   incidents: Incident[]
 ): StudentCluster[] {
   const clusters: StudentCluster[] = [
-    { type: 'excelencia', label: 'Excelência', students: [], count: 0, percentage: 0, characteristics: ['Média >= 8', 'Frequência >= 90%', 'Sem ocorrências graves'] },
+    { type: 'excelencia', label: 'Excelência', students: [], count: 0, percentage: 0, characteristics: ['Média >= 8', 'Frequência >= 90%', 'Sem acompanhamentos graves'] },
     { type: 'regular', label: 'Regular', students: [], count: 0, percentage: 0, characteristics: ['Média entre 6 e 8', 'Frequência >= 75%'] },
     { type: 'atencao', label: 'Atenção', students: [], count: 0, percentage: 0, characteristics: ['Média entre 5 e 6', 'OU frequência entre 60-75%'] },
-    { type: 'critico', label: 'Crítico', students: [], count: 0, percentage: 0, characteristics: ['Média < 5', 'OU frequência < 60%', 'OU múltiplas ocorrências graves'] }
+    { type: 'critico', label: 'Crítico', students: [], count: 0, percentage: 0, characteristics: ['Média < 5', 'OU frequência < 60%', 'OU múltiplos acompanhamentos graves'] }
   ];
   
   students.forEach(student => {
@@ -497,7 +497,7 @@ export function analyzeBehaviorCorrelation(
   attendance: AttendanceRecord[],
   incidents: Incident[]
 ): BehaviorPerformanceCorrelation {
-  // Separar alunos com e sem ocorrências
+  // Separar alunos com e sem acompanhamentos
   const studentsWithIncidents: Student[] = [];
   const studentsWithoutIncidents: Student[] = [];
   
@@ -571,18 +571,18 @@ export function analyzeBehaviorCorrelation(
   
   const gradeDiff = avgWithoutIncidents - avgWithIncidents;
   if (gradeDiff > 0.5) {
-    insights.push(`Alunos com ocorrências têm média ${gradeDiff.toFixed(1)} pontos menor que alunos sem ocorrências`);
+    insights.push(`Alunos com acompanhamentos têm média ${gradeDiff.toFixed(1)} pontos menor que alunos sem acompanhamentos`);
   }
   
   const graveImpact = impactBySeverity.find(i => i.severity === 'grave');
   if (graveImpact && graveImpact.avgGradeDrop > 1) {
-    insights.push(`Ocorrências graves estão associadas a queda de ${graveImpact.avgGradeDrop.toFixed(1)} pontos na média`);
+    insights.push(`Acompanhamentos graves estão associados a queda de ${graveImpact.avgGradeDrop.toFixed(1)} pontos na média`);
   }
   
   if (temporalPattern === 'queda_precede_ocorrencia') {
-    insights.push('Padrão identificado: quedas de rendimento precedem ocorrências - sugere intervenção acadêmica precoce');
+    insights.push('Padrão identificado: quedas de rendimento precedem acompanhamentos - sugere intervenção acadêmica precoce');
   } else if (temporalPattern === 'ocorrencia_precede_queda') {
-    insights.push('Padrão identificado: ocorrências precedem queda de rendimento - sugere acompanhamento pós-incidente');
+    insights.push('Padrão identificado: acompanhamentos precedem queda de rendimento - sugere acompanhamento pós-incidente');
   }
   
   if (studentsInNegativeCycle.length > 0) {
@@ -590,7 +590,7 @@ export function analyzeBehaviorCorrelation(
   }
   
   if (freqWithIncidents < freqWithoutIncidents - 5) {
-    insights.push(`Alunos com ocorrências têm frequência ${(freqWithoutIncidents - freqWithIncidents).toFixed(0)}% menor`);
+    insights.push(`Alunos com acompanhamentos têm frequência ${(freqWithoutIncidents - freqWithIncidents).toFixed(0)}% menor`);
   }
   
   return {
@@ -699,7 +699,7 @@ function identifyNegativeCycles(
     
     if (studentIncidents.length < 2) return;
     
-    // Verificar se houve quedas consecutivas após ocorrências
+    // Verificar se houve quedas consecutivas após acompanhamentos
     const quarters = ['1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre'];
     const studentGrades = grades.filter(g => g.studentId === student.id);
     
@@ -720,7 +720,7 @@ function identifyNegativeCycles(
     if (consecutiveDrops >= 2 && studentIncidents.length >= 2) {
       result.push({
         name: student.name,
-        details: `${studentIncidents.length} ocorrências e ${consecutiveDrops} quedas consecutivas de notas`
+        details: `${studentIncidents.length} acompanhamentos e ${consecutiveDrops} quedas consecutivas de notas`
       });
     }
   });
@@ -733,7 +733,7 @@ function calculateSimpleCorrelation(
   grades: Grade[],
   incidents: Incident[]
 ): number {
-  // Correlação simplificada: -1 (mais ocorrências = menos notas) a 1
+  // Correlação simplificada: -1 (mais acompanhamentos = menos notas) a 1
   const data = students.map(student => {
     const studentGrades = grades.filter(g => g.studentId === student.id);
     const incidentCount = getStudentIncidentCount(student.id, incidents);

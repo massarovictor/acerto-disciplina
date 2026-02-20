@@ -12,6 +12,7 @@ export interface User {
 
 export type IncidentStatus = 'aberta' | 'acompanhamento' | 'resolvida';
 export type IncidentSeverity = 'leve' | 'intermediaria' | 'grave' | 'gravissima';
+export type IncidentType = 'disciplinar' | 'acompanhamento_familiar';
 export type FollowUpType = 'conversa_individual' | 'conversa_pais' | 'situacoes_diversas';
 
 export interface IncidentEpisode {
@@ -42,6 +43,7 @@ export interface FollowUpRecord {
 
 export interface Incident {
   id: string;
+  incidentType: IncidentType;
   date: string;
   classId: string;
   studentIds: string[];

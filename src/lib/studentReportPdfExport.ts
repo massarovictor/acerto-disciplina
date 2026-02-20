@@ -2,7 +2,7 @@
  * Relatório Individual do Aluno - Versão V5.1 (Topicalizada e Robusta)
  * 
  * Estrutura:
- * 1. Informações do Estudante + Métricas (Média, Ocorrências)
+ * 1. Informações do Estudante + Métricas (Média, Acompanhamentos)
  * 2. Quadro de Aproveitamento
  * 3. Parecer Pedagógico (Topicalizado - Estilo Ata)
  * 4. Histórico Comportamental
@@ -184,7 +184,7 @@ class StudentReportPDFGenerator {
         // 2. Linha de KPIs (Dashboard Row)
         gen.createDashboardRow([
           gen.createKPIBox('Média Geral', avgScore.toFixed(1), avgScore >= 6 ? PDF_COLORS.status.aprovado : PDF_COLORS.status.critico, 'Desempenho Global'),
-          gen.createKPIBox('Ocorrências', this.incidents.length.toString(), this.incidents.length > 0 ? PDF_COLORS.status.atencao : PDF_COLORS.status.aprovado, 'Total Registrado')
+          gen.createKPIBox('Acompanhamentos', this.incidents.length.toString(), this.incidents.length > 0 ? PDF_COLORS.status.atencao : PDF_COLORS.status.aprovado, 'Total Registrado')
         ])
       ],
       margin: [0, 0, 0, 25]
@@ -276,12 +276,12 @@ class StudentReportPDFGenerator {
     const vulnerabilities = below6.map(s => `${s.name} (${s.avg.toFixed(1)})`);
     const strengths = above8.map(s => `${s.name} (${s.avg.toFixed(1)})`);
 
-    let incidentText = 'Ausência de ocorrências registradas.';
+    let incidentText = 'Ausência de acompanhamentos registrados.';
     if (this.incidents.length > 0) {
       const graveCount = this.incidents.filter(i => i.finalSeverity === 'grave' || i.finalSeverity === 'gravissima').length;
       incidentText = graveCount > 0
         ? `Constam ${this.incidents.length} registros, sendo ${graveCount} de maior complexidade.`
-        : `Registram-se ${this.incidents.length} ocorrências pontuais sob monitoramento.`;
+        : `Registram-se ${this.incidents.length} acompanhamentos pontuais sob monitoramento.`;
     }
 
     let encaminhamento = 'Manutenção do acompanhamento regular.';

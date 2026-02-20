@@ -459,7 +459,7 @@ export async function generateCompleteAcademicReport(
   pdf.setFontSize(10);
   pdf.setTextColor(55, 65, 81);
   pdf.text(
-    `Total de alunos: ${students.length} • Média geral: ${classAverage.toFixed(1)} • Ocorrências registradas: ${incidents.length}`,
+    `Total de alunos: ${students.length} • Média geral: ${classAverage.toFixed(1)} • Acompanhamentos registrados: ${incidents.length}`,
     margin,
     yPos
   );
@@ -490,11 +490,11 @@ export async function generateCompleteAcademicReport(
       (metric) => `${metric.student.name} — ${metric.absences} falta(s) (${metric.presenceRate.toFixed(1)}% presença)`
     );
 
-  sectionTitle('Ocorrências e frequência', 'Principais destaques comportamentais e de presença');
+  sectionTitle('Acompanhamentos e frequência', 'Principais destaques comportamentais e de presença');
   pdf.setFont('Helvetica', 'bold');
   pdf.setFontSize(10);
   pdf.setTextColor(30, 41, 59);
-  pdf.text('Top ocorrências', margin, yPos);
+  pdf.text('Top acompanhamentos', margin, yPos);
   yPos += 6;
   pdf.setFont('Helvetica', 'normal');
   pdf.setFontSize(9);
@@ -691,6 +691,5 @@ export function addAreaAnalysisSection(
 
   return yPos;
 }
-
 
 

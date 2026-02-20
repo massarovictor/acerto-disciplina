@@ -64,7 +64,7 @@ export const AddStudentsDialog = ({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
                 <DialogHeader>
-                    <DialogTitle>Adicionar Alunos à Ocorrência</DialogTitle>
+                    <DialogTitle>Adicionar Alunos ao Acompanhamento</DialogTitle>
                 </DialogHeader>
 
                 <div className="flex items-center gap-2 py-4">
@@ -104,7 +104,7 @@ export const AddStudentsDialog = ({
                         ))
                     ) : (
                         <div className="text-center py-8 text-muted-foreground text-sm">
-                            {searchTerm ? 'Nenhum aluno encontrado' : 'Todos os alunos da turma já estão na ocorrência'}
+                            {searchTerm ? 'Nenhum aluno encontrado' : 'Todos os alunos da turma já estão no acompanhamento'}
                         </div>
                     )}
                 </div>

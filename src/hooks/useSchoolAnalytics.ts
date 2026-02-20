@@ -13,6 +13,7 @@ import { getSubjectArea, SUBJECT_AREAS } from '@/lib/subjects';
 import { QUARTERS } from '@/lib/subjects';
 import { perfTimer } from '@/lib/perf';
 import { CLASSIFICATION_COLOR_HEX } from '@/lib/statusPalette';
+import { isDisciplinaryIncident } from '@/lib/incidentType';
 
 // ============================================
 // TIPOS
@@ -332,6 +333,9 @@ export function computeSchoolAnalytics(
   incidents: Incident[],
   filters: AnalyticsFilters
 ): SchoolAnalyticsResult {
+  const disciplinaryIncidents = incidents.filter((incident) =>
+    isDisciplinaryIncident(incident),
+  );
   const parseLocalDate = (value: string) => new Date(`${value}T00:00:00`);
   const addMonths = (date: Date, months: number) => {
     const next = new Date(date);
@@ -759,7 +763,7 @@ export function computeSchoolAnalytics(
       comparisonClassIdsSet.has(record.classId) &&
       isDateInRange(record.date, classRanges.get(record.classId)),
     );
-    const comparisonIncidents = incidents.filter((incident) =>
+    const comparisonIncidents = disciplinaryIncidents.filter((incident) =>
       comparisonClassIdsSet.has(incident.classId) &&
       isDateInRange(incident.date, classRanges.get(incident.classId)),
     );
@@ -894,7 +898,7 @@ export function computeSchoolAnalytics(
     let comparisonAttendance = attendance.filter((record) =>
       comparisonClassIdsSet.has(record.classId),
     );
-    let comparisonIncidents = incidents.filter((incident) =>
+    let comparisonIncidents = disciplinaryIncidents.filter((incident) =>
       comparisonClassIdsSet.has(incident.classId),
     );
 
@@ -1077,7 +1081,7 @@ export function computeSchoolAnalytics(
   };
 
   let filteredAttendance = attendance.filter(a => candidateClassIds.has(a.classId));
-  let filteredIncidents = incidents.filter(i => candidateClassIds.has(i.classId));
+  let filteredIncidents = disciplinaryIncidents.filter(i => candidateClassIds.has(i.classId));
 
   // Filtrar por range de datas quando schoolYear específico
   if (!useAllYears && targetSchoolYear !== null) {
@@ -1111,7 +1115,7 @@ export function computeSchoolAnalytics(
       return range ? isDateInRange(a.date, range) : false;
     });
 
-    filteredIncidents = incidents.filter(i => {
+    filteredIncidents = disciplinaryIncidents.filter(i => {
       if (!candidateClassIds.has(i.classId)) return false;
       const range = classRanges.get(i.classId);
       return range ? isDateInRange(i.date, range) : false;
@@ -1152,7 +1156,7 @@ export function computeSchoolAnalytics(
       return date.getFullYear() === targetCalYear;
     });
 
-    // Filtrar ocorrências pelo ano calendário  
+    // Filtrar acompanhamentos pelo ano calendário  
     filteredIncidents = filteredIncidents.filter(i => {
       const date = parseLocalDate(i.date);
       if (Number.isNaN(date.getTime())) return false;
@@ -1593,7 +1597,7 @@ export function computeSchoolAnalytics(
   // BEHAVIORAL ANALYTICS (NOVO)
   // ============================================
 
-  // Ocorrências por severidade
+  // Acompanhamentos por severidade
   const severityCounts = {
     leve: filteredIncidents.filter(i => i.finalSeverity === 'leve').length,
     intermediaria: filteredIncidents.filter(i => i.finalSeverity === 'intermediaria').length,
@@ -1609,7 +1613,7 @@ export function computeSchoolAnalytics(
     { severity: 'gravissima', count: severityCounts.gravissima, percent: totalIncidentsCount > 0 ? (severityCounts.gravissima / totalIncidentsCount) * 100 : 0 },
   ];
 
-  // Ranking de turmas por ocorrências
+  // Ranking de turmas por acompanhamentos
   const classIncidentRanking: ClassIncidentRanking[] = filteredClasses.map(cls => {
     const classIncidents = incidentsByClassId.get(cls.id) ?? [];
     const classStudentCount = filteredStudentsByClassId.get(cls.id)?.length ?? 0;
@@ -1632,7 +1636,7 @@ export function computeSchoolAnalytics(
     };
   }).sort((a, b) => b.incidentCount - a.incidentCount);
 
-  // Top alunos por ocorrências
+  // Top alunos por acompanhamentos
   const studentIncidentMap = new Map<string, { count: number; lastDate: string | null; severities: { leve: number; intermediaria: number; grave: number; gravissima: number } }>();
 
   filteredIncidents.forEach(incident => {
@@ -1838,49 +1842,49 @@ export function computeSchoolAnalytics(
 
   // === INSIGHTS COMPORTAMENTAIS ===
 
-  // Insight: Ocorrências altas
+  // Insight: Acompanhamentos altas
   if (averageIncidentsPerStudent > 0.5) {
     insights.push({
       id: 'high-incidents',
       type: 'warning',
       category: 'behavioral',
-      title: 'Alto índice de ocorrências',
-      description: `Média de ${averageIncidentsPerStudent.toFixed(1)} ocorrências por aluno. Considere ações preventivas.`,
+      title: 'Alto índice de acompanhamentos',
+      description: `Média de ${averageIncidentsPerStudent.toFixed(1)} acompanhamentos por aluno. Considere ações preventivas.`,
     });
   }
 
-  // Insight: Ocorrências graves/gravíssimas
+  // Insight: Acompanhamentos graves/gravíssimas
   const severeIncidents = severityCounts.grave + severityCounts.gravissima;
   if (severeIncidents > 0) {
     insights.push({
       id: 'severe-incidents',
       type: 'alert',
       category: 'behavioral',
-      title: `${severeIncidents} ocorrências graves`,
-      description: `Há ${severityCounts.grave} ocorrências graves e ${severityCounts.gravissima} gravíssimas que requerem atenção especial.`,
+      title: `${severeIncidents} acompanhamentos graves`,
+      description: `Há ${severityCounts.grave} acompanhamentos graves e ${severityCounts.gravissima} gravíssimos que requerem atenção especial.`,
     });
   }
 
-  // Insight: Ocorrências pendentes
+  // Insight: Acompanhamentos pendentes
   if (openIncidentsCount > 5) {
     insights.push({
       id: 'pending-incidents',
       type: 'warning',
       category: 'behavioral',
-      title: `${openIncidentsCount} ocorrências pendentes`,
-      description: `Existem ocorrências aguardando resolução. Considere revisar e dar encaminhamento.`,
+      title: `${openIncidentsCount} acompanhamentos pendentes`,
+      description: `Existem acompanhamentos aguardando resolução. Considere revisar e dar encaminhamento.`,
     });
   }
 
-  // Insight: Turma com mais ocorrências
+  // Insight: Turma com mais acompanhamentos
   const classWithMostIncidents = classIncidentRanking[0];
   if (classWithMostIncidents && classWithMostIncidents.incidentCount >= 5) {
     insights.push({
       id: 'class-most-incidents',
       type: 'warning',
       category: 'behavioral',
-      title: `${classWithMostIncidents.classData.name} lidera em ocorrências`,
-      description: `${classWithMostIncidents.incidentCount} ocorrências registradas (${classWithMostIncidents.incidentsPerStudent.toFixed(1)} por aluno).`,
+      title: `${classWithMostIncidents.classData.name} lidera em acompanhamentos`,
+      description: `${classWithMostIncidents.incidentCount} acompanhamentos registrados (${classWithMostIncidents.incidentsPerStudent.toFixed(1)} por aluno).`,
       actionLabel: 'Ver turma',
       actionData: { classId: classWithMostIncidents.classData.id },
     });
@@ -1896,7 +1900,7 @@ export function computeSchoolAnalytics(
         type: 'success',
         category: 'behavioral',
         title: 'Melhoria no comportamento',
-        description: `Ocorrências reduziram ${(((prevMonth - lastMonth) / prevMonth) * 100).toFixed(0)}% em relação ao mês anterior.`,
+        description: `Acompanhamentos reduziram ${(((prevMonth - lastMonth) / prevMonth) * 100).toFixed(0)}% em relação ao mês anterior.`,
       });
     }
   }

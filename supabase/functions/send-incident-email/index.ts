@@ -23,6 +23,7 @@ interface EmailPayload {
     incident: {
         id: string;
         date: string;
+        incidentType?: 'disciplinar' | 'acompanhamento_familiar';
         description: string;
         finalSeverity: string;
         suggestedAction?: string;
@@ -40,6 +41,13 @@ const SEVERITY_LABELS: Record<string, string> = {
     'gravissima': 'Gravíssima',
 };
 
+const FAMILY_ATTENTION_LABELS: Record<string, string> = {
+    'leve': 'Baixa',
+    'intermediaria': 'Média',
+    'grave': 'Alta',
+    'gravissima': 'Crítica',
+};
+
 function formatDate(dateStr: string): string {
     const date = new Date(dateStr);
     return date.toLocaleDateString('pt-BR', {
@@ -52,30 +60,37 @@ function formatDate(dateStr: string): string {
 function buildEmailContent(payload: EmailPayload): { subject: string; body: string } {
     const { type, incident, className, studentNames, teacherName } = payload;
     const dateFormatted = formatDate(incident.date);
-    const severityLabel = SEVERITY_LABELS[incident.finalSeverity] || incident.finalSeverity;
+    const isFamilyIncident = incident.incidentType === 'acompanhamento_familiar';
+    const severityLabel = isFamilyIncident
+        ? (FAMILY_ATTENTION_LABELS[incident.finalSeverity] || incident.finalSeverity)
+        : (SEVERITY_LABELS[incident.finalSeverity] || incident.finalSeverity);
     const studentsText = studentNames.join(', ');
     const greeting = teacherName ? `Prezado(a) ${teacherName},` : 'Prezado(a) Professor(a),';
+    const flowLabel = isFamilyIncident ? 'Acompanhamento Familiar' : 'Ocorrência Disciplinar';
 
     switch (type) {
         case 'new_incident':
             return {
-                subject: `[NOVA] Ocorrência - ${className} - ${dateFormatted}`,
+                subject: isFamilyIncident
+                    ? `[NOVO] Acompanhamento Familiar - ${className} - ${dateFormatted}`
+                    : `[NOVA] Ocorrência - ${className} - ${dateFormatted}`,
                 body: `${greeting}
 
-Uma nova ocorrência foi registrada para sua turma:
+Um novo registro foi lançado para sua turma:
 
 📅 Data: ${dateFormatted}
 📚 Turma: ${className}
 👤 Aluno(s): ${studentsText}
-⚠️ Gravidade: ${severityLabel}
+📌 Tipo: ${flowLabel}
+⚠️ ${isFamilyIncident ? 'Nível de atenção' : 'Gravidade'}: ${severityLabel}
 
 📝 Descrição:
 ${incident.description}
 
-🎯 Ação Sugerida:
+🎯 ${isFamilyIncident ? 'Plano sugerido' : 'Ação Sugerida'}:
 ${incident.suggestedAction || 'Avaliar situação e definir ação'}
 
-Por favor, acesse o sistema para iniciar o acompanhamento.
+Por favor, acesse o sistema para dar continuidade ao acompanhamento.
 
 Atenciosamente,
 MAVIC - Sistema de Gestão Escolar`,
@@ -83,15 +98,18 @@ MAVIC - Sistema de Gestão Escolar`,
 
         case 'incident_followup':
             return {
-                subject: `[AÇÃO] Acompanhamento Iniciado - ${className}`,
+                subject: isFamilyIncident
+                    ? `[AÇÃO] Atendimento Familiar Iniciado - ${className}`
+                    : `[AÇÃO] Acompanhamento Iniciado - ${className}`,
                 body: `${greeting}
 
-O acompanhamento da ocorrência foi iniciado:
+O acompanhamento do registro foi iniciado:
 
-📅 Data da Ocorrência: ${dateFormatted}
+📅 Data do Registro: ${dateFormatted}
 📚 Turma: ${className}
 👤 Aluno(s): ${studentsText}
-⚠️ Gravidade: ${severityLabel}
+📌 Tipo: ${flowLabel}
+⚠️ ${isFamilyIncident ? 'Nível de atenção' : 'Gravidade'}: ${severityLabel}
 
 Por favor, acompanhe o caso e registre as ações realizadas no sistema.
 
@@ -101,13 +119,16 @@ MAVIC - Sistema de Gestão Escolar`,
 
         case 'incident_resolved':
             return {
-                subject: `[OK] Ocorrência Resolvida - ${className}`,
+                subject: isFamilyIncident
+                    ? `[OK] Acompanhamento Familiar Concluído - ${className}`
+                    : `[OK] Ocorrência Resolvida - ${className}`,
                 body: `${greeting}
 
-A ocorrência registrada em ${dateFormatted} foi RESOLVIDA.
+O registro iniciado em ${dateFormatted} foi concluído.
 
 📚 Turma: ${className}
 👤 Aluno(s): ${studentsText}
+📌 Tipo: ${flowLabel}
 ✅ Status: Acompanhamento Concluído
 
 Atenciosamente,

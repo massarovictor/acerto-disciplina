@@ -13,24 +13,29 @@ import {
   Clock,
   CheckCircle2,
   Trash2,
-  Edit,
   Filter,
-  ExternalLink
+  ExternalLink,
+  Users2,
 } from 'lucide-react';
-import { getSeverityColor, getSeverityLabel, getUrgencyDot } from '@/lib/incidentUtils';
+import { getSeverityColor, getUrgencyDot } from '@/lib/incidentUtils';
 import { useIncidents, useClasses, useStudents } from '@/hooks/useData';
 
 import { IncidentManagementDialog } from '@/components/incidents/IncidentManagementDialog';
 import { IncidentWizard } from '@/components/incidents/IncidentWizard';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Incident } from '@/types';
+import { Incident, IncidentType } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useUIStore } from '@/stores/useUIStore';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatBrasiliaDate } from '@/lib/brasiliaDate';
+import {
+  getIncidentSeverityLabel,
+  getIncidentTypeLabel,
+  isDisciplinaryIncident,
+} from '@/lib/incidentType';
 
 const Incidents = () => {
   const { user, profile } = useAuth();
@@ -43,10 +48,16 @@ const Incidents = () => {
   const { incidentsUI, setIncidentsUI } = useUIStore();
   const searchTerm = incidentsUI.searchTerm;
   const classFilter = incidentsUI.classFilter;
+  const typeFilter = incidentsUI.typeFilter || 'all';
   const activeTab = incidentsUI.activeTab;
 
   const setSearchTerm = useCallback((value: string) => setIncidentsUI({ searchTerm: value }), [setIncidentsUI]);
   const setClassFilter = useCallback((value: string) => setIncidentsUI({ classFilter: value }), [setIncidentsUI]);
+  const setTypeFilter = useCallback(
+    (value: 'all' | 'disciplinar' | 'acompanhamento_familiar') =>
+      setIncidentsUI({ typeFilter: value }),
+    [setIncidentsUI],
+  );
   const setActiveTab = useCallback((value: 'aberta' | 'acompanhamento' | 'resolvida') => setIncidentsUI({ activeTab: value }), [setIncidentsUI]);
 
 
@@ -54,6 +65,7 @@ const Incidents = () => {
   const [deletingIncident, setDeletingIncident] = useState<Incident | null>(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
   const [showNewIncidentDialog, setShowNewIncidentDialog] = useState(false);
+  const [newIncidentType, setNewIncidentType] = useState<IncidentType>('disciplinar');
   const [initialTab, setInitialTab] = useState<'info' | 'followup' | 'comments'>('info');
   const normalizeEmail = (value?: string | null) => (value || '').trim().toLowerCase();
 
@@ -84,10 +96,20 @@ const Incidents = () => {
     }
   }, [classFilter, directorOwnedClasses, profile?.role, setClassFilter]);
 
+  const typeFilteredIncidents = useMemo(() => {
+    if (typeFilter === 'all') return incidents;
+    if (typeFilter === 'disciplinar') {
+      return incidents.filter((incident) => isDisciplinaryIncident(incident));
+    }
+    return incidents.filter(
+      (incident) => incident.incidentType === 'acompanhamento_familiar',
+    );
+  }, [incidents, typeFilter]);
+
   // Filter incidents by status
-  const openIncidents = incidents.filter(i => i.status === 'aberta');
-  const followUpIncidents = incidents.filter(i => i.status === 'acompanhamento');
-  const resolvedIncidents = incidents.filter(i => i.status === 'resolvida');
+  const openIncidents = typeFilteredIncidents.filter(i => i.status === 'aberta');
+  const followUpIncidents = typeFilteredIncidents.filter(i => i.status === 'acompanhamento');
+  const resolvedIncidents = typeFilteredIncidents.filter(i => i.status === 'resolvida');
 
   // Optimize lookups
   const classMap = useMemo(() => new Map(classes.map(c => [c.id, c])), [classes]);
@@ -152,9 +174,9 @@ const Incidents = () => {
       return (
         <div className="text-center py-12">
           <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-          <h3 className="text-lg font-medium mb-1">Nenhuma ocorrência encontrada</h3>
+          <h3 className="text-lg font-medium mb-1">Nenhum acompanhamento encontrado</h3>
           <p className="text-sm text-muted-foreground">
-            {searchTerm ? 'Tente ajustar os filtros de busca.' : 'Não há ocorrências neste status.'}
+            {searchTerm ? 'Tente ajustar os filtros de busca.' : 'Não há acompanhamentos neste status.'}
           </p>
         </div>
       );
@@ -187,8 +209,14 @@ const Incidents = () => {
               <div className="flex-1 min-w-0 space-y-1">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <span className="font-medium text-foreground">{incidentStudents.map(s => s.name).join(', ') || 'Aluno não identificado'}</span>
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5">
+                    {getIncidentTypeLabel(incident.incidentType)}
+                  </Badge>
                   <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-5 ${getSeverityColor(incident.finalSeverity)}`}>
-                    {getSeverityLabel(incident.finalSeverity)}
+                    {getIncidentSeverityLabel(
+                      incident.finalSeverity,
+                      incident.incidentType,
+                    )}
                   </Badge>
                 </div>
 
@@ -255,13 +283,32 @@ const Incidents = () => {
   return (
     <PageContainer>
       <PageHeader
-        title="Ocorrências"
-        description="Gestão e acompanhamento comportamental"
+        title="Acompanhamentos"
+        description="Gestão disciplinar e acompanhamento familiar"
         actions={
-          <Button onClick={() => setShowNewIncidentDialog(true)} className="gap-2 shadow-sm">
-            <Plus className="h-4 w-4" />
-            Nova Ocorrência
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => {
+                setNewIncidentType('disciplinar');
+                setShowNewIncidentDialog(true);
+              }}
+              className="gap-2 shadow-sm"
+            >
+              <Plus className="h-4 w-4" />
+              Nova Ocorrência
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setNewIncidentType('acompanhamento_familiar');
+                setShowNewIncidentDialog(true);
+              }}
+              className="gap-2 shadow-sm"
+            >
+              <Users2 className="h-4 w-4" />
+              Novo Acompanhamento Familiar
+            </Button>
+          </div>
         }
       />
 
@@ -318,6 +365,26 @@ const Incidents = () => {
             className="pl-10"
           />
         </div>
+        <Select
+          value={typeFilter}
+          onValueChange={(value) =>
+            setTypeFilter(
+              value as 'all' | 'disciplinar' | 'acompanhamento_familiar',
+            )
+          }
+        >
+          <SelectTrigger className="w-[250px]">
+            <Filter className="h-4 w-4 mr-2" />
+            <SelectValue placeholder="Filtrar por tipo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os Tipos</SelectItem>
+            <SelectItem value="disciplinar">Disciplinar</SelectItem>
+            <SelectItem value="acompanhamento_familiar">
+              Acompanhamento Familiar
+            </SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={classFilter} onValueChange={setClassFilter}>
           <SelectTrigger className="w-[250px]">
             <Filter className="h-4 w-4 mr-2" />
@@ -351,7 +418,7 @@ const Incidents = () => {
         <TabsContent value="aberta" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Ocorrências Abertas</CardTitle>
+              <CardTitle>Acompanhamentos Abertos</CardTitle>
             </CardHeader>
             <CardContent>
               {renderIncidentsList(filteredOpenIncidents)}
@@ -362,7 +429,7 @@ const Incidents = () => {
         <TabsContent value="acompanhamento" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Ocorrências em Acompanhamento</CardTitle>
+              <CardTitle>Acompanhamentos em Andamento</CardTitle>
             </CardHeader>
             <CardContent>
               {renderIncidentsList(filteredFollowUpIncidents)}
@@ -373,7 +440,7 @@ const Incidents = () => {
         <TabsContent value="resolvida" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Ocorrências Resolvidas</CardTitle>
+              <CardTitle>Acompanhamentos Resolvidos</CardTitle>
             </CardHeader>
             <CardContent>
               {renderIncidentsList(filteredResolvedIncidents)}
@@ -412,7 +479,7 @@ const Incidents = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
             <AlertDialogDescription className="space-y-4">
-              <p>Tem certeza que deseja excluir esta ocorrência? Esta ação não pode ser desfeita.</p>
+              <p>Tem certeza que deseja excluir este acompanhamento? Esta ação não pode ser desfeita.</p>
               <div className="space-y-2">
                 <p className="text-sm font-medium">Digite <span className="font-bold text-destructive">excluir</span> para confirmar:</p>
                 <Input
@@ -434,14 +501,14 @@ const Incidents = () => {
                   try {
                     await deleteIncident(deletingIncident.id);
                     toast({
-                      title: 'Ocorrência excluída',
-                      description: 'A ocorrência foi removida com sucesso.',
+                      title: 'Acompanhamento excluído',
+                      description: 'O acompanhamento foi removido com sucesso.',
                     });
                     setDeletingIncident(null);
                   } catch (error) {
                     toast({
                       title: 'Erro',
-                      description: 'Não foi possível excluir a ocorrência.',
+                      description: 'Não foi possível excluir o acompanhamento.',
                       variant: 'destructive',
                     });
                   }
@@ -459,13 +526,28 @@ const Incidents = () => {
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="border-b pb-4 mb-4">
             <DialogTitle className="flex items-center gap-2 text-xl">
-              <div className="p-2 rounded-full bg-[#DC2626]/15 dark:bg-[#DC2626]/20">
-                <AlertTriangle className="h-5 w-5 text-[#DC2626]" />
+              <div
+                className={`p-2 rounded-full ${
+                  newIncidentType === 'acompanhamento_familiar'
+                    ? 'bg-[#0EA5E9]/15 dark:bg-[#0EA5E9]/20'
+                    : 'bg-[#DC2626]/15 dark:bg-[#DC2626]/20'
+                }`}
+              >
+                {newIncidentType === 'acompanhamento_familiar' ? (
+                  <Users2 className="h-5 w-5 text-[#0EA5E9]" />
+                ) : (
+                  <AlertTriangle className="h-5 w-5 text-[#DC2626]" />
+                )}
               </div>
-              Registrar Nova Ocorrência
+              {newIncidentType === 'acompanhamento_familiar'
+                ? 'Registrar Acompanhamento Familiar'
+                : 'Registrar Nova Ocorrência'}
             </DialogTitle>
           </DialogHeader>
-          <IncidentWizard onComplete={() => setShowNewIncidentDialog(false)} />
+          <IncidentWizard
+            incidentType={newIncidentType}
+            onComplete={() => setShowNewIncidentDialog(false)}
+          />
         </DialogContent>
       </Dialog>
     </PageContainer>

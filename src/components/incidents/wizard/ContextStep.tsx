@@ -19,13 +19,19 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useClasses } from "@/hooks/useData";
 import { IncidentFormData } from "../IncidentWizard";
+import { IncidentType } from "@/types";
 
 interface ContextStepProps {
   formData: Partial<IncidentFormData>;
   updateFormData: (data: Partial<IncidentFormData>) => void;
+  incidentType: IncidentType;
 }
 
-export const ContextStep = ({ formData, updateFormData }: ContextStepProps) => {
+export const ContextStep = ({
+  formData,
+  updateFormData,
+  incidentType,
+}: ContextStepProps) => {
   const { classes } = useClasses();
   const selectedDate = formData.date
     ? parse(formData.date, "yyyy-MM-dd", new Date())
@@ -36,9 +42,15 @@ export const ContextStep = ({ formData, updateFormData }: ContextStepProps) => {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold">Contexto da Ocorrência</h2>
+        <h2 className="text-2xl font-bold">
+          {incidentType === "acompanhamento_familiar"
+            ? "Contexto do Acompanhamento Familiar"
+            : "Contexto da Ocorrência"}
+        </h2>
         <p className="text-muted-foreground mt-1">
-          Informe a turma e data em que ocorreu o incidente
+          {incidentType === "acompanhamento_familiar"
+            ? "Informe a turma e data de abertura do acompanhamento"
+            : "Informe a turma e data em que ocorreu o incidente"}
         </p>
       </div>
 

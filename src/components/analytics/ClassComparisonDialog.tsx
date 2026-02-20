@@ -258,7 +258,7 @@ export function ClassComparisonDialog({
                     */}
                     {!subjectMode && (
                       <MetricRow
-                        label="Ocorrências"
+                        label="Acompanhamentos"
                         values={activeData.map(c => c.incidentCount)}
                         bestValue={Math.min(...activeData.map(c => c.incidentCount))}
                         format={(v) => v.toString()}

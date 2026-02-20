@@ -51,6 +51,7 @@ import { exportClassRankingsWorkbook, exportClassRankingsPdf, type RankingType }
 import { getSchoolConfig, getDefaultConfig } from "@/lib/schoolConfig";
 import { SUBJECT_AREAS, QUARTERS, FUNDAMENTAL_SUBJECT_AREAS } from "@/lib/subjects";
 import { calculateCurrentYearFromCalendar } from "@/lib/classYearCalculator";
+import { isDisciplinaryIncident } from "@/lib/incidentType";
 
 interface IntegratedReportsProps {
   classes: Class[];
@@ -144,6 +145,10 @@ export const IntegratedReports = ({
   const selectedClassData = useMemo(
     () => classes.find((cls) => cls.id === selectedClass) || null,
     [classes, selectedClass],
+  );
+  const disciplinaryIncidents = useMemo(
+    () => incidents.filter((incident) => isDisciplinaryIncident(incident)),
+    [incidents],
   );
 
   useEffect(() => {
@@ -377,13 +382,13 @@ export const IntegratedReports = ({
   const classIncidents = useMemo(
     () =>
       selectedClass
-        ? incidents.filter(
+        ? disciplinaryIncidents.filter(
           (i) =>
             i.classId === selectedClass &&
             isDateInRange(i.date, schoolYearRange),
         )
         : [],
-    [incidents, selectedClass, schoolYearRange],
+    [disciplinaryIncidents, selectedClass, schoolYearRange],
   );
   const classIncidentsForPeriod = useMemo(
     () =>
@@ -409,7 +414,7 @@ export const IntegratedReports = ({
   const rankingIncidentsForExport = useMemo(() => {
     if (!selectedClass || !includeRankingIncidents) return [];
 
-    return incidents
+    return disciplinaryIncidents
       .filter((incident) => incident.classId === selectedClass)
       .filter((incident) => {
         if (rankingSchoolYearRanges.length === 0) return true;
@@ -418,7 +423,7 @@ export const IntegratedReports = ({
         );
       });
   }, [
-    incidents,
+    disciplinaryIncidents,
     includeRankingIncidents,
     selectedClass,
     rankingSchoolYearRanges,
@@ -836,7 +841,7 @@ export const IntegratedReports = ({
         historicalGrades,
         grades,
         externalAssessments,
-        incidents
+        disciplinaryIncidents
       );
 
       toast({
@@ -899,7 +904,7 @@ export const IntegratedReports = ({
               Ranking de Turma
             </CardTitle>
             <CardDescription>
-              Ranking acadêmico com comparação por médias e filtros de ocorrências.
+              Ranking acadêmico com comparação por médias e filtros de acompanhamentos.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col">
@@ -1039,7 +1044,7 @@ export const IntegratedReports = ({
               Exportar Ranking de Turma
             </DialogTitle>
             <DialogDescription>
-              Gere ranking acadêmico em XLS ou PDF com médias e ocorrências conforme a configuração selecionada.
+              Gere ranking acadêmico em XLS ou PDF com médias e acompanhamentos conforme a configuração selecionada.
             </DialogDescription>
           </DialogHeader>
 
@@ -1111,7 +1116,7 @@ export const IntegratedReports = ({
 
               <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
                 <div className="space-y-2">
-                  <Label>Ocorrências</Label>
+                  <Label>Acompanhamentos</Label>
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
                     <Checkbox
                       checked={includeRankingIncidents}
@@ -1119,10 +1124,10 @@ export const IntegratedReports = ({
                         setIncludeRankingIncidents(checked === true)
                       }
                     />
-                    <span>Computar ocorrências no ranking</span>
+                    <span>Computar acompanhamentos no ranking</span>
                   </label>
                   <p className="text-xs text-muted-foreground">
-                    Quando ativado, conta todas as ocorrências do período selecionado, sem filtrar tipo ou status.
+                    Quando ativado, conta todos os acompanhamentos disciplinares do período selecionado, incluindo todos os status.
                   </p>
                 </div>
               </div>
@@ -1133,8 +1138,8 @@ export const IntegratedReports = ({
                 <div className="flex justify-between"><span>Alunos na turma:</span><span className="font-bold">{classStudents.length}</span></div>
                 <div className="flex justify-between"><span>Disciplinas técnicas detectadas:</span><span className="font-bold">{rankingTechnicalSubjects.length}</span></div>
                 <div className="flex justify-between"><span>Tipo selecionado:</span><span className="font-bold">{rankingTypeOptions.find((option) => option.value === selectedRankingType)?.label ?? "-"}</span></div>
-                <div className="flex justify-between"><span>Ocorrências computadas:</span><span className="font-bold">{includeRankingIncidents ? rankingIncidentsForExport.length : 0}</span></div>
-                <div className="flex justify-between"><span>Alunos com ocorrência:</span><span className="font-bold">{includeRankingIncidents ? rankingStudentsWithIncidentsCount : 0}</span></div>
+                <div className="flex justify-between"><span>Acompanhamentos computados:</span><span className="font-bold">{includeRankingIncidents ? rankingIncidentsForExport.length : 0}</span></div>
+                <div className="flex justify-between"><span>Alunos com acompanhamento:</span><span className="font-bold">{includeRankingIncidents ? rankingStudentsWithIncidentsCount : 0}</span></div>
               </div>
             )}
           </div>
@@ -1251,7 +1256,7 @@ export const IntegratedReports = ({
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-center">
                   <div>
-                    <p className="text-xs text-muted-foreground">Ocorrências</p>
+                    <p className="text-xs text-muted-foreground">Acompanhamentos</p>
                     <p className="font-bold">{selectedStudentMetrics.incidents}</p>
                   </div>
                   <div>

@@ -1,4 +1,4 @@
-import { FollowUpRecord } from '@/types';
+import { FollowUpRecord, IncidentType } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, User, FileText, MessageSquare, Users, ClipboardList } from 'lucide-react';
@@ -6,17 +6,26 @@ import { formatBrasiliaDate, formatBrasiliaDateTime } from '@/lib/brasiliaDate';
 
 interface FollowUpListProps {
   followUps: FollowUpRecord[];
+  incidentType?: IncidentType;
 }
 
-export const FollowUpList = ({ followUps }: FollowUpListProps) => {
+export const FollowUpList = ({
+  followUps,
+  incidentType = 'disciplinar',
+}: FollowUpListProps) => {
+  const isFamilyFlow = incidentType === 'acompanhamento_familiar';
   const getFollowUpTypeLabel = (type: string) => {
     switch (type) {
       case 'conversa_individual':
-        return 'Conversa Individual';
+        return isFamilyFlow ? 'Atendimento Individual' : 'Conversa Individual';
       case 'conversa_pais':
-        return 'Conversa com Pais';
+        return isFamilyFlow
+          ? 'Atendimento com Família'
+          : 'Conversa com Pais';
       case 'situacoes_diversas':
-        return 'Situações Diversas';
+        return isFamilyFlow
+          ? 'Registro Pedagógico/Emocional'
+          : 'Situações Diversas';
       default:
         return type;
     }
@@ -90,7 +99,9 @@ export const FollowUpList = ({ followUps }: FollowUpListProps) => {
 
               {followUp.motivo && (
                 <div>
-                  <p className="text-sm font-medium mb-1">Motivo:</p>
+                  <p className="text-sm font-medium mb-1">
+                    {isFamilyFlow ? 'Contexto:' : 'Motivo:'}
+                  </p>
                   <p className="text-sm text-muted-foreground">{followUp.motivo}</p>
                 </div>
               )}

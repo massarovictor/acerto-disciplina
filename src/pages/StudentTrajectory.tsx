@@ -1216,10 +1216,10 @@ const StudentTrajectory = () => {
                                             </CardContent>
                                         </Card>
 
-                                        {/* Ocorrências */}
+                                        {/* Acompanhamentos */}
                                         <Card>
                                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                                <CardTitle className="text-sm font-medium text-muted-foreground">Ocorrências</CardTitle>
+                                                <CardTitle className="text-sm font-medium text-muted-foreground">Acompanhamentos</CardTitle>
                                                 <div className="p-2 rounded-lg bg-destructive/15 text-destructive dark:bg-destructive/20 dark:text-destructive">
                                                     <AlertTriangle className="h-4 w-4" />
                                                 </div>
@@ -1831,8 +1831,8 @@ const StudentTrajectory = () => {
                                                             />
                                                         </Line>
 
-                                                        {/* Ocorrências - Vermelho */}
-                                                        <Scatter dataKey="incident" fill="#e74c3c" name="Ocorrências" shape="triangle" />
+                                                        {/* Acompanhamentos - Vermelho */}
+                                                        <Scatter dataKey="incident" fill="#e74c3c" name="Acompanhamentos" shape="triangle" />
 
                                                         {/* Linha de Projeção/Simulação - Laranja tracejada */}
                                                         {showSimulation && (

@@ -7,6 +7,7 @@ import { ArrowRight, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Incident, Student } from "@/types";
 import { getUrgencyDot } from "@/lib/incidentUtils";
+import { isDisciplinaryIncident } from "@/lib/incidentType";
 
 interface RecentActivityProps {
     incidents: Incident[];
@@ -15,9 +16,12 @@ interface RecentActivityProps {
 
 export const RecentActivity = ({ incidents, students }: RecentActivityProps) => {
     const navigate = useNavigate();
+    const disciplinaryIncidents = incidents.filter((incident) =>
+        isDisciplinaryIncident(incident),
+    );
 
-    // Pegar as 5 últimas ocorrências, independente do status
-    const recentIncidents = [...incidents]
+    // Pegar as 5 últimas acompanhamentos, independente do status
+    const recentIncidents = [...disciplinaryIncidents]
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 5);
 
@@ -42,7 +46,7 @@ export const RecentActivity = ({ incidents, students }: RecentActivityProps) => 
                     variant="ghost"
                     size="sm"
                     className="text-muted-foreground text-xs hover:text-primary"
-                    onClick={() => navigate('/ocorrencias')}
+                    onClick={() => navigate('/acompanhamentos')}
                 >
                     Ver todas <ArrowRight className="ml-1 h-3 w-3" />
                 </Button>

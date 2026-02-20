@@ -1,5 +1,6 @@
 import { Incident, IncidentSeverity, Student } from '@/types';
 import { isPerformanceConvocationIncident } from './incidentClassification';
+import { isDisciplinaryIncident } from './incidentType';
 import { getCurrentBrasiliaYear, getBrasiliaYear } from './brasiliaDate';
 
 /**
@@ -53,6 +54,7 @@ export function getStudentIncidentCounts(
   // Filter incidents: disciplinary incidents belonging to student within school year.
   const studentIncidents = allIncidents.filter(incident => {
     if (!incident.studentIds.includes(studentId)) return false;
+    if (!isDisciplinaryIncident(incident)) return false;
     if (isPerformanceConvocationIncident(incident)) return false;
 
     // Filter by school year (incidents from current academic year)
@@ -205,8 +207,8 @@ export function checkEscalationStatus(
       reason: counts.grave >= 1
         ? 'Aluno possui ocorrência grave no histórico'
         : counts.intermediaria >= 2
-          ? `Aluno possui ${counts.intermediaria} ocorrências intermediárias`
-          : `Aluno possui ${counts.leve} ocorrências leves`,
+          ? `Aluno possui ${counts.intermediaria} acompanhamentos intermediários`
+          : `Aluno possui ${counts.leve} acompanhamentos leves`,
       level: 'suspensao_1_dia'
     };
   }
@@ -216,7 +218,7 @@ export function checkEscalationStatus(
       isEscalated: true,
       reason: counts.intermediaria >= 1
         ? 'Aluno possui ocorrência intermediária no histórico'
-        : `Aluno possui ${counts.leve} ocorrências leves`,
+        : `Aluno possui ${counts.leve} acompanhamentos leves`,
       level: 'comunicado_pais'
     };
   }

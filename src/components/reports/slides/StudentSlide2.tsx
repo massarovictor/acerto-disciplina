@@ -131,7 +131,7 @@ export const StudentSlide2 = ({ student, grades, incidents, attendance }: Studen
         <div className="col-span-2 space-y-4">
           <Card className="bg-card/50 backdrop-blur">
             <CardContent className="pt-4">
-              <h3 className="font-semibold mb-3 text-sm">Ocorrências Recentes</h3>
+              <h3 className="font-semibold mb-3 text-sm">Acompanhamentos Recentes</h3>
               {studentIncidents.length > 0 ? (
                 <div className="space-y-2 max-h-[200px] overflow-y-auto">
                   {studentIncidents.map((incident, index) => (
@@ -185,7 +185,7 @@ export const StudentSlide2 = ({ student, grades, incidents, attendance }: Studen
                   <ul className="text-muted-foreground space-y-0.5 ml-3">
                     <li>• Necessita reforço em {worstSubjects[0]?.subject || 'algumas áreas'}</li>
                     {totalAbsences > 10 && <li>• Taxa de faltas elevada</li>}
-                    {studentIncidents.length > 3 && <li>• Múltiplas ocorrências disciplinares</li>}
+                    {studentIncidents.length > 3 && <li>• Múltiplos acompanhamentos disciplinares</li>}
                   </ul>
                 </div>
               </div>

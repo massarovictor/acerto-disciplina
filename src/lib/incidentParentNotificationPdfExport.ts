@@ -1,13 +1,18 @@
 import JSZip from 'jszip';
 import { Class, FollowUpRecord, Incident, Student } from '@/types';
 import { INCIDENT_EPISODES } from '@/data/mockData';
+import { FAMILY_FOLLOW_UP_EPISODES } from '@/data/familyFollowUpEpisodes';
 import { BasePDFGenerator } from './basePdfExport';
 import { ActionLevel, getRequiredActionLevel } from './incidentActions';
 import { isPerformanceConvocationIncident } from './incidentClassification';
 import { formatBrasiliaDate, getBrasiliaYear } from './brasiliaDate';
+import { isFamilyIncident } from './incidentType';
 
 const EPISODE_MAP = new Map(
   INCIDENT_EPISODES.map((episode) => [episode.id, episode.description]),
+);
+const FAMILY_EPISODE_MAP = new Map(
+  FAMILY_FOLLOW_UP_EPISODES.map((episode) => [episode.id, episode.description]),
 );
 
 const SEVERITY_LABELS: Record<string, string> = {
@@ -15,6 +20,13 @@ const SEVERITY_LABELS: Record<string, string> = {
   intermediaria: 'Intermediária',
   grave: 'Grave',
   gravissima: 'Gravíssima',
+};
+
+const FAMILY_ATTENTION_LABELS: Record<string, string> = {
+  leve: 'Baixa',
+  intermediaria: 'Média',
+  grave: 'Alta',
+  gravissima: 'Crítica',
 };
 
 const ACTION_LEVEL_SHORT_TEXT: Record<ActionLevel, string> = {
@@ -92,12 +104,19 @@ class IncidentParentNotificationPDF extends BasePDFGenerator {
   private getOccurrenceSummary(incident: Incident): string {
     if (incident.description?.trim()) return incident.description.trim();
 
+    const isFamilyFlow = isFamilyIncident(incident);
     if (incident.episodes && incident.episodes.length > 0) {
-      const list = incident.episodes.map((episodeId) => EPISODE_MAP.get(episodeId) ?? episodeId);
+      const list = incident.episodes.map((episodeId) =>
+        isFamilyFlow
+          ? FAMILY_EPISODE_MAP.get(episodeId) ?? episodeId
+          : EPISODE_MAP.get(episodeId) ?? episodeId,
+      );
       return list.join('; ');
     }
 
-    return 'Ocorrência disciplinar registrada no sistema da escola.';
+    return isFamilyFlow
+      ? 'Acompanhamento familiar registrado no sistema da escola.'
+      : 'Ocorrência disciplinar registrada no sistema da escola.';
   }
 
   private getSchoolMeasure(
@@ -106,6 +125,14 @@ class IncidentParentNotificationPDF extends BasePDFGenerator {
     isPerformanceConvocation: boolean,
   ): string {
     const latestFollowUp = this.getLatestFollowUp(incident.followUps);
+    const isFamilyFlow = isFamilyIncident(incident);
+
+    if (isFamilyFlow) {
+      if (latestFollowUp?.providencias?.trim()) return latestFollowUp.providencias.trim();
+      if (incident.actions?.trim()) return incident.actions.trim();
+      if (incident.suggestedAction?.trim()) return incident.suggestedAction.trim();
+      return 'Plano de acompanhamento pedagógico e socioemocional construído com responsáveis e equipe escolar.';
+    }
 
     if (isPerformanceConvocation) {
       const followUpMeasure = latestFollowUp?.providencias?.trim();
@@ -133,9 +160,14 @@ class IncidentParentNotificationPDF extends BasePDFGenerator {
   }
 
   private getFamilyMessage(
+    incident: Incident,
     actionLevel: ActionLevel,
     isPerformanceConvocation: boolean,
   ): string {
+    if (isFamilyIncident(incident)) {
+      return 'Solicitamos o comparecimento dos responsáveis para alinhamento de estratégias de apoio pedagógico e emocional ao estudante.';
+    }
+
     if (isPerformanceConvocation) {
       return 'Solicitamos o comparecimento do responsável legal na escola para alinhamentos pedagógicos e acompanhamento do rendimento bimestral.';
     }
@@ -172,8 +204,10 @@ class IncidentParentNotificationPDF extends BasePDFGenerator {
       this.colWidth(6) - 8,
     );
     this.renderField(
-      'Gravidade',
-      SEVERITY_LABELS[incident.finalSeverity] || incident.finalSeverity,
+      isFamilyIncident(incident) ? 'Nível de atenção' : 'Gravidade',
+      isFamilyIncident(incident)
+        ? (FAMILY_ATTENTION_LABELS[incident.finalSeverity] || incident.finalSeverity)
+        : (SEVERITY_LABELS[incident.finalSeverity] || incident.finalSeverity),
       col2,
       startY + 9,
       this.colWidth(6) - 8,
@@ -231,10 +265,14 @@ class IncidentParentNotificationPDF extends BasePDFGenerator {
 
     const targetStudent = singleStudent || students[0];
     const targetStudentIds = targetStudent ? [targetStudent.id] : incident.studentIds;
-    const isPerformanceConvocation = isPerformanceConvocationIncident(incident);
+    const isFamilyFlow = isFamilyIncident(incident);
+    const isPerformanceConvocation =
+      !isFamilyFlow && isPerformanceConvocationIncident(incident);
     const incidentSchoolYear = getBrasiliaYear(incident.date);
     const historicalIncidents = allIncidents.filter((item) => item.id !== incident.id);
-    const actionLevel = isPerformanceConvocation
+    const actionLevel = isFamilyFlow
+      ? 'conversa_registro'
+      : isPerformanceConvocation
       ? 'comunicado_pais'
       : getRequiredActionLevel(
           targetStudentIds,
@@ -244,7 +282,13 @@ class IncidentParentNotificationPDF extends BasePDFGenerator {
         );
 
     this.setFont('md', 'bold', '#000000');
-    this.drawText('Notificação aos Responsáveis', this.margin, this.y);
+    this.drawText(
+      isFamilyFlow
+        ? 'Comunicado de Acompanhamento Familiar'
+        : 'Notificação aos Responsáveis',
+      this.margin,
+      this.y,
+    );
     this.y += 6;
 
     this.setFont('2xs', 'normal', '#666666');
@@ -258,7 +302,9 @@ class IncidentParentNotificationPDF extends BasePDFGenerator {
     this.renderIdentification(targetStudent, incidentClass, incident);
 
     this.renderSectionTitle('Comunicado');
-    const intro = `Informamos que o(a) estudante ${targetStudent?.name || 'identificado(a) neste registro'} esteve envolvido(a) em ocorrência disciplinar registrada pela escola.`;
+    const intro = isFamilyFlow
+      ? `Informamos que o(a) estudante ${targetStudent?.name || 'identificado(a) neste registro'} está em acompanhamento familiar de caráter pedagógico e socioemocional.`
+      : `Informamos que o(a) estudante ${targetStudent?.name || 'identificado(a) neste registro'} esteve envolvido(a) em ocorrência disciplinar registrada pela escola.`;
     this.setFont('xs', 'normal', '#000000');
     const introLines = this.pdf.splitTextToSize(intro, this.contentWidth - 2);
     this.drawText(introLines, this.margin + 1, this.y + 3);
@@ -272,7 +318,9 @@ class IncidentParentNotificationPDF extends BasePDFGenerator {
     this.drawText(summaryLines, this.margin + 1, this.y + 3);
     this.y += Math.max(6, summaryLines.length * 4) + 3;
 
-    this.renderSectionTitle('Medida adotada pela escola');
+    this.renderSectionTitle(
+      isFamilyFlow ? 'Plano adotado pela escola' : 'Medida adotada pela escola',
+    );
     const measureLines = this.pdf.splitTextToSize(
       this.getSchoolMeasure(incident, actionLevel, isPerformanceConvocation),
       this.contentWidth - 2,
@@ -283,7 +331,7 @@ class IncidentParentNotificationPDF extends BasePDFGenerator {
 
     this.renderSectionTitle('Encaminhamento aos responsáveis');
     const familyLines = this.pdf.splitTextToSize(
-      this.getFamilyMessage(actionLevel, isPerformanceConvocation),
+      this.getFamilyMessage(incident, actionLevel, isPerformanceConvocation),
       this.contentWidth - 2
     );
     this.setFont('xs', 'normal', '#000000');

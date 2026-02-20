@@ -60,26 +60,26 @@ export const ReportOverview = ({ classes, students, incidents, grades }: ReportO
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Ocorrências</CardTitle>
+            <CardTitle className="text-sm font-medium">Total de Acompanhamentos</CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalIncidents}</div>
             <p className="text-xs text-muted-foreground">
-              {openIncidents} abertas
+              {openIncidents} em aberto
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ocorrências Críticas</CardTitle>
+            <CardTitle className="text-sm font-medium">Acompanhamentos Críticos</CardTitle>
             <AlertTriangle className="h-4 w-4 text-severity-critical" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{criticalIncidents}</div>
             <p className="text-xs text-muted-foreground">
-              Gravíssimas
+              Graves e gravíssimos
             </p>
           </CardContent>
         </Card>
@@ -130,7 +130,7 @@ export const ReportOverview = ({ classes, students, incidents, grades }: ReportO
 
         <Card>
           <CardHeader>
-            <CardTitle>Ocorrências por Turma</CardTitle>
+            <CardTitle>Acompanhamentos por Turma</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -138,7 +138,7 @@ export const ReportOverview = ({ classes, students, incidents, grades }: ReportO
                 <div key={index}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm font-medium">{item.class}</span>
-                    <span className="text-sm text-muted-foreground">{item.count} ocorrências</span>
+                    <span className="text-sm text-muted-foreground">{item.count} acompanhamentos</span>
                   </div>
                   <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
                     <div 
@@ -156,7 +156,7 @@ export const ReportOverview = ({ classes, students, incidents, grades }: ReportO
       {/* Severity Distribution */}
       <Card>
         <CardHeader>
-          <CardTitle>Distribuição de Ocorrências por Gravidade</CardTitle>
+          <CardTitle>Distribuição de Acompanhamentos por Gravidade</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -165,7 +165,7 @@ export const ReportOverview = ({ classes, students, incidents, grades }: ReportO
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-medium">{item.severity}</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">{item.count} ocorrências</span>
+                    <span className="text-sm text-muted-foreground">{item.count} acompanhamentos</span>
                     <Badge variant="outline">
                       {totalIncidents > 0 ? Math.round((item.count / totalIncidents) * 100) : 0}%
                     </Badge>
@@ -187,7 +187,7 @@ export const ReportOverview = ({ classes, students, incidents, grades }: ReportO
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Status das Ocorrências</CardTitle>
+            <CardTitle>Status dos Acompanhamentos</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -195,7 +195,7 @@ export const ReportOverview = ({ classes, students, incidents, grades }: ReportO
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-medium">Abertas</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">{openIncidents} ocorrências</span>
+                    <span className="text-sm text-muted-foreground">{openIncidents} acompanhamentos</span>
                     <Badge variant="outline" className="bg-status-open/10 text-status-open">
                       {totalIncidents > 0 ? Math.round((openIncidents / totalIncidents) * 100) : 0}%
                     </Badge>
@@ -213,7 +213,7 @@ export const ReportOverview = ({ classes, students, incidents, grades }: ReportO
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-medium">Em Acompanhamento</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">{followUpIncidents} ocorrências</span>
+                    <span className="text-sm text-muted-foreground">{followUpIncidents} acompanhamentos</span>
                     <Badge variant="outline" className="bg-status-analysis/10 text-status-analysis">
                       {totalIncidents > 0 ? Math.round((followUpIncidents / totalIncidents) * 100) : 0}%
                     </Badge>
@@ -231,7 +231,7 @@ export const ReportOverview = ({ classes, students, incidents, grades }: ReportO
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-medium">Resolvidas</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">{resolvedIncidents} ocorrências</span>
+                    <span className="text-sm text-muted-foreground">{resolvedIncidents} acompanhamentos</span>
                     <Badge variant="outline" className="bg-status-resolved/10 text-status-resolved">
                       {totalIncidents > 0 ? Math.round((resolvedIncidents / totalIncidents) * 100) : 0}%
                     </Badge>

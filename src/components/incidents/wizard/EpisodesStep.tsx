@@ -8,32 +8,60 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { INCIDENT_EPISODES } from '@/data/mockData';
+import { FAMILY_FOLLOW_UP_EPISODES } from '@/data/familyFollowUpEpisodes';
 import { IncidentFormData } from '../IncidentWizard';
-import { IncidentSeverity } from '@/types';
+import { IncidentEpisode, IncidentSeverity, IncidentType } from '@/types';
 import { AlertCircle, Plus, X } from 'lucide-react';
 
 interface EpisodesStepProps {
   formData: Partial<IncidentFormData>;
   updateFormData: (data: Partial<IncidentFormData>) => void;
+  incidentType: IncidentType;
 }
 
 const severityConfig = {
-  leve: { label: 'Leve', color: 'bg-severity-light-bg text-severity-light border-severity-light' },
-  intermediaria: { label: 'Intermediária', color: 'bg-severity-intermediate-bg text-severity-intermediate border-severity-intermediate' },
-  grave: { label: 'Grave', color: 'bg-severity-serious-bg text-severity-serious border-severity-serious' },
-  gravissima: { label: 'Gravíssima', color: 'bg-severity-critical-bg text-severity-critical border-severity-critical' },
+  leve: { color: 'bg-severity-light-bg text-severity-light border-severity-light' },
+  intermediaria: { color: 'bg-severity-intermediate-bg text-severity-intermediate border-severity-intermediate' },
+  grave: { color: 'bg-severity-serious-bg text-severity-serious border-severity-serious' },
+  gravissima: { color: 'bg-severity-critical-bg text-severity-critical border-severity-critical' },
 };
 
-export const EpisodesStep = ({ formData, updateFormData }: EpisodesStepProps) => {
+const DISCIPLINARY_SEVERITY_LABELS: Record<IncidentSeverity, string> = {
+  leve: 'Leve',
+  intermediaria: 'Intermediária',
+  grave: 'Grave',
+  gravissima: 'Gravíssima',
+};
+
+const FAMILY_SEVERITY_LABELS: Record<IncidentSeverity, string> = {
+  leve: 'Baixa',
+  intermediaria: 'Média',
+  grave: 'Alta',
+  gravissima: 'Crítica',
+};
+
+export const EpisodesStep = ({
+  formData,
+  updateFormData,
+  incidentType,
+}: EpisodesStepProps) => {
   const selectedEpisodes = formData.episodes || [];
+  const episodesCatalog =
+    incidentType === 'acompanhamento_familiar'
+      ? FAMILY_FOLLOW_UP_EPISODES
+      : INCIDENT_EPISODES;
+  const severityLabels =
+    incidentType === 'acompanhamento_familiar'
+      ? FAMILY_SEVERITY_LABELS
+      : DISCIPLINARY_SEVERITY_LABELS;
   const [customEpisode, setCustomEpisode] = useState('');
 
   // Separar episódios da lista e customizados
   const listedEpisodes = selectedEpisodes.filter(ep => 
-    INCIDENT_EPISODES.some(e => e.id === ep)
+    episodesCatalog.some(e => e.id === ep)
   );
   const customEpisodes = selectedEpisodes.filter(ep => 
-    !INCIDENT_EPISODES.some(e => e.id === ep)
+    !episodesCatalog.some(e => e.id === ep)
   );
 
   const toggleEpisode = (episodeId: string) => {
@@ -86,7 +114,7 @@ export const EpisodesStep = ({ formData, updateFormData }: EpisodesStepProps) =>
   };
 
   const calculateSeverity = (episodeIds: string[]): IncidentSeverity => {
-    const episodes = INCIDENT_EPISODES.filter((e) => episodeIds.includes(e.id));
+    const episodes = episodesCatalog.filter((e) => episodeIds.includes(e.id));
     
     // Episódios customizados não afetam o cálculo automático de gravidade
     // O usuário deve ajustar manualmente se necessário
@@ -96,13 +124,13 @@ export const EpisodesStep = ({ formData, updateFormData }: EpisodesStepProps) =>
     return 'leve';
   };
 
-  const groupedEpisodes = INCIDENT_EPISODES.reduce((acc, episode) => {
+  const groupedEpisodes = episodesCatalog.reduce((acc, episode) => {
     if (!acc[episode.severity]) {
       acc[episode.severity] = [];
     }
     acc[episode.severity].push(episode);
     return acc;
-  }, {} as Record<string, typeof INCIDENT_EPISODES>);
+  }, {} as Record<string, IncidentEpisode[]>);
 
   const calculatedSeverity = formData.calculatedSeverity || 'leve';
   const finalSeverity = formData.finalSeverity || calculatedSeverity;
@@ -111,9 +139,15 @@ export const EpisodesStep = ({ formData, updateFormData }: EpisodesStepProps) =>
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold">Episódios</h2>
+        <h2 className="text-2xl font-bold">
+          {incidentType === 'acompanhamento_familiar'
+            ? 'Pontos de Acompanhamento'
+            : 'Episódios'}
+        </h2>
         <p className="text-muted-foreground mt-1">
-          Selecione os episódios que melhor descrevem a ocorrência
+          {incidentType === 'acompanhamento_familiar'
+            ? 'Selecione os pontos que descrevem o contexto pedagógico e emocional'
+            : 'Selecione os episódios que melhor descrevem a ocorrência'}
         </p>
       </div>
 
@@ -122,18 +156,22 @@ export const EpisodesStep = ({ formData, updateFormData }: EpisodesStepProps) =>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <AlertCircle className="h-5 w-5" />
-              Grau Calculado
+              {incidentType === 'acompanhamento_familiar'
+                ? 'Nível de Atenção Calculado'
+                : 'Grau Calculado'}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Baseado nos episódios selecionados:</span>
+              <span className="text-sm text-muted-foreground">
+                Baseado nos itens selecionados:
+              </span>
               <Badge className={severityConfig[formData.calculatedSeverity].color}>
-                {severityConfig[formData.calculatedSeverity].label}
+                {severityLabels[formData.calculatedSeverity]}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              {selectedEpisodes.length} episódio(s) selecionado(s)
+              {selectedEpisodes.length} item(ns) selecionado(s)
             </p>
           </CardContent>
         </Card>
@@ -142,15 +180,25 @@ export const EpisodesStep = ({ formData, updateFormData }: EpisodesStepProps) =>
       {/* Episódios Customizados */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Episódio Não Listado</CardTitle>
+          <CardTitle className="text-base">
+            {incidentType === 'acompanhamento_familiar'
+              ? 'Ponto Não Listado'
+              : 'Episódio Não Listado'}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Se o episódio não estiver na lista acima, você pode adicionar um episódio customizado.
+            {incidentType === 'acompanhamento_familiar'
+              ? 'Se o ponto de acompanhamento não estiver na lista, adicione um item customizado.'
+              : 'Se o episódio não estiver na lista acima, você pode adicionar um episódio customizado.'}
           </p>
           <div className="flex gap-2">
             <Input
-              placeholder="Descreva o episódio..."
+              placeholder={
+                incidentType === 'acompanhamento_familiar'
+                  ? 'Descreva o ponto de acompanhamento...'
+                  : 'Descreva o episódio...'
+              }
               value={customEpisode}
               onChange={(e) => setCustomEpisode(e.target.value)}
               onKeyDown={(e) => {
@@ -173,7 +221,7 @@ export const EpisodesStep = ({ formData, updateFormData }: EpisodesStepProps) =>
           
           {customEpisodes.length > 0 && (
             <div className="space-y-2 mt-4">
-              <Label className="text-sm">Episódios Customizados Adicionados:</Label>
+              <Label className="text-sm">Itens Customizados Adicionados:</Label>
               <div className="space-y-2">
                 {customEpisodes.map((episode, index) => (
                   <div
@@ -204,7 +252,7 @@ export const EpisodesStep = ({ formData, updateFormData }: EpisodesStepProps) =>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Badge variant="outline" className={severityConfig[severity].color}>
-                  {severityConfig[severity].label}
+                  {severityLabels[severity]}
                 </Badge>
               </CardTitle>
             </CardHeader>
@@ -238,11 +286,19 @@ export const EpisodesStep = ({ formData, updateFormData }: EpisodesStepProps) =>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Grau Final</CardTitle>
+          <CardTitle className="text-base">
+            {incidentType === 'acompanhamento_familiar'
+              ? 'Nível Final de Atenção'
+              : 'Grau Final'}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="finalSeverity">Grau final da ocorrência</Label>
+            <Label htmlFor="finalSeverity">
+              {incidentType === 'acompanhamento_familiar'
+                ? 'Nível final do acompanhamento'
+                : 'Grau final da ocorrência'}
+            </Label>
             <Select
               value={finalSeverity}
               onValueChange={(value) => {
@@ -258,25 +314,31 @@ export const EpisodesStep = ({ formData, updateFormData }: EpisodesStepProps) =>
                 <SelectValue placeholder="Selecione o grau final" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="leve">Leve</SelectItem>
-                <SelectItem value="intermediaria">Intermediária</SelectItem>
-                <SelectItem value="grave">Grave</SelectItem>
-                <SelectItem value="gravissima">Gravíssima</SelectItem>
+                <SelectItem value="leve">{severityLabels.leve}</SelectItem>
+                <SelectItem value="intermediaria">{severityLabels.intermediaria}</SelectItem>
+                <SelectItem value="grave">{severityLabels.grave}</SelectItem>
+                <SelectItem value="gravissima">{severityLabels.gravissima}</SelectItem>
               </SelectContent>
             </Select>
             {hasOverride && (
               <p className="text-xs text-muted-foreground">
-                O grau final esta diferente do calculado automaticamente.
+                {incidentType === 'acompanhamento_familiar'
+                  ? 'O nível final está diferente do cálculo automático.'
+                  : 'O grau final está diferente do calculado automaticamente.'}
               </p>
             )}
           </div>
 
           {hasOverride && (
             <div className="space-y-2">
-              <Label htmlFor="severityOverrideReason">Motivo da alteracao *</Label>
+              <Label htmlFor="severityOverrideReason">Motivo da alteração *</Label>
               <Textarea
                 id="severityOverrideReason"
-                placeholder="Explique por que o grau final foi alterado..."
+                placeholder={
+                  incidentType === 'acompanhamento_familiar'
+                    ? 'Explique por que o nível final foi ajustado...'
+                    : 'Explique por que o grau final foi alterado...'
+                }
                 value={formData.severityOverrideReason || ''}
                 onChange={(e) => updateFormData({ severityOverrideReason: e.target.value })}
                 rows={3}

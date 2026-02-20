@@ -42,14 +42,14 @@ export function checkLowPerformanceStudents(
 }
 
 /**
- * Gera ocorrências de convocação de pais para alunos com baixo rendimento em um bimestre
+ * Gera acompanhamentos de convocação de pais para alunos com baixo rendimento em um bimestre
  * @param grades Todas as notas
  * @param students Alunos da turma
  * @param classData Dados da turma
  * @param quarter Bimestre
- * @param existingIncidents Ocorrências existentes (para evitar duplicatas)
+ * @param existingIncidents Acompanhamentos existentes (para evitar duplicatas)
  * @param createdBy ID do usuário criando
- * @returns Array de novas ocorrências
+ * @returns Array de novos acompanhamentos
  */
 export function generateQuarterIncidents(
   grades: Grade[],
@@ -151,6 +151,7 @@ export function generateQuarterIncidents(
       const description = `CONVOCAÇÃO DE PAIS - ${quarterLabel}: Convocação por baixo rendimento no ${quarterLabel}. Critério institucional: estudante com 3 ou mais disciplinas abaixo da média no bimestre. Situação identificada: ${result.subjectsBelowAverage.length} disciplina(s) abaixo da média (${subjectsDetail}).`;
 
       const newIncident: Omit<Incident, 'id' | 'createdAt' | 'updatedAt'> = {
+        incidentType: 'disciplinar',
         classId: classData.id,
         studentIds: [result.studentId],
         date: incidentDate,

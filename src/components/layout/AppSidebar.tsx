@@ -17,7 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 const menuItems = [
   { icon: Home, label: 'Dashboard', path: '/' },
   { icon: LineChart, label: 'Analytics', path: '/analytics' },
-  { icon: AlertTriangle, label: 'Ocorrências', path: '/ocorrencias' },
+  { icon: AlertTriangle, label: 'Acompanhamentos', path: '/acompanhamentos' },
   { icon: School, label: 'Turmas', path: '/turmas' },
   { icon: Users, label: 'Alunos', path: '/alunos' },
   { icon: BookOpen, label: 'Notas', path: '/notas-frequencia' },

@@ -99,8 +99,8 @@ export const SchoolIncidentsSlide = ({
     return (
         <>
             <SlideLayout
-                title={`${schoolName} — Análise de Ocorrências`}
-                subtitle={`${period === 'all' ? 'Ano Letivo Completo' : period} • ${incidentData.total} ocorrências registradas`}
+                title={`${schoolName} — Análise de Acompanhamentos`}
+                subtitle={`${period === 'all' ? 'Ano Letivo Completo' : period} • ${incidentData.total} acompanhamentos registrados`}
                 footer="MAVIC - Sistema de Acompanhamento Escolar"
             >
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 32, height: '100%' }}>
@@ -191,7 +191,7 @@ export const SchoolIncidentsSlide = ({
                             padding: 20,
                         }}>
                             <p style={{ margin: '0 0 12px 0', fontSize: 14, fontWeight: 600, color: REPORT_COLORS.text.secondary, textTransform: 'uppercase' }}>
-                                Status das Ocorrências
+                                Status dos Acompanhamentos
                             </p>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
                                 <div style={{ textAlign: 'center', padding: 12, background: '#EF444415', borderRadius: 8 }}>
@@ -224,7 +224,7 @@ export const SchoolIncidentsSlide = ({
                             background: REPORT_COLORS.background.surface,
                             borderBottom: `1px solid ${REPORT_COLORS.border}`,
                         }}>
-                            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Turmas por Número de Ocorrências</h3>
+                            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Turmas por Número de Acompanhamentos</h3>
                             <p style={{ margin: '4px 0 0', fontSize: 13, color: REPORT_COLORS.text.secondary }}>
                                 Ordenadas da maior para menor quantidade
                             </p>
@@ -280,7 +280,7 @@ export const SchoolIncidentsSlide = ({
 
                             {incidentData.byClass.length === 0 && (
                                 <div style={{ padding: 40, textAlign: 'center', color: REPORT_COLORS.text.tertiary }}>
-                                    Nenhuma ocorrência registrada.
+                                    Nenhum acompanhamento registrado.
                                 </div>
                             )}
 
@@ -309,10 +309,10 @@ export const SchoolIncidentsSlide = ({
                             <div className="p-2 rounded-full bg-primary/10">
                                 <List className="h-5 w-5 text-primary" />
                             </div>
-                            Ranking Completo de Turmas por Ocorrências
+                            Ranking Completo de Turmas por Acompanhamentos
                         </DialogTitle>
                         <DialogDescription>
-                            Listagem completa de turmas ordenada por volume de ocorrências
+                            Listagem completa de turmas ordenada por volume de acompanhamentos
                         </DialogDescription>
                     </DialogHeader>
 

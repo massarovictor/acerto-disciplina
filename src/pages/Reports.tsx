@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 
 import { useSearchParams } from "react-router-dom";
 import { useEffect } from "react";
+import { isDisciplinaryIncident } from "@/lib/incidentType";
 
 const Reports = () => {
   // ✅ Usando Zustand store para persistir tab entre navegações
@@ -32,6 +33,9 @@ const Reports = () => {
   const { classes } = useClasses();
   const { students } = useStudents();
   const { incidents } = useIncidents();
+  const disciplinaryIncidents = incidents.filter((incident) =>
+    isDisciplinaryIncident(incident),
+  );
   // DISABLED: Attendance feature temporarily removed
   // const { attendance } = useAttendance();
 
@@ -52,7 +56,7 @@ const Reports = () => {
           <IntegratedReports
             classes={classes}
             students={students}
-            incidents={incidents}
+            incidents={disciplinaryIncidents}
             enabled={activeTab === "integrated"}
           />
         </TabsContent>
@@ -61,7 +65,7 @@ const Reports = () => {
           <ClassSlides
             classes={classes}
             students={students}
-            incidents={incidents}
+            incidents={disciplinaryIncidents}
             enabled={activeTab === "slides"}
           />
         </TabsContent>

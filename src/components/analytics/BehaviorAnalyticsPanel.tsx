@@ -1,10 +1,10 @@
 /**
  * Painel de Analytics Comportamental
  * 
- * Exibe dados de ocorrências disciplinares:
+ * Exibe dados de acompanhamentos disciplinares:
  * - Resumo por severidade
- * - Ranking de turmas por ocorrências
- * - Top alunos com ocorrências
+ * - Ranking de turmas por acompanhamentos
+ * - Top alunos com acompanhamentos
  * - Gráfico de tendência mensal
  */
 
@@ -108,7 +108,7 @@ export function BehaviorAnalyticsPanel({
                                 </div>
                                 <div>
                                     <p className="text-2xl font-bold">{totalIncidents}</p>
-                                    <p className="text-xs text-muted-foreground">Total de Ocorrências</p>
+                                    <p className="text-xs text-muted-foreground">Total de Acompanhamentos</p>
                                 </div>
                             </div>
                         </CardContent>
@@ -159,7 +159,7 @@ export function BehaviorAnalyticsPanel({
 
                 {/* Grid Principal */}
                 <div className="grid gap-6 lg:grid-cols-2">
-                    {/* Ocorrências por Severidade */}
+                    {/* Acompanhamentos por Severidade */}
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base">Distribuição por Severidade</CardTitle>
@@ -231,7 +231,7 @@ export function BehaviorAnalyticsPanel({
                                         <Area
                                             type="monotone"
                                             dataKey="count"
-                                            name="Ocorrências"
+                                            name="Acompanhamentos"
                                             stroke="hsl(var(--primary))"
                                             fill="hsl(var(--primary))"
                                             fillOpacity={0.2}
@@ -246,12 +246,12 @@ export function BehaviorAnalyticsPanel({
                     {/* Ranking de Turmas */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Turmas com Mais Ocorrências</CardTitle>
+                            <CardTitle className="text-base">Turmas com Mais Acompanhamentos</CardTitle>
                         </CardHeader>
                         <CardContent>
                             {classIncidentRanking.length === 0 ? (
                                 <p className="text-sm text-muted-foreground text-center py-4">
-                                    Nenhuma ocorrência registrada
+                                    Nenhum acompanhamento registrado
                                 </p>
                             ) : (
                                 <div className="space-y-3">
@@ -300,12 +300,12 @@ export function BehaviorAnalyticsPanel({
                     {/* Top Alunos */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Alunos com Mais Ocorrências</CardTitle>
+                            <CardTitle className="text-base">Alunos com Mais Acompanhamentos</CardTitle>
                         </CardHeader>
                         <CardContent>
                             {topStudentsByIncidents.length === 0 ? (
                                 <p className="text-sm text-muted-foreground text-center py-4">
-                                    Nenhuma ocorrência registrada
+                                    Nenhum acompanhamento registrado
                                 </p>
                             ) : (
                                 <div className="space-y-3">
@@ -403,10 +403,10 @@ export function BehaviorAnalyticsPanel({
                             <div className="p-2 rounded-full bg-primary/10">
                                 <List className="h-5 w-5 text-primary" />
                             </div>
-                            Ranking de Turmas por Ocorrências
+                            Ranking de Turmas por Acompanhamentos
                         </DialogTitle>
                         <DialogDescription>
-                            Listagem completa de turmas ordenada por volume de ocorrências
+                            Listagem completa de turmas ordenada por volume de acompanhamentos
                         </DialogDescription>
                     </DialogHeader>
 
@@ -482,10 +482,10 @@ export function BehaviorAnalyticsPanel({
                             <div className="p-2 rounded-full bg-primary/10">
                                 <List className="h-5 w-5 text-primary" />
                             </div>
-                            Ranking de Alunos por Ocorrências
+                            Ranking de Alunos por Acompanhamentos
                         </DialogTitle>
                         <DialogDescription>
-                            Listagem completa de alunos ordenada por volume de ocorrências
+                            Listagem completa de alunos ordenada por volume de acompanhamentos
                         </DialogDescription>
                     </DialogHeader>
 

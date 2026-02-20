@@ -1754,6 +1754,7 @@ export function useIncidents() {
 
     const payload = mapIncidentToDb(
       {
+        incidentType: updates.incidentType ?? base.incidentType ?? "disciplinar",
         classId: updates.classId ?? base.classId,
         date: updates.date ?? base.date,
         studentIds: updates.studentIds ?? base.studentIds,

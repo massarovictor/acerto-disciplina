@@ -58,7 +58,7 @@ export function SchoolOverviewCards({
     ...(showBehavior
       ? [
         {
-          title: 'Ocorrências',
+          title: 'Acompanhamentos',
           value: overview.totalIncidents.toString(),
           icon: AlertTriangle,
           description: 'Total registrado',

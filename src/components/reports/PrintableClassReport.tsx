@@ -109,7 +109,7 @@ export const PrintableClassReport = ({
               <p>{attentionSubjects.length > 0 ? attentionSubjects.join(', ') : 'Nenhuma'}</p>
               <div className="mt-3 grid gap-2 md:grid-cols-2">
                 <div>
-                  <p className="font-medium text-muted-foreground">Ocorrências</p>
+                  <p className="font-medium text-muted-foreground">Acompanhamentos</p>
                   <p>{incidents.length} registro(s)</p>
                 </div>
                 <div>

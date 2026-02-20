@@ -361,7 +361,7 @@ export const ClassesManage = ({ highlightId }: ClassesManageProps) => {
     ).length;
     const incidentCount = incidents.filter((i) => i.classId === cls.id).length;
 
-    // BLOQUEIO: Se houver ocorrências, não permitir exclusão
+    // BLOQUEIO: Se houver acompanhamentos, não permitir exclusão
     if (incidentCount > 0) {
       toast({
         title: "Exclusão bloqueada",

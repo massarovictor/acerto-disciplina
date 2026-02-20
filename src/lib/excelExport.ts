@@ -352,7 +352,7 @@ const buildIncidentCountByStudent = (incidents: Incident[]): Map<string, number>
 
 const buildIncidentsContextLabel = (resolvedIncidents: RankingIncidentsResolved): string | null =>
   resolvedIncidents.includeIncidents
-    ? `Ocorrências no período: ${resolvedIncidents.filteredIncidents.length}`
+    ? `Acompanhamentos no período: ${resolvedIncidents.filteredIncidents.length}`
     : null;
 
 const getXlsHeaders = (
@@ -363,14 +363,14 @@ const getXlsHeaders = (
 
   if (rankingType === 'general') {
     return includeIncidents
-      ? [...baseHeaders, 'Media Base Comum', 'Media Disciplinas Tecnicas', 'Media Geral', 'Ocorrências']
+      ? [...baseHeaders, 'Media Base Comum', 'Media Disciplinas Tecnicas', 'Media Geral', 'Acompanhamentos']
       : [...baseHeaders, 'Media Base Comum', 'Media Disciplinas Tecnicas', 'Media Geral'];
   }
 
   const metricHeader =
     rankingType === 'common' ? 'Media Base Comum' : 'Media Disciplinas Tecnicas';
   return includeIncidents
-    ? [...baseHeaders, metricHeader, 'Ocorrências']
+    ? [...baseHeaders, metricHeader, 'Acompanhamentos']
     : [...baseHeaders, metricHeader];
 };
 
@@ -414,7 +414,7 @@ const getPdfHeaders = (
       { text: 'Média Base Comum', style: 'tableHeader' },
       { text: 'Média Técnica', style: 'tableHeader' },
       { text: 'Média Geral', style: 'tableHeader' },
-      ...(includeIncidents ? [{ text: 'Ocorrências', style: 'tableHeader' }] : []),
+      ...(includeIncidents ? [{ text: 'Acompanhamentos', style: 'tableHeader' }] : []),
     ];
   }
 
@@ -423,7 +423,7 @@ const getPdfHeaders = (
   return [
     ...baseHeaders,
     { text: metricHeader, style: 'tableHeader' },
-    ...(includeIncidents ? [{ text: 'Ocorrências', style: 'tableHeader' }] : []),
+    ...(includeIncidents ? [{ text: 'Acompanhamentos', style: 'tableHeader' }] : []),
   ];
 };
 

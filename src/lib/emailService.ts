@@ -1,11 +1,12 @@
 import { supabase } from '@/services/supabase';
-import { Incident, Class, Student } from '@/types';
+import { Incident, Class, Student, IncidentType } from '@/types';
 
 interface EmailPayload {
     type: 'new_incident' | 'incident_followup' | 'incident_resolved';
     incident: {
         id: string;
         date: string;
+        incidentType: IncidentType;
         description: string;
         finalSeverity: string;
         suggestedAction?: string;
@@ -40,6 +41,7 @@ export async function sendIncidentEmail(
         incident: {
             id: incident.id,
             date: incident.date,
+            incidentType: incident.incidentType ?? 'disciplinar',
             description: incident.description,
             finalSeverity: incident.finalSeverity,
             suggestedAction: incident.suggestedAction,

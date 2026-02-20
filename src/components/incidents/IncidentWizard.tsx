@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type ComponentType } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,14 +8,15 @@ import { StudentsStep } from "./wizard/StudentsStep";
 import { EpisodesStep } from "./wizard/EpisodesStep";
 import { DetailsStep } from "./wizard/DetailsStep";
 import { ReviewStep } from "./wizard/ReviewStep";
-import { IncidentSeverity } from "@/types";
+import { IncidentSeverity, IncidentType } from "@/types";
 import { useIncidents, useClasses, useStudents } from "@/hooks/useData";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle } from "lucide-react";
-import { getSeverityColor, getSeverityLabel } from "@/lib/incidentUtils";
+import { getSeverityColor } from "@/lib/incidentUtils";
 import { sendIncidentEmail } from "@/lib/emailService";
 import { getBrasiliaISODate } from "@/lib/brasiliaDate";
+import { getIncidentSeverityLabel } from "@/lib/incidentType";
 
 export interface IncidentFormData {
   classId: string;
@@ -30,7 +31,17 @@ export interface IncidentFormData {
   suggestedAction?: string;
 }
 
-const steps = [
+interface IncidentWizardStepProps {
+  formData: Partial<IncidentFormData>;
+  updateFormData: (data: Partial<IncidentFormData>) => void;
+  incidentType: IncidentType;
+}
+
+const steps: Array<{
+  id: number;
+  name: string;
+  component: ComponentType<IncidentWizardStepProps>;
+}> = [
   { id: 1, name: "Contexto", component: ContextStep },
   { id: 2, name: "Alunos", component: StudentsStep },
   { id: 3, name: "Episódios", component: EpisodesStep },
@@ -40,9 +51,13 @@ const steps = [
 
 interface IncidentWizardProps {
   onComplete?: () => void;
+  incidentType?: IncidentType;
 }
 
-export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
+export const IncidentWizard = ({
+  onComplete,
+  incidentType = "disciplinar",
+}: IncidentWizardProps) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<Partial<IncidentFormData>>({
     date: getBrasiliaISODate(),
@@ -107,7 +122,10 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
     ) {
       toast({
         title: "Erro",
-        description: "Informe o motivo da alteração do grau final.",
+        description:
+          incidentType === "acompanhamento_familiar"
+            ? "Informe o motivo da alteração do nível final de atenção."
+            : "Informe o motivo da alteração do grau final.",
         variant: "destructive",
       });
       setCurrentStep(3);
@@ -116,6 +134,7 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
 
     try {
       const newIncident = await addIncident({
+        incidentType,
         classId: formData.classId,
         date: formData.date || getBrasiliaISODate(),
         studentIds: formData.studentIds,
@@ -148,9 +167,14 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
       }
 
       toast({
-        title: "Ocorrência registrada",
+        title:
+          incidentType === "acompanhamento_familiar"
+            ? "Acompanhamento familiar registrado"
+            : "Ocorrência registrada",
         description:
-          "A ocorrência foi registrada com sucesso e aguarda validação.",
+          incidentType === "acompanhamento_familiar"
+            ? "O acompanhamento familiar foi registrado com sucesso."
+            : "A ocorrência foi registrada com sucesso e aguarda validação.",
       });
 
       if (onComplete) {
@@ -161,7 +185,10 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
     } catch (error) {
       toast({
         title: "Erro",
-        description: "Não foi possível registrar a ocorrência.",
+        description:
+          incidentType === "acompanhamento_familiar"
+            ? "Não foi possível registrar o acompanhamento familiar."
+            : "Não foi possível registrar a ocorrência.",
         variant: "destructive",
       });
     }
@@ -234,12 +261,16 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
           formData.episodes.length > 0 && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-card">
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Gravidade:</span>
+              <span className="text-sm text-muted-foreground">
+                {incidentType === "acompanhamento_familiar"
+                  ? "Nível de atenção:"
+                  : "Gravidade:"}
+              </span>
               <Badge
                 variant="outline"
                 className={getSeverityColor(displaySeverity)}
               >
-                {getSeverityLabel(displaySeverity)}
+                {getIncidentSeverityLabel(displaySeverity, incidentType)}
               </Badge>
             </div>
           )}
@@ -250,6 +281,7 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
         <CurrentStepComponent
           formData={formData}
           updateFormData={updateFormData}
+          incidentType={incidentType}
         />
       </div>
 
@@ -267,7 +299,11 @@ export const IncidentWizard = ({ onComplete }: IncidentWizardProps) => {
             Avançar
           </Button>
         ) : (
-          <Button onClick={handleSubmit}>Registrar Ocorrência</Button>
+          <Button onClick={handleSubmit}>
+            {incidentType === "acompanhamento_familiar"
+              ? "Registrar Acompanhamento Familiar"
+              : "Registrar Ocorrência"}
+          </Button>
         )}
       </div>
     </div>
