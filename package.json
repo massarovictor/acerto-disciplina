@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "lint:colors": "bash scripts/check-no-hardcoded-colors.sh",
     "preview": "vite preview",
-    "report": "tsx scripts/generateReport.ts"
+    "report": "tsx scripts/generateReport.ts",
+    "validate:certificados": "tsx scripts/validateCertificateLanguage.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

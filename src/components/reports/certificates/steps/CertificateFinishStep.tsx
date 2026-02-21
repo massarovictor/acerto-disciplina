@@ -2,7 +2,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CertificateType } from '@/lib/certificateTypes';
-import { type SidebarPattern } from '@/lib/certificatePdfExport';
 import { Class, SignatureMode } from '@/types';
 
 interface CertificateFinishStepProps {
@@ -16,17 +15,7 @@ interface CertificateFinishStepProps {
     setTeacherName: (name: string) => void;
     signatureMode: SignatureMode;
     setSignatureMode: (mode: SignatureMode) => void;
-
-    // Visual da Faixa Lateral
-    sidebarPattern: SidebarPattern;
-    setSidebarPattern: (pattern: SidebarPattern) => void;
 }
-
-const SIDEBAR_PATTERN_OPTIONS: { value: SidebarPattern; label: string; preview: string }[] = [
-    { value: 'chevrons', label: 'Chevrons', preview: '‹‹‹' },
-    { value: 'hexagons', label: 'Hexágonos', preview: '⬡⬡⬡' },
-    { value: 'diagonal_lines', label: 'Linhas Diagonais', preview: '///' },
-];
 
 export function CertificateFinishStep({
     type,
@@ -37,8 +26,6 @@ export function CertificateFinishStep({
     setTeacherName,
     signatureMode,
     setSignatureMode,
-    sidebarPattern,
-    setSidebarPattern,
 }: CertificateFinishStepProps) {
 
     const typeLabel = type === 'monitoria'
@@ -79,28 +66,6 @@ export function CertificateFinishStep({
                     </Select>
                 </div>
 
-                <div className="space-y-2">
-                    <Label>Estilo da faixa lateral</Label>
-                    <div className="grid grid-cols-3 gap-2">
-                        {SIDEBAR_PATTERN_OPTIONS.map((opt) => (
-                            <button
-                                key={opt.value}
-                                type="button"
-                                onClick={() => setSidebarPattern(opt.value)}
-                                className={`relative flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 text-center transition-all ${sidebarPattern === opt.value
-                                    ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
-                                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-                                    }`}
-                            >
-                                <span className="text-lg font-mono tracking-wider text-slate-600">{opt.preview}</span>
-                                <span className={`text-xs font-medium ${sidebarPattern === opt.value ? 'text-primary' : 'text-slate-500'}`}>
-                                    {opt.label}
-                                </span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
                 <p className="text-xs text-muted-foreground mt-4 leading-relaxed">
                     Os certificados receberão automaticamente um QR Code verificável e código único para validação pública.
                 </p>
@@ -126,10 +91,8 @@ export function CertificateFinishStep({
                         <span className="col-span-2 font-medium">{studentCount} selecionado(s)</span>
                     </div>
                     <div className="grid grid-cols-3 gap-1">
-                        <span className="text-slate-500">Faixa Lateral:</span>
-                        <span className="col-span-2 font-medium">
-                            {SIDEBAR_PATTERN_OPTIONS.find(o => o.value === sidebarPattern)?.label || 'Chevrons'}
-                        </span>
+                        <span className="text-slate-500">Moldura lateral:</span>
+                        <span className="col-span-2 font-medium">Configurações Institucionais</span>
                     </div>
                 </div>
             </div>

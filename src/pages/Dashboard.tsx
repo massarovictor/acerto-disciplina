@@ -95,7 +95,7 @@ const Dashboard = () => {
       title: 'Relatórios',
       description: 'Documentos e atas',
       icon: FileBarChart,
-      path: '/relatorios',
+      path: '/relatorios-integrados',
       iconBg: 'bg-violet-50 dark:bg-violet-900/20',
       iconColor: 'text-violet-600 dark:text-violet-400',
     },

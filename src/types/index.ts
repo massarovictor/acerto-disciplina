@@ -293,3 +293,23 @@ export interface CreateSavedCertificateEventInput {
   typeMeta?: Record<string, unknown>;
   students: CreateSavedCertificateEventStudentInput[];
 }
+
+export interface UpdateSavedCertificateEventInput {
+  title: string;
+  certificateType: SavedCertificateType;
+  classId?: string;
+  classNameSnapshot: string;
+  schoolYear: 1 | 2 | 3;
+  periodMode: SavedCertificatePeriodMode;
+  selectedQuarters: string[];
+  periodLabel: string;
+  referenceType?: SavedCertificateReferenceType;
+  referenceValue?: string;
+  referenceLabel?: string;
+  baseText: string;
+  teacherName?: string;
+  directorName?: string;
+  signatureMode?: SignatureMode;
+  typeMeta?: Record<string, unknown>;
+  students: CreateSavedCertificateEventStudentInput[];
+}

@@ -5,6 +5,17 @@
 import { supabase } from '@/services/supabase/client';
 import { perfTimer } from '@/lib/perf';
 
+export const SCHOOL_ASSETS_BUCKET = 'school-assets';
+export const SCHOOL_ASSET_MAX_BYTES = 5 * 1024 * 1024;
+export const SCHOOL_ASSET_ALLOWED_MIME_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/svg+xml',
+] as const;
+
+export type SchoolAssetType = 'logo' | 'certificate_frame';
+
 export interface SchoolConfig {
   schoolName: string;
   address?: string;
@@ -16,6 +27,9 @@ export interface SchoolConfig {
   directorName?: string;
   inep?: string; // Código INEP
   logoBase64?: string; // Logo em Base64
+  logoStoragePath?: string; // Logo no Supabase Storage
+  certificateFrameStoragePath?: string; // Moldura lateral no Supabase Storage
+  certificateFrameBase64?: string; // Moldura resolvida para renderização
   signatureBase64?: string; // Assinatura digitalizada em Base64
   themeColor?: string; // Cor principal dos PDFs
   additionalInfo?: string; // Informações adicionais
@@ -24,6 +38,110 @@ export interface SchoolConfig {
 const STORAGE_KEY = 'school_config';
 let schoolConfigCache: SchoolConfig | null = null;
 let schoolConfigInFlight: Promise<SchoolConfig> | null = null;
+
+const sanitizeFileName = (value: string): string => {
+  const normalized = value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return normalized || 'asset';
+};
+
+const ensureAuthenticatedUserId = async (): Promise<string> => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user?.id) {
+    throw new Error('Usuário não autenticado para gerenciar arquivos.');
+  }
+
+  return user.id;
+};
+
+const blobToDataUrl = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Falha ao converter arquivo para Data URL.'));
+    reader.readAsDataURL(blob);
+  });
+
+const validateSchoolAssetFile = (file: File) => {
+  if (file.size > SCHOOL_ASSET_MAX_BYTES) {
+    throw new Error('Arquivo excede o limite de 5MB.');
+  }
+
+  if (!SCHOOL_ASSET_ALLOWED_MIME_TYPES.includes(file.type as (typeof SCHOOL_ASSET_ALLOWED_MIME_TYPES)[number])) {
+    throw new Error('Formato de arquivo inválido. Use PNG, JPG, WEBP ou SVG.');
+  }
+};
+
+export const uploadSchoolAsset = async (
+  type: SchoolAssetType,
+  file: File,
+): Promise<string> => {
+  validateSchoolAssetFile(file);
+  const userId = await ensureAuthenticatedUserId();
+
+  const now = Date.now();
+  const randomToken = Math.random().toString(36).slice(2, 10);
+  const fileName = sanitizeFileName(file.name);
+  const path = `${userId}/${type}/${now}_${randomToken}_${fileName}`;
+
+  const { error } = await supabase.storage
+    .from(SCHOOL_ASSETS_BUCKET)
+    .upload(path, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type || undefined,
+    });
+
+  if (error) {
+    throw new Error(error.message || 'Falha ao enviar arquivo para o Supabase Storage.');
+  }
+
+  return path;
+};
+
+export const removeSchoolAsset = async (path: string): Promise<void> => {
+  const normalizedPath = path.trim();
+  if (!normalizedPath) return;
+
+  await ensureAuthenticatedUserId();
+
+  const { error } = await supabase.storage
+    .from(SCHOOL_ASSETS_BUCKET)
+    .remove([normalizedPath]);
+
+  if (error) {
+    throw new Error(error.message || 'Falha ao remover arquivo do Supabase Storage.');
+  }
+};
+
+export const downloadSchoolAssetAsDataUrl = async (
+  path: string,
+): Promise<string | undefined> => {
+  const normalizedPath = path.trim();
+  if (!normalizedPath) return undefined;
+
+  await ensureAuthenticatedUserId();
+
+  const { data, error } = await supabase.storage
+    .from(SCHOOL_ASSETS_BUCKET)
+    .download(normalizedPath);
+
+  if (error || !data) {
+    return undefined;
+  }
+
+  try {
+    return await blobToDataUrl(data);
+  } catch {
+    return undefined;
+  }
+};
 
 export const getSchoolConfig = async (): Promise<SchoolConfig> => {
   if (typeof window === 'undefined') {
@@ -69,7 +187,21 @@ export const getSchoolConfig = async (): Promise<SchoolConfig> => {
 
     if (data) {
       done({ ok: true, source: 'supabase' });
-      return mapFromDb(data);
+      const mapped = mapFromDb(data);
+      const [logoBase64FromStorage, frameBase64FromStorage] = await Promise.all([
+        mapped.logoStoragePath
+          ? downloadSchoolAssetAsDataUrl(mapped.logoStoragePath)
+          : Promise.resolve(undefined),
+        mapped.certificateFrameStoragePath
+          ? downloadSchoolAssetAsDataUrl(mapped.certificateFrameStoragePath)
+          : Promise.resolve(undefined),
+      ]);
+
+      return {
+        ...mapped,
+        logoBase64: logoBase64FromStorage || mapped.logoBase64,
+        certificateFrameBase64: frameBase64FromStorage || mapped.certificateFrameBase64,
+      };
     }
 
     done({ ok: true, source: 'default' });
@@ -152,7 +284,25 @@ const saveSchoolConfigToLocalStorage = (config: SchoolConfig): void => {
 };
 
 // Mapeamento entre interface TypeScript e banco de dados
-const mapFromDb = (dbRow: any): SchoolConfig => ({
+type SchoolConfigDbRow = {
+  school_name?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  cep?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  director_name?: string | null;
+  inep?: string | null;
+  logo_storage_path?: string | null;
+  certificate_frame_storage_path?: string | null;
+  logo_base64?: string | null;
+  signature_base64?: string | null;
+  theme_color?: string | null;
+  additional_info?: string | null;
+};
+
+const mapFromDb = (dbRow: SchoolConfigDbRow): SchoolConfig => ({
   schoolName: dbRow.school_name || 'INSTITUIÇÃO DE ENSINO',
   address: dbRow.address || '',
   city: dbRow.city || '',
@@ -162,6 +312,8 @@ const mapFromDb = (dbRow: any): SchoolConfig => ({
   email: dbRow.email || '',
   directorName: dbRow.director_name || '',
   inep: dbRow.inep || '',
+  logoStoragePath: dbRow.logo_storage_path || undefined,
+  certificateFrameStoragePath: dbRow.certificate_frame_storage_path || undefined,
   logoBase64: dbRow.logo_base64 || undefined,
   signatureBase64: dbRow.signature_base64 || undefined,
   themeColor: dbRow.theme_color || '#0F172A',
@@ -178,7 +330,9 @@ const mapToDb = (config: SchoolConfig) => ({
   email: config.email || null,
   director_name: config.directorName || null,
   inep: config.inep || null,
-  logo_base64: config.logoBase64 || null,
+  logo_storage_path: config.logoStoragePath || null,
+  certificate_frame_storage_path: config.certificateFrameStoragePath || null,
+  logo_base64: config.logoStoragePath ? null : (config.logoBase64 || null),
   signature_base64: config.signatureBase64 || null,
   theme_color: config.themeColor || '#0F172A',
   additional_info: config.additionalInfo || null,

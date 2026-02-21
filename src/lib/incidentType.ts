@@ -8,6 +8,25 @@ export const isFamilyIncident = (
   incident?: Pick<Incident, "incidentType"> | null,
 ) => incident?.incidentType === "acompanhamento_familiar";
 
+export const filterDisciplinaryIncidents = <
+  T extends Pick<Incident, "incidentType">,
+>(
+  incidents: T[],
+) => incidents.filter((incident) => isDisciplinaryIncident(incident));
+
+export const filterFamilyIncidents = <T extends Pick<Incident, "incidentType">>(
+  incidents: T[],
+) => incidents.filter((incident) => isFamilyIncident(incident));
+
+export const partitionIncidentsByType = <
+  T extends Pick<Incident, "incidentType">,
+>(
+  incidents: T[],
+) => ({
+  disciplinaryIncidents: filterDisciplinaryIncidents(incidents),
+  familyIncidents: filterFamilyIncidents(incidents),
+});
+
 export const getIncidentTypeLabel = (incidentType?: IncidentType | null) => {
   if (incidentType === "acompanhamento_familiar") {
     return "Acompanhamento Familiar";

@@ -21,7 +21,13 @@ import { SavedCertificateEvent, SavedCertificateEventStudent } from '@/types';
 import { Download, Pencil, Save, Search, X } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { type UpdateCertificateEventInput } from '@/hooks/useCertificateEvents';
+
+interface LegacyInlineUpdateInput {
+  title?: string;
+  baseText?: string;
+  teacherName?: string;
+  directorName?: string;
+}
 
 interface SavedCertificateEventDialogProps {
   open: boolean;
@@ -31,7 +37,10 @@ interface SavedCertificateEventDialogProps {
     event: SavedCertificateEvent,
     student: SavedCertificateEventStudent,
   ) => Promise<void>;
-  onUpdateEvent?: (id: string, updates: UpdateCertificateEventInput) => Promise<void>;
+  onUpdateEvent?: (
+    id: string,
+    updates: LegacyInlineUpdateInput,
+  ) => Promise<unknown>;
 }
 
 const HIGHLIGHT_TONE_CLASS: Record<'confirmed' | 'pending', string> = {
@@ -53,7 +62,7 @@ export const SavedCertificateEventDialog = ({
 }: SavedCertificateEventDialogProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [downloadingStudentId, setDownloadingStudentId] = useState<string | null>(null);
-  const [downloadingAll, setDownloadingAll] = useState(false);
+  const [downloadingAll] = useState(false);
 
   // Edit mode states
   const [isEditing, setIsEditing] = useState(false);
@@ -97,14 +106,6 @@ export const SavedCertificateEventDialog = ({
     } finally {
       setDownloadingStudentId(null);
     }
-  };
-
-  const handleDownloadAll = async () => {
-    if (event.students.length === 0) return;
-
-    setDownloadingAll(true);
-    // Aqui reutilizamos o mesmo endpoint de lote na lógica de exportação global
-    // Caso contrário o botão da tabela principal fará o download da turma completa
   };
 
   const handleSaveEdits = async () => {
@@ -195,7 +196,7 @@ export const SavedCertificateEventDialog = ({
                     <strong>Evento:</strong> {typeMeta.eventMeta.eventName}
                   </p>
                   <p>
-                    <strong>Local:</strong> {typeMeta.eventMeta.location}
+                    <strong>Local:</strong> {typeMeta.eventMeta.location || '-'}
                   </p>
                 </div>
               ) : null}
@@ -256,7 +257,7 @@ export const SavedCertificateEventDialog = ({
                         variant="ghost"
                         size="icon"
                         onClick={() => handleDownloadStudent(student)}
-                        disabled={downloadingStudentId === student.id || downloadingAll || downloadingSelected}
+                        disabled={downloadingStudentId === student.id || downloadingAll}
                       >
                         <Download className="h-4 w-4" />
                       </Button>

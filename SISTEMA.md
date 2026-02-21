@@ -123,6 +123,16 @@ Detalhe importante de estabilidade em relatorios:
 - Filtros por serie/turma/disciplina/periodo.
 - Processamento em worker para nao bloquear UI.
 - Cache em IndexedDB.
+- Segmentacao oficial de convivência:
+  - **Convivência Disciplinar**: considera somente `incident_type = disciplinar`.
+  - **Convivência Familiar**: considera somente `incident_type = acompanhamento_familiar`.
+  - A aba de Analytics foi dividida para evitar mistura de contextos.
+  - Sem migracao legada: a separacao ocorre por regra de calculo.
+- Contrato de insights (v2026-02):
+  - Insights de convivência são exibidos em bloco unico por aba (sem duplicacao entre componentes).
+  - Geração baseada em regras acionáveis (pendências críticas, concentração grave, turma fora da curva, piora de tendência).
+  - Coleções de insights são deduplicadas por chave semântica e ordenadas por prioridade.
+  - “Destaques Importantes” do dashboard usa política de evidência mínima para crescimento/queda.
 
 ### 4.8 Trajetoria academica
 - Cruzamento de notas regulares, historicas e externas.
@@ -196,16 +206,17 @@ Layout paisagem com camadas:
    - `hexagons`: grid de hexagonos wireframe (tech/moderno)
    - `diagonal_lines`: riscos finos a 45 graus (minimalista)
 4. **Gradiente de profundidade** vertical sobre a faixa
-5. **Header**: logo da escola ao lado do titulo "CERTIFICADO DE [TIPO]"
-6. **Corpo**: nome do aluno, texto do certificado, data de emissao
-7. **Assinaturas**: cursiva digital acima da linha, nome impresso e subtitulo abaixo
-8. **QR Code**: selo de verificacao no canto superior direito, codigo discreto em fonte 6px
+5. **Moldura lateral opcional** (asset da escola em `school-assets`, aplicado apenas na faixa esquerda)
+6. **Header**: logo da escola ao lado do titulo "CERTIFICADO DE [TIPO]"
+7. **Corpo**: nome do aluno, texto do certificado, data de emissao
+8. **Assinaturas**: cursiva digital acima da linha, nome impresso e subtitulo abaixo
+9. **QR Code**: selo de verificacao no canto superior direito, codigo discreto em fonte 6px
 
 Capacidades de export:
 - Geracao por aluno (`generateCertificateFiles`).
 - Geracao de PDF unico com varias paginas (`generateCombinedCertificatePdf`).
 - Download individual/ZIP (`downloadCertificateFiles`, `downloadCombinedCertificatePdf`).
-- Uso de: logo, assinatura da direcao, assinatura do professor, QR + codigo por aluno.
+- Uso de: logo, moldura lateral (opcional), assinatura da direcao, assinatura do professor, QR + codigo por aluno.
 
 ### 6.4 Templates de texto
 Arquivo: `src/lib/certificateTemplates.ts`
@@ -230,6 +241,24 @@ Capacidades:
 - Fonte: `src/pages/CertificateVerification.tsx`
 - Backend: RPC `public.verify_certificate_code(p_code text)`
 - Resultado esperado: status (`valid`/`revoked`) + dados essenciais do certificado.
+
+### 6.7 Pre-requisito de schema para QR (obrigatorio)
+Para o fluxo atual (sem legado), certificados dependem de:
+- Coluna `verification_code` em `public.certificate_event_students`.
+- Coluna `verification_status` em `public.certificate_event_students`.
+- Funcao `public.verify_certificate_code(text)`.
+
+Migration obrigatoria:
+- `supabase/migrations/2026-02-22_certificate_verification_and_signature.sql`
+
+Sintoma de ambiente desatualizado:
+- Erro `Could not find the 'verification_code' column of 'certificate_event_students' in the schema cache`.
+
+Checklist rapido de troubleshooting:
+1. Aplicar migrations incrementais em ordem no SQL Editor (nao apenas `schema.sql`).
+2. Executar `NOTIFY pgrst, 'reload schema';`.
+3. Confirmar colunas e indices em `information_schema.columns` e `pg_indexes`.
+4. Validar RPC `public.verify_certificate_code`.
 
 ---
 
@@ -272,6 +301,10 @@ Fonte principal consolidada:
 `public.school_config`
 - PK fixa singleton: `id = 00000000-0000-0000-0000-000000000000`
 - Campos centrais: identidade escolar, contato, diretor, logo, assinatura, cor tema.
+- Assets de identidade visual:
+  - `logo_storage_path` (Supabase Storage privado, bucket `school-assets`)
+  - `certificate_frame_storage_path` (moldura lateral de certificados)
+  - Fallback legado de logo em `logo_base64` para compatibilidade.
 
 #### Academico
 
@@ -471,6 +504,10 @@ Papeis em uso:
   - Cria snapshot persistido de certificados + RLS.
 - `2026-02-22_certificate_verification_and_signature.sql`
   - Adiciona assinatura por modo, codigo de verificacao e RPC publica de validacao.
+- `2026-02-23_school_config_storage_paths.sql`
+  - Adiciona paths de Storage para logo e moldura lateral em `school_config`.
+- `2026-02-23_storage_school_assets_bucket.sql`
+  - Cria/configura bucket privado `school-assets` e policies em `storage.objects`.
 
 ---
 
@@ -484,6 +521,10 @@ Arquivo: `src/components/reports/IntegratedReports.tsx`
 ### 10.2 Slides
 Arquivo: `src/components/reports/ClassSlides.tsx`
 - Modos de geracao por recorte (turma, individual, situacao, escola).
+
+### 10.2.1 Tendencia mensal em convivência
+- As series mensais de convivência (disciplinar e familiar) usam `monthLabel` (`MMM/AA`) no eixo X.
+- Motivo: evitar colisoes de rótulo em intervalos que cruzam anos (ex.: Jan/25 vs Jan/26).
 
 ### 10.3 Certificados
 Arquivos principais:

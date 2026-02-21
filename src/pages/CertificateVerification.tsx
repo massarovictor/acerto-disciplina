@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,32 @@ interface CertificateVerificationRow {
 const normalizeVerificationCode = (value: string) =>
   value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
 
+const isLocalhostHost = (host: string): boolean =>
+  host === 'localhost' ||
+  host === '127.0.0.1' ||
+  host === '0.0.0.0' ||
+  host.endsWith('.local');
+
+const isMissingVerifyRpcError = (raw: string): boolean => {
+  const normalized = raw.toLowerCase();
+  return (
+    normalized.includes('verify_certificate_code') &&
+    (normalized.includes('could not find') ||
+      normalized.includes('does not exist') ||
+      normalized.includes('function') ||
+      normalized.includes('schema cache'))
+  );
+};
+
+const isCertificatesSchemaError = (raw: string): boolean => {
+  const normalized = raw.toLowerCase();
+  return (
+    normalized.includes('certificate_event_students') &&
+    normalized.includes('verification_code') &&
+    (normalized.includes('schema cache') || normalized.includes('does not exist'))
+  );
+};
+
 const CERTIFICATE_TYPE_LABEL: Record<string, string> = {
   monitoria: 'Monitoria',
   destaque: 'Aluno Destaque',
@@ -44,10 +70,21 @@ const VerificationStatusBadge = ({ status }: { status: 'valid' | 'revoked' }) =>
   );
 
 const CertificateVerification = () => {
+  const { codigo: codeFromPathParam } = useParams<{ codigo?: string }>();
   const [searchParams] = useSearchParams();
-  const initialCode = useMemo(
-    () => normalizeVerificationCode(searchParams.get('codigo') || ''),
+
+  const codeFromQuery = useMemo(
+    () =>
+      searchParams.get('codigo') ||
+      searchParams.get('code') ||
+      searchParams.get('c') ||
+      '',
     [searchParams],
+  );
+
+  const initialCode = useMemo(
+    () => normalizeVerificationCode(codeFromPathParam || codeFromQuery || ''),
+    [codeFromPathParam, codeFromQuery],
   );
 
   const [codeInput, setCodeInput] = useState(initialCode);
@@ -76,7 +113,20 @@ const CertificateVerification = () => {
       });
 
       if (rpcError) {
-        setError('Não foi possível validar o certificado neste momento.');
+        const rawError = [rpcError.message, rpcError.details, rpcError.hint, rpcError.code]
+          .filter(Boolean)
+          .join(' | ');
+
+        if (isMissingVerifyRpcError(rawError) || isCertificatesSchemaError(rawError)) {
+          setError(
+            "Validação indisponível: schema de certificados desatualizado no Supabase. Aplique a migration 2026-02-22 e execute NOTIFY pgrst, 'reload schema';.",
+          );
+          return;
+        }
+
+        setError(
+          rawError || 'Não foi possível validar o certificado neste momento.',
+        );
         return;
       }
 
@@ -96,6 +146,10 @@ const CertificateVerification = () => {
   }, []);
 
   useEffect(() => {
+    setCodeInput(initialCode);
+  }, [initialCode]);
+
+  useEffect(() => {
     if (!initialCode) return;
     runVerification(initialCode);
   }, [initialCode, runVerification]);
@@ -108,6 +162,20 @@ const CertificateVerification = () => {
   return (
     <div className="min-h-screen bg-muted/30 px-4 py-10">
       <div className="mx-auto max-w-3xl space-y-6">
+        {typeof window !== 'undefined' && isLocalhostHost(window.location.hostname) ? (
+          <Card className="border-amber-300 bg-amber-50">
+            <CardContent className="pt-6 text-xs text-amber-800 space-y-1">
+              <p>
+                Ambiente local detectado: QR lido no celular nao abre `localhost` deste computador.
+              </p>
+              <p>
+                Para validar no celular, use URL publica ou configure `VITE_CERTIFICATE_VERIFICATION_BASE_URL`
+                apontando para um dominio acessivel.
+              </p>
+            </CardContent>
+          </Card>
+        ) : null}
+
         <Card>
           <CardHeader>
             <CardTitle>Validação de Certificado</CardTitle>

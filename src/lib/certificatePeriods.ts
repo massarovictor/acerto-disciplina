@@ -2,6 +2,16 @@ import { QUARTERS } from '@/lib/subjects';
 
 export type CertificatePeriodMode = 'quarters' | 'annual';
 
+const toLowerQuarterLabel = (quarter: string): string =>
+  quarter.replace(/bimestre/gi, 'bimestre');
+
+const joinWithAnd = (items: string[]): string => {
+  if (items.length === 0) return '';
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} e ${items[1]}`;
+  return `${items.slice(0, -1).join(', ')} e ${items[items.length - 1]}`;
+};
+
 export const resolveCertificateQuarters = (
   periodMode: CertificatePeriodMode,
   selectedQuarters: string[],
@@ -21,10 +31,11 @@ export const formatCertificatePeriodLabel = (
   const currentYear = new Date().getFullYear();
 
   if (periodMode === 'annual') {
-    return `Anual (1º ao 4º bimestre) — ${currentYear}`;
+    return `1º ao 4º bimestre de ${currentYear}`;
   }
 
   const resolved = resolveCertificateQuarters(periodMode, selectedQuarters);
-  if (resolved.length === 0) return 'Bimestres não selecionados';
-  return `${resolved.join(', ')} — ${currentYear}`;
+  if (resolved.length === 0) return 'bimestres não selecionados';
+  const normalized = resolved.map(toLowerQuarterLabel);
+  return `${joinWithAnd(normalized)} de ${currentYear}`;
 };

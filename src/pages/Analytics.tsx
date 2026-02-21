@@ -22,6 +22,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -55,13 +56,13 @@ import { StudentRankingPanel } from '@/components/analytics/StudentRankingPanel'
 import { SubjectAnalysisPanel } from '@/components/analytics/SubjectAnalysisPanel';
 import { ClassComparisonDialog } from '@/components/analytics/ClassComparisonDialog';
 import { BehaviorAnalyticsPanel } from '@/components/analytics/BehaviorAnalyticsPanel';
+import { FamilyAnalyticsPanel } from '@/components/analytics/FamilyAnalyticsPanel';
 import { CohortComparisonTable } from '@/components/analytics/CohortComparisonTable';
 import { useUIStore } from '@/stores/useUIStore';
 import { useToast } from '@/hooks/use-toast';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useAnalyticsFiltersLogic } from '@/hooks/useAnalyticsFiltersLogic';
-import { isDisciplinaryIncident } from '@/lib/incidentType';
 
 // Componente de Insights Inline (Neutralizado)
 const InlineInsights = ({
@@ -74,6 +75,27 @@ const InlineInsights = ({
   onAction?: (insight: Insight) => void;
 }) => {
   if (insights.length === 0) return null;
+
+  const isFilterAction = (insight: Insight) => {
+    const actionData = insight.actionData as
+      | {
+        classId?: string;
+        subject?: string;
+        filter?: string;
+        severity?: string[];
+        source?: string;
+      }
+      | undefined;
+
+    if (!actionData) return false;
+    return Boolean(
+      actionData.classId ||
+      actionData.subject ||
+      actionData.filter ||
+      actionData.source ||
+      (Array.isArray(actionData.severity) && actionData.severity.length > 0),
+    );
+  };
 
   return (
     <Card className="border-border/60 shadow-sm">
@@ -111,16 +133,16 @@ const InlineInsights = ({
                 </div>
               </div>
 
-              {insight.actionLabel && onAction && (
+              {insight.actionLabel && onAction && !isFilterAction(insight) && (
                 <div className="pl-9">
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-7 text-xs px-2 -ml-2 text-primary hover:text-primary/80"
                     onClick={() => onAction(insight)}
+                    aria-label={insight.actionLabel}
                   >
                     {insight.actionLabel}
-                    <span className="sr-only">sobre {insight.title}</span>
                   </Button>
                 </div>
               )}
@@ -175,7 +197,7 @@ const SubjectComparisonCard = ({ subjects }: { subjects: SubjectAnalytics[] }) =
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // ... (InlineInsights e SubjectComparisonCard mantidos como estavam ou movidos para arquivos separados futuramente)
-const ANALYTICS_TABS = ['dashboard', 'subjects', 'classes', 'ranking-alunos', 'behavior'] as const;
+const ANALYTICS_TABS = ['dashboard', 'subjects', 'classes', 'ranking-alunos', 'behavior', 'family'] as const;
 type AnalyticsTab = (typeof ANALYTICS_TABS)[number];
 
 const isAnalyticsTab = (value: unknown): value is AnalyticsTab =>
@@ -183,16 +205,14 @@ const isAnalyticsTab = (value: unknown): value is AnalyticsTab =>
 
 const Analytics = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { classes } = useClasses();
   const { students } = useStudents();
   const { professionalSubjects } = useProfessionalSubjects();
   const { templates } = useProfessionalSubjectTemplates();
-  const { analyticsUI, setAnalyticsFilters, setAnalyticsUI } = useUIStore();
+  const { analyticsUI, setAnalyticsFilters, setAnalyticsUI, setIncidentsUI } = useUIStore();
   const filters = analyticsUI.filters as AnalyticsFilters;
   const { incidents } = useIncidents();
-  const disciplinaryIncidents = incidents.filter((incident) =>
-    isDisciplinaryIncident(incident),
-  );
 
   const {
     grades,
@@ -215,7 +235,7 @@ const Analytics = () => {
     classes,
     grades,
     [], // DISABLED: Attendance temporarily removed
-    disciplinaryIncidents,
+    incidents,
     filters
   );
 
@@ -284,7 +304,13 @@ const Analytics = () => {
 
   const handleInsightAction = (insight: Insight) => {
     const actionData = insight.actionData as
-      | { classId?: string; subject?: string; filter?: string }
+      | {
+        classId?: string;
+        subject?: string;
+        filter?: string;
+        severity?: string[];
+        source?: string;
+      }
       | undefined;
     if (!actionData) return;
 
@@ -323,6 +349,54 @@ const Analytics = () => {
       toast({
         title: "Navegando...",
         description: "Exibindo alunos em destaque",
+        duration: 2000,
+      });
+    } else if (actionData.filter === 'open') {
+      setIncidentsUI({
+        activeTab: 'aberta',
+        typeFilter:
+          insight.category === 'family'
+            ? 'acompanhamento_familiar'
+            : 'disciplinar',
+        searchTerm: '',
+      });
+      navigate('/acompanhamentos');
+      toast({
+        title: "Abrindo acompanhamentos",
+        description: "Lista filtrada para casos em aberto.",
+        duration: 2200,
+      });
+      return;
+    }
+
+    if (Array.isArray(actionData.severity) && actionData.severity.length > 0) {
+      const includesSevere =
+        actionData.severity.includes('grave') ||
+        actionData.severity.includes('gravissima');
+      setIncidentsUI({
+        activeTab: 'aberta',
+        typeFilter:
+          insight.category === 'family'
+            ? 'acompanhamento_familiar'
+            : 'disciplinar',
+        searchTerm: includesSevere ? 'grav' : '',
+      });
+      navigate('/acompanhamentos');
+      toast({
+        title: "Abrindo acompanhamentos",
+        description: includesSevere
+          ? "Lista filtrada para casos graves/gravíssimos em aberto."
+          : "Lista filtrada para o recorte selecionado.",
+        duration: 2200,
+      });
+      return;
+    }
+
+    if (actionData.source === 'monthlyTrend') {
+      setActiveTab(insight.category === 'family' ? 'family' : 'behavior');
+      toast({
+        title: "Navegando...",
+        description: "Mostrando a tendência mensal da aba.",
         duration: 2000,
       });
     }
@@ -414,7 +488,7 @@ const Analytics = () => {
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-6">
           <TabsTrigger value="dashboard" className="gap-2">
             <LayoutDashboard className="h-4 w-4" />
             Visão 360º
@@ -433,7 +507,11 @@ const Analytics = () => {
           </TabsTrigger>
           <TabsTrigger value="behavior" className="gap-2">
             <Users2 className="h-4 w-4" />
-            Convivência
+            Convivência Disciplinar
+          </TabsTrigger>
+          <TabsTrigger value="family" className="gap-2">
+            <ClipboardList className="h-4 w-4" />
+            Convivência Familiar
           </TabsTrigger>
         </TabsList>
 
@@ -467,7 +545,7 @@ const Analytics = () => {
           )}
 
           <InlineInsights
-            insights={[...analytics.categorizedInsights.academic, ...analytics.categorizedInsights.risk].slice(0, 3)}
+            insights={analytics.categorizedInsights.dashboard}
             title="Destaques Importantes"
             onAction={handleInsightAction}
           />
@@ -546,7 +624,6 @@ const Analytics = () => {
             <>
               <BehaviorAnalyticsPanel
                 behavioralAnalytics={analytics.behavioralAnalytics}
-                behavioralInsights={analytics.categorizedInsights.behavioral}
               />
               <InlineInsights
                 insights={analytics.categorizedInsights.behavioral}
@@ -560,6 +637,37 @@ const Analytics = () => {
               <h3 className="text-lg font-medium">Filtro de Disciplina Ativo</h3>
               <p className="text-muted-foreground max-w-md">
                 Dados comportamentais são globais e não são filtrados por disciplina específica. Remova o filtro de disciplina para visualizar esta aba.
+              </p>
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={() => handleFilterChange({ subjects: [] })}
+              >
+                Limpar Filtro de Disciplina
+              </Button>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ================= ABA 6: CONVIVÊNCIA FAMILIAR ================= */}
+        <TabsContent value="family" className="space-y-8">
+          {!analyticsContext.hasSubjectFilter ? (
+            <>
+              <FamilyAnalyticsPanel
+                familyAnalytics={analytics.familyAnalytics}
+              />
+              <InlineInsights
+                insights={analytics.categorizedInsights.family}
+                title="Alertas de Convivência Familiar"
+                onAction={handleInsightAction}
+              />
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center p-12 text-center border rounded-lg bg-muted/10">
+              <GraduationCap className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium">Filtro de Disciplina Ativo</h3>
+              <p className="text-muted-foreground max-w-md">
+                Dados de convivência familiar são globais e não são filtrados por disciplina específica. Remova o filtro de disciplina para visualizar esta aba.
               </p>
               <Button
                 variant="outline"

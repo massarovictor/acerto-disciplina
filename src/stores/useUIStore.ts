@@ -28,7 +28,7 @@ interface IncidentsUIState {
 }
 
 interface AnalyticsUIState {
-    activeTab: 'dashboard' | 'subjects' | 'classes' | 'ranking-alunos' | 'behavior';
+    activeTab: 'dashboard' | 'subjects' | 'classes' | 'ranking-alunos' | 'behavior' | 'family';
     filters: {
         series: string[];
         classIds: string[];
@@ -52,10 +52,6 @@ interface ClassesUIState {
 
 interface GradesAttendanceUIState {
     activeTab: string;
-}
-
-interface ReportsUIState {
-    activeTab: 'integrated' | 'slides' | 'certificates';
 }
 
 interface TrajectoryUIState {
@@ -89,9 +85,6 @@ interface UIState {
     // GradesAttendance page
     gradesAttendanceUI: GradesAttendanceUIState;
 
-    // Reports page
-    reportsUI: ReportsUIState;
-
     // Trajectory page
     trajectoryUI: TrajectoryUIState;
 
@@ -119,10 +112,6 @@ interface UIState {
     // Actions - GradesAttendance
     setGradesAttendanceUI: (data: Partial<GradesAttendanceUIState>) => void;
     resetGradesAttendanceUI: () => void;
-
-    // Actions - Reports
-    setReportsUI: (data: Partial<ReportsUIState>) => void;
-    resetReportsUI: () => void;
 
     // Actions - Trajectory
     setTrajectoryUI: (data: Partial<TrajectoryUIState>) => void;
@@ -179,10 +168,6 @@ const initialGradesAttendanceUI: GradesAttendanceUIState = {
     activeTab: 'grades',
 };
 
-const initialReportsUI: ReportsUIState = {
-    activeTab: 'integrated',
-};
-
 const initialTrajectoryUI: TrajectoryUIState = {
     viewMode: 'individual',
     selectedClassId: '',
@@ -207,7 +192,6 @@ export const useUIStore = create<UIState>()(
             analyticsUI: initialAnalyticsUI,
             classesUI: initialClassesUI,
             gradesAttendanceUI: initialGradesAttendanceUI,
-            reportsUI: initialReportsUI,
             trajectoryUI: initialTrajectoryUI,
 
             // Actions - Grades
@@ -264,14 +248,6 @@ export const useUIStore = create<UIState>()(
                 })),
             resetGradesAttendanceUI: () =>
                 set({ gradesAttendanceUI: initialGradesAttendanceUI }),
-
-            // Actions - Reports
-            setReportsUI: (data) =>
-                set((state) => ({
-                    reportsUI: { ...state.reportsUI, ...data },
-                })),
-            resetReportsUI: () =>
-                set({ reportsUI: initialReportsUI }),
 
             // Actions - Trajectory
             setTrajectoryUI: (data) =>

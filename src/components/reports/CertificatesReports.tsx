@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -16,26 +16,37 @@ import {
   sanitizeCertificateFileToken,
 } from '@/lib/certificateEventTypes';
 import {
+  downloadCombinedCertificatePdf,
   downloadCertificateFiles,
   generateCertificateFiles,
 } from '@/lib/certificatePdfExport';
 import { getBrasiliaISODate } from '@/lib/brasiliaDate';
-import { Class, CreateSavedCertificateEventInput, SavedCertificateEvent, SavedCertificateEventStudent, Student } from '@/types';
-import { Award, CalendarCheck, ClipboardCheck, Medal, Plus } from 'lucide-react';
+import {
+  Class,
+  CreateSavedCertificateEventInput,
+  SavedCertificateEvent,
+  SavedCertificateEventStudent,
+  Student,
+  UpdateSavedCertificateEventInput,
+} from '@/types';
 import { CertificatesErrorBoundary } from './certificates/CertificatesErrorBoundary';
 import { UnifiedCertificateDialog } from './certificates/UnifiedCertificateDialog';
-import { SavedCertificateEventDialog } from './certificates/SavedCertificateEventDialog';
 import { SavedCertificateEventsTable } from './certificates/SavedCertificateEventsTable';
+
+const CERTIFICATES_SCHEMA_BLOCK_REASON =
+  "Schema de certificados desatualizado no Supabase. Aplique a migration 2026-02-22 e execute NOTIFY pgrst, 'reload schema'; para reativar emissão, edição e download.";
 
 interface CertificatesReportsProps {
   classes: Class[];
   students: Student[];
   enabled?: boolean;
+  createRequestNonce?: number;
 }
 
 const CertificatesReportsContent = ({
   classes,
   students,
+  createRequestNonce,
 }: CertificatesReportsProps) => {
   const { profile } = useAuth();
   const { toast } = useToast();
@@ -44,34 +55,66 @@ const CertificatesReportsContent = ({
     events,
     loading,
     error,
+    schemaStatus,
+    schemaErrorMessage,
     createCertificateEventWithStudents,
     updateCertificateEvent,
     deleteCertificateEvent,
   } = useCertificateEvents();
 
-  // Novo Dialog Unificado
   const [showUnifiedDialog, setShowUnifiedDialog] = useState(false);
-  const [detailEvent, setDetailEvent] = useState<SavedCertificateEvent | null>(null);
+  const [editingEvent, setEditingEvent] = useState<SavedCertificateEvent | null>(null);
+  const lastCreateRequestRef = useRef<number | undefined>(createRequestNonce);
 
   useEffect(() => {
-    if (!detailEvent?.id) return;
+    if (!editingEvent?.id) return;
 
-    const updatedEvent = events.find((event) => event.id === detailEvent.id) || null;
-    setDetailEvent((current) => {
+    const updatedEvent = events.find((event) => event.id === editingEvent.id) || null;
+    setEditingEvent((current) => {
       if (!current) return current;
       if (!updatedEvent) return null;
       if (current.id !== updatedEvent.id) return current;
       return updatedEvent;
     });
-  }, [events, detailEvent?.id]);
+  }, [events, editingEvent?.id]);
 
   const isAdmin = profile?.role === 'admin';
+  const schemaIncompatible = schemaStatus === 'incompatible';
+  const schemaBlockMessage = schemaErrorMessage || CERTIFICATES_SCHEMA_BLOCK_REASON;
+
+  useEffect(() => {
+    if (!schemaIncompatible) return;
+    setShowUnifiedDialog(false);
+    setEditingEvent(null);
+  }, [schemaIncompatible]);
+
+  useEffect(() => {
+    if (createRequestNonce === undefined) return;
+    if (createRequestNonce === lastCreateRequestRef.current) return;
+    lastCreateRequestRef.current = createRequestNonce;
+
+    if (schemaIncompatible) {
+      toast({
+        variant: 'destructive',
+        title: 'Schema incompatível',
+        description: schemaBlockMessage,
+      });
+      return;
+    }
+
+    setEditingEvent(null);
+    setShowUnifiedDialog(true);
+  }, [createRequestNonce, schemaBlockMessage, schemaIncompatible, toast]);
 
   const downloadEventStudents = async (
     event: SavedCertificateEvent,
     studentsSubset?: SavedCertificateEventStudent[],
     options?: { forceZip?: boolean; zipName?: string; successMessage?: string },
   ) => {
+    if (schemaIncompatible) {
+      throw new Error(schemaBlockMessage);
+    }
+
     const exportInput = buildExportInputFromSavedCertificateEvent(event, studentsSubset);
     const files = await generateCertificateFiles(exportInput);
 
@@ -97,10 +140,22 @@ const CertificatesReportsContent = ({
   };
 
   const handleCreateSavedEvent = async (input: CreateSavedCertificateEventInput) => {
+    if (schemaIncompatible) {
+      throw new Error(schemaBlockMessage);
+    }
     return createCertificateEventWithStudents(input);
   };
 
   const handleDeleteSavedEvent = async (event: SavedCertificateEvent) => {
+    if (schemaIncompatible) {
+      toast({
+        variant: 'destructive',
+        title: 'Schema incompatível',
+        description: schemaBlockMessage,
+      });
+      return;
+    }
+
     try {
       await deleteCertificateEvent(event.id);
       toast({
@@ -117,11 +172,33 @@ const CertificatesReportsContent = ({
     }
   };
 
-  const handleDownloadEvent = async (event: SavedCertificateEvent) => {
+  const handleDownloadEvent = async (
+    event: SavedCertificateEvent,
+    mode: 'zip_individual' | 'pdf_unico',
+  ) => {
+    if (schemaIncompatible) {
+      toast({
+        variant: 'destructive',
+        title: 'Schema incompatível',
+        description: schemaBlockMessage,
+      });
+      return;
+    }
+
     try {
+      if (mode === 'pdf_unico') {
+        const exportInput = buildExportInputFromSavedCertificateEvent(event);
+        await downloadCombinedCertificatePdf(exportInput);
+        toast({
+          title: 'Download concluído',
+          description: `PDF único de "${event.title}" baixado com sucesso.`,
+        });
+        return;
+      }
+
       await downloadEventStudents(event, undefined, {
-        forceZip: event.students.length > 1,
-        successMessage: `Arquivos de "${event.title}" baixados com sucesso.`,
+        forceZip: true,
+        successMessage: `ZIP de "${event.title}" baixado com sucesso.`,
       });
     } catch (downloadError) {
       console.error('Erro ao baixar evento salvo:', downloadError);
@@ -133,132 +210,87 @@ const CertificatesReportsContent = ({
     }
   };
 
-  const handleDownloadStudent = async (
-    event: SavedCertificateEvent,
-    student: SavedCertificateEventStudent,
+  const handleUpdateSavedEvent = async (
+    eventId: string,
+    input: UpdateSavedCertificateEventInput,
   ) => {
-    try {
-      await downloadEventStudents(event, [student], {
-        forceZip: false,
-        successMessage: `Certificado de ${student.studentNameSnapshot} baixado.`,
-      });
-    } catch (downloadError) {
-      console.error('Erro ao baixar certificado individual:', downloadError);
-      toast({
-        variant: 'destructive',
-        title: 'Erro no download',
-        description: 'Não foi possível baixar o certificado do aluno.',
-      });
+    if (schemaIncompatible) {
+      throw new Error(schemaBlockMessage);
     }
-  };
-
-  const handleDownloadStudentsFromDetail = async (
-    event: SavedCertificateEvent,
-    studentsSubset: SavedCertificateEventStudent[],
-  ) => {
-    try {
-      await downloadEventStudents(event, studentsSubset, {
-        forceZip: studentsSubset.length > 1,
-        successMessage:
-          studentsSubset.length === event.students.length
-            ? `Todos os certificados de "${event.title}" foram baixados.`
-            : `Subset com ${studentsSubset.length} aluno(s) baixado com sucesso.`,
-      });
-    } catch (downloadError) {
-      console.error('Erro ao baixar subset de alunos:', downloadError);
-      toast({
-        variant: 'destructive',
-        title: 'Erro no download',
-        description: 'Não foi possível baixar a seleção de alunos.',
-      });
-    }
-  };
-
-  const handleDownloadSelectedEvents = async (selectedEvents: SavedCertificateEvent[]) => {
-    const dateToken = getBrasiliaISODate(new Date());
 
     try {
-      const filesToZip = [] as Awaited<ReturnType<typeof generateCertificateFiles>>;
-
-      for (const event of selectedEvents) {
-        const exportInput = buildExportInputFromSavedCertificateEvent(event);
-        const generatedFiles = await generateCertificateFiles(exportInput);
-        const eventToken = sanitizeCertificateFileToken(event.title || 'evento');
-        const eventDateToken = getBrasiliaISODate(event.createdAt);
-        const folderPath = `${eventToken}_${eventDateToken || dateToken}`;
-
-        generatedFiles.forEach((file) => {
-          filesToZip.push({
-            ...file,
-            folderPath,
-          });
-        });
-      }
-
-      await downloadCertificateFiles(filesToZip, {
-        forceZip: true,
-        zipFileName: `Certificados_lista_${dateToken}.zip`,
-      });
+      const updated = await updateCertificateEvent(eventId, input);
 
       toast({
-        title: 'Download em lote concluído',
-        description: `${selectedEvents.length} evento(s) foram exportados em um único ZIP.`,
+        title: 'Certificado atualizado',
+        description: `O evento "${updated.title}" foi atualizado com sucesso.`,
       });
-    } catch (downloadError) {
-      console.error('Erro no download em lote de eventos:', downloadError);
+      return updated;
+    } catch (updateError) {
+      console.error('Erro ao atualizar evento salvo:', updateError);
       toast({
         variant: 'destructive',
-        title: 'Erro no download em lote',
-        description: 'Não foi possível gerar o ZIP da lista selecionada.',
+        title: 'Erro ao atualizar',
+        description: 'Não foi possível salvar as alterações do certificado.',
       });
+      throw updateError;
     }
   };
 
   return (
     <>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2 mt-[-10px]">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Emissão de Certificados</h2>
-          <p className="text-muted-foreground text-sm mt-1">
-            Gere, gerencie e valide os certificados emitidos pela escola.
-          </p>
-        </div>
-        <Button
-          className="shadow-sm"
-          onClick={() => setShowUnifiedDialog(true)}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Emitir Certificados
-        </Button>
-      </div>
+      {schemaIncompatible ? (
+        <Card className="border-destructive/40 bg-destructive/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-destructive">
+              Certificados temporariamente bloqueados
+            </CardTitle>
+            <CardDescription className="text-destructive/90">
+              {schemaBlockMessage}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-xs text-destructive/90 space-y-1">
+            <p>Ordem recomendada no SQL Editor:</p>
+            <p>1. `2026-02-21_certificate_events.sql` (se necessário)</p>
+            <p>2. `2026-02-22_certificate_verification_and_signature.sql`</p>
+            <p>3. `NOTIFY pgrst, 'reload schema';`</p>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="space-y-4">
         <SavedCertificateEventsTable
           events={events}
           loading={loading}
-          error={error}
+          error={schemaIncompatible ? null : error}
           isAdmin={isAdmin}
-          onOpenDetails={setDetailEvent}
+          actionsDisabled={schemaIncompatible}
+          actionsDisabledReason={schemaBlockMessage}
+          onEditEvent={(event) => {
+            if (schemaIncompatible) return;
+            setEditingEvent(event);
+            setShowUnifiedDialog(true);
+          }}
           onDownloadEvent={handleDownloadEvent}
           onDeleteEvent={handleDeleteSavedEvent}
         />
       </div>
 
-      <UnifiedCertificateDialog
-        open={showUnifiedDialog}
-        onOpenChange={setShowUnifiedDialog}
-        classes={classes}
-        students={students}
-        onSaveEvent={handleCreateSavedEvent}
-      />
-
-      <SavedCertificateEventDialog
-        open={!!detailEvent}
-        onOpenChange={(open) => !open && setDetailEvent(null)}
-        event={detailEvent}
-        onDownloadStudent={handleDownloadStudent}
-        onUpdateEvent={updateCertificateEvent}
-      />
+      {!schemaIncompatible ? (
+        <UnifiedCertificateDialog
+          open={showUnifiedDialog}
+          onOpenChange={(open) => {
+            setShowUnifiedDialog(open);
+            if (!open) setEditingEvent(null);
+          }}
+          mode={editingEvent ? 'edit' : 'create'}
+          initialEvent={editingEvent || undefined}
+          classes={classes}
+          students={students}
+          onSaveEvent={handleCreateSavedEvent}
+          onSubmitEdit={handleUpdateSavedEvent}
+        />
+      ) : null}
     </>
   );
 };

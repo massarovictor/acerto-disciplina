@@ -18,13 +18,13 @@ export interface CertificateTemplateData {
 
 const CERTIFICATE_TEMPLATES: Record<CertificateType, string> = {
   monitoria:
-    'Certificamos que {{aluno}}, da turma {{turma}}, atuou na monitoria de {{referencia}} {{periodoMonitoria}}, totalizando {{cargaHoraria}} horas.',
+    'A {{escola}} certifica que o(a) aluno(a) {{aluno}}, da turma {{turma}}, atuou como monitor(a){{referencia}}, realizando {{atividade}} {{periodoMonitoria}}, totalizando {{cargaHoraria}} horas.',
   destaque:
-    'Certificamos que {{aluno}}, da turma {{turma}}, foi reconhecido(a) pelo excelente desempenho no período {{periodo}}{{referencia}}, demonstrando compromisso exemplar com os estudos.',
+    'A {{escola}} certifica que o(a) aluno(a) {{aluno}}, da turma {{turma}}, foi reconhecido(a) pelo excelente desempenho {{periodo}}{{referencia}}, demonstrando compromisso exemplar com os estudos.',
   evento_participacao:
-    'Certificamos que {{aluno}} participou do evento "{{eventoNome}}", realizado em {{eventoData}}, com carga horária de {{cargaHoraria}} horas{{eventoPapel}}{{referencia}}.',
+    'A {{escola}} certifica que o(a) aluno(a) {{aluno}}, da turma {{turma}}, participou do evento "{{eventoNome}}"{{eventoPapel}}{{referencia}}, realizado em {{eventoData}}, com carga horária de {{cargaHoraria}} horas.',
   evento_organizacao:
-    'Certificamos que {{aluno}} atuou no evento "{{eventoNome}}"{{eventoPapel}}, realizado em {{eventoData}}, com carga horária de {{cargaHoraria}} horas{{referencia}}.',
+    'A {{escola}} certifica que o(a) aluno(a) {{aluno}}, da turma {{turma}}, atuou na organização do evento "{{eventoNome}}"{{eventoPapel}}{{referencia}}, realizado em {{eventoData}}, com carga horária de {{cargaHoraria}} horas.',
 };
 
 export const getCertificateTemplate = (certificateType: CertificateType): string =>
@@ -34,6 +34,11 @@ const normalizeTemplateValue = (value?: string | null): string => {
   const text = (value || '').trim();
   return text;
 };
+
+const normalizeTemplateFragment = (value?: string | null): string =>
+  (value || '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+$/g, '');
 
 export const applyCertificateTemplate = (
   template: string,
@@ -45,14 +50,14 @@ export const applyCertificateTemplate = (
     turma: normalizeTemplateValue(data.turma),
     anoTurma: normalizeTemplateValue(data.anoTurma),
     periodo: normalizeTemplateValue(data.periodo),
-    referencia: normalizeTemplateValue(data.referencia),
+    referencia: normalizeTemplateFragment(data.referencia),
     cargaHoraria: normalizeTemplateValue(data.cargaHoraria),
     atividade: normalizeTemplateValue(data.atividade),
     periodoMonitoria: normalizeTemplateValue(data.periodoMonitoria),
     eventoNome: normalizeTemplateValue(data.eventoNome),
     eventoData: normalizeTemplateValue(data.eventoData),
     eventoLocal: normalizeTemplateValue(data.eventoLocal),
-    eventoPapel: normalizeTemplateValue(data.eventoPapel),
+    eventoPapel: normalizeTemplateFragment(data.eventoPapel),
   };
 
   let resolved = template;

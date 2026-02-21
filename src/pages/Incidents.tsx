@@ -129,6 +129,10 @@ const Incidents = () => {
       const lowerSearch = searchTerm.toLowerCase();
       filtered = filtered.filter(incident => {
         const incidentClass = classMap.get(incident.classId);
+        const severityLabel = getIncidentSeverityLabel(
+          incident.finalSeverity,
+          incident.incidentType,
+        ).toLowerCase();
         // Check if ANY student in the incident matches
         const studentMatch = incident.studentIds.some(id =>
           studentMap.get(id)?.name.toLowerCase().includes(lowerSearch)
@@ -137,7 +141,9 @@ const Incidents = () => {
         return (
           incidentClass?.name.toLowerCase().includes(lowerSearch) ||
           incident.description?.toLowerCase().includes(lowerSearch) ||
-          studentMatch
+          studentMatch ||
+          incident.finalSeverity.toLowerCase().includes(lowerSearch) ||
+          severityLabel.includes(lowerSearch)
         );
       });
     }

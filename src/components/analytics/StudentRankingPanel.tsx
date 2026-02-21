@@ -3,7 +3,6 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -60,7 +59,6 @@ export function StudentRankingPanel({
   activeSubjects = [],
   filters,
 }: StudentRankingPanelProps) {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const { setTrajectoryUI } = useUIStore();
   const [openTopRanking, setOpenTopRanking] = useState(false);
@@ -87,7 +85,6 @@ export function StudentRankingPanel({
     (studentAnalytics: StudentAnalytics) => {
       const student = studentAnalytics.student;
       const params = new URLSearchParams();
-      params.set('tab', 'slides');
       params.set('view', 'individual');
       params.set('classId', student.classId);
       params.set('studentId', student.id);
@@ -110,7 +107,7 @@ export function StudentRankingPanel({
         }
       }
 
-      window.open(`/relatorios?${params.toString()}`, '_blank');
+      window.open(`/slides?${params.toString()}`, '_blank');
     },
     [filters],
   );

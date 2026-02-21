@@ -129,6 +129,70 @@ Indicadores visuais de estado.
 - Sempre use `ScrollArea` se a lista puder crescer indefinidamente.
 - Mostre "Empty States" (estados vazios) amigáveis quando não houver dados ("Nenhuma ocorrência registrada hoje" + Ícone).
 
+### 4.4. Padrão de Filtros (Obrigatório)
+Para páginas com busca/filtro (ex: **Turmas**, **Alunos**, **Certificados**), usar sempre o mesmo bloco:
+
+1. Card de filtro com estrutura:
+   - `CardHeader` com fundo suave: `bg-muted/20`, borda inferior e título curto.
+   - Título fixo: **"Filtrar e Buscar"** com ícone `Search` (`h-4 w-4`).
+   - `CardContent` com inputs/filtros.
+2. Layout responsivo:
+   - Mobile: coluna (`flex-col`), Desktop: linha (`md:flex-row`).
+   - Gap padrão: `gap-4`.
+3. Campo de busca:
+   - Ícone dentro do input, alinhado à esquerda.
+   - Classe recomendada: input com `pl-10`.
+4. Selects:
+   - Largura consistente: `w-full md:w-64`.
+5. Ações auxiliares (ex: exportar):
+   - Botão `outline` no mesmo bloco de filtros, à direita no desktop.
+
+Objetivo: previsibilidade de UX entre módulos operacionais.
+
+### 4.5. Padrão de Lista Operacional em Cards
+Para listagens operacionais (ex: **Acompanhamentos Resolvidos** e **Certificados Emitidos**):
+
+1. Item em card clicável com:
+   - borda + `shadow-sm`
+   - hover: `hover:border-primary/30 hover:bg-muted/30`
+   - estrutura: marcador visual + conteúdo + ações.
+2. Hierarquia de conteúdo:
+   - Linha 1: título principal + badges de contexto (tipo/status/período).
+   - Linha 2: metadados compactos separados por `•` (ex: turma, quantidade, data).
+   - Linha 3 (opcional): descrição curta com `line-clamp-2`.
+3. Ações por ícone (padrão):
+   - Botões `ghost`, tamanho `h-8 w-8 p-0`.
+   - Sem texto visível; usar `title` + `sr-only` para acessibilidade.
+   - Ordem recomendada: abrir/editar, baixar, excluir.
+4. Header da seção:
+   - Título da listagem + subtítulo curto orientado à ação.
+
+### 4.6. Segmentação de Convivência no Analytics
+Para evitar distorção de métricas após introdução de novos tipos de acompanhamento:
+
+1. **Convivência Disciplinar**:
+   - Usa apenas registros `incident_type = disciplinar`.
+   - Alimenta indicadores de comportamento escolar, risco e correlação acadêmica.
+2. **Convivência Familiar**:
+   - Usa apenas registros `incident_type = acompanhamento_familiar`.
+   - Exibida em aba própria no Analytics.
+3. **Regra obrigatória de produto**:
+   - Nunca misturar disciplinar e familiar em KPIs analíticos principais.
+   - Cada trilha possui card, ranking, tendência mensal e insights próprios.
+4. **Tendência Mensal (6 meses)**:
+   - Usar rótulo único por eixo (`MMM/AA`, ex.: `Fev/26`) para evitar colisão visual na virada de ano.
+5. **Insights (contrato obrigatório)**:
+   - Cada aba exibe **um único bloco** de insights (sem duplicação entre painel e rodapé).
+   - Insights devem ser **acionáveis**: conter situação observada, impacto e ação sugerida.
+   - Insights são ordenados por prioridade e deduplicados por chave semântica.
+   - Métricas cosméticas (ex.: texto genérico de média por aluno sem contexto) não devem gerar insight.
+6. **Dashboard - Destaques Importantes**:
+   - Mostrar highlights de crescimento/queda apenas com evidência mínima:
+     - pelo menos 3 pontos temporais válidos
+     - variação absoluta mínima relevante
+     - base mínima de estudantes/notas
+   - Sem evidência suficiente, o bloco pode ficar vazio (sem mensagem fraca).
+
 ---
 
 ## 5. Acessibilidade (A11y)

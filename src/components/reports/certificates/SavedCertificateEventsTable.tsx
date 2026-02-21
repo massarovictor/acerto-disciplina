@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
   AlertDialog,
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -20,32 +21,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
 import { CERTIFICATE_TYPE_LABEL, CERTIFICATE_TYPE_ORDER } from '@/lib/certificateEventTypes';
 import { formatBrasiliaDateTime } from '@/lib/brasiliaDate';
 import { SavedCertificateEvent, SavedCertificateType } from '@/types';
-import { Download, Eye, Pencil, Trash2 } from 'lucide-react';
+import { Download, Pencil, Search, Trash2 } from 'lucide-react';
 
 interface SavedCertificateEventsTableProps {
   events: SavedCertificateEvent[];
   loading: boolean;
   error?: string | null;
   isAdmin: boolean;
-  onOpenDetails: (event: SavedCertificateEvent, editMode?: boolean) => void;
-  onDownloadEvent: (event: SavedCertificateEvent) => Promise<void>;
+  actionsDisabled?: boolean;
+  actionsDisabledReason?: string;
+  onEditEvent: (event: SavedCertificateEvent) => void;
+  onDownloadEvent: (
+    event: SavedCertificateEvent,
+    mode: 'zip_individual' | 'pdf_unico',
+  ) => Promise<void>;
   onDeleteEvent: (event: SavedCertificateEvent) => Promise<void>;
 }
 
@@ -54,15 +46,24 @@ export const SavedCertificateEventsTable = ({
   loading,
   error,
   isAdmin,
-  onOpenDetails,
+  actionsDisabled = false,
+  actionsDisabledReason,
+  onEditEvent,
   onDownloadEvent,
   onDeleteEvent,
 }: SavedCertificateEventsTableProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | SavedCertificateType>('all');
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadEvent, setDownloadEvent] = useState<SavedCertificateEvent | null>(null);
   const [deletingEvent, setDeletingEvent] = useState<SavedCertificateEvent | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!actionsDisabled) return;
+    setDownloadEvent(null);
+    setDeletingEvent(null);
+  }, [actionsDisabled]);
 
   const filteredEvents = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -80,24 +81,31 @@ export const SavedCertificateEventsTable = ({
     });
   }, [events, searchTerm, typeFilter]);
 
-  const groupedEvents = useMemo(() => {
-    return CERTIFICATE_TYPE_ORDER.map((type) => ({
-      type,
-      events: filteredEvents.filter((event) => event.certificateType === type),
-    })).filter((group) => group.events.length > 0 || typeFilter === group.type);
-  }, [filteredEvents, typeFilter]);
+  const sortedEvents = useMemo(
+    () =>
+      [...filteredEvents].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      ),
+    [filteredEvents],
+  );
 
-  const handleDownloadEvent = async (event: SavedCertificateEvent) => {
+  const handleDownloadEvent = async (
+    event: SavedCertificateEvent,
+    mode: 'zip_individual' | 'pdf_unico',
+  ) => {
+    if (actionsDisabled) return;
+
     setDownloadingId(event.id);
     try {
-      await onDownloadEvent(event);
+      await onDownloadEvent(event, mode);
     } finally {
       setDownloadingId(null);
+      setDownloadEvent(null);
     }
   };
 
   const handleDeleteEvent = async () => {
-    if (!deletingEvent) return;
+    if (!deletingEvent || actionsDisabled) return;
 
     setDeletingId(deletingEvent.id);
     try {
@@ -111,32 +119,58 @@ export const SavedCertificateEventsTable = ({
   return (
     <>
       <div className="space-y-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
-          <Input
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Buscar por nome do evento ou turma"
-            className="md:max-w-md"
-          />
-          <Select
-            value={typeFilter}
-            onValueChange={(value) => setTypeFilter(value as 'all' | SavedCertificateType)}
-          >
-            <SelectTrigger className="md:w-[240px]">
-              <SelectValue placeholder="Filtrar por tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os tipos</SelectItem>
-              {CERTIFICATE_TYPE_ORDER.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {CERTIFICATE_TYPE_LABEL[type]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Card>
+          <CardHeader className="pb-3 border-b bg-muted/20">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Search className="h-4 w-4" />
+                Filtrar e Buscar
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Buscar por nome do evento ou turma..."
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <div className="w-full md:w-64">
+                <Select
+                  value={typeFilter}
+                  onValueChange={(value) => setTypeFilter(value as 'all' | SavedCertificateType)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filtrar por tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os tipos</SelectItem>
+                    {CERTIFICATE_TYPE_ORDER.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {CERTIFICATE_TYPE_LABEL[type]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="rounded-md border p-3">
+          <div className="border-b border-border/60 pb-3 mb-3">
+            <h3 className="text-base font-semibold text-foreground">Certificados Emitidos</h3>
+            <p className="text-xs text-muted-foreground">
+              Visualize, edite, baixe ou exclua certificados salvos.
+            </p>
+          </div>
+
           {loading ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
               Carregando certificados salvos...
@@ -148,89 +182,114 @@ export const SavedCertificateEventsTable = ({
               Nenhum certificado salvo encontrado.
             </div>
           ) : (
-            <Accordion type="multiple" defaultValue={groupedEvents.map((group) => group.type)}>
-              {groupedEvents.map((group) => (
-                <AccordionItem key={group.type} value={group.type}>
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">{CERTIFICATE_TYPE_LABEL[group.type]}</span>
-                      <Badge variant="secondary">{group.events.length}</Badge>
+            <div className="space-y-3">
+              {sortedEvents.map((event) => (
+                <div
+                  key={event.id}
+                  className="flex items-start gap-4 p-4 border rounded-lg hover:border-primary/30 hover:bg-muted/30 transition-all bg-card shadow-sm cursor-pointer group"
+                  onClick={() => {
+                    if (actionsDisabled) return;
+                    onEditEvent(event);
+                  }}
+                >
+                  <div className="mt-1.5 w-2.5 h-2.5 rounded-full bg-primary shadow-sm" />
+
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className="font-medium text-foreground">{event.title}</span>
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5">
+                        {CERTIFICATE_TYPE_LABEL[event.certificateType]}
+                      </Badge>
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5">
+                        {event.periodLabel}
+                      </Badge>
                     </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Nome</TableHead>
-                            <TableHead>Turma</TableHead>
-                            <TableHead>Alunos</TableHead>
-                            <TableHead>Criado em</TableHead>
-                            {isAdmin ? <TableHead>Autor</TableHead> : null}
-                            <TableHead className="text-right">Ações</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {group.events.map((event) => (
-                            <TableRow key={event.id}>
-                              <TableCell className="font-medium">{event.title}</TableCell>
-                              <TableCell>{event.classNameSnapshot}</TableCell>
-                              <TableCell>{event.studentsCount}</TableCell>
-                              <TableCell>{formatBrasiliaDateTime(event.createdAt)}</TableCell>
-                              {isAdmin ? <TableCell>{event.createdByName}</TableCell> : null}
-                              <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-1">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => onOpenDetails(event)}
-                                    title="Visualizar detalhes"
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => onOpenDetails(event, true)}
-                                    title="Editar certificado"
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleDownloadEvent(event)}
-                                    disabled={downloadingId === event.id}
-                                    title="Baixar todos (ZIP ou PDF)"
-                                  >
-                                    <Download className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => setDeletingEvent(event)}
-                                    disabled={deletingId === event.id}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                      <span className="font-medium text-foreground/80">
+                        {event.classNameSnapshot || 'Turma N/A'}
+                      </span>
+                      <span>•</span>
+                      <span>{event.studentsCount} aluno(s)</span>
+                      <span>•</span>
+                      <span>{formatBrasiliaDateTime(event.createdAt)}</span>
+                      {isAdmin && event.createdByName ? (
+                        <>
+                          <span>•</span>
+                          <span>por {event.createdByName}</span>
+                        </>
+                      ) : null}
                     </div>
-                  </AccordionContent>
-                </AccordionItem>
+
+                    {event.referenceLabel ? (
+                      <p className="text-sm text-muted-foreground/90 line-clamp-2 mt-1.5 leading-relaxed">
+                        Referência: {event.referenceLabel}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="flex gap-2 self-center ml-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={(clickEvent) => {
+                        clickEvent.stopPropagation();
+                        if (actionsDisabled) return;
+                        onEditEvent(event);
+                      }}
+                      disabled={actionsDisabled}
+                      title="Abrir detalhes"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      <span className="sr-only">Abrir detalhes</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={(clickEvent) => {
+                        clickEvent.stopPropagation();
+                        if (actionsDisabled || downloadingId === event.id) return;
+                        setDownloadEvent(event);
+                      }}
+                      disabled={actionsDisabled || downloadingId === event.id}
+                      title="Baixar certificados"
+                    >
+                      <Download className="h-4 w-4" />
+                      <span className="sr-only">Baixar certificados</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={(clickEvent) => {
+                        clickEvent.stopPropagation();
+                        if (actionsDisabled || deletingId === event.id) return;
+                        setDeletingEvent(event);
+                      }}
+                      disabled={actionsDisabled || deletingId === event.id}
+                      title="Excluir"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span className="sr-only">Excluir</span>
+                    </Button>
+                  </div>
+                </div>
               ))}
-            </Accordion>
+            </div>
           )}
         </div>
       </div>
+
+      {actionsDisabled && actionsDisabledReason ? (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          {actionsDisabledReason}
+        </div>
+      ) : null}
 
       <AlertDialog open={!!deletingEvent} onOpenChange={(open) => !open && setDeletingEvent(null)}>
         <AlertDialogContent>
@@ -241,15 +300,49 @@ export const SavedCertificateEventsTable = ({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={actionsDisabled}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={(event) => {
                 event.preventDefault();
                 handleDeleteEvent();
               }}
-              disabled={!deletingEvent || deletingId === deletingEvent.id}
+              disabled={actionsDisabled || !deletingEvent || deletingId === deletingEvent.id}
             >
               {deletingId && deletingEvent?.id === deletingId ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!downloadEvent} onOpenChange={(open) => !open && setDownloadEvent(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Escolha o formato de download</AlertDialogTitle>
+            <AlertDialogDescription>
+              Selecione como deseja baixar os certificados de "{downloadEvent?.title}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!downloadingId}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                if (!downloadEvent) return;
+                handleDownloadEvent(downloadEvent, 'zip_individual');
+              }}
+              disabled={actionsDisabled || !downloadEvent || !!downloadingId}
+            >
+              {downloadingId ? 'Baixando...' : 'ZIP com PDFs individuais'}
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                if (!downloadEvent) return;
+                handleDownloadEvent(downloadEvent, 'pdf_unico');
+              }}
+              disabled={actionsDisabled || !downloadEvent || !!downloadingId}
+            >
+              {downloadingId ? 'Baixando...' : 'PDF único'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

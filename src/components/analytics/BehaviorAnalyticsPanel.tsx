@@ -1,7 +1,7 @@
 /**
  * Painel de Analytics Comportamental
  * 
- * Exibe dados de acompanhamentos disciplinares:
+ * Exibe dados de convivência disciplinar:
  * - Resumo por severidade
  * - Ranking de turmas por acompanhamentos
  * - Top alunos com acompanhamentos
@@ -12,16 +12,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import {
     AlertTriangle,
-    Users,
     TrendingDown,
     TrendingUp,
     Clock,
     CheckCircle2,
-    AlertCircle
 } from 'lucide-react';
 import {
     BehavioralAnalytics,
-    Insight,
 } from '@/hooks/useSchoolAnalytics';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -53,31 +50,15 @@ import {
 
 interface BehaviorAnalyticsPanelProps {
     behavioralAnalytics: BehavioralAnalytics;
-    behavioralInsights: Insight[];
 }
 
 import {
     getSeverityLabel,
 } from '@/lib/incidentUtils';
-import { INCIDENT_SEVERITY_COLOR_HEX } from '@/lib/statusPalette';
-
-const InsightIcon = ({ type }: { type: Insight['type'] }) => {
-    const iconClass = 'h-4 w-4';
-    switch (type) {
-        case 'alert':
-            return <AlertTriangle className={`${iconClass} text-destructive`} />;
-        case 'warning':
-            return <AlertCircle className={`${iconClass} text-warning`} />;
-        case 'success':
-            return <CheckCircle2 className={`${iconClass} text-success`} />;
-        default:
-            return <AlertCircle className={`${iconClass} text-info`} />;
-    }
-};
+import { INCIDENT_SEVERITY_COLOR_HEX, UNIFIED_STATUS_TONES } from '@/lib/statusPalette';
 
 export function BehaviorAnalyticsPanel({
     behavioralAnalytics,
-    behavioralInsights
 }: BehaviorAnalyticsPanelProps) {
     const [isClassRankingOpen, setIsClassRankingOpen] = useState(false);
     const [isStudentRankingOpen, setIsStudentRankingOpen] = useState(false);
@@ -89,17 +70,17 @@ export function BehaviorAnalyticsPanel({
         monthlyTrend,
         openIncidentsCount,
         resolvedIncidentsCount,
-        averageIncidentsPerStudent,
     } = behavioralAnalytics;
 
     const totalIncidents = incidentsBySeverity.reduce((sum, s) => sum + s.count, 0);
+    const trendColor = UNIFIED_STATUS_TONES.green;
 
     return (
         <Card className="border-none shadow-none">
 
             <CardContent className="px-0 space-y-6">
                 {/* Overview Cards */}
-                <div className="grid gap-4 md:grid-cols-4">
+                <div className="grid gap-4 md:grid-cols-3">
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
@@ -108,7 +89,7 @@ export function BehaviorAnalyticsPanel({
                                 </div>
                                 <div>
                                     <p className="text-2xl font-bold">{totalIncidents}</p>
-                                    <p className="text-xs text-muted-foreground">Total de Acompanhamentos</p>
+                                    <p className="text-xs text-muted-foreground">Total Disciplinar</p>
                                 </div>
                             </div>
                         </CardContent>
@@ -142,19 +123,6 @@ export function BehaviorAnalyticsPanel({
                         </CardContent>
                     </Card>
 
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-info/10">
-                                    <Users className="h-5 w-5 text-info" />
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold">{averageIncidentsPerStudent.toFixed(1)}</p>
-                                    <p className="text-xs text-muted-foreground">Por Aluno</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
                 </div>
 
                 {/* Grid Principal */}
@@ -209,7 +177,7 @@ export function BehaviorAnalyticsPanel({
                                     <AreaChart data={monthlyTrend}>
                                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                                         <XAxis
-                                            dataKey="month"
+                                            dataKey="monthLabel"
                                             fontSize={12}
                                             tickLine={false}
                                             axisLine={false}
@@ -231,11 +199,13 @@ export function BehaviorAnalyticsPanel({
                                         <Area
                                             type="monotone"
                                             dataKey="count"
-                                            name="Acompanhamentos"
-                                            stroke="hsl(var(--primary))"
-                                            fill="hsl(var(--primary))"
-                                            fillOpacity={0.2}
-                                            strokeWidth={2}
+                                            name="Disciplinares"
+                                            stroke={trendColor}
+                                            fill={trendColor}
+                                            fillOpacity={0.28}
+                                            strokeWidth={3}
+                                            dot={{ r: 3, fill: trendColor, stroke: '#ffffff', strokeWidth: 1.5 }}
+                                            activeDot={{ r: 5, fill: trendColor, stroke: '#ffffff', strokeWidth: 2 }}
                                         />
                                     </AreaChart>
                                 </ResponsiveContainer>
@@ -246,7 +216,7 @@ export function BehaviorAnalyticsPanel({
                     {/* Ranking de Turmas */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Turmas com Mais Acompanhamentos</CardTitle>
+                            <CardTitle className="text-base">Turmas com Mais Ocorrências Disciplinares</CardTitle>
                         </CardHeader>
                         <CardContent>
                             {classIncidentRanking.length === 0 ? (
@@ -273,9 +243,6 @@ export function BehaviorAnalyticsPanel({
                                             </div>
                                             <div className="text-right">
                                                 <p className="text-sm font-bold">{item.incidentCount}</p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {item.incidentsPerStudent.toFixed(1)}/aluno
-                                                </p>
                                             </div>
                                         </div>
                                     ))}
@@ -300,7 +267,7 @@ export function BehaviorAnalyticsPanel({
                     {/* Top Alunos */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Alunos com Mais Acompanhamentos</CardTitle>
+                            <CardTitle className="text-base">Alunos com Mais Ocorrências Disciplinares</CardTitle>
                         </CardHeader>
                         <CardContent>
                             {topStudentsByIncidents.length === 0 ? (
@@ -359,41 +326,6 @@ export function BehaviorAnalyticsPanel({
                     </Card>
                 </div>
 
-                {/* Insights Comportamentais */}
-                {behavioralInsights.length > 0 && (
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-base flex items-center gap-2">
-                                <AlertCircle className="h-4 w-4 text-warning" />
-                                Insights Comportamentais
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid gap-3 md:grid-cols-2">
-                                {behavioralInsights.map(insight => (
-                                    <div
-                                        key={insight.id}
-                                        className={`p-3 rounded-lg border-l-4 ${insight.type === 'alert' ? 'border-l-red-500 bg-destructive/10' :
-                                            insight.type === 'warning' ? 'border-l-amber-500 bg-warning/10' :
-                                                insight.type === 'success' ? 'border-l-emerald-500 bg-success/10' :
-                                                    'border-l-blue-500 bg-info/10'
-                                            }`}
-                                    >
-                                        <div className="flex items-start gap-2">
-                                            <InsightIcon type={insight.type} />
-                                            <div>
-                                                <h4 className="font-medium text-sm">{insight.title}</h4>
-                                                <p className="text-xs text-muted-foreground mt-1">
-                                                    {insight.description}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
             </CardContent>
 
             <Dialog open={isClassRankingOpen} onOpenChange={setIsClassRankingOpen}>
@@ -403,10 +335,10 @@ export function BehaviorAnalyticsPanel({
                             <div className="p-2 rounded-full bg-primary/10">
                                 <List className="h-5 w-5 text-primary" />
                             </div>
-                            Ranking de Turmas por Acompanhamentos
+                            Ranking de Turmas por Ocorrências Disciplinares
                         </DialogTitle>
                         <DialogDescription>
-                            Listagem completa de turmas ordenada por volume de acompanhamentos
+                            Listagem completa de turmas ordenada por volume disciplinar
                         </DialogDescription>
                     </DialogHeader>
 
@@ -482,10 +414,10 @@ export function BehaviorAnalyticsPanel({
                             <div className="p-2 rounded-full bg-primary/10">
                                 <List className="h-5 w-5 text-primary" />
                             </div>
-                            Ranking de Alunos por Acompanhamentos
+                            Ranking de Alunos por Ocorrências Disciplinares
                         </DialogTitle>
                         <DialogDescription>
-                            Listagem completa de alunos ordenada por volume de acompanhamentos
+                            Listagem completa de alunos ordenada por volume disciplinar
                         </DialogDescription>
                     </DialogHeader>
 

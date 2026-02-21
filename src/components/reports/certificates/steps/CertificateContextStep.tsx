@@ -55,6 +55,8 @@ interface CertificateContextStepProps {
 
     // Específico: Monitoria
     monitoriaPeriod: string;
+    activity: string;
+    setActivity: (value: string) => void;
 }
 
 export function CertificateContextStep({
@@ -98,6 +100,8 @@ export function CertificateContextStep({
     setWorkloadHours,
 
     monitoriaPeriod,
+    activity,
+    setActivity,
 }: CertificateContextStepProps) {
 
     const sortedClasses = useMemo(
@@ -275,10 +279,20 @@ export function CertificateContextStep({
                 )}
 
                 {isMonitoria && (
-                    <div className="space-y-2">
-                        <Label>Período Descritivo <span className="text-xs text-muted-foreground">(autopreenchido)</span></Label>
-                        <Input value={monitoriaPeriod} readOnly className="bg-slate-50 cursor-default" />
-                    </div>
+                    <>
+                        <div className="space-y-2">
+                            <Label>Atividade da Monitoria</Label>
+                            <Input
+                                value={activity}
+                                onChange={(e) => setActivity(e.target.value)}
+                                placeholder="Ex.: Apoio em Matemática Aplicada"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Período Descritivo <span className="text-xs text-muted-foreground">(autopreenchido)</span></Label>
+                            <Input value={monitoriaPeriod} readOnly className="bg-slate-50 cursor-default" />
+                        </div>
+                    </>
                 )}
 
                 {!isEvent && !isMonitoria && (

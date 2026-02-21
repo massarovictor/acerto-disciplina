@@ -4,6 +4,7 @@ import {
   SavedCertificateEvent,
   SavedCertificateEventStudent,
   SavedCertificateType,
+  UpdateSavedCertificateEventInput,
 } from "@/types";
 import {
   ExportCertificatesPdfInput,
@@ -26,12 +27,13 @@ export interface SavedCertificateEventMeta {
   eventDate: string;
   eventDateStart?: string;
   eventDateEnd?: string;
-  location: string;
+  location?: string;
   workloadHours: number;
   role: string;
 }
 
 export interface CertificateEventTypeMeta {
+  schemaVersion?: number;
   monitoriaMeta?: SavedCertificateMonitoriaMeta;
   eventMeta?: SavedCertificateEventMeta;
   highlightMetaByStudentId?: Record<string, SavedCertificateHighlightMeta>;
@@ -71,8 +73,8 @@ export interface CertificateEventStudentRow {
   text_override: string | null;
   highlight_status: "confirmed" | "pending" | null;
   highlight_average: number | null;
-  verification_code: string | null;
-  verification_status: "valid" | "revoked" | null;
+  verification_code: string;
+  verification_status: "valid" | "revoked";
   created_at: string;
 }
 
@@ -84,6 +86,7 @@ export type CreateCertificateEventWithStudentsInput =
   CreateSavedCertificateEventInput;
 
 export type CreateCertificateEventWithStudentsResult = SavedCertificateEvent;
+export type UpdateCertificateEventWithStudentsInput = UpdateSavedCertificateEventInput;
 
 export const CERTIFICATE_TYPE_LABEL: Record<SavedCertificateType, string> = {
   monitoria: "Monitoria",
@@ -121,20 +124,23 @@ export const sanitizeCertificateFileToken = (value: string) =>
 
 export const mapSavedCertificateEventStudent = (
   row: CertificateEventStudentRow,
-): SavedCertificateEventStudent => ({
-  id: row.id,
-  certificateEventId: row.certificate_event_id,
-  ownerId: row.owner_id,
-  studentId: row.student_id || undefined,
-  studentNameSnapshot: row.student_name_snapshot,
-  textOverride: row.text_override || undefined,
-  highlightStatus: row.highlight_status || undefined,
-  highlightAverage:
-    typeof row.highlight_average === "number" ? row.highlight_average : row.highlight_average ?? null,
-  verificationCode: row.verification_code || row.id,
-  verificationStatus: row.verification_status || "valid",
-  createdAt: row.created_at,
-});
+): SavedCertificateEventStudent => {
+  const verificationCode = (row.verification_code || "").trim();
+  return {
+    id: row.id,
+    certificateEventId: row.certificate_event_id,
+    ownerId: row.owner_id,
+    studentId: row.student_id || undefined,
+    studentNameSnapshot: row.student_name_snapshot,
+    textOverride: row.text_override || undefined,
+    highlightStatus: row.highlight_status || undefined,
+    highlightAverage:
+      typeof row.highlight_average === "number" ? row.highlight_average : row.highlight_average ?? null,
+    verificationCode,
+    verificationStatus: row.verification_status === "revoked" ? "revoked" : "valid",
+    createdAt: row.created_at,
+  };
+};
 
 export const mapSavedCertificateEvent = (
   row: CertificateEventWithStudentsRow,
@@ -220,7 +226,7 @@ const readEventMeta = (
   const role = asString(value.role);
   const workloadHours = asFiniteNumber(value.workloadHours);
 
-  if (!eventName || !eventDate || !location || !role || workloadHours === null) {
+  if (!eventName || !eventDate || !role || workloadHours === null) {
     return undefined;
   }
 

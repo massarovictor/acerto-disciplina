@@ -10,7 +10,7 @@ type CacheEntry = {
 const DB_NAME = "analytics-cache";
 const STORE_NAME = "analytics_results";
 const DB_VERSION = 1;
-const CACHE_VERSION = "2";
+const CACHE_VERSION = "3";
 const MAX_ENTRIES = 50;
 const MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
 

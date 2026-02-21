@@ -13,7 +13,15 @@ import { getSubjectArea, SUBJECT_AREAS } from '@/lib/subjects';
 import { QUARTERS } from '@/lib/subjects';
 import { perfTimer } from '@/lib/perf';
 import { CLASSIFICATION_COLOR_HEX } from '@/lib/statusPalette';
-import { isDisciplinaryIncident } from '@/lib/incidentType';
+import { partitionIncidentsByType } from '@/lib/incidentType';
+import {
+  buildBehaviorInsights,
+  buildDashboardHighlights,
+  buildFamilyInsights,
+  dedupeInsightsBySemanticKey,
+  scoreInsightPriority,
+  InsightEvidenceLevel,
+} from '@/lib/analyticsInsightRules';
 
 // ============================================
 // TIPOS
@@ -75,6 +83,8 @@ export interface ClassAnalytics {
   average: number;
   frequency: number;
   growth: number | null;
+  trendPoints?: number;
+  gradeSampleCount?: number;
   classifications: {
     critico: number;
     atencao: number;
@@ -117,11 +127,14 @@ export interface SchoolOverview {
 export interface Insight {
   id: string;
   type: 'warning' | 'alert' | 'success' | 'info';
-  category: 'academic' | 'behavioral' | 'risk';  // Nova categoria
+  category: 'academic' | 'behavioral' | 'risk' | 'family';
   title: string;
   description: string;
   actionLabel?: string;
   actionData?: unknown;
+  priority?: number;
+  semanticKey?: string;
+  evidenceLevel?: InsightEvidenceLevel;
 }
 
 // Novo: Analytics comportamentais
@@ -155,6 +168,7 @@ export interface StudentIncidentRanking {
 
 export interface MonthlyIncidentTrend {
   month: string;  // 'Jan', 'Fev', etc.
+  monthLabel: string; // 'Jan/26'
   year: number;
   count: number;
 }
@@ -169,10 +183,22 @@ export interface BehavioralAnalytics {
   averageIncidentsPerStudent: number;
 }
 
+export interface FamilyAnalytics {
+  incidentsBySeverity: IncidentBySeverity[];
+  classIncidentRanking: ClassIncidentRanking[];
+  topStudentsByIncidents: StudentIncidentRanking[];
+  monthlyTrend: MonthlyIncidentTrend[];
+  openIncidentsCount: number;
+  resolvedIncidentsCount: number;
+  averageIncidentsPerStudent: number;
+}
+
 export interface CategorizedInsights {
+  dashboard: Insight[];
   academic: Insight[];
   behavioral: Insight[];
   risk: Insight[];
+  family: Insight[];
 }
 
 export interface AnalyticsContextSummary {
@@ -210,6 +236,7 @@ export interface SchoolAnalyticsResult {
 
   // Behavioral Analytics (NOVO)
   behavioralAnalytics: BehavioralAnalytics;
+  familyAnalytics: FamilyAnalytics;
 
   // Insights categorizados (MODIFICADO)
   insights: Insight[];  // Todos os insights
@@ -303,11 +330,22 @@ export const EMPTY_ANALYTICS_RESULT: SchoolAnalyticsResult = {
     resolvedIncidentsCount: 0,
     averageIncidentsPerStudent: 0,
   },
+  familyAnalytics: {
+    incidentsBySeverity: [],
+    classIncidentRanking: [],
+    topStudentsByIncidents: [],
+    monthlyTrend: [],
+    openIncidentsCount: 0,
+    resolvedIncidentsCount: 0,
+    averageIncidentsPerStudent: 0,
+  },
   insights: [],
   categorizedInsights: {
+    dashboard: [],
     academic: [],
     behavioral: [],
     risk: [],
+    family: [],
   },
   comparisonData: [],
   comparisonCourseYearData: [],
@@ -333,10 +371,28 @@ export function computeSchoolAnalytics(
   incidents: Incident[],
   filters: AnalyticsFilters
 ): SchoolAnalyticsResult {
-  const disciplinaryIncidents = incidents.filter((incident) =>
-    isDisciplinaryIncident(incident),
-  );
-  const parseLocalDate = (value: string) => new Date(`${value}T00:00:00`);
+  const BRASILIA_TIMEZONE = 'America/Sao_Paulo';
+  const { disciplinaryIncidents, familyIncidents } =
+    partitionIncidentsByType(incidents);
+  const parseLocalDate = (value: string | undefined | null) => {
+    if (!value) return new Date(Number.NaN);
+    const normalized = value.trim();
+    if (!normalized) return new Date(Number.NaN);
+
+    // ISO date only: 2026-02-21
+    if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+      return new Date(`${normalized}T00:00:00`);
+    }
+
+    // BR date: 21/02/2026
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(normalized)) {
+      const [day, month, year] = normalized.split("/");
+      return new Date(`${year}-${month}-${day}T00:00:00`);
+    }
+
+    // ISO timestamp or other valid Date input
+    return new Date(normalized);
+  };
   const addMonths = (date: Date, months: number) => {
     const next = new Date(date);
     next.setMonth(next.getMonth() + months);
@@ -346,6 +402,16 @@ export function computeSchoolAnalytics(
     const next = new Date(date);
     next.setFullYear(next.getFullYear() + years);
     return next;
+  };
+  const getBrasiliaMonthYear = (value: Date) => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: BRASILIA_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+    }).formatToParts(value);
+    const year = Number(parts.find((part) => part.type === 'year')?.value);
+    const month = Number(parts.find((part) => part.type === 'month')?.value) - 1;
+    return { year, month };
   };
   const getQuarterRange = (
     startYearDate: string | undefined,
@@ -857,6 +923,8 @@ export function computeSchoolAnalytics(
         average,
         frequency,
         growth,
+        trendPoints: quarterAverages.length,
+        gradeSampleCount: classYearGrades.length,
         classifications,
         incidentCount: classIncidents.length,
         trend,
@@ -1073,6 +1141,8 @@ export function computeSchoolAnalytics(
         average,
         frequency,
         growth,
+        trendPoints: quarterAverages.length,
+        gradeSampleCount: classYearGrades.length,
         classifications,
         incidentCount: classIncidents.length,
         trend,
@@ -1082,6 +1152,7 @@ export function computeSchoolAnalytics(
 
   let filteredAttendance = attendance.filter(a => candidateClassIds.has(a.classId));
   let filteredIncidents = disciplinaryIncidents.filter(i => candidateClassIds.has(i.classId));
+  let filteredFamilyIncidents = familyIncidents.filter(i => candidateClassIds.has(i.classId));
 
   // Filtrar por range de datas quando schoolYear específico
   if (!useAllYears && targetSchoolYear !== null) {
@@ -1116,6 +1187,11 @@ export function computeSchoolAnalytics(
     });
 
     filteredIncidents = disciplinaryIncidents.filter(i => {
+      if (!candidateClassIds.has(i.classId)) return false;
+      const range = classRanges.get(i.classId);
+      return range ? isDateInRange(i.date, range) : false;
+    });
+    filteredFamilyIncidents = familyIncidents.filter(i => {
       if (!candidateClassIds.has(i.classId)) return false;
       const range = classRanges.get(i.classId);
       return range ? isDateInRange(i.date, range) : false;
@@ -1162,6 +1238,11 @@ export function computeSchoolAnalytics(
       if (Number.isNaN(date.getTime())) return false;
       return date.getFullYear() === targetCalYear;
     });
+    filteredFamilyIncidents = filteredFamilyIncidents.filter(i => {
+      const date = parseLocalDate(i.date);
+      if (Number.isNaN(date.getTime())) return false;
+      return date.getFullYear() === targetCalYear;
+    });
   }
 
 
@@ -1198,6 +1279,8 @@ export function computeSchoolAnalytics(
   const displayStudents = hasGradesInScope ? filteredStudents : candidateStudents;
 
   const filteredStudentsById = new Map(filteredStudents.map((student) => [student.id, student]));
+  const candidateStudentsById = new Map(candidateStudents.map((student) => [student.id, student]));
+  const candidateStudentsByClassId = groupById(candidateStudents, (student) => student.classId);
   const filteredStudentsByClassId = groupById(filteredStudents, (student) => student.classId);
   const gradesByClassId = groupById(filteredGrades, (grade) => grade.classId);
   const gradesByStudentId = groupById(filteredGrades, (grade) => grade.studentId);
@@ -1222,6 +1305,18 @@ export function computeSchoolAnalytics(
         bucket.push(incident);
       } else {
         incidentsByStudentId.set(studentId, [incident]);
+      }
+    });
+  });
+  const familyIncidentsByClassId = groupById(filteredFamilyIncidents, (incident) => incident.classId);
+  const familyIncidentsByStudentId = new Map<string, Incident[]>();
+  filteredFamilyIncidents.forEach((incident) => {
+    incident.studentIds.forEach((studentId) => {
+      const bucket = familyIncidentsByStudentId.get(studentId);
+      if (bucket) {
+        bucket.push(incident);
+      } else {
+        familyIncidentsByStudentId.set(studentId, [incident]);
       }
     });
   });
@@ -1321,6 +1416,8 @@ export function computeSchoolAnalytics(
       average,
       frequency,
       growth,
+      trendPoints: quarterAverages.length,
+      gradeSampleCount: classYearGrades.length,
       classifications,
       incidentCount: classIncidents.length,
       trend,
@@ -1593,6 +1690,43 @@ export function computeSchoolAnalytics(
     classifications: totalClassifications,
   };
 
+  const buildMonthlyTrendData = (sourceIncidents: Incident[]): MonthlyIncidentTrend[] => {
+    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const now = new Date();
+    const nowInBrasilia = getBrasiliaMonthYear(now);
+    const trend: MonthlyIncidentTrend[] = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(Date.UTC(nowInBrasilia.year, nowInBrasilia.month, 15));
+      date.setUTCMonth(date.getUTCMonth() - i);
+      const referenceMonthYear = getBrasiliaMonthYear(date);
+      const month = referenceMonthYear.month;
+      const year = referenceMonthYear.year;
+
+      const count = sourceIncidents.filter((incident) => {
+        const incidentDate = parseLocalDate(incident.date);
+        const resolvedDate = Number.isNaN(incidentDate.getTime())
+          ? parseLocalDate(incident.createdAt)
+          : incidentDate;
+        if (Number.isNaN(resolvedDate.getTime())) return false;
+        const resolvedMonthYear = getBrasiliaMonthYear(resolvedDate);
+        return (
+          resolvedMonthYear.month === month &&
+          resolvedMonthYear.year === year
+        );
+      }).length;
+
+      trend.push({
+        month: monthNames[month],
+        monthLabel: `${monthNames[month]}/${String(year).slice(-2)}`,
+        year,
+        count,
+      });
+    }
+
+    return trend;
+  };
+
   // ============================================
   // BEHAVIORAL ANALYTICS (NOVO)
   // ============================================
@@ -1672,26 +1806,7 @@ export function computeSchoolAnalytics(
     .slice(0, 10);
 
   // Tendência mensal (últimos 6 meses)
-  const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-  const now = new Date();
-  const monthlyTrend: MonthlyIncidentTrend[] = [];
-
-  for (let i = 5; i >= 0; i--) {
-    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const month = date.getMonth();
-    const year = date.getFullYear();
-
-    const count = filteredIncidents.filter(incident => {
-      const incidentDate = new Date(incident.date);
-      return incidentDate.getMonth() === month && incidentDate.getFullYear() === year;
-    }).length;
-
-    monthlyTrend.push({
-      month: monthNames[month],
-      year,
-      count,
-    });
-  }
+  const monthlyTrend = buildMonthlyTrendData(filteredIncidents);
 
   const openIncidentsCount = filteredIncidents.filter(i => i.status !== 'resolvida').length;
   const resolvedIncidentsCount = filteredIncidents.filter(i => i.status === 'resolvida').length;
@@ -1707,6 +1822,97 @@ export function computeSchoolAnalytics(
     openIncidentsCount,
     resolvedIncidentsCount,
     averageIncidentsPerStudent,
+  };
+
+  // ============================================
+  // FAMILY ANALYTICS (NOVO)
+  // ============================================
+
+  const familySeverityCounts = {
+    leve: filteredFamilyIncidents.filter(i => i.finalSeverity === 'leve').length,
+    intermediaria: filteredFamilyIncidents.filter(i => i.finalSeverity === 'intermediaria').length,
+    grave: filteredFamilyIncidents.filter(i => i.finalSeverity === 'grave').length,
+    gravissima: filteredFamilyIncidents.filter(i => i.finalSeverity === 'gravissima').length,
+  };
+
+  const totalFamilyIncidentsCount = filteredFamilyIncidents.length;
+  const familyIncidentsBySeverity: IncidentBySeverity[] = [
+    { severity: 'leve', count: familySeverityCounts.leve, percent: totalFamilyIncidentsCount > 0 ? (familySeverityCounts.leve / totalFamilyIncidentsCount) * 100 : 0 },
+    { severity: 'intermediaria', count: familySeverityCounts.intermediaria, percent: totalFamilyIncidentsCount > 0 ? (familySeverityCounts.intermediaria / totalFamilyIncidentsCount) * 100 : 0 },
+    { severity: 'grave', count: familySeverityCounts.grave, percent: totalFamilyIncidentsCount > 0 ? (familySeverityCounts.grave / totalFamilyIncidentsCount) * 100 : 0 },
+    { severity: 'gravissima', count: familySeverityCounts.gravissima, percent: totalFamilyIncidentsCount > 0 ? (familySeverityCounts.gravissima / totalFamilyIncidentsCount) * 100 : 0 },
+  ];
+
+  const familyClassIncidentRanking: ClassIncidentRanking[] = candidateClasses.map((cls) => {
+    const classIncidents = familyIncidentsByClassId.get(cls.id) ?? [];
+    const classStudentCount = candidateStudentsByClassId.get(cls.id)?.length ?? 0;
+
+    const severities = {
+      leve: classIncidents.filter(i => i.finalSeverity === 'leve').length,
+      intermediaria: classIncidents.filter(i => i.finalSeverity === 'intermediaria').length,
+      grave: classIncidents.filter(i => i.finalSeverity === 'grave').length,
+      gravissima: classIncidents.filter(i => i.finalSeverity === 'gravissima').length,
+    };
+
+    return {
+      classData: cls,
+      incidentCount: classIncidents.length,
+      studentCount: classStudentCount,
+      incidentsPerStudent: classStudentCount > 0 ? classIncidents.length / classStudentCount : 0,
+      openIncidents: classIncidents.filter(i => i.status !== 'resolvida').length,
+      severities,
+    };
+  }).sort((a, b) => b.incidentCount - a.incidentCount);
+
+  const familyStudentIncidentMap = new Map<string, { count: number; lastDate: string | null; severities: { leve: number; intermediaria: number; grave: number; gravissima: number } }>();
+
+  filteredFamilyIncidents.forEach((incident) => {
+    incident.studentIds.forEach((studentId) => {
+      const current = familyStudentIncidentMap.get(studentId) || {
+        count: 0,
+        lastDate: null,
+        severities: { leve: 0, intermediaria: 0, grave: 0, gravissima: 0 },
+      };
+      current.count++;
+      current.severities[incident.finalSeverity as keyof typeof current.severities]++;
+      if (!current.lastDate || incident.date > current.lastDate) {
+        current.lastDate = incident.date;
+      }
+      familyStudentIncidentMap.set(studentId, current);
+    });
+  });
+
+  const topStudentsByFamilyIncidents: StudentIncidentRanking[] = Array.from(familyStudentIncidentMap.entries())
+    .map(([studentId, data]) => {
+      const student = candidateStudentsById.get(studentId);
+      const studentClass = student ? classById.get(student.classId) : undefined;
+      return student ? {
+        student,
+        className: studentClass?.name || 'Sem turma',
+        incidentCount: data.count,
+        lastIncidentDate: data.lastDate,
+        severities: data.severities,
+      } : null;
+    })
+    .filter((entry): entry is StudentIncidentRanking => entry !== null)
+    .sort((a, b) => b.incidentCount - a.incidentCount)
+    .slice(0, 10);
+
+  const familyMonthlyTrend = buildMonthlyTrendData(filteredFamilyIncidents);
+  const openFamilyIncidentsCount = filteredFamilyIncidents.filter(i => i.status !== 'resolvida').length;
+  const resolvedFamilyIncidentsCount = filteredFamilyIncidents.filter(i => i.status === 'resolvida').length;
+  const averageFamilyIncidentsPerStudent = candidateStudents.length > 0
+    ? filteredFamilyIncidents.length / candidateStudents.length
+    : 0;
+
+  const familyAnalytics: FamilyAnalytics = {
+    incidentsBySeverity: familyIncidentsBySeverity,
+    classIncidentRanking: familyClassIncidentRanking,
+    topStudentsByIncidents: topStudentsByFamilyIncidents,
+    monthlyTrend: familyMonthlyTrend,
+    openIncidentsCount: openFamilyIncidentsCount,
+    resolvedIncidentsCount: resolvedFamilyIncidentsCount,
+    averageIncidentsPerStudent: averageFamilyIncidentsPerStudent,
   };
 
   // ============================================
@@ -1810,107 +2016,112 @@ export function computeSchoolAnalytics(
     });
   }
 
-  // Insight: Crescimento de desempenho
-  const growthClasses = classRanking.filter((c) => typeof c.growth === 'number');
-  if (growthClasses.length > 0) {
-    const bestGrowth = growthClasses.reduce((best, current) =>
-      (current.growth ?? 0) > (best.growth ?? 0) ? current : best,
-    );
-    if ((bestGrowth.growth ?? 0) >= 0.5) {
-      insights.push({
-        id: 'best-growth',
-        type: 'success',
-        category: 'academic',
-        title: `${bestGrowth.classData.name} teve maior crescimento`,
-        description: `Evolução de ${(bestGrowth.growth ?? 0).toFixed(1)} pontos entre o primeiro e o último bimestre disponível.`,
+  const behaviorInsights = buildBehaviorInsights({
+    openIncidentsCount,
+    totalIncidents: filteredIncidents.length,
+    severeIncidentsCount: severityCounts.grave + severityCounts.gravissima,
+    severityBreakdown: {
+      grave: severityCounts.grave,
+      gravissima: severityCounts.gravissima,
+    },
+    classRanking: classIncidentRanking.map((item) => ({
+      classId: item.classData.id,
+      className: item.classData.name,
+      incidentCount: item.incidentCount,
+      incidentsPerStudent: item.incidentsPerStudent,
+      openIncidents: item.openIncidents,
+      studentCount: item.studentCount,
+    })),
+    monthlyTrend: monthlyTrend.map((item) => ({
+      monthLabel: item.monthLabel,
+      count: item.count,
+    })),
+    pendingIncidents: filteredIncidents
+      .filter((incident) => incident.status !== 'resolvida')
+      .map((incident) => ({
+        date: incident.date,
+        status: incident.status,
+      })),
+  });
+
+  const familyInsights = buildFamilyInsights({
+    openIncidentsCount: openFamilyIncidentsCount,
+    totalIncidents: filteredFamilyIncidents.length,
+    severeIncidentsCount: familySeverityCounts.grave + familySeverityCounts.gravissima,
+    classRanking: familyClassIncidentRanking.map((item) => ({
+      classId: item.classData.id,
+      className: item.classData.name,
+      incidentCount: item.incidentCount,
+      incidentsPerStudent: item.incidentsPerStudent,
+      openIncidents: item.openIncidents,
+      studentCount: item.studentCount,
+    })),
+    monthlyTrend: familyMonthlyTrend.map((item) => ({
+      monthLabel: item.monthLabel,
+      count: item.count,
+    })),
+    pendingIncidents: filteredFamilyIncidents
+      .filter((incident) => incident.status !== 'resolvida')
+      .map((incident) => ({
+        date: incident.date,
+        status: incident.status,
+      })),
+  });
+
+  const dashboardHighlights = buildDashboardHighlights({
+    growthItems: classRanking
+      .filter((item) => typeof item.growth === 'number')
+      .map((item) => ({
+        classId: item.classData.id,
+        className: item.classData.name,
+        growth: item.growth ?? 0,
+        trendPoints: item.trendPoints ?? 0,
+        studentCount: item.studentCount,
+        gradeSampleCount: item.gradeSampleCount ?? 0,
+      })),
+  });
+
+  const normalizeInsights = (source: Insight[]) => {
+    const actionable = source
+      .map((insight) => ({
+        ...insight,
+        priority: insight.priority ?? scoreInsightPriority(insight),
+      }))
+      .filter((insight) => {
+        const hasAction = Boolean(insight.actionLabel);
+        const isCritical = insight.type === 'alert' || insight.type === 'warning';
+        return hasAction || isCritical;
       });
-    }
 
-    const worstGrowth = growthClasses.reduce((worst, current) =>
-      (current.growth ?? 0) < (worst.growth ?? 0) ? current : worst,
-    );
-    if ((worstGrowth.growth ?? 0) <= -0.5) {
-      insights.push({
-        id: 'worst-growth',
-        type: 'warning',
-        category: 'academic',
-        title: `${worstGrowth.classData.name} apresentou queda de desempenho`,
-        description: `Queda de ${(Math.abs(worstGrowth.growth ?? 0)).toFixed(1)} ponto(s) entre o primeiro e o último bimestre disponível.`,
-      });
-    }
-  }
-
-  // === INSIGHTS COMPORTAMENTAIS ===
-
-  // Insight: Acompanhamentos altas
-  if (averageIncidentsPerStudent > 0.5) {
-    insights.push({
-      id: 'high-incidents',
-      type: 'warning',
-      category: 'behavioral',
-      title: 'Alto índice de acompanhamentos',
-      description: `Média de ${averageIncidentsPerStudent.toFixed(1)} acompanhamentos por aluno. Considere ações preventivas.`,
+    return dedupeInsightsBySemanticKey(actionable).sort((a, b) => {
+      const aPriority = a.priority ?? 0;
+      const bPriority = b.priority ?? 0;
+      return bPriority - aPriority;
     });
-  }
+  };
 
-  // Insight: Acompanhamentos graves/gravíssimas
-  const severeIncidents = severityCounts.grave + severityCounts.gravissima;
-  if (severeIncidents > 0) {
-    insights.push({
-      id: 'severe-incidents',
-      type: 'alert',
-      category: 'behavioral',
-      title: `${severeIncidents} acompanhamentos graves`,
-      description: `Há ${severityCounts.grave} acompanhamentos graves e ${severityCounts.gravissima} gravíssimos que requerem atenção especial.`,
-    });
-  }
-
-  // Insight: Acompanhamentos pendentes
-  if (openIncidentsCount > 5) {
-    insights.push({
-      id: 'pending-incidents',
-      type: 'warning',
-      category: 'behavioral',
-      title: `${openIncidentsCount} acompanhamentos pendentes`,
-      description: `Existem acompanhamentos aguardando resolução. Considere revisar e dar encaminhamento.`,
-    });
-  }
-
-  // Insight: Turma com mais acompanhamentos
-  const classWithMostIncidents = classIncidentRanking[0];
-  if (classWithMostIncidents && classWithMostIncidents.incidentCount >= 5) {
-    insights.push({
-      id: 'class-most-incidents',
-      type: 'warning',
-      category: 'behavioral',
-      title: `${classWithMostIncidents.classData.name} lidera em acompanhamentos`,
-      description: `${classWithMostIncidents.incidentCount} acompanhamentos registrados (${classWithMostIncidents.incidentsPerStudent.toFixed(1)} por aluno).`,
-      actionLabel: 'Ver turma',
-      actionData: { classId: classWithMostIncidents.classData.id },
-    });
-  }
-
-  // Insight: Melhoria no comportamento
-  if (monthlyTrend.length >= 2) {
-    const lastMonth = monthlyTrend[monthlyTrend.length - 1].count;
-    const prevMonth = monthlyTrend[monthlyTrend.length - 2].count;
-    if (prevMonth > 0 && lastMonth < prevMonth * 0.7) {
-      insights.push({
-        id: 'behavior-improvement',
-        type: 'success',
-        category: 'behavioral',
-        title: 'Melhoria no comportamento',
-        description: `Acompanhamentos reduziram ${(((prevMonth - lastMonth) / prevMonth) * 100).toFixed(0)}% em relação ao mês anterior.`,
-      });
-    }
-  }
+  const academicInsights = normalizeInsights(insights.filter(i => i.category === 'academic'));
+  const riskInsights = normalizeInsights(insights.filter(i => i.category === 'risk'));
+  const normalizedBehaviorInsights = normalizeInsights(behaviorInsights);
+  const normalizedFamilyInsights = normalizeInsights(familyInsights);
+  const normalizedDashboardHighlights = normalizeInsights(dashboardHighlights);
 
   // === CATEGORIZAR INSIGHTS ===
   const categorizedInsights: CategorizedInsights = {
-    academic: insights.filter(i => i.category === 'academic'),
-    behavioral: insights.filter(i => i.category === 'behavioral'),
-    risk: insights.filter(i => i.category === 'risk'),
+    dashboard: normalizedDashboardHighlights,
+    academic: academicInsights,
+    behavioral: normalizedBehaviorInsights,
+    risk: riskInsights,
+    family: normalizedFamilyInsights,
   };
+
+  const mergedInsights = normalizeInsights([
+    ...academicInsights,
+    ...riskInsights,
+    ...normalizedBehaviorInsights,
+    ...normalizedFamilyInsights,
+    ...normalizedDashboardHighlights,
+  ]);
 
   // ============================================
   // DADOS DE COMPARAÇÃO
@@ -1949,7 +2160,8 @@ export function computeSchoolAnalytics(
     bestSubjects,
     worstSubjects,
     behavioralAnalytics,
-    insights,
+    familyAnalytics,
+    insights: mergedInsights,
     categorizedInsights,
     comparisonData,
     comparisonCourseYearData,
@@ -1960,6 +2172,7 @@ export function computeSchoolAnalytics(
     students: displayStudents.length,
     grades: filteredGrades.length,
     incidents: filteredIncidents.length,
+    familyIncidents: filteredFamilyIncidents.length,
     attendance: filteredAttendance.length,
     calendarYear: filters.calendarYear,
     quarter: filters.quarter,

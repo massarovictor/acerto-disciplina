@@ -12,7 +12,9 @@ import Classes from '@/pages/Classes';
 import ArchivedClasses from '@/pages/ArchivedClasses';
 import Students from '@/pages/Students';
 import GradesAttendance from '@/pages/GradesAttendance';
-import Reports from '@/pages/Reports';
+import IntegratedReportsPage from '@/pages/IntegratedReportsPage';
+import SlidesPage from '@/pages/SlidesPage';
+import CertificatesPage from '@/pages/CertificatesPage';
 import Analytics from '@/pages/Analytics';
 import Users from '@/pages/Users';
 import StudentTrajectory from '@/pages/StudentTrajectory';
@@ -59,6 +61,32 @@ const LegacyIncidentsRedirect = () => {
   );
 };
 
+const LegacyReportsRedirect = () => {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const tab = (params.get('tab') || '').toLowerCase();
+  params.delete('tab');
+  const nextSearch = params.toString();
+
+  const pathname =
+    tab === 'slides'
+      ? '/slides'
+      : tab === 'certificates'
+        ? '/certificados'
+        : '/relatorios-integrados';
+
+  return (
+    <Navigate
+      to={{
+        pathname,
+        search: nextSearch ? `?${nextSearch}` : '',
+        hash: location.hash,
+      }}
+      replace
+    />
+  );
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="system" disableTransitionOnChange>
@@ -75,6 +103,7 @@ const App = () => (
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/certificados/verificar" element={<CertificateVerification />} />
+              <Route path="/certificados/verificar/:codigo" element={<CertificateVerification />} />
               <Route
                 path="/"
                 element={
@@ -90,7 +119,10 @@ const App = () => (
                 <Route path="turmas-arquivadas" element={<ArchivedClasses />} />
                 <Route path="alunos" element={<Students />} />
                 <Route path="notas-frequencia" element={<GradesAttendance />} />
-                <Route path="relatorios" element={<Reports />} />
+                <Route path="relatorios-integrados" element={<IntegratedReportsPage />} />
+                <Route path="slides" element={<SlidesPage />} />
+                <Route path="certificados" element={<CertificatesPage />} />
+                <Route path="relatorios" element={<LegacyReportsRedirect />} />
                 <Route path="analytics" element={<Analytics />} />
                 <Route path="trajetoria" element={<StudentTrajectory />} />
                 <Route path="usuarios" element={<Users />} />

@@ -1,4 +1,16 @@
-import { Home, School, Users, BookOpen, BarChart3, AlertTriangle, LineChart, Shield, History } from 'lucide-react';
+import {
+  Home,
+  School,
+  Users,
+  BookOpen,
+  BarChart3,
+  AlertTriangle,
+  LineChart,
+  Shield,
+  History,
+  Presentation,
+  FileText,
+} from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Sidebar,
@@ -22,7 +34,9 @@ const menuItems = [
   { icon: Users, label: 'Alunos', path: '/alunos' },
   { icon: BookOpen, label: 'Notas', path: '/notas-frequencia' },
   { icon: History, label: 'Trajetória', path: '/trajetoria' },
-  { icon: BarChart3, label: 'Relatórios', path: '/relatorios' },
+  { icon: BarChart3, label: 'Relatórios', path: '/relatorios-integrados' },
+  { icon: Presentation, label: 'Slide', path: '/slides' },
+  { icon: FileText, label: 'Certificados', path: '/certificados' },
 ];
 
 export const AppSidebar = () => {

@@ -61,7 +61,6 @@ export function ClassRankingTable({
 
   const handleClassClick = (cls: ClassAnalytics) => {
     const params = new URLSearchParams();
-    params.set('tab', 'slides');
     params.set('classId', cls.classData.id);
 
     if (filters) {
@@ -98,7 +97,7 @@ export function ClassRankingTable({
       }
     }
 
-    window.open(`/relatorios?${params.toString()}`, '_blank');
+    window.open(`/slides?${params.toString()}`, '_blank');
   };
 
   const sortedData = [...classRanking].sort((a, b) => {

@@ -2,12 +2,11 @@ import JSZip from 'jszip';
 import QRCode from 'qrcode';
 import type { Content, TDocumentDefinitions } from 'pdfmake/interfaces';
 
-import {
-  applyCertificateTemplate,
-  type CertificateTemplateData,
-} from '@/lib/certificateTemplates';
 import { type CertificateType } from '@/lib/certificateTypes';
 import { formatBrasiliaDate, getBrasiliaISODate } from '@/lib/brasiliaDate';
+import {
+  buildCertificateTextPreview as buildCertificateTextPreviewWithLanguage,
+} from '@/lib/certificateLanguage';
 import { PDF_COLORS, PDF_STYLES, getPdfMake } from '@/lib/pdfGenerator';
 import { getDefaultConfig, getSchoolConfig } from '@/lib/schoolConfig';
 import { type SignatureMode } from '@/types';
@@ -82,6 +81,7 @@ interface ResolvedExportCertificatesPdfInput extends ExportCertificatesPdfInput 
   schoolCity?: string;
   schoolState?: string;
   schoolLogoBase64?: string;
+  certificateFrameBase64?: string;
   directorSignatureBase64?: string;
   themeColor: string;
   verificationBaseUrl: string;
@@ -101,9 +101,7 @@ const CERTIFICATE_TOKEN_BY_TYPE: Record<CertificateType, string> = {
   evento_organizacao: 'evento_organizacao',
 };
 
-const LEFT_STRIP_WIDTH = 0;
 const SIGNATURE_LINE_WIDTH = 220;
-const MAX_VISIBLE_CERTIFICATE_TEXT = 520;
 const SHOW_HIGHLIGHT_BADGE = false;
 
 let signatureFontLoadPromise: Promise<void> | null = null;
@@ -152,125 +150,52 @@ const downloadBlob = (blob: Blob, fileName: string) => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
-const resolveEventDateLabel = (eventMeta?: EventCertificateMeta): string => {
-  if (!eventMeta) return '-';
-
-  if (eventMeta.eventDateStart && eventMeta.eventDateEnd) {
-    return `${formatBrasiliaDate(eventMeta.eventDateStart)} a ${formatBrasiliaDate(eventMeta.eventDateEnd)}`;
-  }
-
-  return formatBrasiliaDate(eventMeta.eventDate);
-};
-
-const stripReferencePrefix = (value: string): string =>
-  value.replace(/^(disciplina|área)\s*:\s*/i, '').trim();
-
-const buildReferencePlaceholder = (
-  certificateType: CertificateType,
-  referenceLabel?: string,
-): string => {
-  if (!referenceLabel?.trim()) return '';
-  const cleanedReference = stripReferencePrefix(referenceLabel);
-  if (!cleanedReference) return '';
-
-  if (certificateType === 'monitoria') {
-    return cleanedReference;
-  }
-
-  if (certificateType === 'destaque') {
-    return `, na \u00e1rea de ${cleanedReference}`;
-  }
-
-  return `, com vínculo em ${cleanedReference}`;
-};
-
-const buildEventRolePlaceholder = (
-  certificateType: CertificateType,
-  role?: string,
-): string => {
-  const cleanedRole = role?.trim();
-  if (!cleanedRole) return '';
-
-  if (certificateType === 'evento_participacao') {
-    return cleanedRole === 'participante' ? '' : `, na condição de ${cleanedRole}`;
-  }
-
-  const roleLower = cleanedRole.toLowerCase();
-  if (roleLower === 'comissão organizadora' || roleLower === 'membro da comissão organizadora') {
-    return `, como membro da comissão organizadora`;
-  }
-
-  return `, atuando como ${cleanedRole}`;
-};
-
-const buildTemplateData = (
-  student: CertificateExportStudentSnapshot,
-  input: ResolvedExportCertificatesPdfInput,
-): CertificateTemplateData => ({
-  aluno: student.name,
-  escola: input.schoolName,
-  turma: input.classData.name,
-  anoTurma: `${input.schoolYear}º ano`,
-  periodo: input.periodLabel,
-  referencia: buildReferencePlaceholder(input.certificateType, input.referenceLabel),
-  cargaHoraria: input.monitoriaMeta
-    ? String(input.monitoriaMeta.workloadHours)
-    : input.eventMeta
-      ? String(input.eventMeta.workloadHours)
-      : '',
-  atividade: input.monitoriaMeta?.activity || '',
-  periodoMonitoria: input.monitoriaMeta?.monitoriaPeriod || '',
-  eventoNome: input.eventMeta?.eventName || '',
-  eventoData: resolveEventDateLabel(input.eventMeta),
-  eventoPapel: buildEventRolePlaceholder(input.certificateType, input.eventMeta?.role),
-});
-
-const normalizeCertificateText = (
-  rawText: string,
-  certificateType: CertificateType,
-): string => {
-  let normalized = rawText
-    .replace(/\s{2,}/g, ' ')
-    .replace(/\s+,/g, ',')
-    .replace(/,\s*,/g, ', ')
-    .replace(/\.\s*\./g, '.')
-    .replace(/,\s*\./g, '.')
-    .trim();
-
-  if (certificateType === 'monitoria') {
-    normalized = normalized
-      .replace(/exerceu atividades de monitoria/gi, 'atuou na monitoria')
-      .replace(/monitoria\s+acad[eê]mica/gi, 'monitoria')
-      .replace(/na disciplina:\s*/gi, 'em ')
-      .replace(/na monitoria de de /gi, 'na monitoria de ')
-      .replace(/na fun[cç][aã]o de monitor(?:ia)?/gi, 'na monitoria');
-  }
-
-  if (certificateType === 'evento_participacao') {
-    normalized = normalized.replace(
-      /na condição de participante/gi,
-      'como participante',
-    );
-  }
-
-  return normalized;
-};
-
-const clampCertificateText = (value: string): string => {
-  const trimmed = value.trim();
-  if (trimmed.length <= MAX_VISIBLE_CERTIFICATE_TEXT) return trimmed;
-  return `${trimmed.slice(0, MAX_VISIBLE_CERTIFICATE_TEXT - 1).trimEnd()}…`;
-};
-
 const getStudentCertificateText = (
   student: CertificateExportStudentSnapshot,
   input: ResolvedExportCertificatesPdfInput,
 ): string => {
-  const rawText = input.textOverrides?.[student.id]?.trim() || input.baseText.trim();
-  const renderedText = applyCertificateTemplate(rawText, buildTemplateData(student, input));
-  const normalizedText = normalizeCertificateText(renderedText, input.certificateType);
-  return clampCertificateText(normalizedText);
+  return buildCertificateTextPreviewWithLanguage({
+    certificateType: input.certificateType,
+    schoolName: input.schoolName,
+    className: input.classData.name,
+    schoolYear: input.schoolYear,
+    periodLabel: input.periodLabel,
+    referenceLabel: input.referenceLabel,
+    baseText: input.textOverrides?.[student.id]?.trim() || input.baseText.trim(),
+    studentName: student.name,
+    monitoriaMeta: input.monitoriaMeta,
+    eventMeta: input.eventMeta,
+  });
 };
+
+export interface CertificateTextPreviewInput {
+  certificateType: CertificateType;
+  schoolName: string;
+  className: string;
+  schoolYear: 1 | 2 | 3;
+  periodLabel: string;
+  referenceLabel?: string;
+  baseText: string;
+  studentName: string;
+  monitoriaMeta?: MonitoriaCertificateMeta;
+  eventMeta?: EventCertificateMeta;
+}
+
+export const buildCertificateTextPreview = (
+  input: CertificateTextPreviewInput,
+): string =>
+  buildCertificateTextPreviewWithLanguage({
+    certificateType: input.certificateType,
+    schoolName: input.schoolName,
+    className: input.className,
+    schoolYear: input.schoolYear,
+    periodLabel: input.periodLabel,
+    referenceLabel: input.referenceLabel,
+    baseText: input.baseText,
+    studentName: input.studentName,
+    monitoriaMeta: input.monitoriaMeta,
+    eventMeta: input.eventMeta,
+  });
 
 const studentHighlightBadge = (
   student: CertificateExportStudentSnapshot,
@@ -416,9 +341,9 @@ const createDigitalSignatureDataUrl = async (name: string): Promise<string | nul
 const createQrDataUrl = async (value: string): Promise<string | null> => {
   try {
     return await QRCode.toDataURL(value, {
-      margin: 1,
-      width: 128,
-      errorCorrectionLevel: 'M',
+      margin: 2,
+      width: 192,
+      errorCorrectionLevel: 'H',
       color: {
         dark: '#0F172A',
         light: '#FFFFFF',
@@ -533,9 +458,14 @@ const buildLandscapeBackground = (input: ResolvedExportCertificatesPdfInput) => 
   const sidebarWidth = 140;
   const subtitleLabel = CERTIFICATE_LAYOUT_SUBTITLE_BY_TYPE[input.certificateType];
   const pattern = input.sidebarPattern || 'chevrons';
-  const patternSvg = SIDEBAR_PATTERN_BUILDERS[pattern](sidebarWidth, pageSize.height, subtitleLabel);
+  const patternSvg = SIDEBAR_PATTERN_BUILDERS[pattern](
+    sidebarWidth,
+    pageSize.height,
+    subtitleLabel,
+  );
+  const hasFrameImage = Boolean(input.certificateFrameBase64?.trim());
 
-  return [
+  const layers: Content[] = [
     {
       canvas: [
         // Fundo branco sólido geral
@@ -558,12 +488,27 @@ const buildLandscapeBackground = (input: ResolvedExportCertificatesPdfInput) => 
         },
       ],
     },
-    // Camada 2: Padrão SVG geométrico + gradiente
-    {
+  ];
+
+  if (hasFrameImage) {
+    layers.push({
+      image: input.certificateFrameBase64 as string,
+      cover: {
+        width: sidebarWidth,
+        height: pageSize.height,
+        align: 'center',
+        valign: 'middle',
+      },
+      absolutePosition: { x: 0, y: 0 },
+    } as unknown as Content);
+  } else {
+    layers.push({
       svg: patternSvg,
       absolutePosition: { x: 0, y: 0 },
-    },
-  ];
+    });
+  }
+
+  return layers;
 };
 
 const buildHeader = (
@@ -580,10 +525,10 @@ const buildHeader = (
           ...(input.schoolLogoBase64
             ? [
               {
-                width: 56,
+                width: 84,
                 image: input.schoolLogoBase64,
-                fit: [48, 48] as [number, number],
-                margin: [0, 2, 12, 0] as [number, number, number, number],
+                fit: [78, 78] as [number, number],
+                margin: [0, 0, 14, 0] as [number, number, number, number],
               },
             ]
             : []),
@@ -624,6 +569,7 @@ const buildHeader = (
 const buildVerificationSeal = async (
   input: ResolvedExportCertificatesPdfInput,
   student: CertificateExportStudentSnapshot,
+  issuedLine: string,
 ): Promise<Content> => {
   const verificationCode = input.verificationCodesByStudentId?.[student.id]?.trim();
   const verificationUrl = resolveVerificationUrl(input, verificationCode);
@@ -632,42 +578,65 @@ const buildVerificationSeal = async (
   return {
     width: 120,
     stack: [
+      {
+        text: issuedLine,
+        fontSize: 7,
+        color: '#94A3B8',
+        alignment: 'center',
+        margin: [0, 0, 0, 4],
+      },
       qrDataUrl
         ? {
           image: qrDataUrl,
-          width: 56,
+          width: 70,
           alignment: 'center',
           margin: [0, 0, 0, 4],
         }
         : {
           canvas: [
             {
-              type: 'ellipse',
-              x: 60,
-              y: 20,
-              r1: 28,
-              r2: 28,
+              type: 'rect',
+              x: 25,
+              y: 0,
+              w: 70,
+              h: 70,
               lineColor: input.themeColor,
               lineWidth: 1,
             },
           ],
-          margin: [0, 0, 0, 20],
+          margin: [0, 0, 0, 4],
         },
       {
-        text: verificationCode || 'Sem código',
-        fontSize: 6,
+        text: verificationCode || 'Código indisponível',
+        fontSize: 7,
         color: '#94A3B8',
         alignment: 'center',
         margin: [0, 0, 0, 1],
       },
       {
-        text: verificationUrl ? 'Validação por QR' : '',
-        fontSize: 6,
+        text: verificationUrl ? 'Validação por QR' : 'Validação indisponível',
+        fontSize: 7,
         color: '#CBD5E1',
         alignment: 'center',
       },
     ],
   };
+};
+
+const assertVerificationCodesForExport = (
+  input: ResolvedExportCertificatesPdfInput,
+): void => {
+  const verificationMap = input.verificationCodesByStudentId || {};
+  const missing = input.students
+    .filter((student) => !verificationMap[student.id]?.trim())
+    .map((student) => student.name);
+
+  if (missing.length === 0) return;
+
+  const sampleName = missing[0] || 'aluno';
+  throw new Error(
+    `Código de verificação ausente para ${missing.length} aluno(s). Exemplo: ${sampleName}. Reabra e salve o evento para regenerar os códigos.`,
+  );
 };
 
 const buildSignatureColumn = ({
@@ -693,13 +662,13 @@ const buildSignatureColumn = ({
       image: imageDataUrl,
       fit: [SIGNATURE_LINE_WIDTH, 46],
       alignment: 'center' as const,
-      margin: [0, 0, 0, 0],
+      margin: [0, 0, 0, -10],
     }
     : {
       text: signatureMode === 'physical_print' ? 'Assinar no documento impresso' : '',
       style: 'caption',
       alignment: 'center' as const,
-      margin: [0, 18, 0, 0],
+      margin: [0, 8, 0, -2],
     }) as Content;
 
   return {
@@ -724,7 +693,7 @@ const buildSignatureColumn = ({
             text: normalizedDisplayName as string,
             style: 'bodySmall',
             alignment: 'center' as const,
-            margin: [0, 4, 0, 0],
+            margin: [0, 1, 0, 0],
           } as Content,
         ]
         : []),
@@ -732,6 +701,7 @@ const buildSignatureColumn = ({
         text: subtitle,
         style: 'caption',
         alignment: 'center',
+        margin: [0, 0, 0, 0],
       } as Content,
     ],
   };
@@ -782,12 +752,12 @@ const buildCertificateBody = async (
     signatureMode: input.signatureMode || 'digital_cursive',
     imageDataUrl: teacherSignatureImage,
   });
-  const verificationSeal = await buildVerificationSeal(input, student);
   const issuedAtLabel = formatBrasiliaDate(new Date(), { dateStyle: 'long' });
   const placePrefix = [input.schoolCity?.trim(), input.schoolState?.trim()]
     .filter(Boolean)
     .join(' - ');
   const issuedLine = placePrefix ? `${placePrefix}, ${issuedAtLabel}` : `Emitido em ${issuedAtLabel}`;
+  const verificationSeal = await buildVerificationSeal(input, student, issuedLine);
 
   return [
     buildHeader(input, verificationSeal),
@@ -814,13 +784,6 @@ const buildCertificateBody = async (
       alignment: 'left',
       lineHeight: layoutProfile.bodyLineHeight + 0.1, // Texto mais arejado
       margin: [0, 0, 0, layoutProfile.bodyMarginBottom + 8],
-    },
-    {
-      text: issuedLine,
-      fontSize: 14,
-      bold: true,
-      color: '#0F172A',
-      margin: [0, 0, 0, 12],
     },
     // Opcional: Uma linha separadora super fina antes das assinaturas para criar a "base" visual
     {
@@ -977,6 +940,9 @@ const resolveInput = async (
 
   const origin =
     getWindowBaseUrl();
+  const envVerificationBase = String(
+    import.meta.env.VITE_CERTIFICATE_VERIFICATION_BASE_URL || '',
+  ).trim();
 
   return {
     ...input,
@@ -986,9 +952,13 @@ const resolveInput = async (
     directorName: resolvedDirectorName,
     signatureMode: input.signatureMode || 'digital_cursive',
     schoolLogoBase64: schoolConfig.logoBase64,
+    certificateFrameBase64: schoolConfig.certificateFrameBase64,
     directorSignatureBase64: schoolConfig.signatureBase64,
     themeColor: normalizeThemeColor(schoolConfig.themeColor),
-    verificationBaseUrl: input.verificationBaseUrl?.trim() || origin,
+    verificationBaseUrl:
+      input.verificationBaseUrl?.trim() ||
+      envVerificationBase ||
+      origin,
   };
 };
 
@@ -998,6 +968,7 @@ export const generateCertificateFiles = async (
   if (input.students.length === 0) return [];
 
   const resolvedInput = await resolveInput(input);
+  assertVerificationCodesForExport(resolvedInput);
 
   const generatedFiles: GeneratedCertificateFile[] = [];
   for (const student of resolvedInput.students) {
@@ -1022,6 +993,7 @@ export const generateCombinedCertificatePdf = async (
   if (input.students.length === 0) return null;
 
   const resolvedInput = await resolveInput(input);
+  assertVerificationCodesForExport(resolvedInput);
   const docDefinition = await createCombinedDocDefinition(resolvedInput);
   const blob = await createPdfBlob(docDefinition);
 
