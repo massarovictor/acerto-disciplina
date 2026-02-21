@@ -9,7 +9,6 @@ import { SlideLayout } from './SlideLayout';
 import { ReportBarChart } from '@/lib/reportCharts';
 import { REPORT_COLORS } from '@/lib/reportDesignSystem';
 import { SUBJECT_AREAS } from '@/lib/subjects';
-import { calculateSummaryStatistics } from '@/lib/advancedCalculations';
 import {
   BookOpen,
   Brain,
@@ -56,15 +55,38 @@ export const SchoolAreasSlide = ({
                 const areaGrades = filteredGrades.filter((g) => area.subjects.includes(g.subject));
                 if (areaGrades.length === 0) return null;
 
-                const values = areaGrades.map((g) => g.grade);
-                const stats = calculateSummaryStatistics(values);
+                const consolidatedStudentSubjectAverages: number[] = [];
+
+                area.subjects.forEach((subject) => {
+                    const subjectGrades = areaGrades.filter((grade) => grade.subject === subject);
+                    if (subjectGrades.length === 0) return;
+
+                    const studentIds = [...new Set(subjectGrades.map((grade) => grade.studentId))];
+                    studentIds.forEach((studentId) => {
+                        const studentSubjectGrades = subjectGrades.filter(
+                            (grade) => grade.studentId === studentId,
+                        );
+                        const subjectAverage =
+                            studentSubjectGrades.reduce((sum, grade) => sum + grade.grade, 0) /
+                            studentSubjectGrades.length;
+                        consolidatedStudentSubjectAverages.push(subjectAverage);
+                    });
+                });
+
+                if (consolidatedStudentSubjectAverages.length === 0) return null;
+
+                const average =
+                    consolidatedStudentSubjectAverages.reduce((sum, value) => sum + value, 0) /
+                    consolidatedStudentSubjectAverages.length;
+                const approved = consolidatedStudentSubjectAverages.filter((value) => value >= 6).length;
+                const failed = consolidatedStudentSubjectAverages.length - approved;
 
                 return {
                     name: area.name,
-                    value: parseFloat(stats.mean.toFixed(1)),
-                    count: areaGrades.length,
-                    approved: areaGrades.filter((g) => g.grade >= 6).length,
-                    failed: areaGrades.filter((g) => g.grade < 6).length,
+                    value: parseFloat(average.toFixed(1)),
+                    count: consolidatedStudentSubjectAverages.length,
+                    approved,
+                    failed,
                 };
             })
             .filter(Boolean) as { name: string; value: number; count: number; approved: number; failed: number }[];
@@ -156,7 +178,7 @@ export const SchoolAreasSlide = ({
                                         {area.name}
                                     </p>
                                     <p style={{ margin: '4px 0 0', fontSize: 13, color: REPORT_COLORS.text.secondary }}>
-                                        {area.count} notas registradas
+                                        {area.count} registros consolidados
                                     </p>
                                 </div>
                                 <div style={{ textAlign: 'right' }}>

@@ -33,9 +33,14 @@ export const ClassOverviewSlide = ({
     const studentStats = students.map((student) => {
       const studentGrades = filteredGrades.filter((g) => g.studentId === student.id);
 
-      // Se aluno não tem notas no período, não entra na média
       if (studentGrades.length === 0) {
-        return { student, recoveryCount: 0, overallAvg: 0, hasGrades: false };
+        return {
+          student,
+          recoveryCount: 0,
+          overallAvg: 0,
+          hasGrades: false,
+          classification: null as 'excellence' | 'approved' | 'attention' | 'critical' | null,
+        };
       }
 
       const subjects = [...new Set(studentGrades.map((g) => g.subject))];
@@ -51,30 +56,30 @@ export const ClassOverviewSlide = ({
         : 0;
 
       const recoveryCount = avgBySubject.filter((a) => a < 6).length;
-      return { student, recoveryCount, overallAvg, hasGrades: true };
+      const classification = classifyStudent(overallAvg, recoveryCount);
+      return { student, recoveryCount, overallAvg, hasGrades: true, classification };
     });
 
-    const activeStudents = studentStats.filter(s => s.hasGrades);
+    const activeStudents = studentStats.filter((student) => student.hasGrades);
+    const classifiedStudents = activeStudents.filter(
+      (student): student is typeof student & {
+        classification: 'excellence' | 'approved' | 'attention' | 'critical';
+      } => student.classification !== null,
+    );
 
-    // 2. Classificação usando a função centralizada
-    // Importante: Alunos sem nota (hasGrades=false) são contados como 'aprovado' por padrão ou ignorados? 
-    // Vamos considerar apenas ativos para métricas de desempenho.
-    const classifications = studentStats.map(s => s.hasGrades ? classifyStudent(s.overallAvg, s.recoveryCount) : 'approved');
-
-    const excellence = classifications.filter(c => c === 'excellence').length;
-    const approved = classifications.filter(c => c === 'approved').length;
-    const attention = classifications.filter(c => c === 'attention').length;
-    const critical = classifications.filter(c => c === 'critical').length;
+    const excellence = classifiedStudents.filter((student) => student.classification === 'excellence').length;
+    const approved = classifiedStudents.filter((student) => student.classification === 'approved').length;
+    const attention = classifiedStudents.filter((student) => student.classification === 'attention').length;
+    const critical = classifiedStudents.filter((student) => student.classification === 'critical').length;
 
     // 3. Média Geral da Turma (Média das médias dos alunos)
     const classAverage = activeStudents.length > 0
       ? activeStudents.reduce((sum, s) => sum + s.overallAvg, 0) / activeStudents.length
       : 0;
 
-    // 4. Taxa de Aprovação (% de alunos Aprovados ou Excelência sobre o TOTAL de alunos)
-    // Se um aluno não tem nota, ele conta pro total? Sim, matriculado.
-    const approvalRate = students.length > 0
-      ? ((excellence + approved) / students.length) * 100
+    // 4. Taxa de aprovação entre alunos com notas no período.
+    const approvalRate = activeStudents.length > 0
+      ? ((excellence + approved) / activeStudents.length) * 100
       : 0;
 
     const criticalIncidents = incidents.filter(
@@ -89,7 +94,8 @@ export const ClassOverviewSlide = ({
       attention,
       critical,
       criticalIncidents,
-      totalGrades
+      totalGrades,
+      studentsWithGrades: activeStudents.length,
     };
   }, [grades, students, incidents, period]);
 
@@ -102,7 +108,7 @@ export const ClassOverviewSlide = ({
 
   // Filtrar categorias zeradas para visualização mais limpa no gráfico
   const activePieData = pieData.filter(d => d.value > 0);
-  const hasStatusData = students.length > 0; // Mostrar gráfico se houver alunos
+  const hasStatusData = metrics.studentsWithGrades > 0;
 
   const KPICard = ({
     icon: Icon,

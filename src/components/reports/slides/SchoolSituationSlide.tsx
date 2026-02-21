@@ -44,7 +44,7 @@ export const SchoolSituationSlide = ({
             const studentGrades = filteredGrades.filter((g) => g.studentId === student.id);
 
             if (studentGrades.length === 0) {
-                return { student, classification: 'approved' as SituationType, hasGrades: false };
+                return { student, classification: null as SituationType | null, hasGrades: false };
             }
 
             const subjects = [...new Set(studentGrades.map((g) => g.subject))];
@@ -63,18 +63,19 @@ export const SchoolSituationSlide = ({
             const classification = classifyStudent(overallAvg, recoveryCount) as SituationType;
             return { student, classification, hasGrades: true };
         });
+        const activeStudentStats = studentStats.filter((student) => student.hasGrades && student.classification !== null);
 
         // Count by situation
         const counts = {
-            critical: studentStats.filter(s => s.classification === 'critical').length,
-            attention: studentStats.filter(s => s.classification === 'attention').length,
-            approved: studentStats.filter(s => s.classification === 'approved').length,
-            excellence: studentStats.filter(s => s.classification === 'excellence').length,
+            critical: activeStudentStats.filter(s => s.classification === 'critical').length,
+            attention: activeStudentStats.filter(s => s.classification === 'attention').length,
+            approved: activeStudentStats.filter(s => s.classification === 'approved').length,
+            excellence: activeStudentStats.filter(s => s.classification === 'excellence').length,
         };
 
         // Calculate per-class situation
         const classSituations: ClassSituation[] = classes.map((cls) => {
-            const classStudents = studentStats.filter(s => s.student.classId === cls.id);
+            const classStudents = activeStudentStats.filter(s => s.student.classId === cls.id);
             return {
                 classId: cls.id,
                 className: cls.name,
@@ -91,7 +92,7 @@ export const SchoolSituationSlide = ({
             .filter(c => c.total > 0)
             .sort((a, b) => b.critical - a.critical);
 
-        return { counts, classSituations: sortedClasses, total: students.length };
+        return { counts, classSituations: sortedClasses, total: activeStudentStats.length };
     }, [grades, students, classes, period]);
 
     const situationConfigs = [
@@ -132,7 +133,7 @@ export const SchoolSituationSlide = ({
     return (
         <SlideLayout
             title={`${schoolName} — Distribuição por Situação`}
-            subtitle={`${period === 'all' ? 'Ano Letivo Completo' : period} • Classificação de ${situationData.total} alunos`}
+            subtitle={`${period === 'all' ? 'Ano Letivo Completo' : period} • Classificação de ${situationData.total} alunos com notas`}
             footer="MAVIC - Sistema de Acompanhamento Escolar"
         >
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, height: '100%' }}>

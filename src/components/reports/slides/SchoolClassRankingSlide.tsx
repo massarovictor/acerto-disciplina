@@ -48,6 +48,7 @@ export const SchoolClassRankingSlide = ({
                 let totalAvg = 0;
                 let excellence = 0;
                 let critical = 0;
+                let approved = 0;
                 let studentsWithGrades = 0;
 
                 classStudents.forEach((student) => {
@@ -68,12 +69,15 @@ export const SchoolClassRankingSlide = ({
 
                     const classification = classifyStudent(studentAvg, recoveryCount);
                     if (classification === 'excellence') excellence++;
+                    if (classification === 'approved') approved++;
                     if (classification === 'critical') critical++;
                 });
 
+                if (studentsWithGrades === 0) return null;
+
                 const average = studentsWithGrades > 0 ? totalAvg / studentsWithGrades : 0;
-                const approvalRate = classStudents.length > 0
-                    ? ((classStudents.length - critical) / classStudents.length) * 100
+                const approvalRate = studentsWithGrades > 0
+                    ? ((excellence + approved) / studentsWithGrades) * 100
                     : 0;
 
                 return {

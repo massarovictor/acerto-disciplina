@@ -53,6 +53,8 @@ interface AreaAnalysisSlideProps {
     grades: Grade[];
     period: string;
     professionalSubjects?: string[];
+    subjectSubset?: string[];
+    pageLabel?: string;
 }
 
 export const AreaAnalysisSlide = ({
@@ -60,12 +62,15 @@ export const AreaAnalysisSlide = ({
     grades,
     period,
     professionalSubjects = [],
+    subjectSubset,
+    pageLabel,
 }: AreaAnalysisSlideProps) => {
     const config = AREA_CONFIG[areaName] || AREA_CONFIG['Formação Técnica'];
     const Icon = config.icon;
 
     // Para área técnica, usar disciplinas dinâmicas
-    const subjects = areaName === 'Formação Técnica' ? professionalSubjects : config.subjects;
+    const allAreaSubjects = areaName === 'Formação Técnica' ? professionalSubjects : config.subjects;
+    const subjects = subjectSubset ?? allAreaSubjects;
 
     const chartData = useMemo(() => {
         const filteredGrades = period === 'all' ? grades : grades.filter((g) => g.quarter === period);
@@ -142,14 +147,14 @@ export const AreaAnalysisSlide = ({
     const areaAverage = useMemo(() => {
         const filteredGrades = period === 'all' ? grades : grades.filter((g) => g.quarter === period);
         const areaRawGrades = filteredGrades
-            .filter(g => subjects.includes(g.subject))
+            .filter(g => allAreaSubjects.includes(g.subject))
             .map(g => g.grade);
 
         if (areaRawGrades.length === 0) return null;
 
         const stats = calculateSummaryStatistics(areaRawGrades);
         return stats.mean;
-    }, [grades, period, subjects]);
+    }, [allAreaSubjects, grades, period]);
 
     const hasData = chartData.length > 0;
 
@@ -163,7 +168,7 @@ export const AreaAnalysisSlide = ({
 
     return (
         <SlideLayout
-            title={areaName}
+            title={pageLabel ? `${areaName} (${pageLabel})` : areaName}
             subtitle={`Análise detalhada • ${period === 'all' ? 'Ano Letivo' : period}`}
             footer="MAVIC - Sistema de Acompanhamento Escolar"
         >

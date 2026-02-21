@@ -42,7 +42,13 @@ export const SchoolOverviewSlide = ({
             const studentGrades = filteredGrades.filter((g) => g.studentId === student.id);
 
             if (studentGrades.length === 0) {
-                return { student, recoveryCount: 0, overallAvg: 0, hasGrades: false };
+                return {
+                    student,
+                    recoveryCount: 0,
+                    overallAvg: 0,
+                    hasGrades: false,
+                    classification: null as 'excellence' | 'approved' | 'attention' | 'critical' | null,
+                };
             }
 
             const subjects = [...new Set(studentGrades.map((g) => g.subject))];
@@ -58,29 +64,30 @@ export const SchoolOverviewSlide = ({
                 : 0;
 
             const recoveryCount = avgBySubject.filter((a) => a < 6).length;
-            return { student, recoveryCount, overallAvg, hasGrades: true };
+            const classification = classifyStudent(overallAvg, recoveryCount);
+            return { student, recoveryCount, overallAvg, hasGrades: true, classification };
         });
 
-        const activeStudents = studentStats.filter(s => s.hasGrades);
-
-        // Classification
-        const classifications = studentStats.map(s =>
-            s.hasGrades ? classifyStudent(s.overallAvg, s.recoveryCount) : 'approved'
+        const activeStudents = studentStats.filter((student) => student.hasGrades);
+        const classifiedStudents = activeStudents.filter(
+            (student): student is typeof student & {
+                classification: 'excellence' | 'approved' | 'attention' | 'critical';
+            } => student.classification !== null,
         );
 
-        const excellence = classifications.filter(c => c === 'excellence').length;
-        const approved = classifications.filter(c => c === 'approved').length;
-        const attention = classifications.filter(c => c === 'attention').length;
-        const critical = classifications.filter(c => c === 'critical').length;
+        const excellence = classifiedStudents.filter((student) => student.classification === 'excellence').length;
+        const approved = classifiedStudents.filter((student) => student.classification === 'approved').length;
+        const attention = classifiedStudents.filter((student) => student.classification === 'attention').length;
+        const critical = classifiedStudents.filter((student) => student.classification === 'critical').length;
 
         // School average (average of student averages)
         const schoolAverage = activeStudents.length > 0
             ? activeStudents.reduce((sum, s) => sum + s.overallAvg, 0) / activeStudents.length
             : 0;
 
-        // Approval rate
-        const approvalRate = students.length > 0
-            ? ((excellence + approved) / students.length) * 100
+        // Approval rate between students with grades in period.
+        const approvalRate = activeStudents.length > 0
+            ? ((excellence + approved) / activeStudents.length) * 100
             : 0;
 
         const criticalIncidents = incidents.filter(
@@ -95,7 +102,8 @@ export const SchoolOverviewSlide = ({
             attention,
             critical,
             criticalIncidents,
-            totalGrades: filteredGrades.length
+            totalGrades: filteredGrades.length,
+            studentsWithGrades: activeStudents.length,
         };
     }, [grades, students, incidents, period]);
 
@@ -107,7 +115,7 @@ export const SchoolOverviewSlide = ({
     ];
 
     const activePieData = pieData.filter(d => d.value > 0);
-    const hasStatusData = students.length > 0;
+    const hasStatusData = metrics.studentsWithGrades > 0;
 
     const KPICard = ({
         icon: Icon,

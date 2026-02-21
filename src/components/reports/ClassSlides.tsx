@@ -156,6 +156,24 @@ const getClassPeriodRangeForCalendarYear = (
     : getQuarterRange(startYearDate, schoolYear, period);
 };
 
+const MAX_SUBJECTS_PER_AREA_SLIDE = 12;
+
+const AREA_SUBJECTS_MAP: Record<string, string[]> = {
+  Linguagens: SUBJECT_AREAS[0]?.subjects ?? [],
+  "Ciências Humanas": SUBJECT_AREAS[1]?.subjects ?? [],
+  "Ciências da Natureza": SUBJECT_AREAS[2]?.subjects ?? [],
+  Matemática: SUBJECT_AREAS[3]?.subjects ?? [],
+};
+
+const chunkItems = <T,>(items: T[], size: number): T[][] => {
+  if (size <= 0) return [items];
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+};
+
 interface ClassSlidesProps {
   classes: Class[];
   students: Student[];
@@ -627,15 +645,50 @@ const ClassSlidesContent = ({
     ];
 
     areasList.forEach((area) => {
-      slides.push(
-        <AreaAnalysisSlide
-          key={`area-${area}`}
-          areaName={area}
-          grades={classGrades}
-          period={selectedPeriod}
-          professionalSubjects={professionalSubjects}
-        />,
+      const areaSubjects =
+        area === "Formação Técnica"
+          ? professionalSubjects
+          : (AREA_SUBJECTS_MAP[area] ?? []);
+      const subjectsWithData = areaSubjects.filter((subject) =>
+        periodGrades.some((grade) => grade.subject === subject),
       );
+      const subjectsToRender =
+        subjectsWithData.length > 0 ? subjectsWithData : areaSubjects;
+      const subjectPages = chunkItems(
+        subjectsToRender,
+        MAX_SUBJECTS_PER_AREA_SLIDE,
+      );
+
+      if (subjectPages.length === 0) {
+        slides.push(
+          <AreaAnalysisSlide
+            key={`area-${area}`}
+            areaName={area}
+            grades={classGrades}
+            period={selectedPeriod}
+            professionalSubjects={professionalSubjects}
+          />,
+        );
+        return;
+      }
+
+      subjectPages.forEach((subjectPage, pageIndex) => {
+        slides.push(
+          <AreaAnalysisSlide
+            key={`area-${area}-page-${pageIndex + 1}`}
+            areaName={area}
+            grades={classGrades}
+            period={selectedPeriod}
+            professionalSubjects={professionalSubjects}
+            subjectSubset={subjectPage}
+            pageLabel={
+              subjectPages.length > 1
+                ? `Página ${pageIndex + 1}/${subjectPages.length}`
+                : undefined
+            }
+          />,
+        );
+      });
     });
 
     studentRankings.forEach(({ student }, index) => {
@@ -668,6 +721,7 @@ const ClassSlidesContent = ({
     classGrades,
     classIncidents,
     classStudents,
+    periodGrades,
     professionalSubjects,
     selectedClass,
     selectedPeriod,
@@ -848,15 +902,50 @@ const ClassSlidesContent = ({
 
     // 4-8. Individual Area Slides (like class view)
     schoolAreasList.forEach((area) => {
-      slides.push(
-        <AreaAnalysisSlide
-          key={`school-area-${area}`}
-          areaName={area}
-          grades={filteredGrades}
-          period={period}
-          professionalSubjects={schoolProfessionalSubjects}
-        />
+      const areaSubjects =
+        area === "Formação Técnica"
+          ? schoolProfessionalSubjects
+          : (AREA_SUBJECTS_MAP[area] ?? []);
+      const subjectsWithData = areaSubjects.filter((subject) =>
+        filteredGrades.some((grade) => grade.subject === subject),
       );
+      const subjectsToRender =
+        subjectsWithData.length > 0 ? subjectsWithData : areaSubjects;
+      const subjectPages = chunkItems(
+        subjectsToRender,
+        MAX_SUBJECTS_PER_AREA_SLIDE,
+      );
+
+      if (subjectPages.length === 0) {
+        slides.push(
+          <AreaAnalysisSlide
+            key={`school-area-${area}`}
+            areaName={area}
+            grades={filteredGrades}
+            period={period}
+            professionalSubjects={schoolProfessionalSubjects}
+          />
+        );
+        return;
+      }
+
+      subjectPages.forEach((subjectPage, pageIndex) => {
+        slides.push(
+          <AreaAnalysisSlide
+            key={`school-area-${area}-page-${pageIndex + 1}`}
+            areaName={area}
+            grades={filteredGrades}
+            period={period}
+            professionalSubjects={schoolProfessionalSubjects}
+            subjectSubset={subjectPage}
+            pageLabel={
+              subjectPages.length > 1
+                ? `Página ${pageIndex + 1}/${subjectPages.length}`
+                : undefined
+            }
+          />
+        );
+      });
     });
 
     // 9. Incidents Slide

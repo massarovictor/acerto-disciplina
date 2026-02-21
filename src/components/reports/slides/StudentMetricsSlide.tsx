@@ -49,13 +49,8 @@ export const StudentMetricsSlide = ({
     const studentGrades = filteredGrades.filter(
       (g) => g.studentId === student.id,
     );
-    const averageGrade =
-      studentGrades.length > 0
-        ? studentGrades.reduce((sum, g) => sum + g.grade, 0) /
-        studentGrades.length
-        : 0;
 
-    // Calculate subject averages for classification
+    // Consolidate by subject so all status metrics use the same base.
     const subjects = [...new Set(studentGrades.map((g) => g.subject))];
     const avgBySubject = subjects.map((sub) => {
       const subGrades = studentGrades.filter((g) => g.subject === sub);
@@ -63,7 +58,12 @@ export const StudentMetricsSlide = ({
         ? subGrades.reduce((s, g) => s + g.grade, 0) / subGrades.length
         : 0;
     });
+    const averageGrade =
+      avgBySubject.length > 0
+        ? avgBySubject.reduce((sum, avg) => sum + avg, 0) / avgBySubject.length
+        : 0;
     const redGradesCount = avgBySubject.filter((a) => a < 6).length;
+    const approvedSubjectsCount = avgBySubject.filter((a) => a >= 6).length;
 
     const studentIncidents = incidents.filter((i) =>
       i.studentIds.includes(student.id),
@@ -98,7 +98,7 @@ export const StudentMetricsSlide = ({
       classification,
       statusColors,
       redGradesCount,
-      approvedGradesCount: studentGrades.filter((g) => g.grade >= 6).length,
+      approvedSubjectsCount,
       quarterAverages,
       trend,
     };
@@ -587,7 +587,7 @@ export const StudentMetricsSlide = ({
                         : REPORT_COLORS.text.secondary,
                   }}
                 >
-                  Reprovadas (&lt; 6.0)
+                  Disciplinas reprovadas (&lt; 6.0)
                 </span>
                 <span
                   style={{
@@ -608,13 +608,13 @@ export const StudentMetricsSlide = ({
                   justifyContent: "space-between",
                   padding: "16px 20px",
                   background:
-                    metrics.approvedGradesCount > 0
+                    metrics.approvedSubjectsCount > 0
                       ? STATUS_COLORS.excellence.bg
                       : REPORT_COLORS.background.surface,
                   borderRadius: 12,
                   alignItems: "center",
                   border:
-                    metrics.approvedGradesCount > 0
+                    metrics.approvedSubjectsCount > 0
                       ? `1px solid ${STATUS_COLORS.excellence.border}`
                       : "none",
                 }}
@@ -623,24 +623,24 @@ export const StudentMetricsSlide = ({
                   style={{
                     fontSize: 20,
                     color:
-                      metrics.approvedGradesCount > 0
+                      metrics.approvedSubjectsCount > 0
                         ? STATUS_COLORS.approved.text
                         : REPORT_COLORS.text.secondary,
                   }}
                 >
-                  Aprovadas (&gt;= 6.0)
+                  Disciplinas aprovadas (&gt;= 6.0)
                 </span>
                 <span
                   style={{
                     fontSize: 32,
                     fontWeight: 800,
                     color:
-                      metrics.approvedGradesCount > 0
+                      metrics.approvedSubjectsCount > 0
                         ? STATUS_COLORS.approved.text
                         : REPORT_COLORS.text.primary,
                   }}
                 >
-                  {metrics.approvedGradesCount}
+                  {metrics.approvedSubjectsCount}
                 </span>
               </div>
             </div>
