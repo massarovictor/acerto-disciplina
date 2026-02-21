@@ -8,12 +8,19 @@ import { Grade } from '@/types';
 import { SlideLayout } from './SlideLayout';
 import { ReportBarChart } from '@/lib/reportCharts';
 import { REPORT_COLORS } from '@/lib/reportDesignSystem';
-import { BookOpen, Brain, FlaskConical, Calculator, Briefcase } from 'lucide-react';
+import {
+  BookOpen,
+  Brain,
+  FlaskConical,
+  Calculator,
+  Briefcase,
+  type LucideIcon,
+} from 'lucide-react';
 import { SUBJECT_AREAS, QUARTERS } from '@/lib/subjects';
 import { calculateSummaryStatistics } from '@/lib/advancedCalculations';
 
 // Configuração das áreas com ícones e cores
-const AREA_CONFIG: Record<string, { icon: any; color: string; subjects: string[] }> = {
+const AREA_CONFIG: Record<string, { icon: LucideIcon; color: string; subjects: string[] }> = {
     'Linguagens': {
         icon: BookOpen,
         color: '#3B82F6', // Blue

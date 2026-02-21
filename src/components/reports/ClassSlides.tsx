@@ -29,7 +29,6 @@ import { StudentMetricsSlide } from "./slides/StudentMetricsSlide";
 import { StudentGradesTableSlide } from "./slides/StudentGradesTableSlide";
 import { SchoolCoverSlide } from "./slides/SchoolCoverSlide";
 import { SchoolOverviewSlide } from "./slides/SchoolOverviewSlide";
-import { SchoolAreasSlide } from "./slides/SchoolAreasSlide";
 import { SchoolSituationSlide } from "./slides/SchoolSituationSlide";
 import { SchoolClassRankingSlide } from "./slides/SchoolClassRankingSlide";
 import { SchoolIncidentsSlide } from "./slides/SchoolIncidentsSlide";
@@ -42,7 +41,6 @@ import {
 } from "@/hooks/useData";
 import { QUARTERS, SUBJECT_AREAS } from "@/lib/subjects";
 import { calculateCurrentYearFromCalendar } from "@/lib/classYearCalculator";
-import { calculateFinalGrade } from "@/lib/approvalCalculator";
 import { getSchoolConfig, getDefaultConfig } from "@/lib/schoolConfig";
 
 // Tipos para classificação por situação
@@ -92,6 +90,25 @@ const getSchoolYearRange = (
   return { start: yearStart, end: yearEnd };
 };
 
+const getQuarterRange = (
+  startYearDate: string | undefined,
+  schoolYear: number,
+  quarter: string,
+) => {
+  if (!startYearDate) return null;
+  const quarterIndex = QUARTERS.indexOf(quarter);
+  if (quarterIndex < 0) return null;
+
+  const startDate = parseLocalDate(startYearDate);
+  if (Number.isNaN(startDate.getTime())) return null;
+
+  const yearOffset = schoolYear - 1;
+  const currentYearStart = addYears(startDate, yearOffset);
+  const rangeStart = addMonths(currentYearStart, quarterIndex * 2);
+  const rangeEnd = addMonths(currentYearStart, quarterIndex * 2 + 2);
+  return { start: rangeStart, end: rangeEnd };
+};
+
 const isDateInRange = (
   value: string,
   range: { start: Date; end: Date } | null,
@@ -114,6 +131,29 @@ const getStartCalendarYear = (cls: Class) => {
       ? currentYear - (cls.currentYear - 1)
       : undefined;
   return inferredYear;
+};
+
+const getFallbackStartYearDate = (schoolClass: Class) =>
+  schoolClass.startCalendarYear
+    ? `${schoolClass.startCalendarYear}-02-01`
+    : undefined;
+
+const getClassPeriodRangeForCalendarYear = (
+  schoolClass: Class,
+  calendarYear: number,
+  period: string,
+) => {
+  const classStartYear = getStartCalendarYear(schoolClass);
+  const startYearDate = schoolClass.startYearDate || getFallbackStartYearDate(schoolClass);
+
+  if (!classStartYear || !startYearDate) return null;
+
+  const schoolYear = calendarYear - classStartYear + 1;
+  if (schoolYear < 1 || schoolYear > 3) return null;
+
+  return period === "all"
+    ? getSchoolYearRange(startYearDate, schoolYear)
+    : getQuarterRange(startYearDate, schoolYear, period);
 };
 
 interface ClassSlidesProps {
@@ -272,6 +312,51 @@ const ClassSlidesContent = ({
     });
     return filtered;
   }, [rawSchoolGrades, selectedCalendarYear, classes]);
+  const classesById = useMemo(
+    () => new Map(classes.map((schoolClass) => [schoolClass.id, schoolClass])),
+    [classes],
+  );
+  const schoolClasses = useMemo(
+    () => classes.filter((schoolClass) => schoolClassIds.includes(schoolClass.id)),
+    [classes, schoolClassIds],
+  );
+  const schoolClassIdSet = useMemo(
+    () => new Set(schoolClasses.map((schoolClass) => schoolClass.id)),
+    [schoolClasses],
+  );
+  const schoolStudents = useMemo(
+    () => students.filter((student) => schoolClassIdSet.has(student.classId)),
+    [students, schoolClassIdSet],
+  );
+  const schoolIncidents = useMemo(
+    () =>
+      incidents.filter((incident) => {
+        if (!schoolClassIdSet.has(incident.classId)) return false;
+        const schoolClass = classesById.get(incident.classId);
+        if (!schoolClass) return false;
+
+        const periodRange = getClassPeriodRangeForCalendarYear(
+          schoolClass,
+          selectedCalendarYear,
+          schoolPeriod,
+        );
+
+        if (periodRange) {
+          return isDateInRange(incident.date, periodRange);
+        }
+
+        const incidentDate = parseLocalDate(incident.date);
+        if (Number.isNaN(incidentDate.getTime())) return false;
+        return incidentDate.getFullYear() === selectedCalendarYear;
+      }),
+    [
+      classesById,
+      incidents,
+      schoolClassIdSet,
+      selectedCalendarYear,
+      schoolPeriod,
+    ],
+  );
 
   const classData = classes.find((c) => c.id === selectedClass);
   useEffect(() => {
@@ -363,9 +448,27 @@ const ClassSlidesContent = ({
     () => getSchoolYearRange(effectiveStartYearDate, selectedSchoolYear),
     [effectiveStartYearDate, selectedSchoolYear],
   );
+  const classPeriodRange = useMemo(
+    () =>
+      selectedPeriod === "all"
+        ? schoolYearRange
+        : getQuarterRange(
+          effectiveStartYearDate,
+          selectedSchoolYear,
+          selectedPeriod,
+        ),
+    [effectiveStartYearDate, schoolYearRange, selectedPeriod, selectedSchoolYear],
+  );
   const classIncidents = useMemo(
-    () => (selectedClass ? incidents.filter((i) => i.classId === selectedClass) : []),
-    [incidents, selectedClass],
+    () =>
+      selectedClass
+        ? incidents.filter(
+          (incident) =>
+            incident.classId === selectedClass &&
+            isDateInRange(incident.date, classPeriodRange),
+        )
+        : [],
+    [classPeriodRange, incidents, selectedClass],
   );
 
   const classGrades = useMemo(
@@ -672,16 +775,16 @@ const ClassSlidesContent = ({
   ]);
 
   // All professional subjects across all classes for school view
-  const allProfessionalSubjects = useMemo(() => {
+  const schoolProfessionalSubjects = useMemo(() => {
     const unique = new Set<string>();
-    classes.forEach(cls => {
+    schoolClasses.forEach(cls => {
       const template = templates.find(t => t.id === cls.templateId);
       template?.subjectsByYear.forEach(y => {
         y.subjects.forEach(s => s?.trim() && unique.add(s.trim()));
       });
     });
     return Array.from(unique);
-  }, [classes, templates]);
+  }, [schoolClasses, templates]);
 
   // School-wide slides
   const schoolSlides = useMemo(() => {
@@ -693,7 +796,7 @@ const ClassSlidesContent = ({
         ? schoolGrades
         : schoolGrades.filter((g) => g.quarter === period);
 
-    if (students.length === 0 && classes.length === 0) return [];
+    if (schoolStudents.length === 0 && schoolClasses.length === 0) return [];
 
     // Determine which areas have data
     const schoolAreasList: string[] = [];
@@ -709,7 +812,7 @@ const ClassSlidesContent = ({
     if (filteredGrades.some(g => SUBJECT_AREAS[3].subjects.includes(g.subject))) {
       schoolAreasList.push("Matemática");
     }
-    if (allProfessionalSubjects.length > 0 && filteredGrades.some(g => allProfessionalSubjects.includes(g.subject))) {
+    if (schoolProfessionalSubjects.length > 0 && filteredGrades.some(g => schoolProfessionalSubjects.includes(g.subject))) {
       schoolAreasList.push("Formação Técnica");
     }
 
@@ -719,25 +822,25 @@ const ClassSlidesContent = ({
         key="school-cover"
         schoolName={schoolName}
         period={period}
-        totalClasses={classes.length}
-        totalStudents={students.length}
+        totalClasses={schoolClasses.length}
+        totalStudents={schoolStudents.length}
       />,
       // 2. Overview with KPIs
       <SchoolOverviewSlide
         key="school-overview"
         schoolName={schoolName}
-        classes={classes}
-        students={students}
+        classes={schoolClasses}
+        students={schoolStudents}
         grades={filteredGrades}
-        incidents={incidents}
+        incidents={schoolIncidents}
         period={period}
       />,
       // 3. Class Ranking
       <SchoolClassRankingSlide
         key="school-class-ranking"
         schoolName={schoolName}
-        classes={classes}
-        students={students}
+        classes={schoolClasses}
+        students={schoolStudents}
         grades={filteredGrades}
         period={period}
       />,
@@ -751,7 +854,7 @@ const ClassSlidesContent = ({
           areaName={area}
           grades={filteredGrades}
           period={period}
-          professionalSubjects={allProfessionalSubjects}
+          professionalSubjects={schoolProfessionalSubjects}
         />
       );
     });
@@ -761,8 +864,8 @@ const ClassSlidesContent = ({
       <SchoolIncidentsSlide
         key="school-incidents"
         schoolName={schoolName}
-        classes={classes}
-        incidents={incidents}
+        classes={schoolClasses}
+        incidents={schoolIncidents}
         period={period}
       />
     );
@@ -772,15 +875,24 @@ const ClassSlidesContent = ({
       <SchoolSituationSlide
         key="school-situation"
         schoolName={schoolName}
-        classes={classes}
-        students={students}
+        classes={schoolClasses}
+        students={schoolStudents}
         grades={filteredGrades}
         period={period}
       />
     );
 
     return slides;
-  }, [viewMode, schoolPeriod, schoolName, classes, students, schoolGrades, incidents, allProfessionalSubjects]);
+  }, [
+    schoolPeriod,
+    schoolClasses,
+    schoolIncidents,
+    schoolName,
+    schoolProfessionalSubjects,
+    schoolStudents,
+    schoolGrades,
+    viewMode,
+  ]);
 
   const activeSlides = viewMode === "class"
     ? classSlides
@@ -1341,7 +1453,7 @@ const ClassSlidesContent = ({
                         <SelectValue placeholder="Ano" />
                       </SelectTrigger>
                       <SelectContent>
-                        {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i + 1).reverse().map((year) => (
+                        {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 4 + i).map((year) => (
                           <SelectItem key={year} value={String(year)}>{year}</SelectItem>
                         ))}
                       </SelectContent>
@@ -1352,7 +1464,7 @@ const ClassSlidesContent = ({
                 <div className="flex-1 min-w-[300px]">
                   <div className="p-2.5 bg-muted/50 rounded-lg text-sm text-muted-foreground border">
                     <p className="font-medium text-foreground truncate" title={schoolName}>{schoolName}</p>
-                    <p className="text-xs">{classes.length} turmas • {students.length} alunos matriculados</p>
+                    <p className="text-xs">{schoolClasses.length} turmas • {schoolStudents.length} alunos matriculados</p>
                   </div>
                 </div>
               </div>

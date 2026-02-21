@@ -176,7 +176,7 @@ const Dashboard = () => {
         actions={
           <>
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
               onClick={handleOpenGlobalSearch}
               aria-label="Buscar função, página ou ação"

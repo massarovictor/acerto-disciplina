@@ -8,7 +8,7 @@ import { Class, Student, Grade, Incident } from '@/types';
 import { SlideLayout } from './SlideLayout';
 import { ReportDonutChart } from '@/lib/reportCharts';
 import { REPORT_COLORS, STATUS_COLORS, classifyStudent } from '@/lib/reportDesignSystem';
-import { Users, TrendingUp, AlertTriangle, Award } from 'lucide-react';
+import { Users, TrendingUp, AlertTriangle, Award, type LucideIcon } from 'lucide-react';
 
 interface ClassOverviewSlideProps {
   classData: Class;
@@ -112,7 +112,7 @@ export const ClassOverviewSlide = ({
     suffix = '',
     subtext = ''
   }: {
-    icon: any;
+    icon: LucideIcon;
     label: string;
     value: string | number;
     color: string;

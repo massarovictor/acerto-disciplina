@@ -8,7 +8,14 @@ import { Student, Grade, Incident, Class } from '@/types';
 import { SlideLayout } from './SlideLayout';
 import { ReportDonutChart } from '@/lib/reportCharts';
 import { REPORT_COLORS, STATUS_COLORS, classifyStudent } from '@/lib/reportDesignSystem';
-import { Users, TrendingUp, AlertTriangle, Award, Building2, GraduationCap } from 'lucide-react';
+import {
+  Users,
+  TrendingUp,
+  AlertTriangle,
+  Award,
+  Building2,
+  type LucideIcon,
+} from 'lucide-react';
 
 interface SchoolOverviewSlideProps {
     schoolName: string;
@@ -110,7 +117,7 @@ export const SchoolOverviewSlide = ({
         suffix = '',
         subtext = ''
     }: {
-        icon: any;
+        icon: LucideIcon;
         label: string;
         value: string | number;
         color: string;

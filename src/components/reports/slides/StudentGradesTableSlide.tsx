@@ -9,6 +9,8 @@ import { Student, Grade } from '@/types';
 import { SlideLayout } from './SlideLayout';
 import { REPORT_COLORS, STATUS_COLORS, getGradeColor } from '@/lib/reportDesignSystem';
 
+const QUARTER_LABELS = ['1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre'];
+
 interface StudentGradesTableSlideProps {
   student: Student;
   grades: Grade[];
@@ -16,8 +18,6 @@ interface StudentGradesTableSlideProps {
 }
 
 export const StudentGradesTableSlide = ({ student, grades, period }: StudentGradesTableSlideProps) => {
-  const quarters = ['1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre'];
-
   const { sortedSubjects, overallAverage, approvedCount, recoveryCount, quarterAverages } = useMemo(() => {
     const filteredGrades = period === 'all'
       ? grades
@@ -47,7 +47,7 @@ export const StudentGradesTableSlide = ({ student, grades, period }: StudentGrad
 
     // Calculate overall average per quarter
     const allStudentGrades = grades.filter(g => g.studentId === student.id);
-    const qAverages = quarters.map((quarter) => {
+    const qAverages = QUARTER_LABELS.map((quarter) => {
       const qGrades = allStudentGrades.filter((g) => g.quarter === quarter);
       if (qGrades.length === 0) return null;
       return qGrades.reduce((sum, g) => sum + g.grade, 0) / qGrades.length;
@@ -148,7 +148,7 @@ export const StudentGradesTableSlide = ({ student, grades, period }: StudentGrad
               <tr style={{ background: REPORT_COLORS.background.surface }}>
                 <th style={{ padding: '16px 20px', textAlign: 'left', fontSize: 18, fontWeight: 700, color: REPORT_COLORS.text.secondary, width: 60 }}>#</th>
                 <th style={{ padding: '16px 20px', textAlign: 'left', fontSize: 18, fontWeight: 700, color: REPORT_COLORS.text.secondary }}>Disciplina</th>
-                {period === 'all' && quarters.map(q => (
+                {period === 'all' && QUARTER_LABELS.map(q => (
                   <th key={q} style={{ padding: '16px 12px', textAlign: 'center', fontSize: 16, fontWeight: 700, color: REPORT_COLORS.text.secondary, width: 100 }}>
                     {q.replace(' Bimestre', '')}
                   </th>
@@ -168,7 +168,7 @@ export const StudentGradesTableSlide = ({ student, grades, period }: StudentGrad
                 >
                   <td style={{ padding: '14px 20px', fontSize: 20, color: REPORT_COLORS.text.tertiary }}>{index + 1}</td>
                   <td style={{ padding: '14px 20px', fontSize: 20, fontWeight: 600, color: REPORT_COLORS.text.primary }}>{item.subject}</td>
-                  {period === 'all' && quarters.map(quarter => {
+                  {period === 'all' && QUARTER_LABELS.map(quarter => {
                     const quarterGrade = item.grades.find(g => g.quarter === quarter);
                     return (
                       <td key={quarter} style={{ padding: '10px 8px', textAlign: 'center' }}>

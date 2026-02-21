@@ -153,10 +153,9 @@ export const GlobalCommandPalette = () => {
   return (
     <>
       <Button
-        variant="outline"
+        variant="ghost"
         size="icon"
         onClick={openPalette}
-        className="text-muted-foreground border-border/70 hover:border-primary/40 hover:text-foreground"
         aria-label="Buscar função, página ou ação"
         title="Buscar função, página ou ação"
       >

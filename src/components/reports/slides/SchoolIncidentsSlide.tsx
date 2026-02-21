@@ -28,7 +28,6 @@ interface SchoolIncidentsSlideProps {
 }
 
 import {
-    getSeverityColor,
     getSeverityLabel
 } from '@/lib/incidentUtils';
 
@@ -48,8 +47,7 @@ export const SchoolIncidentsSlide = ({
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
     const incidentData = useMemo(() => {
-        // Filter by period if needed (incidents have date, we'd need quarter mapping)
-        // For simplicity, using all incidents for now
+        // Incidents já chegam filtrados por período no componente pai (ClassSlides).
         const filteredIncidents = incidents;
 
         // Count by severity
@@ -90,7 +88,7 @@ export const SchoolIncidentsSlide = ({
             byClass,
             byStatus,
         };
-    }, [classes, incidents, period]);
+    }, [classes, incidents]);
 
     // Mostrar apenas top 5 no slide para caber o botão
     const displayClasses = incidentData.byClass.slice(0, 5);

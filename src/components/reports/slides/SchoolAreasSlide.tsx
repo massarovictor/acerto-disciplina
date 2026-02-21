@@ -10,7 +10,14 @@ import { ReportBarChart } from '@/lib/reportCharts';
 import { REPORT_COLORS } from '@/lib/reportDesignSystem';
 import { SUBJECT_AREAS } from '@/lib/subjects';
 import { calculateSummaryStatistics } from '@/lib/advancedCalculations';
-import { BookOpen, Brain, FlaskConical, Calculator, Briefcase } from 'lucide-react';
+import {
+  BookOpen,
+  Brain,
+  FlaskConical,
+  Calculator,
+  Briefcase,
+  type LucideIcon,
+} from 'lucide-react';
 
 interface SchoolAreasSlideProps {
     schoolName: string;
@@ -19,7 +26,7 @@ interface SchoolAreasSlideProps {
     professionalSubjects: string[];
 }
 
-const AREA_CONFIGS: Record<string, { icon: any; color: string }> = {
+const AREA_CONFIGS: Record<string, { icon: LucideIcon; color: string }> = {
     'Linguagens': { icon: BookOpen, color: '#3B82F6' },
     'Ciências Humanas': { icon: Brain, color: '#8B5CF6' },
     'Ciências da Natureza': { icon: FlaskConical, color: '#10B981' },
