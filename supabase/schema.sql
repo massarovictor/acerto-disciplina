@@ -49,6 +49,50 @@ CREATE TABLE public.classes (
   CONSTRAINT classes_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES auth.users(id),
   CONSTRAINT classes_director_id_fkey FOREIGN KEY (director_id) REFERENCES public.profiles(id)
 );
+CREATE TABLE public.certificate_events (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  owner_id uuid NOT NULL,
+  created_by_name text NOT NULL,
+  title text NOT NULL,
+  certificate_type text NOT NULL CHECK (certificate_type = ANY (ARRAY['monitoria'::text, 'destaque'::text, 'evento_participacao'::text, 'evento_organizacao'::text])),
+  class_id uuid,
+  class_name_snapshot text NOT NULL,
+  school_year smallint NOT NULL CHECK (school_year >= 1 AND school_year <= 3),
+  period_mode text NOT NULL CHECK (period_mode = ANY (ARRAY['quarters'::text, 'annual'::text])),
+  selected_quarters ARRAY NOT NULL DEFAULT '{}'::text[],
+  period_label text NOT NULL,
+  reference_type text CHECK (reference_type = ANY (ARRAY['subject'::text, 'area'::text])),
+  reference_value text,
+  reference_label text,
+  base_text text NOT NULL,
+  teacher_name text,
+  director_name text,
+  signature_mode text NOT NULL DEFAULT 'digital_cursive'::text CHECK (signature_mode = ANY (ARRAY['digital_cursive'::text, 'physical_print'::text])),
+  type_meta jsonb NOT NULL DEFAULT '{}'::jsonb,
+  students_count integer NOT NULL DEFAULT 0 CHECK (students_count >= 0),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT certificate_events_pkey PRIMARY KEY (id),
+  CONSTRAINT certificate_events_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES auth.users(id),
+  CONSTRAINT certificate_events_class_id_fkey FOREIGN KEY (class_id) REFERENCES public.classes(id) ON DELETE SET NULL
+);
+CREATE TABLE public.certificate_event_students (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  owner_id uuid NOT NULL,
+  certificate_event_id uuid NOT NULL,
+  student_id uuid,
+  student_name_snapshot text NOT NULL,
+  text_override text,
+  highlight_status text CHECK (highlight_status = ANY (ARRAY['confirmed'::text, 'pending'::text])),
+  highlight_average numeric,
+  verification_code text NOT NULL DEFAULT upper(replace((gen_random_uuid())::text, '-'::text, ''::text)),
+  verification_status text NOT NULL DEFAULT 'valid'::text CHECK (verification_status = ANY (ARRAY['valid'::text, 'revoked'::text])),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT certificate_event_students_pkey PRIMARY KEY (id),
+  CONSTRAINT certificate_event_students_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES auth.users(id),
+  CONSTRAINT certificate_event_students_certificate_event_id_fkey FOREIGN KEY (certificate_event_id) REFERENCES public.certificate_events(id) ON DELETE CASCADE,
+  CONSTRAINT certificate_event_students_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id) ON DELETE SET NULL
+);
 CREATE TABLE public.comments (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   owner_id uuid NOT NULL,

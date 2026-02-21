@@ -16,6 +16,7 @@ import Reports from '@/pages/Reports';
 import Analytics from '@/pages/Analytics';
 import Users from '@/pages/Users';
 import StudentTrajectory from '@/pages/StudentTrajectory';
+import CertificateVerification from '@/pages/CertificateVerification';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -73,6 +74,7 @@ const App = () => (
           >
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/certificados/verificar" element={<CertificateVerification />} />
               <Route
                 path="/"
                 element={

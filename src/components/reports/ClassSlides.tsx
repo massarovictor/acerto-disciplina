@@ -67,7 +67,7 @@ import { useSearchParams } from "react-router-dom";
 
 // ...
 
-export const ClassSlides = ({
+const ClassSlidesContent = ({
   classes,
   students,
   incidents,
@@ -1522,4 +1522,9 @@ export const ClassSlides = ({
       )}
     </div>
   );
+};
+
+export const ClassSlides = (props: ClassSlidesProps) => {
+  if (!props.enabled) return null;
+  return <ClassSlidesContent {...props} />;
 };

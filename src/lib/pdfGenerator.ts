@@ -11,6 +11,50 @@ import { getSchoolConfig, SchoolConfig, getDefaultConfig } from './schoolConfig'
 // pdfMake será carregado dinamicamente
 let pdfMakeInstance: any = null;
 
+const resolveVfsPayload = (pdfFontsModule: any) =>
+  {
+    const candidates = [
+      pdfFontsModule?.pdfMake?.vfs,
+      pdfFontsModule?.default?.pdfMake?.vfs,
+      pdfFontsModule?.vfs,
+      pdfFontsModule?.default?.vfs,
+      pdfFontsModule?.default,
+      pdfFontsModule,
+    ];
+
+    for (const candidate of candidates) {
+      if (!candidate || typeof candidate !== 'object') continue;
+      const keys = Object.keys(candidate);
+      const hasFontFiles = keys.some((key) => /\.(ttf|otf)$/i.test(key));
+      if (hasFontFiles) {
+        return candidate;
+      }
+    }
+
+    return null;
+  };
+
+const hasEmbeddedRoboto = (pdfMake: any) => {
+  const robotoFile = pdfMake?.fonts?.Roboto?.normal || 'Roboto-Regular.ttf';
+
+  if (pdfMake?.vfs && typeof pdfMake.vfs === 'object') {
+    return Boolean(pdfMake.vfs[robotoFile]);
+  }
+
+  if (typeof pdfMake?.virtualfs?.existsSync === 'function') {
+    try {
+      return (
+        pdfMake.virtualfs.existsSync(robotoFile) ||
+        pdfMake.virtualfs.existsSync(`/${robotoFile}`)
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+};
+
 // Função exportada para uso em outros arquivos
 export async function getPdfMake() {
   if (pdfMakeInstance) return pdfMakeInstance;
@@ -21,15 +65,34 @@ export async function getPdfMake() {
 
     pdfMakeInstance = pdfMakeModule.default || pdfMakeModule;
 
-    // Tentar diferentes formas de acesso ao vfs
-    const vfs = (pdfFontsModule as any).pdfMake?.vfs
-      || (pdfFontsModule as any).default?.pdfMake?.vfs
-      || (pdfFontsModule as any).vfs
-      || (pdfFontsModule as any).default?.vfs;
+    const vfsPayload = resolveVfsPayload(pdfFontsModule as any);
+    let fontsConfigured = false;
 
-    if (vfs) {
-      pdfMakeInstance.vfs = vfs;
-    } else {
+    if (vfsPayload && typeof pdfMakeInstance.addVirtualFileSystem === 'function') {
+      pdfMakeInstance.addVirtualFileSystem(vfsPayload);
+      fontsConfigured = true;
+    } else if (vfsPayload) {
+      // Compatibilidade com versões antigas do pdfmake.
+      pdfMakeInstance.vfs = vfsPayload;
+      fontsConfigured = true;
+    }
+
+    if (!pdfMakeInstance.fonts) {
+      pdfMakeInstance.fonts = {
+        Roboto: {
+          normal: 'Roboto-Regular.ttf',
+          bold: 'Roboto-Medium.ttf',
+          italics: 'Roboto-Italic.ttf',
+          bolditalics: 'Roboto-MediumItalic.ttf',
+        },
+      };
+    }
+
+    if (!fontsConfigured) {
+      fontsConfigured = hasEmbeddedRoboto(pdfMakeInstance);
+    }
+
+    if (!fontsConfigured) {
       console.warn('VFS Fonts não foram carregadas corretamente. O PDF pode ficar sem fontes.');
     }
 

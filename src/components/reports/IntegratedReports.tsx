@@ -78,7 +78,7 @@ const getDefaultSchoolYearForClass = (classInfo: Class): 1 | 2 | 3 => {
     : 1;
 };
 
-export const IntegratedReports = ({
+const IntegratedReportsContent = ({
   classes,
   students,
   incidents,
@@ -152,33 +152,43 @@ export const IntegratedReports = ({
   );
 
   useEffect(() => {
+    const updateSchoolYear = (value: 1 | 2 | 3) => {
+      setSelectedSchoolYear((prev) => (prev === value ? prev : value));
+    };
+
     if (!selectedClass) {
-      setSelectedSchoolYear(1);
+      updateSchoolYear(1);
       return;
     }
     // Calcular dinamicamente o ano atual da turma baseado no ano calendário de início
     const classInfo = classes.find((cls) => cls.id === selectedClass);
     if (!classInfo) {
-      setSelectedSchoolYear(1);
+      updateSchoolYear(1);
       return;
     }
 
-    setSelectedSchoolYear(getDefaultSchoolYearForClass(classInfo));
+    updateSchoolYear(getDefaultSchoolYearForClass(classInfo));
   }, [selectedClass, classes]);
 
   useEffect(() => {
+    const updateRankingSchoolYears = (value: 1 | 2 | 3) => {
+      setSelectedRankingSchoolYears((prev) =>
+        prev.length === 1 && prev[0] === value ? prev : [value],
+      );
+    };
+
     if (!selectedClass) {
-      setSelectedRankingSchoolYears([1]);
+      updateRankingSchoolYears(1);
       return;
     }
 
     const classInfo = classes.find((cls) => cls.id === selectedClass);
     if (!classInfo) {
-      setSelectedRankingSchoolYears([1]);
+      updateRankingSchoolYears(1);
       return;
     }
 
-    setSelectedRankingSchoolYears([getDefaultSchoolYearForClass(classInfo)]);
+    updateRankingSchoolYears(getDefaultSchoolYearForClass(classInfo));
   }, [selectedClass, classes]);
 
   const parseLocalDate = (value: string) => new Date(`${value}T00:00:00`);
@@ -1356,4 +1366,9 @@ export const IntegratedReports = ({
 
     </>
   );
+};
+
+export const IntegratedReports = (props: IntegratedReportsProps) => {
+  if (!props.enabled) return null;
+  return <IntegratedReportsContent {...props} />;
 };

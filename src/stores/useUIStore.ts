@@ -55,7 +55,7 @@ interface GradesAttendanceUIState {
 }
 
 interface ReportsUIState {
-    activeTab: string;
+    activeTab: 'integrated' | 'slides' | 'certificates';
 }
 
 interface TrajectoryUIState {

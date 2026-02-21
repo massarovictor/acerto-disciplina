@@ -214,3 +214,82 @@ export interface ExternalAssessment {
   createdAt: string;
   updatedAt?: string;
 }
+
+export type SavedCertificateType =
+  | "monitoria"
+  | "destaque"
+  | "evento_participacao"
+  | "evento_organizacao";
+
+export type SavedCertificatePeriodMode = "quarters" | "annual";
+export type SavedCertificateReferenceType = "subject" | "area";
+export type SignatureMode = "digital_cursive" | "physical_print";
+export type CertificateVerificationStatus = "valid" | "revoked";
+
+export interface SavedCertificateEventStudent {
+  id: string;
+  certificateEventId: string;
+  ownerId: string;
+  studentId?: string;
+  studentNameSnapshot: string;
+  textOverride?: string;
+  highlightStatus?: "confirmed" | "pending";
+  highlightAverage?: number | null;
+  verificationCode: string;
+  verificationStatus: CertificateVerificationStatus;
+  createdAt: string;
+}
+
+export interface SavedCertificateEvent {
+  id: string;
+  ownerId: string;
+  createdByName: string;
+  title: string;
+  certificateType: SavedCertificateType;
+  classId?: string;
+  classNameSnapshot: string;
+  schoolYear: 1 | 2 | 3;
+  periodMode: SavedCertificatePeriodMode;
+  selectedQuarters: string[];
+  periodLabel: string;
+  referenceType?: SavedCertificateReferenceType;
+  referenceValue?: string;
+  referenceLabel?: string;
+  baseText: string;
+  teacherName?: string;
+  directorName?: string;
+  signatureMode: SignatureMode;
+  typeMeta: Record<string, unknown>;
+  studentsCount: number;
+  createdAt: string;
+  updatedAt: string;
+  students: SavedCertificateEventStudent[];
+}
+
+export interface CreateSavedCertificateEventStudentInput {
+  studentId?: string;
+  studentNameSnapshot: string;
+  textOverride?: string;
+  highlightStatus?: "confirmed" | "pending";
+  highlightAverage?: number | null;
+}
+
+export interface CreateSavedCertificateEventInput {
+  title: string;
+  certificateType: SavedCertificateType;
+  classId?: string;
+  classNameSnapshot: string;
+  schoolYear: 1 | 2 | 3;
+  periodMode: SavedCertificatePeriodMode;
+  selectedQuarters: string[];
+  periodLabel: string;
+  referenceType?: SavedCertificateReferenceType;
+  referenceValue?: string;
+  referenceLabel?: string;
+  baseText: string;
+  teacherName?: string;
+  directorName?: string;
+  signatureMode?: SignatureMode;
+  typeMeta?: Record<string, unknown>;
+  students: CreateSavedCertificateEventStudentInput[];
+}
