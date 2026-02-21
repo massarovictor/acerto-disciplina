@@ -120,6 +120,10 @@ Indicadores visuais de estado.
   1.  **Topo/Esquerda**: Informação mais urgente (ex: Ocorrências hoje).
   2.  **Direita**: Informação de suporte (ex: Aniversariantes).
   3.  **Abaixo**: Navegação ou histórico.
+- **Interações obrigatórias dos widgets**:
+  - Card **Atividade Recente**: CTA `Ver todas` deve abrir dialog no próprio dashboard (não redirecionar).
+  - Card **Aniversariantes**: CTA `Ver todos` abre dialog com abas `Próximos` e `Passados`.
+  - Ambos os dialogs seguem o bloco padrão de filtros (`Filtrar e Buscar`).
 
 ### 4.2. Formulários (Dialogs vs Drawers)
 - **Dialog (Modal)**: Para ações rápidas que exigem foco total e pouco input (ex: Confirmar exclusão).
@@ -129,7 +133,15 @@ Indicadores visuais de estado.
 - Sempre use `ScrollArea` se a lista puder crescer indefinidamente.
 - Mostre "Empty States" (estados vazios) amigáveis quando não houver dados ("Nenhuma ocorrência registrada hoje" + Ícone).
 
-### 4.4. Padrão de Filtros (Obrigatório)
+### 4.4. Busca Global (Ctrl/Cmd+K)
+1. Trigger na TopBar com botão `Buscar função`.
+2. Atalho obrigatório: `Ctrl+K` (Windows/Linux) e `Cmd+K` (macOS).
+3. Itens agrupados em:
+   - **Páginas**
+   - **Ações rápidas**
+4. Resultados devem respeitar perfil/permissão do usuário (não mostrar destinos bloqueados).
+
+### 4.5. Padrão de Filtros (Obrigatório)
 Para páginas com busca/filtro (ex: **Turmas**, **Alunos**, **Certificados**), usar sempre o mesmo bloco:
 
 1. Card de filtro com estrutura:
@@ -149,7 +161,7 @@ Para páginas com busca/filtro (ex: **Turmas**, **Alunos**, **Certificados**), u
 
 Objetivo: previsibilidade de UX entre módulos operacionais.
 
-### 4.5. Padrão de Lista Operacional em Cards
+### 4.6. Padrão de Lista Operacional em Cards
 Para listagens operacionais (ex: **Acompanhamentos Resolvidos** e **Certificados Emitidos**):
 
 1. Item em card clicável com:
@@ -167,7 +179,7 @@ Para listagens operacionais (ex: **Acompanhamentos Resolvidos** e **Certificados
 4. Header da seção:
    - Título da listagem + subtítulo curto orientado à ação.
 
-### 4.6. Segmentação de Convivência no Analytics
+### 4.7. Segmentação de Convivência no Analytics
 Para evitar distorção de métricas após introdução de novos tipos de acompanhamento:
 
 1. **Convivência Disciplinar**:
@@ -191,7 +203,17 @@ Para evitar distorção de métricas após introdução de novos tipos de acompa
      - pelo menos 3 pontos temporais válidos
      - variação absoluta mínima relevante
      - base mínima de estudantes/notas
-   - Sem evidência suficiente, o bloco pode ficar vazio (sem mensagem fraca).
+  - Sem evidência suficiente, o bloco pode ficar vazio (sem mensagem fraca).
+
+### 4.8. Visibilidade por Perfil (UI + Rotas)
+1. Módulos **Turmas**, **Alunos** e **Notas** são admin-only.
+2. Aplicar sempre dois níveis:
+   - ocultar itens na Sidebar, cards do Dashboard e busca global;
+   - bloquear acesso direto por URL com redirecionamento para `/`.
+3. Regra de Dashboard:
+   - `admin`: vê atividade recente sem restrição de turma;
+   - `diretor`: vê atividade recente apenas das turmas sob sua direção;
+   - `professor`: card de atividade recente deve ser omitido.
 
 ---
 

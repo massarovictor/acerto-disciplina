@@ -16,11 +16,14 @@ import { getSchoolConfig, getDefaultConfig, SchoolConfig } from './schoolConfig'
 import { PDF_COLORS, PDF_STYLES, getPdfMake, getPDFGenerator, PDFGenerator } from './pdfGenerator';
 import {
   classifyStudent,
-  SubjectGradeInfo,
   CLASSIFICATION_LABELS,
-  CLASSIFICATION_COLORS
+  CLASSIFICATION_COLORS,
 } from './advancedAnalytics';
 import { QUARTERS } from './subjects';
+import {
+  buildIndividualBehaviorEntries,
+} from './reportBehaviorSummary';
+import { resolveReportAccentColor } from './reportPdfTheme';
 
 class StudentReportPDFGenerator {
   private config: SchoolConfig;
@@ -30,6 +33,7 @@ class StudentReportPDFGenerator {
   private incidents: Incident[] = [];
   private attendance: AttendanceRecord[] = [];
   private periodLabel = 'Ano Completo';
+  private accentColor = PDF_COLORS.primary;
 
   constructor() {
     this.config = getDefaultConfig();
@@ -52,6 +56,7 @@ class StudentReportPDFGenerator {
       this.incidents = incidents.filter(i => i.studentIds.includes(student.id));
       this.attendance = []; // Feature desativada
       this.periodLabel = periodContextLabel?.trim() || 'Ano Completo';
+      this.accentColor = resolveReportAccentColor(this.config.themeColor);
 
       const content = this.buildDocumentContent(subjects);
       const docDefinition = this.createDocDefinition(content);
@@ -78,7 +83,10 @@ class StudentReportPDFGenerator {
       pageMargins: [40, 60, 40, 60],
       header: (currentPage) => this.createPageHeader(currentPage),
       footer: (currentPage, pageCount) => this.createPageFooter(currentPage, pageCount),
-      styles: PDF_STYLES,
+      styles: {
+        ...PDF_STYLES,
+        tableHeader: { ...(PDF_STYLES.tableHeader || {}), fillColor: this.accentColor },
+      },
       defaultStyle: { fontSize: 10 },
       content,
     };
@@ -257,7 +265,14 @@ class StudentReportPDFGenerator {
               })
             ]
           },
-          layout: 'lightHorizontalLines', // Cleaner layout
+          layout: {
+            hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>
+              i === 0 || i === node.table.body.length ? 0 : 0.5,
+            vLineWidth: () => 0,
+            hLineColor: () => '#CBD5E1',
+            paddingLeft: () => 4,
+            paddingRight: () => 4,
+          },
           margin: [0, 0, 0, 20]
         }
       ]
@@ -276,13 +291,10 @@ class StudentReportPDFGenerator {
     const vulnerabilities = below6.map(s => `${s.name} (${s.avg.toFixed(1)})`);
     const strengths = above8.map(s => `${s.name} (${s.avg.toFixed(1)})`);
 
-    let incidentText = 'Ausência de acompanhamentos registrados.';
-    if (this.incidents.length > 0) {
-      const graveCount = this.incidents.filter(i => i.finalSeverity === 'grave' || i.finalSeverity === 'gravissima').length;
-      incidentText = graveCount > 0
-        ? `Constam ${this.incidents.length} registros, sendo ${graveCount} de maior complexidade.`
-        : `Registram-se ${this.incidents.length} acompanhamentos pontuais sob monitoramento.`;
-    }
+    const behaviorEntries = buildIndividualBehaviorEntries(this.incidents, {
+      maxCauseLength: 180,
+      includeStatusInLine: false,
+    });
 
     let encaminhamento = 'Manutenção do acompanhamento regular.';
     if (classification.classification === 'critico') encaminhamento = 'Intervenção imediata e plano de recuperação individualizado.';
@@ -323,13 +335,29 @@ class StudentReportPDFGenerator {
                     margin: [0, 0, 0, 15]
                   },
 
-                  // Disciplinary
+                  // Comportamental
                   {
-                    text: [
-                      { text: 'DISCIPLINA: ', fontSize: 8, bold: true },
-                      { text: incidentText, fontSize: 8 }
+                    stack: [
+                      { text: 'COMPORTAMENTAL:', fontSize: 8, bold: true, margin: [0, 0, 0, 3] },
+                      ...(behaviorEntries.length > 0
+                        ? [
+                            {
+                              ul: behaviorEntries.map((entry) => entry.line),
+                              fontSize: 8,
+                              color: '#334155',
+                              margin: [0, 0, 0, 0],
+                            } as Content,
+                          ]
+                        : [
+                            {
+                              text: 'Sem registros no período.',
+                              fontSize: 8,
+                              color: PDF_COLORS.secondary,
+                              italics: true,
+                            } as Content,
+                          ]),
                     ],
-                    margin: [0, 0, 0, 6]
+                    margin: [0, 0, 0, 6],
                   },
 
                   // Forwarding
@@ -404,8 +432,23 @@ class StudentReportPDFGenerator {
   }
 }
 
-export const generateStudentReportPDF = async (...args: any[]) => {
+export const generateStudentReportPDF = async (
+  student: Student,
+  studentClass: Class | undefined,
+  grades: Grade[],
+  incidents: Incident[],
+  attendance: AttendanceRecord[],
+  subjects?: string[],
+  periodContextLabel?: string,
+) => {
   const gen = new StudentReportPDFGenerator();
-  // @ts-ignore
-  return gen.generate(...args);
+  return gen.generate(
+    student,
+    studentClass,
+    grades,
+    incidents,
+    attendance,
+    subjects,
+    periodContextLabel,
+  );
 };

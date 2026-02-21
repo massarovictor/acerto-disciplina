@@ -31,6 +31,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatBrasiliaDate } from '@/lib/brasiliaDate';
+import { useSearchParams } from 'react-router-dom';
 import {
   getIncidentSeverityLabel,
   getIncidentTypeLabel,
@@ -67,6 +68,7 @@ const Incidents = () => {
   const [showNewIncidentDialog, setShowNewIncidentDialog] = useState(false);
   const [newIncidentType, setNewIncidentType] = useState<IncidentType>('disciplinar');
   const [initialTab, setInitialTab] = useState<'info' | 'followup' | 'comments'>('info');
+  const [searchParams, setSearchParams] = useSearchParams();
   const normalizeEmail = (value?: string | null) => (value || '').trim().toLowerCase();
 
   // Get active classes for filter
@@ -95,6 +97,25 @@ const Incidents = () => {
       setClassFilter(firstDirectorClass.id);
     }
   }, [classFilter, directorOwnedClasses, profile?.role, setClassFilter]);
+
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action !== 'nova-ocorrencia') return;
+
+    const requestedType = searchParams.get('tipo');
+    const parsedType: IncidentType =
+      requestedType === 'acompanhamento_familiar'
+        ? 'acompanhamento_familiar'
+        : 'disciplinar';
+
+    setNewIncidentType(parsedType);
+    setShowNewIncidentDialog(true);
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('action');
+    nextParams.delete('tipo');
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const typeFilteredIncidents = useMemo(() => {
     if (typeFilter === 'all') return incidents;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,8 @@ import {
   Settings,
   ArrowRight,
   Sparkles,
-  LayoutGrid
+  LayoutGrid,
+  Search,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -24,6 +25,8 @@ import { BirthdayWidget } from '@/components/dashboard/BirthdayWidget';
 import { OperatingStatus } from '@/components/dashboard/OperatingStatus';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { isDisciplinaryIncident } from '@/lib/incidentType';
+import { formatBrasiliaDate } from '@/lib/brasiliaDate';
+import { filterIncidentsByDashboardScope, getDashboardRoleScope } from '@/lib/dashboardRoleScope';
 
 interface NavigationCard {
   title: string;
@@ -34,26 +37,63 @@ interface NavigationCard {
   iconColor: string;
   badge?: string | number;
   badgeVariant?: 'default' | 'destructive' | 'secondary';
+  requiredRole?: 'admin';
 }
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   const { incidents } = useIncidents();
   const { classes } = useClasses();
   const { students } = useStudents();
 
   const [showSchoolConfig, setShowSchoolConfig] = useState(false);
+  const handleOpenGlobalSearch = () => {
+    window.dispatchEvent(new Event('open-global-search'));
+  };
 
-  // Calculate badges and counts
-  const activeClasses = classes.filter(c => !c.archived);
-  const activeStudents = students.filter(s => s.status === 'active');
-  const disciplinaryIncidents = incidents.filter((incident) =>
-    isDisciplinaryIncident(incident),
+  const roleScope = useMemo(
+    () => getDashboardRoleScope({ profile, user, classes }),
+    [classes, profile, user],
   );
-  const activeClassIds = new Set(activeClasses.map((c) => c.id));
-  const pendingIncidents = disciplinaryIncidents.filter(
-    (i) => i.status !== 'resolvida' && activeClassIds.has(i.classId),
+  const activeClasses = useMemo(
+    () => classes.filter((schoolClass) => !schoolClass.archived),
+    [classes],
+  );
+  const scopedActiveClasses = useMemo(() => {
+    if (roleScope.isAdmin) {
+      return activeClasses;
+    }
+
+    if (roleScope.role === 'diretor') {
+      const allowedClassIds = new Set(roleScope.allowedClassIds);
+      return activeClasses.filter((schoolClass) => allowedClassIds.has(schoolClass.id));
+    }
+
+    return [];
+  }, [activeClasses, roleScope]);
+  const scopedActiveClassIds = useMemo(
+    () => new Set(scopedActiveClasses.map((schoolClass) => schoolClass.id)),
+    [scopedActiveClasses],
+  );
+  const scopedActiveStudents = useMemo(
+    () =>
+      students.filter(
+        (student) =>
+          student.status === 'active' && scopedActiveClassIds.has(student.classId),
+      ),
+    [students, scopedActiveClassIds],
+  );
+  const scopedIncidents = useMemo(
+    () => filterIncidentsByDashboardScope(incidents, roleScope),
+    [incidents, roleScope],
+  );
+  const scopedDisciplinaryIncidents = useMemo(
+    () => scopedIncidents.filter((incident) => isDisciplinaryIncident(incident)),
+    [scopedIncidents],
+  );
+  const pendingIncidents = scopedDisciplinaryIncidents.filter(
+    (i) => i.status !== 'resolvida' && scopedActiveClassIds.has(i.classId),
   );
 
   const navigationCards: NavigationCard[] = [
@@ -64,6 +104,7 @@ const Dashboard = () => {
       path: '/turmas',
       iconBg: 'bg-indigo-50 dark:bg-indigo-900/20',
       iconColor: 'text-indigo-600 dark:text-indigo-400',
+      requiredRole: 'admin',
     },
     {
       title: 'Alunos',
@@ -72,6 +113,7 @@ const Dashboard = () => {
       path: '/alunos',
       iconBg: 'bg-blue-50 dark:bg-blue-900/20',
       iconColor: 'text-blue-600 dark:text-blue-400',
+      requiredRole: 'admin',
     },
     {
       title: 'Notas/Freq.',
@@ -80,6 +122,7 @@ const Dashboard = () => {
       path: '/notas-frequencia',
       iconBg: 'bg-emerald-50 dark:bg-emerald-900/20',
       iconColor: 'text-emerald-600 dark:text-emerald-400',
+      requiredRole: 'admin',
     },
     {
       title: 'Acompanhamentos',
@@ -116,6 +159,9 @@ const Dashboard = () => {
       iconColor: 'text-cyan-600 dark:text-cyan-400',
     },
   ];
+  const filteredNavigationCards = roleScope.isAdmin
+    ? navigationCards
+    : navigationCards.filter((card) => card.requiredRole !== 'admin');
 
   return (
     <PageContainer>
@@ -126,36 +172,49 @@ const Dashboard = () => {
             <span>Olá, {user?.email?.split('@')[0] || 'Gestor'}</span>
           </>
         }
-        description={`Hoje é ${new Date().toLocaleDateString('pt-BR', { dateStyle: 'full' })}`}
+        description={`Hoje é ${formatBrasiliaDate(new Date(), { dateStyle: 'full' })}`}
         actions={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowSchoolConfig(true)}
-            className="gap-2"
-          >
-            <Settings className="h-4 w-4" />
-            Configurar
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleOpenGlobalSearch}
+              aria-label="Buscar função, página ou ação"
+              title="Buscar função, página ou ação"
+            >
+              <Search className="h-4 w-4" />
+              <span className="sr-only">Buscar função, página ou ação</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowSchoolConfig(true)}
+              className="gap-2"
+            >
+              <Settings className="h-4 w-4" />
+              Configurar
+            </Button>
+          </>
         }
       />
 
       {/* 1. Operating Status (Top KPIs) */}
       <OperatingStatus
-        studentsCount={activeStudents.length}
-        classesCount={activeClasses.length}
+        studentsCount={scopedActiveStudents.length}
+        classesCount={scopedActiveClasses.length}
         pendingIncidentsCount={pendingIncidents.length}
+        canNavigateAdminResources={roleScope.isAdmin}
       />
 
       {/* 2. Main Bento Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Left Column (2/3): Recent Activity */}
-        <div className="lg:col-span-2 h-full">
-          <RecentActivity incidents={disciplinaryIncidents} students={students} />
-        </div>
+        {roleScope.canViewRecentActivity ? (
+          <div className="lg:col-span-2 h-full">
+            <RecentActivity incidents={scopedIncidents} classes={classes} students={students} />
+          </div>
+        ) : null}
 
-        {/* Right Column (1/3): Birthdays */}
-        <div className="space-y-6 flex flex-col h-full">
+        <div className={`space-y-6 flex flex-col h-full ${roleScope.canViewRecentActivity ? '' : 'lg:col-span-3'}`}>
           <div className="flex-1">
             <BirthdayWidget students={students} classes={classes} />
           </div>
@@ -170,7 +229,7 @@ const Dashboard = () => {
         </div>
 
         <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {navigationCards.map((card) => (
+          {filteredNavigationCards.map((card) => (
             <Card
               key={card.path}
               className="
@@ -210,17 +269,19 @@ const Dashboard = () => {
       </div>
 
       {/* Archived Classes Link */}
-      <div className="flex justify-center mt-12 mb-8">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground hover:text-foreground text-xs"
-          onClick={() => navigate('/turmas-arquivadas')}
-        >
-          Ver turmas arquivadas
-          <ArrowRight className="h-3 w-3 ml-1" />
-        </Button>
-      </div>
+      {roleScope.isAdmin ? (
+        <div className="flex justify-center mt-12 mb-8">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground text-xs"
+            onClick={() => navigate('/turmas-arquivadas')}
+          >
+            Ver turmas arquivadas
+            <ArrowRight className="h-3 w-3 ml-1" />
+          </Button>
+        </div>
+      ) : null}
 
       {/* School Config Dialog */}
       <SchoolConfigDialog

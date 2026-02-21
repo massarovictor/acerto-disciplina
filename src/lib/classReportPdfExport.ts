@@ -23,6 +23,10 @@ import {
 } from './advancedAnalytics';
 import { generateInsightsReport, InsightsReport } from './insightsEngine';
 import { QUARTERS, SUBJECT_AREAS, FUNDAMENTAL_SUBJECT_AREAS, getSubjectArea } from './subjects';
+import {
+  buildClassBehaviorEntriesByStudent,
+} from './reportBehaviorSummary';
+import { resolveReportAccentColor } from './reportPdfTheme';
 
 
 
@@ -41,6 +45,21 @@ interface AreaAnalysis {
   subjects: string[]; // V7 Requirement
 }
 
+interface SubjectQuarterStats {
+  q: number;
+  avg: number;
+  approved: number;
+  reproved: number;
+  count: number;
+}
+
+interface SubjectStatsRow {
+  name: string;
+  quarters: SubjectQuarterStats[];
+  average: number;
+  hasData: boolean;
+}
+
 // ============================================
 // CLASSE PRINCIPAL
 // ============================================
@@ -56,6 +75,7 @@ class ClassReportPDFGenerator {
   private students: Student[] = [];
   private incidents: Incident[] = [];
   private professionalSubjects: string[] = [];
+  private accentColor = PDF_COLORS.primary;
 
   constructor() {
     this.config = getDefaultConfig();
@@ -77,6 +97,7 @@ class ClassReportPDFGenerator {
       this.incidents = incidents;
       this.professionalSubjects = professionalSubjects;
       this.currentClass = cls;
+      this.accentColor = resolveReportAccentColor(this.config.themeColor);
 
       this.period = selectedQuarter && selectedQuarter !== 'anual'
         ? selectedQuarter
@@ -364,7 +385,11 @@ class ClassReportPDFGenerator {
       pageMargins: [40, 60, 40, 60],
       header: (currentPage) => this.createPageHeader(cls, currentPage),
       footer: (currentPage, pageCount) => this.createPageFooter(currentPage, pageCount),
-      styles: PDF_STYLES,
+      styles: {
+        ...PDF_STYLES,
+        tableHeader: { ...(PDF_STYLES.tableHeader || {}), fillColor: this.accentColor },
+        headerGroup: { ...(PDF_STYLES.headerGroup || {}), fillColor: this.accentColor },
+      },
       defaultStyle: { fontSize: 10 },
       content,
     };
@@ -464,7 +489,7 @@ class ClassReportPDFGenerator {
 
         // Linha 1: KPIs Principais
         gen.createDashboardRow([
-          gen.createKPIBox('Total de Alunos', summary.totalStudents, PDF_COLORS.primary, 'Matriculados'),
+          gen.createKPIBox('Total de Alunos', summary.totalStudents, this.accentColor, 'Matriculados'),
           gen.createKPIBox('Média Geral', summary.classAverage.toFixed(1), summary.classAverage >= 6 ? PDF_COLORS.status.aprovado : PDF_COLORS.status.critico, 'Média Global'),
           gen.createKPIBox('Taxa de Aprovação', summary.approvalRate.toFixed(1) + '%', summary.approvalRate >= 70 ? PDF_COLORS.status.aprovado : PDF_COLORS.status.atencao, 'Aprovados + Exc.')
         ]),
@@ -684,7 +709,7 @@ class ClassReportPDFGenerator {
     } as unknown as Content);
   }
 
-  private calculateSubjectStats(subjects: string[]) {
+  private calculateSubjectStats(subjects: string[]): SubjectStatsRow[] {
     return subjects.map(sub => {
       const subGrades = this.grades.filter(g => g.subject === sub);
       const quarters = [1, 2, 3, 4].map(q => {
@@ -714,7 +739,7 @@ class ClassReportPDFGenerator {
     }).filter((subject) => subject.hasData);
   }
 
-  private buildQuarterlyTable(stats: any[]): Content {
+  private buildQuarterlyTable(stats: SubjectStatsRow[]): Content {
     const mainHeaderCell = {
       style: 'headerGroup',
       color: PDF_COLORS.primary,
@@ -751,7 +776,7 @@ class ClassReportPDFGenerator {
 
     const bodyRows = stats.map((sub) => {
       const row: TableCell[] = [{ text: sub.name, style: 'tableCompact', alignment: 'left', bold: true }];
-      sub.quarters.forEach((q: any) => {
+      sub.quarters.forEach((q) => {
         row.push({ text: q.count > 0 ? q.approved : '-', style: 'tableCompact', alignment: 'center' });
         row.push({ text: q.count > 0 ? q.reproved : '-', style: 'tableCompact', alignment: 'center', color: q.reproved > 0 ? PDF_COLORS.danger : PDF_COLORS.secondary, bold: q.reproved > 0 });
         row.push({ text: q.count > 0 ? q.avg.toFixed(1) : '-', style: 'tableCompact', alignment: 'center', bold: true });
@@ -770,7 +795,7 @@ class ClassReportPDFGenerator {
         ]
       },
       layout: {
-        hLineWidth: (i: number, node: any) => (i === 0 || i === node.table.body.length) ? 1 : 0.5,
+        hLineWidth: (i: number, node: { table: { body: unknown[] } }) => (i === 0 || i === node.table.body.length) ? 1 : 0.5,
         vLineWidth: (i: number) => (i === 0 || i === 13) ? 0 : (i === 1 || i === 4 || i === 7 || i === 10) ? 0.5 : 0, // Linhas verticais separando bimestres
         hLineColor: () => '#E2E8F0',
         vLineColor: () => '#CBD5E1',
@@ -796,9 +821,18 @@ class ClassReportPDFGenerator {
       return a.studentName.localeCompare(b.studentName, 'pt-BR');
     });
 
-    // Adicionar espaçamento entre alunos (2 quebras de linha)
-    // V7: Compact Student Grid
-    const studentCards = sortedProfiles.map(profile => this.buildStudentCompactCard(profile));
+    const behaviorByStudent = buildClassBehaviorEntriesByStudent(
+      this.incidents,
+      sortedProfiles.map((profile) => profile.studentId),
+      { maxCauseLength: 180, includeStatusInLine: false },
+    );
+    const behaviorMap = new Map(
+      behaviorByStudent.map((item) => [item.studentId, item]),
+    );
+
+    const studentCards = sortedProfiles.map((profile) =>
+      this.buildStudentCompactCard(profile, behaviorMap.get(profile.studentId)),
+    );
 
     return {
       stack: [
@@ -811,14 +845,16 @@ class ClassReportPDFGenerator {
   }
 
   // Novo Card Compacto (V7.4 Topificado)
-  private buildStudentCompactCard(profile: StudentProfile): Content {
+  private buildStudentCompactCard(
+    profile: StudentProfile,
+    behavior?: ReturnType<typeof buildClassBehaviorEntriesByStudent>[number],
+  ): Content {
     const student = this.students.find(s => s.id === profile.studentId);
     const studentName = student?.name || 'Aluno Desconhecido';
 
     const statusColor = CLASSIFICATION_COLORS[profile.classification];
     const statusLabel = CLASSIFICATION_LABELS[profile.classification];
     const average = profile.average.toFixed(1);
-    const frequencyLabel = 'N/D';
     const reprovacoes = profile.subjectsBelow6.length;
 
     // Preparar Listas
@@ -828,15 +864,7 @@ class ClassReportPDFGenerator {
       return avg ? `${s} (${avg.toFixed(1)})` : `${s}`;
     }).slice(0, 5); // Limit to top 5 to save space
 
-    // Texto Disciplinar
-    const studentIncidents = this.incidents.filter(i => i.studentIds.includes(profile.studentId));
-    let incidentText = 'Ausência de acompanhamentos registrados.';
-    if (studentIncidents.length > 0) {
-      const graveCount = studentIncidents.filter(i => i.finalSeverity === 'grave' || i.finalSeverity === 'gravissima').length;
-      incidentText = graveCount > 0
-        ? `Constam ${studentIncidents.length} registros, sendo ${graveCount} de maior complexidade.`
-        : `Registram-se ${studentIncidents.length} acompanhamentos pontuais sob monitoramento.`;
-    }
+    const behaviorEntries = behavior?.entries ?? [];
 
     // Encaminhamento
     let encaminhamento = 'Manutenção do acompanhamento regular.';
@@ -860,7 +888,7 @@ class ClassReportPDFGenerator {
 
               // 2. Métricas Lineares
               {
-                text: `Média: ${average}   |   Frequência: ${frequencyLabel}   |   Reprovações: ${reprovacoes}`,
+                text: `Média: ${average}   |   Reprovações: ${reprovacoes}`,
                 fontSize: 8, color: PDF_COLORS.secondary, bold: true, margin: [0, 0, 0, 4]
               },
 
@@ -892,13 +920,29 @@ class ClassReportPDFGenerator {
                 margin: [0, 2, 0, 4]
               },
 
-              // 5. Campo Disciplinar
+              // 5. Campo Comportamental
               {
-                text: [
-                  { text: 'CAMPO DISCIPLINAR: ', fontSize: 7, bold: true },
-                  { text: incidentText, fontSize: 7 }
+                stack: [
+                  { text: 'CAMPO COMPORTAMENTAL:', fontSize: 8, bold: true, margin: [0, 2, 0, 1] },
+                  ...(behaviorEntries.length > 0
+                    ? [
+                        {
+                          ul: behaviorEntries.map((entry) => entry.line),
+                          fontSize: 8,
+                          color: '#334155',
+                          margin: [0, 0, 0, 2],
+                        } as Content,
+                      ]
+                    : [
+                        {
+                          text: 'Sem registros no período.',
+                          fontSize: 8,
+                          color: PDF_COLORS.secondary,
+                          italics: true,
+                          margin: [0, 0, 0, 2],
+                        } as Content,
+                      ]),
                 ],
-                margin: [0, 2, 0, 2]
               },
 
               // 6. Encaminhamento
@@ -918,7 +962,6 @@ class ClassReportPDFGenerator {
       layout: 'noBorders',
       fillColor: '#F8FAFC',
       margin: [0, 0, 0, 8],
-      unbreakable: true
     } as Content;
   }
 

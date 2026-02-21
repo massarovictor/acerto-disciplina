@@ -5,12 +5,25 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useClasses, useStudents } from '@/hooks/useData';
 import { Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 const CertificatesPage = () => {
   const { classes } = useClasses();
   const { students } = useStudents();
   const [createRequestNonce, setCreateRequestNonce] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action !== 'emitir') return;
+
+    setCreateRequestNonce((prev) => prev + 1);
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('action');
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   return (
     <PageContainer>

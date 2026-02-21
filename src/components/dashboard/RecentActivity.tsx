@@ -1,29 +1,30 @@
+import { useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Clock } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { Incident, Student } from "@/types";
+import { Class, Incident, Student } from "@/types";
 import { getUrgencyDot } from "@/lib/incidentUtils";
-import { isDisciplinaryIncident } from "@/lib/incidentType";
+import { getIncidentTypeLabel, getIncidentSeverityLabel } from "@/lib/incidentType";
+import { RecentActivityDialog } from "./RecentActivityDialog";
 
 interface RecentActivityProps {
     incidents: Incident[];
+    classes: Class[];
     students: Student[];
 }
 
-export const RecentActivity = ({ incidents, students }: RecentActivityProps) => {
-    const navigate = useNavigate();
-    const disciplinaryIncidents = incidents.filter((incident) =>
-        isDisciplinaryIncident(incident),
-    );
+export const RecentActivity = ({ incidents, classes, students }: RecentActivityProps) => {
+    const [showAllDialog, setShowAllDialog] = useState(false);
 
-    // Pegar as 5 últimas acompanhamentos, independente do status
-    const recentIncidents = [...disciplinaryIncidents]
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 5);
+    const recentIncidents = useMemo(
+      () =>
+        [...incidents]
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .slice(0, 5),
+      [incidents],
+    );
 
     const formatTimeAgo = (dateString: string) => {
         const date = new Date(dateString);
@@ -36,79 +37,90 @@ export const RecentActivity = ({ incidents, students }: RecentActivityProps) => 
         return `${Math.floor(diffInSeconds / 86400)}d atrás`;
     };
 
-    const getStudent = (id: string) => students.find(s => s.id === id);
-
     return (
-        <Card className="col-span-1 md:col-span-2 flex flex-col h-full">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-lg font-semibold">Atividade Recente</CardTitle>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-muted-foreground text-xs hover:text-primary"
-                    onClick={() => navigate('/acompanhamentos')}
-                >
-                    Ver todas <ArrowRight className="ml-1 h-3 w-3" />
-                </Button>
-            </CardHeader>
-            <CardContent className="flex-1 min-h-[300px]">
-                {recentIncidents.length > 0 ? (
-                    <div className="space-y-4">
-                        {recentIncidents.map((incident) => {
-                            // Find student (incidents store studentIds array, usually 1 student for individual incidents)
-                            const studentId = incident.studentIds?.[0];
-                            const student = students.find(s => s.id === studentId);
-                            const severityColor = getUrgencyDot(incident.finalSeverity);
+        <>
+          <Card className="col-span-1 md:col-span-2 flex flex-col h-full">
+              <CardHeader className="flex flex-col gap-2 pb-2 sm:flex-row sm:items-center sm:justify-between">
+                  <CardTitle className="text-lg font-semibold">Atividade Recente</CardTitle>
+                  <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-center text-muted-foreground text-xs hover:text-primary sm:w-auto sm:justify-start"
+                      onClick={() => setShowAllDialog(true)}
+                  >
+                      Ver todas <ArrowRight className="ml-1 h-3 w-3" />
+                  </Button>
+              </CardHeader>
+              <CardContent className="flex-1 min-h-[300px]">
+                  {recentIncidents.length > 0 ? (
+                      <div className="space-y-4">
+                          {recentIncidents.map((incident) => {
+                              const studentId = incident.studentIds?.[0];
+                              const student = students.find(s => s.id === studentId);
+                              const severityColor = getUrgencyDot(incident.finalSeverity);
 
-                            return (
-                                <div key={incident.id} className="flex items-start gap-3 pb-3 border-b last:border-0 last:pb-0">
-                                    <Avatar className="h-9 w-9 border">
-                                        <AvatarImage src={student?.photoUrl} />
-                                        <AvatarFallback className="text-xs bg-muted">
-                                            {student?.name?.substring(0, 2).toUpperCase() || 'AL'}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex-1 space-y-1">
-                                        <div className="flex items-center justify-between">
-                                            <p className="text-sm font-medium leading-none truncate max-w-[200px]">
-                                                {student?.name || 'Aluno não encontrado'}
-                                            </p>
-                                            <div className="flex items-center text-xs text-muted-foreground">
-                                                <Clock className="mr-1 h-3 w-3" />
-                                                {formatTimeAgo(incident.createdAt)}
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <div className={`h-2 w-2 rounded-full ${severityColor}`} />
-                                            <span className="text-xs text-muted-foreground capitalize">
-                                                {incident.finalSeverity}
-                                            </span>
-                                            {incident.status === 'resolvida' && (
-                                                <Badge
-                                                    variant="outline"
-                                                    className="text-[10px] h-4 px-1 py-0 ml-auto border-[#10B981]/35 text-[#10B981] bg-[#10B981]/10 dark:bg-[#10B981]/20"
-                                                >
-                                                    Resolvida
-                                                </Badge>
-                                            )}
-                                        </div>
-                                        <p className="text-xs text-muted-foreground line-clamp-1">
-                                            {incident.description}
-                                        </p>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground space-y-2">
-                        <div className="p-3 rounded-full bg-muted/50">
-                            <Clock className="h-6 w-6 opacity-30" />
-                        </div>
-                        <p className="text-sm">Nenhuma atividade recente</p>
-                    </div>
-                )}
-            </CardContent>
-        </Card>
+                              return (
+                                  <div key={incident.id} className="flex items-start gap-3 pb-3 border-b last:border-0 last:pb-0">
+                                      <Avatar className="h-9 w-9 border">
+                                          <AvatarImage src={student?.photoUrl} />
+                                          <AvatarFallback className="text-xs bg-muted">
+                                              {student?.name?.substring(0, 2).toUpperCase() || 'AL'}
+                                          </AvatarFallback>
+                                      </Avatar>
+                                      <div className="flex-1 space-y-1">
+                                          <div className="flex items-center justify-between">
+                                              <p className="text-sm font-medium leading-none truncate max-w-[220px]">
+                                                  {student?.name || 'Aluno não encontrado'}
+                                              </p>
+                                              <div className="flex items-center text-xs text-muted-foreground">
+                                                  <Clock className="mr-1 h-3 w-3" />
+                                                  {formatTimeAgo(incident.createdAt)}
+                                              </div>
+                                          </div>
+                                          <div className="flex items-center gap-2 mt-1">
+                                              <div className={`h-2 w-2 rounded-full ${severityColor}`} />
+                                              <span className="text-xs text-muted-foreground">
+                                                  {getIncidentTypeLabel(incident.incidentType)}
+                                              </span>
+                                              <span className="text-xs text-muted-foreground">•</span>
+                                              <span className="text-xs text-muted-foreground">
+                                                  {getIncidentSeverityLabel(incident.finalSeverity, incident.incidentType)}
+                                              </span>
+                                              {incident.status === 'resolvida' && (
+                                                  <Badge
+                                                      variant="outline"
+                                                      className="text-[10px] h-4 px-1 py-0 ml-auto border-[#10B981]/35 text-[#10B981] bg-[#10B981]/10 dark:bg-[#10B981]/20"
+                                                  >
+                                                      Resolvida
+                                                  </Badge>
+                                              )}
+                                          </div>
+                                          <p className="text-xs text-muted-foreground line-clamp-1">
+                                              {incident.description}
+                                          </p>
+                                      </div>
+                                  </div>
+                              );
+                          })}
+                      </div>
+                  ) : (
+                      <div className="h-full flex flex-col items-center justify-center text-muted-foreground space-y-2">
+                          <div className="p-3 rounded-full bg-muted/50">
+                              <Clock className="h-6 w-6 opacity-30" />
+                          </div>
+                          <p className="text-sm">Nenhuma atividade recente</p>
+                      </div>
+                  )}
+              </CardContent>
+          </Card>
+
+          <RecentActivityDialog
+            open={showAllDialog}
+            onOpenChange={setShowAllDialog}
+            incidents={incidents}
+            classes={classes}
+            students={students}
+          />
+        </>
     );
 };

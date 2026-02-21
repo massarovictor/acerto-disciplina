@@ -1,4 +1,4 @@
-import { Bell, LogOut, Sun, Moon } from 'lucide-react';
+import { LogOut, Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,9 +13,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { GlobalCommandPalette } from './GlobalCommandPalette';
 
 export const TopBar = () => {
-  const { user, profile, logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { resolvedTheme, setTheme } = useTheme();
 
@@ -37,19 +38,11 @@ export const TopBar = () => {
     });
   };
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center gap-4 bg-background px-6">
       <SidebarTrigger />
       <div className="flex-1" />
+      <GlobalCommandPalette />
       <Button
         variant="ghost"
         size="icon"

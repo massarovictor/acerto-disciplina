@@ -19,6 +19,7 @@ import Analytics from '@/pages/Analytics';
 import Users from '@/pages/Users';
 import StudentTrajectory from '@/pages/StudentTrajectory';
 import CertificateVerification from '@/pages/CertificateVerification';
+import { AdminOnlyRoute } from '@/components/auth/AdminOnlyRoute';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -115,10 +116,38 @@ const App = () => (
                 <Route index element={<Dashboard />} />
                 <Route path="acompanhamentos" element={<Incidents />} />
                 <Route path="ocorrencias" element={<LegacyIncidentsRedirect />} />
-                <Route path="turmas" element={<Classes />} />
-                <Route path="turmas-arquivadas" element={<ArchivedClasses />} />
-                <Route path="alunos" element={<Students />} />
-                <Route path="notas-frequencia" element={<GradesAttendance />} />
+                <Route
+                  path="turmas"
+                  element={(
+                    <AdminOnlyRoute>
+                      <Classes />
+                    </AdminOnlyRoute>
+                  )}
+                />
+                <Route
+                  path="turmas-arquivadas"
+                  element={(
+                    <AdminOnlyRoute>
+                      <ArchivedClasses />
+                    </AdminOnlyRoute>
+                  )}
+                />
+                <Route
+                  path="alunos"
+                  element={(
+                    <AdminOnlyRoute>
+                      <Students />
+                    </AdminOnlyRoute>
+                  )}
+                />
+                <Route
+                  path="notas-frequencia"
+                  element={(
+                    <AdminOnlyRoute>
+                      <GradesAttendance />
+                    </AdminOnlyRoute>
+                  )}
+                />
                 <Route path="relatorios-integrados" element={<IntegratedReportsPage />} />
                 <Route path="slides" element={<SlidesPage />} />
                 <Route path="certificados" element={<CertificatesPage />} />

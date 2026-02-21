@@ -3,15 +3,11 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { IntegratedReports } from '@/components/reports/IntegratedReports';
 import { Card, CardContent } from '@/components/ui/card';
 import { useClasses, useIncidents, useStudents } from '@/hooks/useData';
-import { isDisciplinaryIncident } from '@/lib/incidentType';
 
 const IntegratedReportsPage = () => {
   const { classes } = useClasses();
   const { students } = useStudents();
   const { incidents } = useIncidents();
-  const disciplinaryIncidents = incidents.filter((incident) =>
-    isDisciplinaryIncident(incident),
-  );
 
   return (
     <PageContainer>
@@ -26,7 +22,7 @@ const IntegratedReportsPage = () => {
             <IntegratedReports
               classes={classes}
               students={students}
-              incidents={disciplinaryIncidents}
+              incidents={incidents}
               enabled
             />
           </CardContent>

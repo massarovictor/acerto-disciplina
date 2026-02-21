@@ -54,6 +54,68 @@ const VIEW_MODES: ViewMode[] = ["class", "individual", "situation", "school"];
 const isViewMode = (value: string): value is ViewMode =>
   VIEW_MODES.includes(value as ViewMode);
 
+const SITUATION_OPTIONS: Array<{
+  value: SituationType;
+  label: string;
+  description: string;
+}> = [
+  { value: "critico", label: "Crítico", description: "3+ disciplinas abaixo de 6" },
+  { value: "atencao", label: "Atenção", description: "1-2 disciplinas abaixo de 6" },
+  { value: "aprovado", label: "Aprovado", description: "Todas disciplinas ≥ 6" },
+  { value: "excelencia", label: "Excelência", description: "Todas ≥ 6 e média geral ≥ 8" },
+];
+
+const parseLocalDate = (value: string) => new Date(`${value}T00:00:00`);
+
+const addMonths = (date: Date, months: number) => {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + months);
+  return next;
+};
+
+const addYears = (date: Date, years: number) => {
+  const next = new Date(date);
+  next.setFullYear(next.getFullYear() + years);
+  return next;
+};
+
+const getSchoolYearRange = (
+  startYearDate: string | undefined,
+  schoolYear: number,
+) => {
+  if (!startYearDate) return null;
+  const startDate = parseLocalDate(startYearDate);
+  if (Number.isNaN(startDate.getTime())) return null;
+  const yearOffset = schoolYear - 1;
+  const yearStart = addYears(startDate, yearOffset);
+  const yearEnd = addMonths(yearStart, 8);
+  return { start: yearStart, end: yearEnd };
+};
+
+const isDateInRange = (
+  value: string,
+  range: { start: Date; end: Date } | null,
+) => {
+  if (!range) return true;
+  const date = parseLocalDate(value);
+  if (Number.isNaN(date.getTime())) return false;
+  return date >= range.start && date < range.end;
+};
+
+const getStartCalendarYear = (cls: Class) => {
+  if (typeof cls.startCalendarYear === "number") return cls.startCalendarYear;
+  if (cls.startYearDate) {
+    const date = parseLocalDate(cls.startYearDate);
+    if (!Number.isNaN(date.getTime())) return date.getFullYear();
+  }
+  const currentYear = new Date().getFullYear();
+  const inferredYear =
+    cls.currentYear && [1, 2, 3].includes(cls.currentYear)
+      ? currentYear - (cls.currentYear - 1)
+      : undefined;
+  return inferredYear;
+};
+
 interface ClassSlidesProps {
   classes: Class[];
   students: Student[];
@@ -150,13 +212,6 @@ const ClassSlidesContent = ({
     { value: 3, label: "3º ano" },
   ];
 
-  const situationOptions: Array<{ value: SituationType; label: string; description: string }> = [
-    { value: "critico", label: "Crítico", description: "3+ disciplinas abaixo de 6" },
-    { value: "atencao", label: "Atenção", description: "1-2 disciplinas abaixo de 6" },
-    { value: "aprovado", label: "Aprovado", description: "Todas disciplinas ≥ 6" },
-    { value: "excelencia", label: "Excelência", description: "Todas ≥ 6 e média geral ≥ 8" },
-  ];
-
   const { grades: scopedGrades } = useGradesScoped({
     classId: selectedClass || undefined,
     quarter: selectedPeriod === "all" ? undefined : selectedPeriod,
@@ -164,20 +219,6 @@ const ClassSlidesContent = ({
   }, { enabled });
 
   const [selectedCalendarYear, setSelectedCalendarYear] = useState<number>(new Date().getFullYear());
-
-  const getStartCalendarYear = (cls: Class) => {
-    if (typeof cls.startCalendarYear === 'number') return cls.startCalendarYear;
-    if (cls.startYearDate) {
-      const date = parseLocalDate(cls.startYearDate);
-      if (!Number.isNaN(date.getTime())) return date.getFullYear();
-    }
-    const currentYear = new Date().getFullYear();
-    const inferredYear =
-      cls.currentYear && [1, 2, 3].includes(cls.currentYear)
-        ? currentYear - (cls.currentYear - 1)
-        : undefined;
-    return inferredYear;
-  };
 
   const schoolClassIds = useMemo(
     () => {
@@ -281,39 +322,6 @@ const ClassSlidesContent = ({
     loadSchoolName();
   }, []);
 
-  const parseLocalDate = (value: string) => new Date(`${value}T00:00:00`);
-  const addMonths = (date: Date, months: number) => {
-    const next = new Date(date);
-    next.setMonth(next.getMonth() + months);
-    return next;
-  };
-  const addYears = (date: Date, years: number) => {
-    const next = new Date(date);
-    next.setFullYear(next.getFullYear() + years);
-    return next;
-  };
-  const getSchoolYearRange = (
-    startYearDate: string | undefined,
-    schoolYear: number,
-  ) => {
-    if (!startYearDate) return null;
-    const startDate = parseLocalDate(startYearDate);
-    if (Number.isNaN(startDate.getTime())) return null;
-    const yearOffset = schoolYear - 1;
-    const yearStart = addYears(startDate, yearOffset);
-    const yearEnd = addMonths(yearStart, 8);
-    return { start: yearStart, end: yearEnd };
-  };
-  const isDateInRange = (
-    value: string,
-    range: { start: Date; end: Date } | null,
-  ) => {
-    if (!range) return true;
-    const date = parseLocalDate(value);
-    if (Number.isNaN(date.getTime())) return false;
-    return date >= range.start && date < range.end;
-  };
-
   const templateSubjects = useMemo(() => {
     if (!classData?.templateId) return [];
     const template = templates.find((t) => t.id === classData.templateId);
@@ -337,11 +345,15 @@ const ClassSlidesContent = ({
     });
     return Array.from(unique);
   }, [templateSubjects, manualSubjects]);
-  const classStudents = selectedClass
-    ? students
-      .filter((s) => s.classId === selectedClass)
-      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
-    : [];
+  const classStudents = useMemo(
+    () =>
+      selectedClass
+        ? students
+          .filter((s) => s.classId === selectedClass)
+          .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+        : [],
+    [selectedClass, students],
+  );
   const fallbackStartYearDate = classData?.startCalendarYear
     ? `${classData.startCalendarYear}-02-01`
     : undefined;
@@ -351,17 +363,22 @@ const ClassSlidesContent = ({
     () => getSchoolYearRange(effectiveStartYearDate, selectedSchoolYear),
     [effectiveStartYearDate, selectedSchoolYear],
   );
-  const classIncidents = selectedClass
-    ? incidents.filter((i) => i.classId === selectedClass)
-    : [];
+  const classIncidents = useMemo(
+    () => (selectedClass ? incidents.filter((i) => i.classId === selectedClass) : []),
+    [incidents, selectedClass],
+  );
 
-  const classGrades = selectedClass
-    ? scopedGrades.filter(
-      (g) =>
-        g.classId === selectedClass &&
-        (g.schoolYear ?? 1) === selectedSchoolYear,
-    )
-    : [];
+  const classGrades = useMemo(
+    () =>
+      selectedClass
+        ? scopedGrades.filter(
+          (g) =>
+            g.classId === selectedClass &&
+            (g.schoolYear ?? 1) === selectedSchoolYear,
+        )
+        : [],
+    [scopedGrades, selectedClass, selectedSchoolYear],
+  );
   const studentData = students.find((s) => s.id === selectedStudent);
 
   const periodGrades = useMemo(() => {
@@ -602,8 +619,8 @@ const ClassSlidesContent = ({
     const slides: React.ReactNode[] = [];
 
     // Slide de capa da situação
-    const situationLabel = situationOptions.find(s => s.value === selectedSituation)?.label || selectedSituation;
-    const situationDesc = situationOptions.find(s => s.value === selectedSituation)?.description || "";
+    const situationLabel = SITUATION_OPTIONS.find(s => s.value === selectedSituation)?.label || selectedSituation;
+    const situationDesc = SITUATION_OPTIONS.find(s => s.value === selectedSituation)?.description || "";
 
     slides.push(
       <CoverSlide
@@ -652,7 +669,6 @@ const ClassSlidesContent = ({
     classIncidents,
     selectedPeriod,
     studentRankings,
-    situationOptions,
   ]);
 
   // All professional subjects across all classes for school view
@@ -1261,7 +1277,7 @@ const ClassSlidesContent = ({
                       <SelectValue placeholder="Selecione a situação" />
                     </SelectTrigger>
                     <SelectContent>
-                      {situationOptions.map((option) => (
+                      {SITUATION_OPTIONS.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label} ({studentsBySituation[option.value]?.length || 0})
                         </SelectItem>
@@ -1273,7 +1289,7 @@ const ClassSlidesContent = ({
 
               {selectedClass && (
                 <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
-                  {situationOptions.map((option) => {
+                  {SITUATION_OPTIONS.map((option) => {
                     const count = studentsBySituation[option.value]?.length || 0;
                     const bgColor = option.value === "critico" ? "bg-destructive/10 text-destructive"
                       : option.value === "atencao" ? "bg-warning/10 text-warning"

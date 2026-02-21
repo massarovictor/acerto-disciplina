@@ -1,16 +1,4 @@
-import {
-  Home,
-  School,
-  Users,
-  BookOpen,
-  BarChart3,
-  AlertTriangle,
-  LineChart,
-  Shield,
-  History,
-  Presentation,
-  FileText,
-} from 'lucide-react';
+import { Shield } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Sidebar,
@@ -24,25 +12,15 @@ import {
   SidebarHeader,
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/contexts/AuthContext';
-
-
-const menuItems = [
-  { icon: Home, label: 'Dashboard', path: '/' },
-  { icon: LineChart, label: 'Analytics', path: '/analytics' },
-  { icon: AlertTriangle, label: 'Acompanhamentos', path: '/acompanhamentos' },
-  { icon: School, label: 'Turmas', path: '/turmas' },
-  { icon: Users, label: 'Alunos', path: '/alunos' },
-  { icon: BookOpen, label: 'Notas', path: '/notas-frequencia' },
-  { icon: History, label: 'Trajetória', path: '/trajetoria' },
-  { icon: BarChart3, label: 'Relatórios', path: '/relatorios-integrados' },
-  { icon: Presentation, label: 'Slide', path: '/slides' },
-  { icon: FileText, label: 'Certificados', path: '/certificados' },
-];
+import { getSidebarNavItems } from '@/lib/navigationSearchIndex';
+import { resolveUserRole } from '@/lib/dashboardRoleScope';
 
 export const AppSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isAdmin, profile, user } = useAuth();
+  const role = resolveUserRole({ profile, user });
+  const menuItems = getSidebarNavItems(role);
 
 
   return (

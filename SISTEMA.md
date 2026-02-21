@@ -72,17 +72,21 @@ Rotas protegidas (dentro de `AppLayout`):
 - `/`: dashboard.
 - `/acompanhamentos`: ocorrencias (rota oficial atual).
 - `/ocorrencias`: redirect legado para `/acompanhamentos`.
-- `/turmas`: gestao de turmas.
-- `/turmas-arquivadas`: turmas arquivadas.
-- `/alunos`: gestao de estudantes.
-- `/notas-frequencia`: pagina de notas (frequencia com uso parcial).
-- `/relatorios`: relatorios integrados, slides e certificados.
+- `/turmas`: gestao de turmas (**admin-only**).
+- `/turmas-arquivadas`: turmas arquivadas (**admin-only**).
+- `/alunos`: gestao de estudantes (**admin-only**).
+- `/notas-frequencia`: pagina de notas (**admin-only**).
+- `/relatorios-integrados`: relatorios integrados.
+- `/slides`: slides de apresentacao.
+- `/certificados`: certificados.
+- `/relatorios`: redirect legado para as rotas novas (query `tab` -> rota dedicada).
 - `/analytics`: painel analitico.
 - `/trajetoria`: visao longitudinal.
-- `/usuarios`: gestao de usuarios (escopo admin).
+- `/usuarios`: gestao de usuarios (**admin-only**).
 
-Detalhe importante de estabilidade em relatorios:
-- Em `src/pages/Reports.tsx`, apenas a aba ativa monta o conteudo pesado (`integrated`, `slides`, `certificates`) para reduzir custo de render.
+Detalhe importante de navegacao:
+- A estrutura de relatorios foi migrada de abas para paginas dedicadas.
+- Compatibilidade legado mantida via redirect de `/relatorios`.
 
 ---
 
@@ -92,21 +96,36 @@ Detalhe importante de estabilidade em relatorios:
 - KPIs operacionais gerais.
 - Atalhos de navegacao.
 - Acesso a configuracao escolar (`school_config`).
+- Card de aniversariantes com dialog explorador:
+  - abas `Proximos` e `Passados`
+  - busca por aluno/turma
+  - filtros de janela temporal (30, 90, 365 dias)
+  - calculo de datas em horario de Brasilia
+- Card `Atividade Recente`:
+  - CTA `Ver todas` abre dialog no proprio dashboard.
+  - Escopo por perfil:
+    - `admin`: todas as turmas
+    - `diretor`: apenas turmas dirigidas (`director_id`/`director_email`)
+    - `professor`: card omitido
+- Busca global na TopBar (`Ctrl+K`/`Cmd+K`) com resultados sensiveis a permissao.
 
 ### 4.2 Turmas
 - CRUD de turmas.
 - Campos academicos e ciclo (`start_calendar_year`, `end_calendar_year`, `archived`).
 - Vinculo de direcao por `director_id` e/ou `director_email`.
 - Integracao com templates de disciplinas profissionais.
+- Acesso restrito a perfil `admin` (UI + guard de rota).
 
 ### 4.3 Alunos
 - CRUD e movimentacao entre turmas.
 - Campos cadastrais completos (matricula, CPF, RG, status etc.).
+- Acesso restrito a perfil `admin` (UI + guard de rota).
 
 ### 4.4 Notas
 - Lancamento manual por turma/aluno/disciplina/bimestre.
 - Uso de `upsert` e agregacoes para analytics.
 - Importacao via parser SIGE.
+- Acesso restrito a perfil `admin` (UI + guard de rota).
 
 ### 4.5 Ocorrencias
 - Wizard de registro.

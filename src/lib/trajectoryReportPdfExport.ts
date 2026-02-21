@@ -15,6 +15,7 @@ import { Class, Student, Grade, Incident, HistoricalGrade, ExternalAssessment } 
 import { getSchoolConfig, getDefaultConfig, SchoolConfig } from './schoolConfig';
 import { PDF_COLORS, PDF_STYLES, getPdfMake, getPDFGenerator, PDFGenerator } from './pdfGenerator';
 import { linearRegression } from './mlAnalytics';
+import { resolveReportAccentColor } from './reportPdfTheme';
 
 interface SubjectTrajectory {
     subject: string;
@@ -30,6 +31,7 @@ interface SubjectTrajectory {
 
 class TrajectoryReportPDFGenerator {
     private config: SchoolConfig;
+    private accentColor = PDF_COLORS.primary;
     private student: Student | null = null;
     private studentClass: Class | undefined;
     private historicalGrades: HistoricalGrade[] = [];
@@ -52,6 +54,7 @@ class TrajectoryReportPDFGenerator {
     ): Promise<void> {
         try {
             this.config = await getSchoolConfig();
+            this.accentColor = resolveReportAccentColor(this.config.themeColor);
             this.student = student;
             this.studentClass = studentClass;
             this.historicalGrades = historicalGrades.filter(g => String(g.studentId) === String(student.id));
@@ -80,7 +83,10 @@ class TrajectoryReportPDFGenerator {
             header: (currentPage) => this.createPageHeader(currentPage),
             footer: (currentPage, pageCount) => this.createPageFooter(currentPage, pageCount),
             content,
-            styles: PDF_STYLES,
+            styles: {
+                ...PDF_STYLES,
+                tableHeader: { ...(PDF_STYLES.tableHeader || {}), fillColor: this.accentColor },
+            },
             defaultStyle: { fontSize: 10 },
         };
     }
@@ -330,7 +336,14 @@ class TrajectoryReportPDFGenerator {
                             })
                         ] as any
                     },
-                    layout: 'lightHorizontalLines',
+                    layout: {
+                        hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>
+                            i === 0 || i === node.table.body.length ? 0 : 0.5,
+                        vLineWidth: () => 0,
+                        hLineColor: () => '#CBD5E1',
+                        paddingLeft: () => 4,
+                        paddingRight: () => 4,
+                    },
                     margin: [0, 0, 0, 20]
                 }
             ]
@@ -398,7 +411,14 @@ class TrajectoryReportPDFGenerator {
                             })
                         ] as any
                     },
-                    layout: 'lightHorizontalLines',
+                    layout: {
+                        hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>
+                            i === 0 || i === node.table.body.length ? 0 : 0.5,
+                        vLineWidth: () => 0,
+                        hLineColor: () => '#CBD5E1',
+                        paddingLeft: () => 4,
+                        paddingRight: () => 4,
+                    },
                     margin: [0, 0, 0, 20]
                 }
             ]
@@ -442,7 +462,14 @@ class TrajectoryReportPDFGenerator {
                             })
                         ] as any
                     },
-                    layout: 'lightHorizontalLines',
+                    layout: {
+                        hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>
+                            i === 0 || i === node.table.body.length ? 0 : 0.5,
+                        vLineWidth: () => 0,
+                        hLineColor: () => '#CBD5E1',
+                        paddingLeft: () => 4,
+                        paddingRight: () => 4,
+                    },
                     margin: [0, 0, 0, 20]
                 }
             ]
@@ -538,7 +565,7 @@ class TrajectoryReportPDFGenerator {
 
         // Colors
         const colorFund = '#64748B'; // Slate 500
-        const colorEM = PDF_COLORS.primary; // Blue/Dark
+        const colorEM = PDF_COLORS.primary;
         const colorRef = '#F59E0B'; // Amber 500
         const colorTrend = PDF_COLORS.secondary;
         const colorGrid = '#E2E8F0';

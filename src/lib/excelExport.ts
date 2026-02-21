@@ -1,7 +1,9 @@
 import * as XLSX from 'xlsx';
 import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
 import { Student, Class, Grade, Incident } from '@/types';
-import { getPdfMake, PDF_COLORS, PDF_STYLES } from './pdfGenerator';
+import { getPdfMake, PDF_STYLES } from './pdfGenerator';
+import { getSchoolConfig } from './schoolConfig';
+import { resolveReportAccentColor } from './reportPdfTheme';
 
 // Modelo de planilha para importação de alunos
 export const generateStudentTemplate = (selectedClass?: Class) => {
@@ -585,6 +587,8 @@ export const exportClassRankingsPdf = async ({
 
   const includeIncidentsColumn = prepared.resolvedIncidents.includeIncidents;
   const incidentContextLabel = buildIncidentsContextLabel(prepared.resolvedIncidents);
+  const schoolConfig = await getSchoolConfig().catch(() => undefined);
+  const accentColor = resolveReportAccentColor(schoolConfig?.themeColor);
   const headers = getPdfHeaders(prepared.rankingType, includeIncidentsColumn);
   const rows = prepared.rankingRows.map((row, index) =>
     getPdfRow(row, index, prepared.rankingType, includeIncidentsColumn),
@@ -637,7 +641,14 @@ export const exportClassRankingsPdf = async ({
               : [28, '*', 108],
         body: [headers, ...rows],
       },
-      layout: 'lightHorizontalLines',
+      layout: {
+        hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>
+          i === 0 || i === node.table.body.length ? 0 : 0.5,
+        vLineWidth: () => 0,
+        hLineColor: () => '#CBD5E1',
+        paddingLeft: () => 4,
+        paddingRight: () => 4,
+      },
     },
   ];
 
@@ -650,7 +661,7 @@ export const exportClassRankingsPdf = async ({
       ...PDF_STYLES,
       tableHeader: {
         ...(PDF_STYLES.tableHeader || {}),
-        fillColor: PDF_COLORS.primary,
+        fillColor: accentColor,
       },
     },
     defaultStyle: {
