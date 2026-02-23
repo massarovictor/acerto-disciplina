@@ -23,13 +23,13 @@ export function predictFinalGrade(quarterGrades: number[]): {
 
   // Preparar dados para regressão
   const data = quarterGrades.map((grade, index) => ({ x: index + 1, y: grade }));
-  
+
   // Calcular tendência
   const trend = calculateTrend(data);
 
   // Prever nota do 4º bimestre (x = 4)
   const predicted = Math.max(0, Math.min(10, trend.slope * 4 + trend.intercept));
-  
+
   // Confiança baseada no R²
   const confidence = Math.round(trend.rSquared * 100);
 
@@ -61,7 +61,7 @@ export function calculateFailureRisk(
 
   gradesBySubject.forEach(grades => {
     const mean = calculateMean(grades);
-    if (mean < 6) {
+    if (Math.round(mean * 10) / 10 < 6) {
       subjectsBelowAverage++;
       if (mean < 5) {
         subjectsInDanger++;
@@ -216,13 +216,13 @@ export function calculateRecoveryPotential(
   // Calcular nota necessária para atingir média 6
   const totalQuarters = 4;
   const quartersLeft = totalQuarters - quarterGrades.length;
-  
+
   if (quartersLeft === 0) {
     // Já no 4º bimestre
     return {
       potential: currentAverage >= 6 ? 'Alto' : 'Baixo',
       minimumGradeNeeded: 0,
-      explanation: currentAverage >= 6 
+      explanation: currentAverage >= 6
         ? 'Aluno já atingiu a média necessária'
         : 'Sem bimestres restantes para recuperação',
     };
@@ -369,7 +369,11 @@ export function analyzeStudentPerformance(
     return Math.min(80, Math.max(20, rawConfidence));
   })();
 
-  let prediction = predictFinalGrade(quarterGrades);
+  let prediction: ReturnType<typeof predictFinalGrade> & {
+    dataPoints: number;
+    historyAverage?: number;
+    currentAverage?: number;
+  } = { ...predictFinalGrade(quarterGrades), dataPoints: quarterGrades.length, historyAverage: undefined, currentAverage: undefined };
   let finalPrediction = prediction.predicted;
   let finalConfidence = prediction.confidence;
   let method = prediction.method;

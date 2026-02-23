@@ -222,7 +222,7 @@ class ClassReportPDFGenerator {
       const studentAverages: { id: string; name: string; avg: number }[] = [];
       studentsInArea.forEach(studentId => {
         const studentAreaGrades = areaGrades.filter(g => g.studentId === studentId);
-        const avg = studentAreaGrades.reduce((s, g) => s + g.grade, 0) / studentAreaGrades.length;
+        const avg = Math.round((studentAreaGrades.reduce((s, g) => s + g.grade, 0) / studentAreaGrades.length) * 10) / 10;
         const student = this.students.find(s => s.id === studentId);
         studentAverages.push({ id: studentId, name: student?.name || '', avg });
       });
@@ -718,7 +718,7 @@ class ClassReportPDFGenerator {
           return quarterNumber === q;
         });
         const count = qGrades.length;
-        const avg = count > 0 ? qGrades.reduce((a, b) => a + b.grade, 0) / count : 0;
+        const avg = count > 0 ? Math.round((qGrades.reduce((a, b) => a + b.grade, 0) / count) * 10) / 10 : 0;
         const reproved = qGrades.filter(g => g.grade < 6).length;
         const approved = count - reproved;
         return { q, avg, approved, reproved, count };
@@ -926,22 +926,22 @@ class ClassReportPDFGenerator {
                   { text: 'CAMPO COMPORTAMENTAL:', fontSize: 8, bold: true, margin: [0, 2, 0, 1] },
                   ...(behaviorEntries.length > 0
                     ? [
-                        {
-                          ul: behaviorEntries.map((entry) => entry.line),
-                          fontSize: 8,
-                          color: '#334155',
-                          margin: [0, 0, 0, 2],
-                        } as Content,
-                      ]
+                      {
+                        ul: behaviorEntries.map((entry) => entry.line),
+                        fontSize: 8,
+                        color: '#334155',
+                        margin: [0, 0, 0, 2],
+                      } as Content,
+                    ]
                     : [
-                        {
-                          text: 'Sem registros no período.',
-                          fontSize: 8,
-                          color: PDF_COLORS.secondary,
-                          italics: true,
-                          margin: [0, 0, 0, 2],
-                        } as Content,
-                      ]),
+                      {
+                        text: 'Sem registros no período.',
+                        fontSize: 8,
+                        color: PDF_COLORS.secondary,
+                        italics: true,
+                        margin: [0, 0, 0, 2],
+                      } as Content,
+                    ]),
                 ],
               },
 

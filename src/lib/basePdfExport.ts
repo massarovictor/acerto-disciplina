@@ -128,62 +128,97 @@ export class BasePDFGenerator {
 
   protected renderHeader(simplified: boolean = false) {
     // Cabeçalho compacto e profissional (preto e branco)
-    
+
     // Nome da Escola - tamanho reduzido
     this.setFont('md', 'bold', '#000000');
     this.drawText(this.config.schoolName, this.margin, this.y + 4);
-    
+
+    let hasLogo = false;
+    let logoWidth = 0;
+
     if (!simplified) {
-      // Info Escola - linha única compacta
+      // Info Escola - cada detalhe em sua própria linha
       this.setFont('2xs', 'normal', '#666666');
-      let infoLine = this.y + 7;
-      
-      const schoolDetails = [];
+      let infoLine = this.y + 10;
+      const availableWidth = this.contentWidth - 35; // reserva espaço para logo
+
+      const schoolDetails: string[] = [];
       if (this.config.inep) schoolDetails.push(`INEP: ${this.config.inep}`);
       if (this.config.phone) schoolDetails.push(`Tel: ${this.config.phone}`);
       if (this.config.email) schoolDetails.push(`Email: ${this.config.email}`);
-      
+
+      // Tenta em uma linha; se não couber, separa
+      const joinedDetails = schoolDetails.join('  |  ');
+      const textWidth = this.pdf.getTextWidth(joinedDetails);
+
       if (schoolDetails.length > 0) {
-        this.drawText(schoolDetails.join('  |  '), this.margin, infoLine);
-        infoLine += 3;
+        if (textWidth <= availableWidth) {
+          this.drawText(joinedDetails, this.margin, infoLine);
+          infoLine += 4;
+        } else {
+          for (const detail of schoolDetails) {
+            this.drawText(detail, this.margin, infoLine);
+            infoLine += 3.5;
+          }
+          infoLine += 0.5;
+        }
       }
-      
+
       if (this.config.address) {
         const addr = `${this.config.address}${this.config.city ? `, ${this.config.city}` : ''}${this.config.state ? ` - ${this.config.state}` : ''}`;
         this.drawText(addr, this.margin, infoLine);
       }
 
-      // Logo reduzido (se houver)
+      // Logo com aspect-ratio preservado (se houver)
       if (this.config.logoBase64 && this.config.logoBase64.startsWith('data:image/')) {
         try {
           const format = this.config.logoBase64.split(';')[0].split('/')[1].toUpperCase();
-          this.pdf.addImage(this.config.logoBase64, format, this.pageWidth - this.margin - 20, this.y, 20, 20);
+          const imgProps = this.pdf.getImageProperties(this.config.logoBase64);
+          const maxH = 20;
+          const maxW = 30;
+          const ratio = imgProps.width / imgProps.height;
+          let imgW = maxH * ratio;
+          let imgH = maxH;
+          if (imgW > maxW) {
+            imgW = maxW;
+            imgH = maxW / ratio;
+          }
+          const logoX = this.pageWidth - this.margin - imgW;
+          const logoY = this.y + (20 - imgH) / 2; // centraliza verticalmente no header
+          this.pdf.addImage(this.config.logoBase64, format, logoX, logoY, imgW, imgH);
+          hasLogo = true;
+          logoWidth = imgW;
         } catch (e) {
           console.error('Erro ao renderizar logo no PDF:', e);
         }
       }
-      
-      this.y += 15;
+
+      this.y += 20;
     } else {
       this.y += 8;
     }
 
-    // Linha divisória fina
-    this.drawLine(this.y, 0.2, '#000000');
+    // Linha divisória fina — encurtada se houver logo para não invadi-la
+    const lineEnd = hasLogo
+      ? this.pageWidth - this.margin - logoWidth - 4
+      : this.pageWidth - this.margin;
+    this.pdf.setDrawColor('#000000');
+    this.pdf.setLineWidth(0.2);
+    this.pdf.line(this.margin, this.y, lineEnd, this.y);
     this.y += 8;
   }
 
   protected renderFooter() {
     const footerY = this.pageHeight - 10;
     this.drawLine(footerY - 5, 0.1, REPORT_COLORS.border);
-    
+
     this.setFont('2xs', 'normal', REPORT_COLORS.text.tertiary);
     this.drawText(
       `Gerado por MAVIC - Sistema de Acompanhamento Escolar em ${new Date().toLocaleDateString('pt-BR')}`,
       this.margin,
       footerY
     );
-    
+
     this.drawText(
       `Página ${this.pageCount}`,
       this.pageWidth - this.margin,
@@ -194,19 +229,19 @@ export class BasePDFGenerator {
 
   protected renderSectionTitle(title: string) {
     this.checkPageBreak(15);
-    
+
     // Linha separadora destacada antes do título
     this.y += 4;
     this.drawLine(this.y, 0.3, '#000000');
     this.y += 6;
-    
+
     // Barra lateral preta mais espessa
     this.drawRect(this.margin, this.y, 2, 7, { fill: '#000000' });
     // Título em formato título (primeira letra maiúscula)
     const titleFormatted = title.charAt(0).toUpperCase() + title.slice(1).toLowerCase();
     this.setFont('sm', 'bold', '#000000');
     this.drawText(titleFormatted, this.margin + 5, this.y + 5.5);
-    
+
     this.y += 12;
   }
 
@@ -218,11 +253,11 @@ export class BasePDFGenerator {
     const labelFormatted = label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
     this.setFont('xs', 'bold', '#000000');
     this.drawText(labelFormatted, x, y);
-    
+
     this.setFont('xs', 'normal', '#000000');
     const lines = this.pdf.splitTextToSize(value || '-', width);
     this.drawText(lines, x, y + 4);
-    
+
     return (lines.length * 5) + 2;
   }
 

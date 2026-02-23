@@ -6,6 +6,7 @@ import { type CertificateType } from '@/lib/certificateTypes';
 import { formatBrasiliaDate, getBrasiliaISODate } from '@/lib/brasiliaDate';
 import {
   buildCertificateTextPreview as buildCertificateTextPreviewWithLanguage,
+  buildCertificateTextForPdf,
 } from '@/lib/certificateLanguage';
 import { PDF_COLORS, PDF_STYLES, getPdfMake } from '@/lib/pdfGenerator';
 import { getDefaultConfig, getSchoolConfig } from '@/lib/schoolConfig';
@@ -154,7 +155,7 @@ const getStudentCertificateText = (
   student: CertificateExportStudentSnapshot,
   input: ResolvedExportCertificatesPdfInput,
 ): string => {
-  return buildCertificateTextPreviewWithLanguage({
+  return buildCertificateTextForPdf({
     certificateType: input.certificateType,
     schoolName: input.schoolName,
     className: input.classData.name,
@@ -266,6 +267,13 @@ const resolveLayoutProfile = ({
     bodyLineHeight = 1.14;
     bodyMarginBottom = 6;
     signatureMarginTop = 4;
+  }
+
+  if (bodyLength > 600) {
+    bodyTextSize = 11.4;
+    bodyLineHeight = 1.1;
+    bodyMarginBottom = 4;
+    signatureMarginTop = 2;
   }
 
   return {
@@ -780,8 +788,7 @@ const buildCertificateBody = async (
       text: certificateText,
       fontSize: layoutProfile.bodyTextSize,
       color: '#334155', // Slate 700 para leitura limpa
-      // Alinhamento à esquerda, layout moderno
-      alignment: 'left',
+      alignment: 'justify',
       lineHeight: layoutProfile.bodyLineHeight + 0.1, // Texto mais arejado
       margin: [0, 0, 0, layoutProfile.bodyMarginBottom + 8],
     },

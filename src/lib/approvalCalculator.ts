@@ -62,7 +62,7 @@ export function calculateFinalGrade(
   // Isso permite que disciplinas semestrais (2 notas) tenham média correta
   const sum = quarterValues.reduce((acc, val) => acc + val, 0);
 
-  return sum / quarterValues.length;
+  return Math.round((sum / quarterValues.length) * 10) / 10;
 }
 
 /**

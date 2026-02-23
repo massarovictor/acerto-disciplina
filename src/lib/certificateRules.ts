@@ -228,7 +228,7 @@ export const buildHighlightSuggestions = ({
           const quarterAverage = values.reduce((sum, value) => sum + value, 0) / values.length;
           availableQuarterAverages.push(quarterAverage);
 
-          if (quarterAverage < 6) {
+          if (Math.round(quarterAverage * 10) / 10 < 6) {
             failingSubjects.add(expectedSubjectKeys.get(subjectKey) || subjectKey);
           }
         });

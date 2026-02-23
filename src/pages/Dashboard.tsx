@@ -207,14 +207,14 @@ const Dashboard = () => {
       />
 
       {/* 2. Main Bento Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
         {roleScope.canViewRecentActivity ? (
-          <div className="lg:col-span-2 h-full">
+          <div className="lg:col-span-3 h-full">
             <RecentActivity incidents={scopedIncidents} classes={classes} students={students} />
           </div>
         ) : null}
 
-        <div className={`space-y-6 flex flex-col h-full ${roleScope.canViewRecentActivity ? '' : 'lg:col-span-3'}`}>
+        <div className={`space-y-6 flex flex-col h-full ${roleScope.canViewRecentActivity ? 'lg:col-span-2' : 'lg:col-span-5'}`}>
           <div className="flex-1">
             <BirthdayWidget students={students} classes={classes} />
           </div>

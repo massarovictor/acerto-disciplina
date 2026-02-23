@@ -1045,14 +1045,14 @@ const StudentTrajectory = () => {
             )}
 
             {subjectFallbackNotice && (
-                <div className="mb-4 px-4 py-3 rounded-lg border border-warning/30 bg-warning/10 dark:bg-warning/20 dark:border-warning/40">
+                <div className="px-4 py-3 rounded-lg border border-warning/30 bg-warning/10 dark:bg-warning/20 dark:border-warning/40">
                     <p className="font-semibold text-sm mb-1 text-warning dark:text-warning">Sem notas registradas</p>
                     <p className="text-sm text-warning dark:text-warning">{subjectFallbackNotice}</p>
                 </div>
             )}
 
             {/* Main Filters - Clean Design (No Labels) */}
-            <div className="grid gap-4 md:grid-cols-3 mb-6">
+            <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-1">
                     <Select value={selectedClass} onValueChange={setSelectedClass}>
                         <SelectTrigger className="h-10 bg-background">
@@ -1162,15 +1162,24 @@ const StudentTrajectory = () => {
                         </Card>
                     )
                 ) : (
-                    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                        <TabsList className="bg-muted p-1 rounded-lg w-full justify-start overflow-x-auto">
-                            <TabsTrigger value="summary" className="px-6">Resumo Holístico</TabsTrigger>
-                            <TabsTrigger value="trajectory" className="px-6">Trajetória e Simulação</TabsTrigger>
-                            <TabsTrigger value="entry" className="px-6">Lançamento Rápido</TabsTrigger>
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
+                        <TabsList className="grid w-full grid-cols-3 bg-muted p-1">
+                            <TabsTrigger value="summary" className="gap-2">
+                                <Zap className="h-4 w-4" />
+                                Resumo Holístico
+                            </TabsTrigger>
+                            <TabsTrigger value="trajectory" className="gap-2">
+                                <TrendingUp className="h-4 w-4" />
+                                Trajetória e Simulação
+                            </TabsTrigger>
+                            <TabsTrigger value="entry" className="gap-2">
+                                <Edit3 className="h-4 w-4" />
+                                Lançamento Rápido
+                            </TabsTrigger>
                         </TabsList>
 
                         {/* TAB: SUMMARY (POTENCIALIDADES E DIFICULDADES) */}
-                        <TabsContent value="summary" className="space-y-6">
+                        <TabsContent value="summary" className="space-y-8">
                             {holisticSummary && (
                                 <>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1311,9 +1320,9 @@ const StudentTrajectory = () => {
                         </TabsContent>
 
                         {/* TAB: ENTRY (LANÇAMENTO RÁPIDO) */}
-                        <TabsContent value="entry" className="space-y-6">
-                            <Tabs defaultValue="school_history" className="w-full">
-                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+                        <TabsContent value="entry" className="space-y-8">
+                            <Tabs defaultValue="school_history" className="w-full space-y-6">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                                     <TabsList>
                                         <TabsTrigger value="school_history" className="gap-2">
                                             <History className="h-4 w-4" />
@@ -1519,70 +1528,68 @@ const StudentTrajectory = () => {
                             </Tabs>
                         </TabsContent>
                         {/* TAB: TRAJECTORY & SIMULATION */}
-                        <TabsContent value="trajectory" className="space-y-6">
-                            {/* Controles de Seleção e Simulação */}
-                            {/* Controles de Seleção e Simulação - Clean */}
-                            <div className="mb-6">
-                                <div className="grid gap-4 md:grid-cols-3 items-center">
-                                    <div className="space-y-1">
-                                        <Select value={simulationScenario} onValueChange={(v) => setSimulationScenario(v as typeof simulationScenario)}>
-                                            <SelectTrigger className="h-10 bg-background">
-                                                <SelectValue placeholder="Selecione o cenário" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="optimistic">
-                                                    <div className="flex items-center gap-2">
-                                                        <TrendingUp className="h-4 w-4 text-success" />
-                                                        <span>Otimista (+10%)</span>
-                                                    </div>
-                                                </SelectItem>
-                                                <SelectItem value="realistic">
-                                                    <div className="flex items-center gap-2">
-                                                        <Activity className="h-4 w-4 text-info" />
-                                                        <span>Realista (Tendência Atual)</span>
-                                                    </div>
-                                                </SelectItem>
-                                                <SelectItem value="pessimistic">
-                                                    <div className="flex items-center gap-2">
-                                                        <TrendingUp className="h-4 w-4 text-destructive rotate-180" />
-                                                        <span>Pessimista (-10%)</span>
-                                                    </div>
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div className="flex items-center gap-3 px-3 py-2 border rounded-md bg-background h-10">
-                                        <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Extensão:</span>
-                                        <input
-                                            type="range"
-                                            min="1"
-                                            max="4"
-                                            value={simulationPoints}
-                                            onChange={(e) => setSimulationPoints(parseInt(e.target.value))}
-                                            className="flex-1 h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
-                                        />
-                                        <span className="w-6 text-center font-bold text-primary text-sm">{simulationPoints}</span>
-                                        <span className="text-[10px] text-muted-foreground uppercase">bim</span>
-                                    </div>
-
-                                    <div className="flex items-center">
-                                        <Button
-                                            variant={showSimulation ? "default" : "outline"}
-                                            onClick={() => setShowSimulation(!showSimulation)}
-                                            disabled={!selectedSubject || subjectTimeline.length < 2}
-                                            className="w-full h-10 gap-2"
-                                        >
-                                            <Target className="h-4 w-4" />
-                                            {showSimulation ? "Parar Simulação" : "Simular Cenário"}
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
-
+                        <TabsContent value="trajectory" className="space-y-8">
                             {selectedSubject ? (
                                 <>
-                                    {/* Cards de Métricas Enriquecidas */}
+                                    {/* Controles de Seleção e Simulação - Clean */}
+                                    <div className="mb-6">
+                                        <div className="grid gap-4 md:grid-cols-3 items-center">
+                                            <div className="space-y-1">
+                                                <Select value={simulationScenario} onValueChange={(v) => setSimulationScenario(v as typeof simulationScenario)}>
+                                                    <SelectTrigger className="h-10 bg-background">
+                                                        <SelectValue placeholder="Selecione o cenário" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="optimistic">
+                                                            <div className="flex items-center gap-2">
+                                                                <TrendingUp className="h-4 w-4 text-success" />
+                                                                <span>Otimista (+10%)</span>
+                                                            </div>
+                                                        </SelectItem>
+                                                        <SelectItem value="realistic">
+                                                            <div className="flex items-center gap-2">
+                                                                <Activity className="h-4 w-4 text-info" />
+                                                                <span>Realista (Tendência Atual)</span>
+                                                            </div>
+                                                        </SelectItem>
+                                                        <SelectItem value="pessimistic">
+                                                            <div className="flex items-center gap-2">
+                                                                <TrendingUp className="h-4 w-4 text-destructive rotate-180" />
+                                                                <span>Pessimista (-10%)</span>
+                                                            </div>
+                                                        </SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            <div className="flex items-center gap-3 px-3 py-2 border rounded-md bg-background h-10">
+                                                <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Extensão:</span>
+                                                <input
+                                                    type="range"
+                                                    min="1"
+                                                    max="4"
+                                                    value={simulationPoints}
+                                                    onChange={(e) => setSimulationPoints(parseInt(e.target.value))}
+                                                    className="flex-1 h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                                                />
+                                                <span className="w-6 text-center font-bold text-primary text-sm">{simulationPoints}</span>
+                                                <span className="text-[10px] text-muted-foreground uppercase">bim</span>
+                                            </div>
+
+                                            <div className="flex items-center">
+                                                <Button
+                                                    variant={showSimulation ? "default" : "outline"}
+                                                    onClick={() => setShowSimulation(!showSimulation)}
+                                                    disabled={!selectedSubject || subjectTimeline.length < 2}
+                                                    className="w-full h-10 gap-2"
+                                                >
+                                                    <Target className="h-4 w-4" />
+                                                    {showSimulation ? "Parar Simulação" : "Simular Cenário"}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     {/* Cards de Métricas Enriquecidas - Design System Premium */}
                                     {enrichedMetrics && trendAnalysis && (
                                         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
@@ -1603,7 +1610,7 @@ const StudentTrajectory = () => {
                                                     <div className={`text-2xl font-bold ${trendAnalysis.trendColor}`}>
                                                         {trendAnalysis.variationPercent >= 0 ? '+' : ''}{trendAnalysis.variationPercent.toFixed(0)}%
                                                     </div>
-                                                    <p className="text-xs text-muted-foreground mt-1">vs. bimestre anterior</p>
+                                                    <p className="text-xs text-muted-foreground mt-1">variação total</p>
                                                 </CardContent>
                                             </Card>
 
@@ -1778,7 +1785,7 @@ const StudentTrajectory = () => {
                                                             stroke="#2563eb"
                                                             strokeWidth={3}
                                                             name="Fundamental"
-                                                            dot={{ r: 5, fill: '#2563eb', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+                                                            dot={{ r: 5, fill: '#2563eb', stroke: 'none' }}
                                                             activeDot={{ r: 7 }}
                                                             connectNulls
                                                         >
@@ -1798,7 +1805,7 @@ const StudentTrajectory = () => {
                                                             stroke="#7c3aed"
                                                             strokeWidth={3}
                                                             name="Ensino Médio"
-                                                            dot={{ r: 5, fill: '#7c3aed', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+                                                            dot={{ r: 5, fill: '#7c3aed', stroke: 'none' }}
                                                             activeDot={{ r: 7 }}
                                                             connectNulls
                                                         >
@@ -1818,7 +1825,7 @@ const StudentTrajectory = () => {
                                                             stroke="#f39c12"
                                                             strokeWidth={3}
                                                             name="Aval. Externa"
-                                                            dot={{ r: 5, fill: '#f39c12', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+                                                            dot={{ r: 5, fill: '#f39c12', stroke: 'none' }}
                                                             activeDot={{ r: 7 }}
                                                             connectNulls
                                                         >
@@ -1843,7 +1850,7 @@ const StudentTrajectory = () => {
                                                                 strokeWidth={3}
                                                                 strokeDasharray="5 5"
                                                                 name="Projeção"
-                                                                dot={{ r: 6, fill: '#f97316', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+                                                                dot={{ r: 6, fill: '#f97316', stroke: 'none' }}
                                                                 activeDot={{ r: 8, fill: '#f97316' }}
                                                                 connectNulls
                                                             >
@@ -1913,7 +1920,7 @@ const StudentTrajectory = () => {
                                                             stroke="#10b981"
                                                             strokeWidth={3}
                                                             name="Performance"
-                                                            dot={{ r: 5, fill: '#10b981', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+                                                            dot={{ r: 5, fill: '#10b981', stroke: 'none' }}
                                                             activeDot={{ r: 7 }}
                                                             connectNulls
                                                         >
@@ -1934,7 +1941,7 @@ const StudentTrajectory = () => {
                                                                 strokeWidth={3}
                                                                 strokeDasharray="5 5"
                                                                 name="Projeção"
-                                                                dot={{ r: 6, fill: '#f97316', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+                                                                dot={{ r: 6, fill: '#f97316', stroke: 'none' }}
                                                                 activeDot={{ r: 8, fill: '#f97316' }}
                                                                 connectNulls
                                                             >
@@ -2345,7 +2352,7 @@ const StudentTrajectory = () => {
                                                             <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => {
                                                                 if (confirm('Excluir esta avaliação?')) deleteExternalAssessment(assessment.id);
                                                             }}>
-                                                                <Lock className="h-4 w-4" />
+                                                                <Trash2 className="h-4 w-4" />
                                                             </Button>
                                                         </div>
                                                     </div>

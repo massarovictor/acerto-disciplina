@@ -309,6 +309,29 @@ export interface CertificateTextPreviewInput {
   eventMeta?: CertificateLanguageEventMeta;
 }
 
+export const buildCertificateTextForPdf = (
+  input: CertificateTextPreviewInput,
+): string => {
+  const templateData = buildTemplateDataPayload({
+    certificateType: input.certificateType,
+    schoolName: input.schoolName,
+    className: input.className,
+    schoolYear: input.schoolYear,
+    periodLabel: input.periodLabel,
+    referenceLabel: input.referenceLabel,
+    monitoriaMeta: input.monitoriaMeta,
+    eventMeta: input.eventMeta,
+    studentName: input.studentName,
+  });
+
+  const renderedText = applyCertificateTemplate(input.baseText.trim(), templateData);
+  return normalizeCertificateText(
+    renderedText,
+    input.certificateType,
+    input.schoolName,
+  );
+};
+
 export const buildCertificateTextPreview = (
   input: CertificateTextPreviewInput,
 ): string => {
