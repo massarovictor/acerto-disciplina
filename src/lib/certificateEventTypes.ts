@@ -34,6 +34,7 @@ export interface SavedCertificateEventMeta {
 
 export interface CertificateEventTypeMeta {
   schemaVersion?: number;
+  referenceYear?: number;
   monitoriaMeta?: SavedCertificateMonitoriaMeta;
   eventMeta?: SavedCertificateEventMeta;
   highlightMetaByStudentId?: Record<string, SavedCertificateHighlightMeta>;

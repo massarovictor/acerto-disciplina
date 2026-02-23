@@ -48,7 +48,6 @@ import {
   resolveCertificateQuarters,
 } from '@/lib/certificatePeriods';
 import {
-  getDefaultSchoolYearForClass,
   resolveAreaReferencesForClass,
   resolveSubjectReferencesForClass,
   resolveTechnicalSubjectsForSchoolYear,
@@ -92,6 +91,7 @@ interface DraftSnapshotInput {
   selectedStudentIds: string[];
   eventTitle: string;
   selectedSchoolYear: 1 | 2 | 3;
+  referenceYear: string;
   periodMode: CertificatePeriodMode;
   selectedQuarters: string[];
   includeReference: boolean;
@@ -104,7 +104,6 @@ interface DraftSnapshotInput {
   eventEndDate: string;
   role: string;
   workloadHours: string;
-  monitoriaPeriod: string;
   activity: string;
   baseText: string;
   textOverrides: Record<string, string>;
@@ -194,7 +193,7 @@ const PLACEHOLDER_TOKENS_BY_TYPE: Record<CertificateType, string[]> = {
 };
 
 const REQUIRED_TOKENS_BY_TYPE: Record<CertificateType, string[]> = {
-  monitoria: ['aluno', 'turma', 'atividade', 'cargaHoraria', 'periodoMonitoria'],
+  monitoria: ['aluno', 'turma', 'atividade', 'cargaHoraria'],
   destaque: ['aluno', 'turma', 'periodo'],
   evento_participacao: ['aluno', 'eventoNome', 'eventoData', 'cargaHoraria'],
   evento_organizacao: ['aluno', 'eventoNome', 'eventoData', 'cargaHoraria'],
@@ -211,65 +210,8 @@ const normalizeName = (value: string) =>
     .trim()
     .toLowerCase();
 
-const getCurrentQuarter = (): string => {
-  const month = new Date().getMonth();
-  if (month < 3) return '1º Bimestre';
-  if (month < 6) return '2º Bimestre';
-  if (month < 9) return '3º Bimestre';
-  return '4º Bimestre';
-};
-
 const formatAverageLabel = (value: number | null) =>
   typeof value === 'number' ? value.toFixed(1).replace('.', ',') : '-';
-
-const resolveDefaultRole = (type: CertificateType) =>
-  type === 'evento_participacao'
-    ? 'participante'
-    : type === 'evento_organizacao'
-      ? 'membro da comissão organizadora'
-      : '';
-
-const resolveMonitoriaPeriodText = (
-  periodMode: CertificatePeriodMode,
-  selectedQuarters: string[],
-): string => {
-  const currentYear = new Date().getFullYear();
-  if (periodMode === 'annual') {
-    return `durante o ano letivo de ${currentYear}`;
-  }
-
-  const normalized = [...selectedQuarters]
-    .sort(quarterSort)
-    .map((quarter) => quarter.replace(/bimestre/gi, 'bimestre'));
-
-  if (normalized.length === 0) return '';
-
-  const quarterNumbers = normalized
-    .map((quarter) => quarter.match(/(\d+)º\s*bimestre/i)?.[1])
-    .filter((value): value is string => Boolean(value))
-    .map((value) => `${value}º`);
-
-  if (quarterNumbers.length === normalized.length) {
-    if (quarterNumbers.length === 1) {
-      return `no período relativo ao ${quarterNumbers[0]} bimestre de ${currentYear}`;
-    }
-
-    const joinedNumbers =
-      quarterNumbers.length === 2
-        ? `${quarterNumbers[0]} e ${quarterNumbers[1]}`
-        : `${quarterNumbers.slice(0, -1).join(', ')} e ${quarterNumbers[quarterNumbers.length - 1]}`;
-    return `no período relativo aos ${joinedNumbers} bimestres de ${currentYear}`;
-  }
-
-  const joined =
-    normalized.length === 1
-      ? normalized[0]
-      : normalized.length === 2
-        ? `${normalized[0]} e ${normalized[1]}`
-        : `${normalized.slice(0, -1).join(', ')} e ${normalized[normalized.length - 1]}`;
-
-  return `no período relativo aos ${joined} de ${currentYear}`;
-};
 
 const buildSnapshot = (draft: DraftSnapshotInput): string => {
   const sortedOverrides = Object.fromEntries(
@@ -316,6 +258,7 @@ export function UnifiedCertificateDialog({
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [eventTitle, setEventTitle] = useState('');
   const [selectedSchoolYear, setSelectedSchoolYear] = useState<1 | 2 | 3>(1);
+  const [referenceYear, setReferenceYear] = useState('');
 
   const [periodMode, setPeriodMode] = useState<CertificatePeriodMode>('quarters');
   const [selectedQuarters, setSelectedQuarters] = useState<string[]>([]);
@@ -334,7 +277,6 @@ export function UnifiedCertificateDialog({
   const [role, setRole] = useState('');
 
   const [workloadHours, setWorkloadHours] = useState('');
-  const [monitoriaPeriod, setMonitoriaPeriod] = useState('');
   const [activity, setActivity] = useState('');
 
   const [baseText, setBaseText] = useState('');
@@ -534,6 +476,7 @@ export function UnifiedCertificateDialog({
     setSelectedStudentIds(draft.selectedStudentIds);
     setEventTitle(draft.eventTitle);
     setSelectedSchoolYear(draft.selectedSchoolYear);
+    setReferenceYear(draft.referenceYear);
 
     setPeriodMode(draft.periodMode);
     setSelectedQuarters(draft.selectedQuarters);
@@ -550,7 +493,6 @@ export function UnifiedCertificateDialog({
     setRole(draft.role);
 
     setWorkloadHours(draft.workloadHours);
-    setMonitoriaPeriod(draft.monitoriaPeriod);
     setActivity(draft.activity);
 
     setBaseText(draft.baseText);
@@ -595,11 +537,20 @@ export function UnifiedCertificateDialog({
         selectedStudentIds: Array.from(new Set(selectedIds)),
         eventTitle: initialEvent.title,
         selectedSchoolYear: initialEvent.schoolYear,
+        referenceYear: String(
+          typeof eventTypeMeta.referenceYear === 'number' &&
+            Number.isFinite(eventTypeMeta.referenceYear)
+            ? Math.trunc(eventTypeMeta.referenceYear)
+            : Number.parseInt(
+                initialEvent.periodLabel.match(/\b(19|20)\d{2}\b/)?.[0] || '',
+                10,
+              ) || '',
+        ),
         periodMode: initialEvent.periodMode,
         selectedQuarters:
           initialEvent.selectedQuarters.length > 0
             ? [...initialEvent.selectedQuarters]
-            : [getCurrentQuarter()],
+            : [],
         includeReference: Boolean(
           initialEvent.referenceType && initialEvent.referenceValue,
         ),
@@ -610,7 +561,7 @@ export function UnifiedCertificateDialog({
         useDateRange: Boolean(eventMeta?.eventDateStart && eventMeta?.eventDateEnd),
         eventStartDate: eventMeta?.eventDateStart || '',
         eventEndDate: eventMeta?.eventDateEnd || '',
-        role: eventMeta?.role || resolveDefaultRole(initialEvent.certificateType),
+        role: eventMeta?.role || '',
         workloadHours:
           initialEvent.certificateType === 'monitoria'
             ? String(monitoriaMeta?.workloadHours ?? '')
@@ -618,13 +569,7 @@ export function UnifiedCertificateDialog({
                 initialEvent.certificateType === 'evento_organizacao'
               ? String(eventMeta?.workloadHours ?? '')
               : '',
-        monitoriaPeriod:
-          monitoriaMeta?.monitoriaPeriod ||
-          resolveMonitoriaPeriodText(
-            initialEvent.periodMode,
-            initialEvent.selectedQuarters,
-          ),
-        activity: monitoriaMeta?.activity || initialEvent.title,
+        activity: monitoriaMeta?.activity || '',
         baseText: initialEvent.baseText || '',
         textOverrides: initialOverrides,
         signatureMode: initialEvent.signatureMode || 'digital_cursive',
@@ -635,17 +580,16 @@ export function UnifiedCertificateDialog({
       return;
     }
 
-    const currentQuarter = getCurrentQuarter();
     const initialPeriodMode: CertificatePeriodMode = 'quarters';
-    const initialSelectedQuarters = [currentQuarter];
     const draft: DraftSnapshotInput = {
       certificateType: null,
       selectedClassId: '',
       selectedStudentIds: [],
       eventTitle: '',
       selectedSchoolYear: 1,
+      referenceYear: '',
       periodMode: initialPeriodMode,
-      selectedQuarters: initialSelectedQuarters,
+      selectedQuarters: [],
       includeReference: false,
       referenceType: 'subject',
       referenceValue: '',
@@ -656,10 +600,6 @@ export function UnifiedCertificateDialog({
       eventEndDate: '',
       role: '',
       workloadHours: '',
-      monitoriaPeriod: resolveMonitoriaPeriodText(
-        initialPeriodMode,
-        initialSelectedQuarters,
-      ),
       activity: '',
       baseText: '',
       textOverrides: {},
@@ -670,22 +610,6 @@ export function UnifiedCertificateDialog({
     applyDraftToState(draft, 'type');
   }, [open, mode, initialEvent, students]);
 
-  useEffect(() => {
-    if (!selectedClassData) return;
-    setSelectedSchoolYear(getDefaultSchoolYearForClass(selectedClassData));
-  }, [selectedClassData]);
-
-  useEffect(() => {
-    if (certificateType !== 'monitoria') return;
-    setMonitoriaPeriod(resolveMonitoriaPeriodText(periodMode, selectedQuarters));
-  }, [certificateType, periodMode, selectedQuarters]);
-
-  useEffect(() => {
-    if (certificateType !== 'monitoria') return;
-    if (!eventTitle.trim()) return;
-    setActivity((prev) => (prev.trim() ? prev : eventTitle.trim()));
-  }, [certificateType, eventTitle]);
-
   const currentSnapshot = useMemo(
     () =>
       buildSnapshot({
@@ -694,6 +618,7 @@ export function UnifiedCertificateDialog({
         selectedStudentIds,
         eventTitle,
         selectedSchoolYear,
+        referenceYear,
         periodMode,
         selectedQuarters,
         includeReference,
@@ -706,7 +631,6 @@ export function UnifiedCertificateDialog({
         eventEndDate,
         role,
         workloadHours,
-        monitoriaPeriod,
         activity,
         baseText,
         textOverrides,
@@ -719,6 +643,7 @@ export function UnifiedCertificateDialog({
       selectedStudentIds,
       eventTitle,
       selectedSchoolYear,
+      referenceYear,
       periodMode,
       selectedQuarters,
       includeReference,
@@ -731,7 +656,6 @@ export function UnifiedCertificateDialog({
       eventEndDate,
       role,
       workloadHours,
-      monitoriaPeriod,
       activity,
       baseText,
       textOverrides,
@@ -795,7 +719,7 @@ export function UnifiedCertificateDialog({
 
     setCertificateType(type);
     setBaseText(getCertificateTemplate(type));
-    setRole(resolveDefaultRole(type));
+    setRole('');
     setStep('context');
   };
 
@@ -823,6 +747,11 @@ export function UnifiedCertificateDialog({
 
   const validateContextStep = (): string | null => {
     if (!selectedClassId) return 'Por favor, selecione uma turma alvo.';
+    if (!eventTitle.trim()) return 'Informe o nome interno do certificado/evento.';
+    const parsedReferenceYear = Number(referenceYear);
+    if (!Number.isInteger(parsedReferenceYear) || parsedReferenceYear < 1900 || parsedReferenceYear > 2100) {
+      return 'Informe um ano de referência válido entre 1900 e 2100.';
+    }
     if (periodMode === 'quarters' && activeQuarters.length === 0) {
       return 'Selecione ao menos um bimestre para o recorte.';
     }
@@ -850,14 +779,13 @@ export function UnifiedCertificateDialog({
       if (useDateRange && (!eventStartDate || !eventEndDate)) {
         return 'Preencha as datas de início e fim do período estendido.';
       }
-      if (certificateType === 'evento_organizacao' && !role.trim()) {
-        return 'Informe a função/papel para organizador de evento.';
+      if (!role.trim()) {
+        return 'Informe a função/papel do aluno no evento.';
       }
     }
 
     if (certificateType === 'monitoria') {
       if (!activity.trim()) return 'Informe a atividade da monitoria.';
-      if (!monitoriaPeriod.trim()) return 'O período da monitoria é obrigatório.';
     }
 
     return null;
@@ -956,7 +884,13 @@ export function UnifiedCertificateDialog({
     const selectedStudentsData = classStudents.filter((student) =>
       selectedStudentSet.has(student.id),
     );
-    const periodLabel = formatCertificatePeriodLabel(periodMode, selectedQuarters);
+    const parsedReferenceYear = Math.trunc(Number(referenceYear));
+    const referenceYearToken = String(parsedReferenceYear);
+    const periodLabel = formatCertificatePeriodLabel(
+      periodMode,
+      selectedQuarters,
+      parsedReferenceYear,
+    );
     const resolvedReferenceLabel = includeReference
       ? (
           referenceType === 'subject' ? subjectReferences : areaReferences
@@ -966,15 +900,36 @@ export function UnifiedCertificateDialog({
       periodMode,
       selectedQuarters,
     );
+    const quarterNumbers = resolvedQuarters
+      .map((quarter) => Number(quarter.match(/(\d+)/)?.[1]))
+      .filter((value) => Number.isInteger(value) && value >= 1 && value <= 4)
+      .sort((a, b) => a - b);
+    const hasContiguousQuarterRange =
+      quarterNumbers.length > 1 &&
+      quarterNumbers.every((value, index) =>
+        index === 0 ? true : value === quarterNumbers[index - 1] + 1,
+      );
+    const monitoriaPeriodText =
+      periodMode === 'annual'
+        ? `durante o ano de ${parsedReferenceYear}`
+        : quarterNumbers.length === 1
+          ? `no período do ${quarterNumbers[0]}º bimestre de ${parsedReferenceYear}`
+          : hasContiguousQuarterRange
+            ? `no período do ${quarterNumbers[0]}º ao ${quarterNumbers[quarterNumbers.length - 1]}º bimestre de ${parsedReferenceYear}`
+            : `no período de ${periodLabel}`;
 
     const eventMeta =
       certificateType === 'evento_participacao' ||
       certificateType === 'evento_organizacao'
         ? {
             eventName: eventName.trim(),
-            eventDate,
-            eventDateStart: useDateRange ? eventStartDate : undefined,
-            eventDateEnd: useDateRange ? eventEndDate : undefined,
+            eventDate: eventDate.replace(/^\d{4}(?=-)/, referenceYearToken),
+            eventDateStart: useDateRange
+              ? eventStartDate.replace(/^\d{4}(?=-)/, referenceYearToken)
+              : undefined,
+            eventDateEnd: useDateRange
+              ? eventEndDate.replace(/^\d{4}(?=-)/, referenceYearToken)
+              : undefined,
             workloadHours: Number(workloadHours),
             role: role.trim(),
           }
@@ -984,7 +939,7 @@ export function UnifiedCertificateDialog({
       certificateType === 'monitoria'
         ? {
             workloadHours: Number(workloadHours),
-            monitoriaPeriod: monitoriaPeriod.trim(),
+            monitoriaPeriod: monitoriaPeriodText,
             activity: activity.trim(),
           }
         : undefined;
@@ -1008,7 +963,8 @@ export function UnifiedCertificateDialog({
         : undefined;
 
     const typeMeta: Record<string, unknown> = {
-      schemaVersion: 2,
+      schemaVersion: 3,
+      referenceYear: parsedReferenceYear,
       ...(eventMeta ? { eventMeta } : {}),
       ...(monitoriaMeta ? { monitoriaMeta } : {}),
       ...(highlightMetaByStudentId
@@ -1017,7 +973,7 @@ export function UnifiedCertificateDialog({
     };
 
     const savePayloadBase = {
-      title: eventTitle.trim() || `Emissão Lote - ${selectedClassData.name}`,
+      title: eventTitle.trim(),
       certificateType,
       classId: selectedClassData.id,
       classNameSnapshot: selectedClassData.name,
@@ -1235,6 +1191,8 @@ export function UnifiedCertificateDialog({
                   setSelectedClassId={setSelectedClassId}
                   selectedSchoolYear={selectedSchoolYear}
                   setSelectedSchoolYear={setSelectedSchoolYear}
+                  referenceYear={referenceYear}
+                  setReferenceYear={setReferenceYear}
                   eventTitle={eventTitle}
                   setEventTitle={setEventTitle}
                   periodMode={periodMode}
@@ -1263,7 +1221,6 @@ export function UnifiedCertificateDialog({
                   setRole={setRole}
                   workloadHours={workloadHours}
                   setWorkloadHours={setWorkloadHours}
-                  monitoriaPeriod={monitoriaPeriod}
                   activity={activity}
                   setActivity={setActivity}
                 />

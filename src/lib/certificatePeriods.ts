@@ -27,15 +27,20 @@ export const resolveCertificateQuarters = (
 export const formatCertificatePeriodLabel = (
   periodMode: CertificatePeriodMode,
   selectedQuarters: string[],
+  referenceYear?: number,
 ): string => {
   const currentYear = new Date().getFullYear();
+  const resolvedYear =
+    typeof referenceYear === 'number' && Number.isFinite(referenceYear)
+      ? Math.trunc(referenceYear)
+      : currentYear;
 
   if (periodMode === 'annual') {
-    return `1º ao 4º bimestre de ${currentYear}`;
+    return `1º ao 4º bimestre de ${resolvedYear}`;
   }
 
   const resolved = resolveCertificateQuarters(periodMode, selectedQuarters);
   if (resolved.length === 0) return 'bimestres não selecionados';
   const normalized = resolved.map(toLowerQuarterLabel);
-  return `${joinWithAnd(normalized)} de ${currentYear}`;
+  return `${joinWithAnd(normalized)} de ${resolvedYear}`;
 };

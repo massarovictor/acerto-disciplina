@@ -16,6 +16,8 @@ interface CertificateContextStepProps {
     setSelectedClassId: (id: string) => void;
     selectedSchoolYear: number;
     setSelectedSchoolYear: (year: 1 | 2 | 3) => void;
+    referenceYear: string;
+    setReferenceYear: (year: string) => void;
     eventTitle: string;
     setEventTitle: (title: string) => void;
 
@@ -54,7 +56,6 @@ interface CertificateContextStepProps {
     setWorkloadHours: (hours: string) => void;
 
     // Específico: Monitoria
-    monitoriaPeriod: string;
     activity: string;
     setActivity: (value: string) => void;
 }
@@ -66,6 +67,8 @@ export function CertificateContextStep({
     setSelectedClassId,
     selectedSchoolYear,
     setSelectedSchoolYear,
+    referenceYear,
+    setReferenceYear,
     eventTitle,
     setEventTitle,
 
@@ -99,7 +102,6 @@ export function CertificateContextStep({
     workloadHours,
     setWorkloadHours,
 
-    monitoriaPeriod,
     activity,
     setActivity,
 }: CertificateContextStepProps) {
@@ -115,7 +117,6 @@ export function CertificateContextStep({
     );
 
     const isEvent = type === 'evento_participacao' || type === 'evento_organizacao';
-    const isOrganizador = type === 'evento_organizacao';
     const isMonitoria = type === 'monitoria';
 
     return (
@@ -141,7 +142,7 @@ export function CertificateContextStep({
                 </div>
 
                 <div className="space-y-2">
-                    <Label>Nome para salvar na lista (Interno)</Label>
+                    <Label>Nome para salvar na lista (Interno) *</Label>
                     <Input
                         value={eventTitle}
                         onChange={(event) => setEventTitle(event.target.value)}
@@ -150,7 +151,7 @@ export function CertificateContextStep({
                     />
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-3">
                     <div className="space-y-2">
                         <Label>Ano letivo da turma</Label>
                         <Select
@@ -167,6 +168,18 @@ export function CertificateContextStep({
                                 <SelectItem value="3">3º ano</SelectItem>
                             </SelectContent>
                         </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Ano de referência do certificado *</Label>
+                        <Input
+                            type="number"
+                            min="1900"
+                            max="2100"
+                            value={referenceYear}
+                            onChange={(event) => setReferenceYear(event.target.value)}
+                            placeholder="Ex.: 2024"
+                        />
                     </div>
 
                     <div className="space-y-2">
@@ -238,13 +251,13 @@ export function CertificateContextStep({
                 {isEvent && (
                     <>
                         <div className="space-y-2">
-                            <Label>Nome do Evento</Label>
+                            <Label>Nome do Evento *</Label>
                             <Input value={eventName} onChange={(e) => setEventName(e.target.value)} placeholder="Ex.: Semana da Computação" />
                         </div>
 
                         <div className="rounded-lg border p-3 bg-slate-50/50 space-y-3">
                             <div className="space-y-2">
-                                <Label>Data de Realização (Principal)</Label>
+                                <Label>Data de Realização (Principal) *</Label>
                                 <Input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
                             </div>
 
@@ -261,19 +274,25 @@ export function CertificateContextStep({
                             )}
                         </div>
 
-                        {isOrganizador && (
-                            <div className="space-y-2">
-                                <Label>Função do Aluno (Organização)</Label>
-                                <Input value={role} onChange={(e) => setRole(e.target.value)} placeholder="Ex.: Coordenador Geral" />
-                            </div>
-                        )}
+                        <div className="space-y-2">
+                            <Label>Função/Papel do Aluno no Evento *</Label>
+                            <Input
+                                value={role}
+                                onChange={(e) => setRole(e.target.value)}
+                                placeholder={
+                                    type === 'evento_organizacao'
+                                        ? 'Ex.: Coordenador Geral'
+                                        : 'Ex.: Participante'
+                                }
+                            />
+                        </div>
                     </>
                 )}
 
                 {/* Carga Horária compartilhada (Eventos + Monitoria) */}
                 {(isEvent || isMonitoria) && (
                     <div className="space-y-2">
-                        <Label>Carga Horária Total (Horas)</Label>
+                        <Label>Carga Horária Total (Horas) *</Label>
                         <Input type="number" min="1" step="0.5" value={workloadHours} onChange={(e) => setWorkloadHours(e.target.value)} placeholder="Ex.: 40" />
                     </div>
                 )}
@@ -281,16 +300,12 @@ export function CertificateContextStep({
                 {isMonitoria && (
                     <>
                         <div className="space-y-2">
-                            <Label>Atividade da Monitoria</Label>
+                            <Label>Atividade da Monitoria *</Label>
                             <Input
                                 value={activity}
                                 onChange={(e) => setActivity(e.target.value)}
                                 placeholder="Ex.: Apoio em Matemática Aplicada"
                             />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Período Descritivo <span className="text-xs text-muted-foreground">(autopreenchido)</span></Label>
-                            <Input value={monitoriaPeriod} readOnly className="bg-slate-50 cursor-default" />
                         </div>
                     </>
                 )}
