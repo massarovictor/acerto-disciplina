@@ -26,6 +26,7 @@ import {
   mapFollowUpToDb,
   mapGradeFromDb,
   mapGradeToDb,
+  mapIncidentPatchToDb,
   mapIncidentFromDb,
   mapIncidentToDb,
   mapProfileFromDb,
@@ -1752,30 +1753,8 @@ export function useIncidents() {
     const base = getIncidentOrThrow(id);
     assertCanManageIncident(base);
 
-    const payload = mapIncidentToDb(
-      {
-        incidentType: updates.incidentType ?? base.incidentType ?? "disciplinar",
-        classId: updates.classId ?? base.classId,
-        date: updates.date ?? base.date,
-        studentIds: updates.studentIds ?? base.studentIds,
-        episodes: updates.episodes ?? base.episodes,
-        calculatedSeverity:
-          updates.calculatedSeverity ?? base.calculatedSeverity,
-        finalSeverity: updates.finalSeverity ?? base.finalSeverity,
-        severityOverrideReason:
-          updates.severityOverrideReason ?? base.severityOverrideReason,
-        description: updates.description ?? base.description,
-        actions: updates.actions ?? base.actions,
-        suggestedAction: updates.suggestedAction ?? base.suggestedAction,
-        status: updates.status ?? base.status,
-        validatedBy: updates.validatedBy ?? base.validatedBy,
-        validatedAt: updates.validatedAt ?? base.validatedAt,
-        createdBy: base.createdBy,
-      },
-      user.id,
-      base.createdBy || user.id,
-      { includeOwnerId: false },
-    );
+    const payload = mapIncidentPatchToDb(updates);
+    if (Object.keys(payload).length === 0) return;
 
     const { data, error } = await supabase
       .from("incidents")

@@ -279,6 +279,7 @@ class IncidentParentNotificationPDF extends BasePDFGenerator {
           incident.finalSeverity,
           historicalIncidents,
           Number.isFinite(incidentSchoolYear) ? incidentSchoolYear : undefined,
+          incident.date,
         );
 
     this.setFont('md', 'bold', '#000000');

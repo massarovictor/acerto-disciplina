@@ -27,6 +27,7 @@ export interface FollowUpRecord {
   incidentId: string;
   type: FollowUpType;
   date: string;
+  suspensionApplied?: boolean;
   responsavel: string;
   motivo?: string;
   providencias?: string;
@@ -57,6 +58,9 @@ export interface Incident {
   status: IncidentStatus;
   validatedBy?: string;
   validatedAt?: string;
+  disciplinaryResetApplied?: boolean;
+  disciplinaryResetAt?: string;
+  disciplinaryResetInferred?: boolean;
   followUps?: FollowUpRecord[];
   createdBy: string;
   createdAt: string;

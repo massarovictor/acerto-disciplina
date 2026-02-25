@@ -1,7 +1,7 @@
 import { Incident, IncidentSeverity, Student } from '@/types';
 import { isPerformanceConvocationIncident } from './incidentClassification';
 import { isDisciplinaryIncident } from './incidentType';
-import { getCurrentBrasiliaYear, getBrasiliaYear } from './brasiliaDate';
+import { getCurrentBrasiliaYear, getBrasiliaISODate, getBrasiliaYear } from './brasiliaDate';
 
 /**
  * Action levels based on accumulation rules:
@@ -40,6 +40,42 @@ const getActionLevelFromCounts = (counts: {
   return 'conversa_registro';
 };
 
+const toISODateOrNull = (value?: Date | string): string | null => {
+  if (!value) return null;
+  const iso = getBrasiliaISODate(value);
+  return iso || null;
+};
+
+const getLatestDisciplinaryResetDate = (
+  studentId: string,
+  allIncidents: Incident[],
+  schoolYear: number,
+  asOfDateIso?: string | null,
+): string | null => {
+  let latestReset: string | null = null;
+
+  for (const incident of allIncidents) {
+    if (!incident.studentIds.includes(studentId)) continue;
+    if (!isDisciplinaryIncident(incident)) continue;
+    if (!incident.disciplinaryResetApplied) continue;
+
+    const resetReference = incident.disciplinaryResetAt ?? incident.date;
+    const resetYear = getBrasiliaYear(resetReference);
+    if (resetYear !== schoolYear) continue;
+
+    const resetDate = toISODateOrNull(resetReference);
+
+    if (!resetDate) continue;
+    if (asOfDateIso && resetDate > asOfDateIso) continue;
+
+    if (!latestReset || resetDate > latestReset) {
+      latestReset = resetDate;
+    }
+  }
+
+  return latestReset;
+};
+
 /**
  * Get incident counts for a student, filtered by current school year
  * considering all disciplinary occurrences regardless of workflow status.
@@ -47,9 +83,17 @@ const getActionLevelFromCounts = (counts: {
 export function getStudentIncidentCounts(
   studentId: string,
   allIncidents: Incident[],
-  currentSchoolYear?: number
+  currentSchoolYear?: number,
+  asOfDate?: Date | string,
 ): { leve: number; intermediaria: number; grave: number; gravissima: number } {
-  const schoolYear = currentSchoolYear ?? getCurrentBrasiliaYear();
+  const asOfDateIso = toISODateOrNull(asOfDate);
+  const schoolYear = currentSchoolYear ?? (asOfDate ? getBrasiliaYear(asOfDate) : getCurrentBrasiliaYear());
+  const latestResetDate = getLatestDisciplinaryResetDate(
+    studentId,
+    allIncidents,
+    schoolYear,
+    asOfDateIso,
+  );
 
   // Filter incidents: disciplinary incidents belonging to student within school year.
   const studentIncidents = allIncidents.filter(incident => {
@@ -59,7 +103,22 @@ export function getStudentIncidentCounts(
 
     // Filter by school year (incidents from current academic year)
     const incidentYear = getBrasiliaYear(incident.date);
-    return incidentYear === schoolYear;
+    if (incidentYear !== schoolYear) return false;
+
+    const incidentDate = toISODateOrNull(incident.date);
+    if (!incidentDate) return false;
+
+    // Temporal consistency: historical checks should not include incidents after the reference date.
+    if (asOfDateIso && incidentDate > asOfDateIso) return false;
+
+    // If a suspension reset exists, only count incidents strictly after reset date.
+    if (latestResetDate) {
+      if (incidentDate <= latestResetDate) {
+        return false;
+      }
+    }
+
+    return true;
   });
 
   return {
@@ -85,7 +144,8 @@ export function getRequiredActionLevel(
   studentIds: string[],
   currentSeverity: IncidentSeverity,
   allIncidents: Incident[],
-  currentSchoolYear?: number
+  currentSchoolYear?: number,
+  asOfDate?: Date | string,
 ): ActionLevel {
   const idsToEvaluate = studentIds.length > 0 ? studentIds : ['__virtual__'];
 
@@ -93,7 +153,7 @@ export function getRequiredActionLevel(
   return idsToEvaluate.reduce<ActionLevel>((highestLevel, studentId) => {
     const baseCounts = studentId === '__virtual__'
       ? { leve: 0, intermediaria: 0, grave: 0, gravissima: 0 }
-      : getStudentIncidentCounts(studentId, allIncidents, currentSchoolYear);
+      : getStudentIncidentCounts(studentId, allIncidents, currentSchoolYear, asOfDate);
 
     const simulatedCounts = { ...baseCounts };
     simulatedCounts[currentSeverity] += 1;
@@ -129,9 +189,17 @@ export function calculateSuggestedAction(
   studentIds: string[],
   finalSeverity: IncidentSeverity,
   allIncidents: Incident[],
-  students: Student[]
+  students: Student[],
+  currentSchoolYear?: number,
+  asOfDate?: Date | string,
 ): string {
-  const level = getRequiredActionLevel(studentIds, finalSeverity, allIncidents);
+  const level = getRequiredActionLevel(
+    studentIds,
+    finalSeverity,
+    allIncidents,
+    currentSchoolYear,
+    asOfDate,
+  );
   return getActionText(level);
 }
 
@@ -188,9 +256,15 @@ export function suggestFollowUpType(
 export function checkEscalationStatus(
   studentId: string,
   allIncidents: Incident[],
-  currentSchoolYear?: number
+  currentSchoolYear?: number,
+  asOfDate?: Date | string,
 ): { isEscalated: boolean; reason: string; level: ActionLevel } {
-  const counts = getStudentIncidentCounts(studentId, allIncidents, currentSchoolYear);
+  const counts = getStudentIncidentCounts(
+    studentId,
+    allIncidents,
+    currentSchoolYear,
+    asOfDate,
+  );
 
   // Check thresholds in order of severity
   if (counts.gravissima >= 1) {

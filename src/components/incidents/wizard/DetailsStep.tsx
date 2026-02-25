@@ -52,8 +52,14 @@ export const DetailsStep = ({
   const requiredLevel = useMemo(() => {
     if (isFamilyFlow) return 'conversa_registro';
     if (!formData.studentIds?.length || !formData.finalSeverity) return 'conversa_registro';
-    return getRequiredActionLevel(formData.studentIds, formData.finalSeverity, incidents);
-  }, [formData.studentIds, formData.finalSeverity, incidents, isFamilyFlow]);
+    return getRequiredActionLevel(
+      formData.studentIds,
+      formData.finalSeverity,
+      incidents,
+      undefined,
+      formData.date,
+    );
+  }, [formData.studentIds, formData.finalSeverity, formData.date, incidents, isFamilyFlow]);
 
   // Check escalation status for each student
   const escalationInfo = useMemo(() => {
@@ -61,14 +67,14 @@ export const DetailsStep = ({
     if (!formData.studentIds?.length) return [];
     return formData.studentIds.map(studentId => {
       const student = students.find(s => s.id === studentId);
-      const status = checkEscalationStatus(studentId, incidents);
+      const status = checkEscalationStatus(studentId, incidents, undefined, formData.date);
       return {
         studentId,
         studentName: student?.name || 'Aluno',
         ...status
       };
     }).filter(info => info.isEscalated);
-  }, [formData.studentIds, incidents, students, isFamilyFlow]);
+  }, [formData.studentIds, formData.date, incidents, students, isFamilyFlow]);
 
   useEffect(() => {
     const severity = formData.finalSeverity || 'leve';
@@ -78,7 +84,9 @@ export const DetailsStep = ({
           formData.studentIds || [],
           severity,
           incidents,
-          students
+          students,
+          undefined,
+          formData.date,
         );
 
     const hasManualActions = (formData.actions ?? '').trim().length > 0;
@@ -94,6 +102,7 @@ export const DetailsStep = ({
   }, [
     formData.actions,
     formData.finalSeverity,
+    formData.date,
     formData.studentIds,
     formData.suggestedAction,
     incidents,

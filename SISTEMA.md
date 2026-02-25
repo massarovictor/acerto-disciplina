@@ -5,7 +5,7 @@
 - Repositorio: `acerto-disciplina`
 - Branch analisada: `main`
 - Commit de referencia: `latest`
-- Ultima atualizacao desta documentacao: `2026-02-21`
+- Ultima atualizacao desta documentacao: `2026-02-25`
 - Idioma padrao da aplicacao: `pt-BR`
 - Objetivo: descrever, de ponta a ponta, o comportamento atual do sistema e seu banco de dados
 
@@ -132,6 +132,16 @@ Detalhe importante de navegacao:
 - Severidade calculada e severidade final com justificativa de override.
 - Ciclo de vida: `aberta` -> `acompanhamento` -> `resolvida`.
 - Follow-ups e comentarios estruturados.
+- Regra de reset disciplinar por suspensao:
+  - Checkbox explicito `Suspensao aplicada` no follow-up disciplinar.
+  - Ao salvar follow-up com checkbox marcado, `follow_ups.suspension_applied = true`.
+  - Trigger SQL (`apply_incident_reset_from_follow_up`) aplica o reset no proprio fluxo transacional:
+    - `incidents.disciplinary_reset_applied = true`
+    - `incidents.disciplinary_reset_at = follow_ups.date` (preservando a data mais recente)
+    - `incidents.disciplinary_reset_inferred = false`
+  - A contagem disciplinar do aluno considera somente ocorrencias com data estritamente posterior ao ultimo reset no mesmo ano.
+  - O calculo de historico respeita a data da ocorrencia em analise (nao considera incidentes "futuros" em casos retroativos).
+  - Fluxo familiar nao usa reset disciplinar.
 
 ### 4.6 Relatorios
 - Relatorios integrados.
@@ -360,11 +370,17 @@ Fonte principal consolidada:
   - `student_ids (uuid[])`, `episodes (text[])`
   - severidades calculada/final
   - `status`: `aberta|acompanhamento|resolvida`
+  - reset disciplinar:
+    - `disciplinary_reset_applied` (bool)
+    - `disciplinary_reset_at` (date)
+    - `disciplinary_reset_inferred` (bool, marca backfill por inferencia)
 
 `public.follow_ups`
 - PK: `id`
 - FKs: `owner_id`, `incident_id`, `created_by`
 - Check `type`: `conversa_individual|conversa_pais|situacoes_diversas`.
+- Campo adicional:
+  - `suspension_applied` (bool) para marcar suspensao efetivamente aplicada no follow-up disciplinar.
 
 `public.comments`
 - PK: `id`
@@ -461,10 +477,15 @@ erDiagram
 - RPC publica (security definer) para validacao de certificado por codigo.
 - Grants: `anon`, `authenticated`.
 
+`public.apply_incident_reset_from_follow_up()`
+- Funcao de trigger para aplicar reset disciplinar em `incidents` quando `follow_ups.suspension_applied = true`.
+- Garante consistencia transacional entre salvamento do follow-up e marco de reset.
+
 ### 7.4 Indices relevantes (migrations recentes)
 - `grades_class_year_quarter_idx`
 - `grades_student_year_quarter_idx`
 - `incidents_type_class_date_idx`
+- `incidents_disciplinary_reset_idx`
 - `certificate_events_owner_created_at_idx`
 - `certificate_events_type_created_at_idx`
 - `certificate_events_class_created_at_idx`
@@ -527,6 +548,13 @@ Papeis em uso:
   - Adiciona paths de Storage para logo e moldura lateral em `school_config`.
 - `2026-02-23_storage_school_assets_bucket.sql`
   - Cria/configura bucket privado `school-assets` e policies em `storage.objects`.
+- `2026-02-25_incidents_disciplinary_reset.sql`
+  - Adiciona campos de reset disciplinar em `incidents`.
+  - Cria indice `incidents_disciplinary_reset_idx`.
+- `2026-02-25_z_incidents_disciplinary_reset_hardening.sql`
+  - Adiciona `follow_ups.suspension_applied`.
+  - Cria trigger `trg_follow_ups_apply_incident_reset` com funcao `apply_incident_reset_from_follow_up`.
+  - Endurece inferencia retroativa para reset disciplinar usando evidencias de execucao (`incidents.actions` e `follow_ups.providencias`), removendo falsos positivos baseados apenas em sugestao.
 
 ---
 

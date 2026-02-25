@@ -53,7 +53,9 @@ export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: 
         incident.studentIds,
         incident.finalSeverity,
         historicalIncidents,
-        students
+        students,
+        undefined,
+        incident.date,
       );
       const autoType = suggestFollowUpType(suggested, incident.finalSeverity);
       
@@ -77,7 +79,7 @@ export const FollowUpDialog = ({ incident, open, onOpenChange, onAddFollowUp }: 
       setTipoSituacao('');
       setDescricaoSituacao('');
     }
-  }, [open, incidents, students, incident.id, incident.studentIds, incident.finalSeverity]);
+  }, [open, incidents, students, incident.id, incident.studentIds, incident.finalSeverity, incident.date]);
 
   const motivoOptions = [
     '1 - Comportamento inadequado',

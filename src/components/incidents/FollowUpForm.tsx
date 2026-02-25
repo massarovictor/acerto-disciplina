@@ -2,6 +2,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { FollowUpType, IncidentType } from '@/types';
 
 interface FollowUpFormProps {
@@ -29,6 +30,9 @@ interface FollowUpFormProps {
   setNomeResponsavelPai: (nome: string) => void;
   grauParentesco: string;
   setGrauParentesco: (grau: string) => void;
+  suspensionApplied: boolean;
+  setSuspensionApplied: (value: boolean) => void;
+  suspensionAppliedLocked?: boolean;
   incidentType?: IncidentType;
 }
 
@@ -57,6 +61,9 @@ export const FollowUpForm = ({
   setNomeResponsavelPai,
   grauParentesco,
   setGrauParentesco,
+  suspensionApplied,
+  setSuspensionApplied,
+  suspensionAppliedLocked = false,
   incidentType = 'disciplinar',
 }: FollowUpFormProps) => {
   const isFamilyFlow = incidentType === 'acompanhamento_familiar';
@@ -155,6 +162,30 @@ export const FollowUpForm = ({
           />
         </div>
       </div>
+
+      {!isFamilyFlow && (
+        <div className="space-y-2 rounded-md border border-muted p-3">
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="suspensao-aplicada"
+              checked={suspensionApplied}
+              disabled={suspensionAppliedLocked}
+              onCheckedChange={(checked) => setSuspensionApplied(checked === true)}
+            />
+            <div className="space-y-1">
+              <Label htmlFor="suspensao-aplicada">Suspensão aplicada</Label>
+              <p className="text-xs text-muted-foreground">
+                Ao marcar suspensão, a próxima ocorrência disciplinar do aluno reinicia do nível inicial.
+              </p>
+              {suspensionAppliedLocked && (
+                <p className="text-xs text-muted-foreground">
+                  Reset disciplinar já registrado para esta ocorrência. Esta marcação não pode ser desfeita.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {(type === 'conversa_individual' || type === 'conversa_pais') && (
         <>

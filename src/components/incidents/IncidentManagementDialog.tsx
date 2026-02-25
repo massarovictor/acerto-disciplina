@@ -94,6 +94,7 @@ export const IncidentManagementDialog = ({
   const [followUpDescricaoSituacao, setFollowUpDescricaoSituacao] = useState('');
   const [followUpNomeResponsavelPai, setFollowUpNomeResponsavelPai] = useState('');
   const [followUpGrauParentesco, setFollowUpGrauParentesco] = useState('');
+  const [followUpSuspensionApplied, setFollowUpSuspensionApplied] = useState(false);
 
   const getLatestFollowUp = (followUps?: FollowUpRecord[]) => {
     if (!followUps || followUps.length === 0) return null;
@@ -133,6 +134,8 @@ export const IncidentManagementDialog = ({
 
   // Auto-preencher acompanhamento quando mudar para status acompanhamento
   useEffect(() => {
+    setFollowUpSuspensionApplied(Boolean(currentIncident.disciplinaryResetApplied));
+
     if (currentIncident.status === 'acompanhamento' && !currentIncident.followUps?.length) {
       if (isFamilyFlow) {
         setFollowUpType('conversa_pais');
@@ -147,7 +150,9 @@ export const IncidentManagementDialog = ({
           : getRequiredActionLevel(
               currentIncident.studentIds,
               currentIncident.finalSeverity,
-              historicalIncidents
+              historicalIncidents,
+              undefined,
+              currentIncident.date,
             );
         const requiredType = getRequiredFollowUpType(requiredLevel);
 
@@ -157,7 +162,9 @@ export const IncidentManagementDialog = ({
               currentIncident.studentIds,
               currentIncident.finalSeverity,
               historicalIncidents,
-              students
+              students,
+              undefined,
+              currentIncident.date,
             );
 
         // Force the required follow-up type based on accumulation rules
@@ -193,6 +200,9 @@ export const IncidentManagementDialog = ({
       setFollowUpDescricaoSituacao(followUp.descricaoSituacao || '');
       setFollowUpNomeResponsavelPai(followUp.nomeResponsavelPai || '');
       setFollowUpGrauParentesco(followUp.grauParentesco || '');
+      setFollowUpSuspensionApplied(
+        Boolean(followUp.suspensionApplied || currentIncident.disciplinaryResetApplied),
+      );
     }
   }, [
     currentIncident.id,
@@ -201,7 +211,9 @@ export const IncidentManagementDialog = ({
     incidents,
     students,
     currentIncident.studentIds,
+    currentIncident.date,
     currentIncident.finalSeverity,
+    currentIncident.disciplinaryResetApplied,
     getFamilyFollowUpSuggestion,
     isPerformanceConvocation,
     isFamilyFlow,
@@ -393,6 +405,10 @@ export const IncidentManagementDialog = ({
       followUp.disciplina = followUpDisciplina;
       followUp.tipoSituacao = followUpTipoSituacao;
       followUp.descricaoSituacao = followUpDescricaoSituacao;
+    }
+
+    if (!isFamilyFlow) {
+      followUp.suspensionApplied = followUpSuspensionApplied;
     }
 
     const existingFollowUpId = getLatestFollowUp(currentIncident.followUps)?.id;
@@ -786,6 +802,9 @@ export const IncidentManagementDialog = ({
                       setNomeResponsavelPai={setFollowUpNomeResponsavelPai}
                       grauParentesco={followUpGrauParentesco}
                       setGrauParentesco={setFollowUpGrauParentesco}
+                      suspensionApplied={followUpSuspensionApplied}
+                      setSuspensionApplied={setFollowUpSuspensionApplied}
+                      suspensionAppliedLocked={Boolean(currentIncident.disciplinaryResetApplied)}
                     />
 
                     <div className="flex justify-between pt-4 border-t">

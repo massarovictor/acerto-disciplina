@@ -105,6 +105,9 @@ export interface IncidentRow {
   status: string;
   validated_by: string | null;
   validated_at: string | null;
+  disciplinary_reset_applied?: boolean | null;
+  disciplinary_reset_at?: string | null;
+  disciplinary_reset_inferred?: boolean | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -116,6 +119,7 @@ export interface FollowUpRow {
   incident_id: string;
   type: string;
   date: string;
+  suspension_applied?: boolean | null;
   responsavel: string | null;
   motivo: string | null;
   providencias: string | null;
@@ -337,6 +341,9 @@ export const mapIncidentFromDb = (row: IncidentRow): Incident => ({
   status: row.status as Incident['status'],
   validatedBy: row.validated_by ?? undefined,
   validatedAt: row.validated_at ?? undefined,
+  disciplinaryResetApplied: row.disciplinary_reset_applied ?? false,
+  disciplinaryResetAt: row.disciplinary_reset_at ?? undefined,
+  disciplinaryResetInferred: row.disciplinary_reset_inferred ?? false,
   followUps: [],
   createdBy: row.created_by ?? '',
   createdAt: row.created_at,
@@ -365,14 +372,46 @@ export const mapIncidentToDb = (
   status: data.status,
   validated_by: data.validatedBy ?? null,
   validated_at: data.validatedAt ?? null,
+  disciplinary_reset_applied: data.disciplinaryResetApplied ?? false,
+  disciplinary_reset_at: data.disciplinaryResetAt ?? null,
+  disciplinary_reset_inferred: data.disciplinaryResetInferred ?? false,
   created_by: createdBy,
 });
+
+export const mapIncidentPatchToDb = (
+  updates: Partial<Omit<Incident, 'id' | 'createdAt' | 'updatedAt' | 'followUps' | 'comments'>>,
+) => {
+  const payload: Record<string, unknown> = {};
+  const has = (key: keyof typeof updates) =>
+    Object.prototype.hasOwnProperty.call(updates, key);
+
+  if (has('incidentType')) payload.incident_type = updates.incidentType ?? 'disciplinar';
+  if (has('classId')) payload.class_id = updates.classId;
+  if (has('date')) payload.date = updates.date;
+  if (has('studentIds')) payload.student_ids = updates.studentIds;
+  if (has('episodes')) payload.episodes = updates.episodes;
+  if (has('calculatedSeverity')) payload.calculated_severity = updates.calculatedSeverity;
+  if (has('finalSeverity')) payload.final_severity = updates.finalSeverity;
+  if (has('severityOverrideReason')) payload.severity_override_reason = updates.severityOverrideReason ?? null;
+  if (has('description')) payload.description = updates.description ?? null;
+  if (has('actions')) payload.actions = updates.actions ?? null;
+  if (has('suggestedAction')) payload.suggested_action = updates.suggestedAction ?? null;
+  if (has('status')) payload.status = updates.status;
+  if (has('validatedBy')) payload.validated_by = updates.validatedBy ?? null;
+  if (has('validatedAt')) payload.validated_at = updates.validatedAt ?? null;
+  if (has('disciplinaryResetApplied')) payload.disciplinary_reset_applied = updates.disciplinaryResetApplied ?? false;
+  if (has('disciplinaryResetAt')) payload.disciplinary_reset_at = updates.disciplinaryResetAt ?? null;
+  if (has('disciplinaryResetInferred')) payload.disciplinary_reset_inferred = updates.disciplinaryResetInferred ?? false;
+
+  return payload;
+};
 
 export const mapFollowUpFromDb = (row: FollowUpRow): FollowUpRecord => ({
   id: row.id,
   incidentId: row.incident_id,
   type: row.type as FollowUpRecord['type'],
   date: row.date,
+  suspensionApplied: row.suspension_applied ?? false,
   responsavel: row.responsavel ?? '',
   motivo: row.motivo ?? undefined,
   providencias: row.providencias ?? undefined,
@@ -397,6 +436,7 @@ export const mapFollowUpToDb = (
   incident_id: incidentId,
   type: data.type,
   date: data.date,
+  suspension_applied: data.suspensionApplied ?? false,
   responsavel: data.responsavel ?? null,
   motivo: data.motivo ?? null,
   providencias: data.providencias ?? null,

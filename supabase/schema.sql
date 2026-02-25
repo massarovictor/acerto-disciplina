@@ -132,6 +132,7 @@ CREATE TABLE public.follow_ups (
   incident_id uuid NOT NULL,
   type text NOT NULL CHECK (type = ANY (ARRAY['conversa_individual'::text, 'conversa_pais'::text, 'situacoes_diversas'::text])),
   date date NOT NULL,
+  suspension_applied boolean NOT NULL DEFAULT false,
   responsavel text,
   motivo text,
   providencias text,
@@ -199,6 +200,9 @@ CREATE TABLE public.incidents (
   status text NOT NULL CHECK (status = ANY (ARRAY['aberta'::text, 'acompanhamento'::text, 'resolvida'::text])),
   validated_by uuid,
   validated_at timestamp with time zone,
+  disciplinary_reset_applied boolean NOT NULL DEFAULT false,
+  disciplinary_reset_at date,
+  disciplinary_reset_inferred boolean NOT NULL DEFAULT false,
   created_by uuid,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
@@ -277,3 +281,6 @@ CREATE TABLE public.students (
   CONSTRAINT students_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES auth.users(id),
   CONSTRAINT students_class_id_fkey FOREIGN KEY (class_id) REFERENCES public.classes(id)
 );
+
+CREATE INDEX IF NOT EXISTS incidents_disciplinary_reset_idx
+ON public.incidents (disciplinary_reset_applied, disciplinary_reset_at);
