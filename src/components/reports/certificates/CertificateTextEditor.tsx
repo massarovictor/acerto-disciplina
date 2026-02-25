@@ -2,12 +2,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
-import { Student } from '@/types';
+
+interface CertificateTextStudentOption {
+  id: string;
+  name: string;
+}
 
 interface CertificateTextEditorProps {
   baseText: string;
   onBaseTextChange: (value: string) => void;
-  selectedStudents: Student[];
+  selectedStudents: CertificateTextStudentOption[];
   textOverrides: Record<string, string>;
   onTextOverrideChange: (studentId: string, value: string) => void;
   previewText?: string;

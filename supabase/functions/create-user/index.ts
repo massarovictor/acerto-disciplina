@@ -20,7 +20,18 @@ const jsonResponse = (body: Record<string, unknown>, status = 200) =>
     },
   });
 
-const findUserByEmail = async (client: ReturnType<typeof createClient>, email: string) => {
+type AdminListUsersClient = {
+  auth: {
+    admin: {
+      listUsers: (params: { page: number; perPage: number }) => Promise<{
+        data: { users: Array<{ id: string; email?: string | null }> };
+        error: unknown;
+      }>;
+    };
+  };
+};
+
+const findUserByEmail = async (client: AdminListUsersClient, email: string) => {
   const perPage = 200;
   const maxPages = 10;
 
@@ -114,7 +125,7 @@ Deno.serve(async (req) => {
     }
 
     // 2. Find user to update profile
-    const existingUser = await findUserByEmail(adminClient, email);
+    const existingUser = await findUserByEmail(adminClient as unknown as AdminListUsersClient, email);
 
     if (existingUser) {
       // 3. Update public.profiles
@@ -141,7 +152,7 @@ Deno.serve(async (req) => {
     let deletedCount = 0;
 
     // 1. Find user in auth.users by email
-    const existingUser = await findUserByEmail(adminClient, email);
+    const existingUser = await findUserByEmail(adminClient as unknown as AdminListUsersClient, email);
 
     // 2. Delete from auth.users if exists
     if (existingUser) {
@@ -210,7 +221,7 @@ Deno.serve(async (req) => {
   }
 
   if (!userId) {
-    const existingUser = await findUserByEmail(adminClient, email);
+    const existingUser = await findUserByEmail(adminClient as unknown as AdminListUsersClient, email);
     userId = existingUser?.id ?? null;
   }
 

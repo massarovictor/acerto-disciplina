@@ -915,10 +915,11 @@ const getStudentCertificateFileName = (
 ): string => {
   const classToken = sanitizeFileNamePart(input.classData.name || 'turma', 'turma');
   const studentToken = sanitizeFileNamePart(student.name || 'aluno', 'aluno');
+  const studentIdToken = sanitizeFileNamePart(student.id || 'aluno', 'aluno').slice(-8);
   const typeToken = CERTIFICATE_TOKEN_BY_TYPE[input.certificateType];
   const dateToken = getBrasiliaISODate(new Date());
 
-  return `Certificado_${typeToken}_${classToken}_${studentToken}_${dateToken}.pdf`;
+  return `Certificado_${typeToken}_${classToken}_${studentToken}_${studentIdToken}_${dateToken}.pdf`;
 };
 
 const getTypeZipFileName = (input: ExportCertificatesPdfInput): string => {

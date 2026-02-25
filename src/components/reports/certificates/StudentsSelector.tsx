@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Student } from '@/types';
 import { Search } from 'lucide-react';
 
 interface StudentIndicator {
@@ -14,8 +13,14 @@ interface StudentIndicator {
   details?: string;
 }
 
+export interface SelectableStudentOption {
+  id: string;
+  name: string;
+  isLegacySnapshot?: boolean;
+}
+
 interface StudentsSelectorProps {
-  students: Student[];
+  students: SelectableStudentOption[];
   selectedStudentIds: string[];
   onChange: (studentIds: string[]) => void;
   indicatorsByStudentId?: Record<string, StudentIndicator>;
@@ -120,7 +125,14 @@ export const StudentsSelector = ({
                     }
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="font-medium leading-5">{student.name}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="font-medium leading-5">{student.name}</div>
+                      {student.isLegacySnapshot ? (
+                        <Badge variant="outline" className="text-[10px] h-5">
+                          Snapshot histórico
+                        </Badge>
+                      ) : null}
+                    </div>
                     {indicator && (
                       <div className="mt-1 flex flex-wrap items-center gap-2">
                         <Badge

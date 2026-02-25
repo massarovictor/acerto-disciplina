@@ -13,12 +13,12 @@ interface EmailPayload {
     };
     className: string;
     studentNames: string[];
-    teacherEmail: string;
     teacherName?: string;
 }
 
 /**
- * Send incident notification email to class director
+ * Send incident notification email to class director.
+ * Recipient is resolved server-side using incident/class data.
  */
 export async function sendIncidentEmail(
     type: EmailPayload['type'],
@@ -26,13 +26,6 @@ export async function sendIncidentEmail(
     classData: Class,
     students: Student[]
 ): Promise<{ success: boolean; error?: string }> {
-    // Validate director email exists
-    if (!classData.directorEmail) {
-        console.warn(`Class ${classData.name} has no directorEmail configured`);
-        return { success: false, error: 'Email do diretor de turma não configurado' };
-    }
-
-    // Get student names
     const involvedStudents = students.filter(s => incident.studentIds.includes(s.id));
     const studentNames = involvedStudents.map(s => s.name);
 
@@ -48,8 +41,7 @@ export async function sendIncidentEmail(
         },
         className: classData.name,
         studentNames,
-        teacherEmail: classData.directorEmail,
-        teacherName: undefined, // Could be fetched from profiles if directorId exists
+        teacherName: undefined,
     };
 
     try {

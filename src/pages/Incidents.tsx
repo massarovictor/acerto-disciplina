@@ -38,9 +38,13 @@ import {
   isDisciplinaryIncident,
 } from '@/lib/incidentType';
 
+const INCIDENT_TABS = new Set(['info', 'followup', 'comments']);
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const Incidents = () => {
   const { user, profile } = useAuth();
-  const { incidents, deleteIncident } = useIncidents();
+  const { incidents, incidentsLoaded, incidentsFetching, deleteIncident } = useIncidents();
   const { classes } = useClasses();
   const { students } = useStudents();
   const { toast } = useToast();
@@ -116,6 +120,60 @@ const Incidents = () => {
     nextParams.delete('tipo');
     setSearchParams(nextParams, { replace: true });
   }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action !== 'open-incident') return;
+
+    const incidentId = searchParams.get('incidentId')?.trim() || '';
+    const requestedTab = searchParams.get('tab')?.trim().toLowerCase();
+
+    const clearOpenIncidentParams = () => {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('action');
+      nextParams.delete('incidentId');
+      nextParams.delete('tab');
+      setSearchParams(nextParams, { replace: true });
+    };
+
+    if (!UUID_REGEX.test(incidentId)) {
+      clearOpenIncidentParams();
+      return;
+    }
+
+    if (!incidentsLoaded || incidentsFetching) return;
+
+    if (!incidents.length) {
+      clearOpenIncidentParams();
+      return;
+    }
+
+    const targetIncident = incidents.find((incident) => incident.id === incidentId);
+    if (!targetIncident) {
+      clearOpenIncidentParams();
+      return;
+    }
+
+    const tabFromParam =
+      requestedTab && INCIDENT_TABS.has(requestedTab)
+        ? (requestedTab as 'info' | 'followup' | 'comments')
+        : undefined;
+
+    const defaultTab: 'info' | 'followup' | 'comments' =
+      targetIncident.status === 'acompanhamento' ? 'followup' : 'info';
+
+    setInitialTab(tabFromParam ?? defaultTab);
+    setActiveTab(targetIncident.status);
+    setManagingIncident(targetIncident);
+    clearOpenIncidentParams();
+  }, [
+    incidents,
+    incidentsLoaded,
+    incidentsFetching,
+    searchParams,
+    setActiveTab,
+    setSearchParams,
+  ]);
 
   const typeFilteredIncidents = useMemo(() => {
     if (typeFilter === 'all') return incidents;

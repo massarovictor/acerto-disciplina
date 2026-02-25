@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,7 +15,26 @@ const Login = () => {
   const [step, setStep] = useState<'email' | 'otp'>('email');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
+
+  const sanitizeNext = (nextPath: string | null): string => {
+    if (!nextPath) return '/';
+    const value = nextPath.trim();
+    if (!value.startsWith('/')) return '/';
+    if (value.startsWith('//')) return '/';
+
+    const lower = value.toLowerCase();
+    if (
+      lower.startsWith('http://') ||
+      lower.startsWith('https://') ||
+      lower.startsWith('javascript:')
+    ) {
+      return '/';
+    }
+
+    return value;
+  };
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +104,8 @@ const Login = () => {
         title: 'Login realizado',
         description: 'Bem-vindo ao MAVIC',
       });
-      navigate('/');
+      const safeNext = sanitizeNext(searchParams.get('next'));
+      navigate(safeNext, { replace: true });
     } catch (error) {
       console.error(error);
       toast({

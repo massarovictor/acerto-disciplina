@@ -15,11 +15,6 @@ import {
   buildExportInputFromSavedCertificateEvent,
   sanitizeCertificateFileToken,
 } from '@/lib/certificateEventTypes';
-import {
-  downloadCombinedCertificatePdf,
-  downloadCertificateFiles,
-  generateCertificateFiles,
-} from '@/lib/certificatePdfExport';
 import { getBrasiliaISODate } from '@/lib/brasiliaDate';
 import {
   Class,
@@ -57,6 +52,7 @@ const CertificatesReportsContent = ({
     error,
     schemaStatus,
     schemaErrorMessage,
+    retrySchemaCheck,
     createCertificateEventWithStudents,
     updateCertificateEvent,
     deleteCertificateEvent,
@@ -64,6 +60,7 @@ const CertificatesReportsContent = ({
 
   const [showUnifiedDialog, setShowUnifiedDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState<SavedCertificateEvent | null>(null);
+  const [isRetryingSchema, setIsRetryingSchema] = useState(false);
   const lastCreateRequestRef = useRef<number | undefined>(createRequestNonce);
 
   useEffect(() => {
@@ -116,6 +113,9 @@ const CertificatesReportsContent = ({
     }
 
     const exportInput = buildExportInputFromSavedCertificateEvent(event, studentsSubset);
+    const { generateCertificateFiles, downloadCertificateFiles } = await import(
+      '@/lib/certificatePdfExport'
+    );
     const files = await generateCertificateFiles(exportInput);
 
     if (files.length === 0) {
@@ -188,6 +188,9 @@ const CertificatesReportsContent = ({
     try {
       if (mode === 'pdf_unico') {
         const exportInput = buildExportInputFromSavedCertificateEvent(event);
+        const { downloadCombinedCertificatePdf } = await import(
+          '@/lib/certificatePdfExport'
+        );
         await downloadCombinedCertificatePdf(exportInput);
         toast({
           title: 'Download concluído',
@@ -237,6 +240,15 @@ const CertificatesReportsContent = ({
     }
   };
 
+  const handleRetrySchemaCheck = async () => {
+    setIsRetryingSchema(true);
+    try {
+      await retrySchemaCheck();
+    } finally {
+      setIsRetryingSchema(false);
+    }
+  };
+
   return (
     <>
       {schemaIncompatible ? (
@@ -254,6 +266,17 @@ const CertificatesReportsContent = ({
             <p>1. `2026-02-21_certificate_events.sql` (se necessário)</p>
             <p>2. `2026-02-22_certificate_verification_and_signature.sql`</p>
             <p>3. `NOTIFY pgrst, 'reload schema';`</p>
+            <div className="pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                onClick={handleRetrySchemaCheck}
+                disabled={loading || isRetryingSchema}
+              >
+                {isRetryingSchema ? 'Revalidando schema...' : 'Tentar novamente'}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : null}

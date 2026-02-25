@@ -1876,7 +1876,28 @@ export function useIncidents() {
       // Ordenar por data
       newFollowUps.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-      storeUpdateIncident(incidentId, { followUps: newFollowUps });
+      const incidentUpdates: Partial<Incident> = { followUps: newFollowUps };
+
+      // Keep local state in sync with reset lock right after save.
+      // Database trigger remains the source of truth and will confirm via realtime/refetch.
+      if (
+        incidentToUpdate.incidentType !== "acompanhamento_familiar" &&
+        savedFollowUp.suspensionApplied
+      ) {
+        const resetDate = savedFollowUp.date;
+        const currentResetAt = incidentToUpdate.disciplinaryResetAt;
+        const shouldUpdateResetDate =
+          !currentResetAt || new Date(resetDate).getTime() > new Date(currentResetAt).getTime();
+
+        incidentUpdates.disciplinaryResetApplied = true;
+        incidentUpdates.disciplinaryResetInferred = false;
+
+        if (shouldUpdateResetDate) {
+          incidentUpdates.disciplinaryResetAt = resetDate;
+        }
+      }
+
+      storeUpdateIncident(incidentId, incidentUpdates);
     } else {
       // Fallback se não encontrar no store (improvável)
       await fetchIncidents(true);
@@ -1926,6 +1947,8 @@ export function useIncidents() {
 
   return {
     incidents,
+    incidentsLoaded,
+    incidentsFetching,
     refreshIncidents: () => fetchIncidents(true),
     addIncident,
     updateIncident,

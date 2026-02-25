@@ -41,7 +41,7 @@ import {
 import { CertificateContextStep } from './steps/CertificateContextStep';
 import { CertificateFinishStep } from './steps/CertificateFinishStep';
 import { CertificateTextEditor } from './CertificateTextEditor';
-import { StudentsSelector } from './StudentsSelector';
+import { SelectableStudentOption, StudentsSelector } from './StudentsSelector';
 import {
   CertificatePeriodMode,
   formatCertificatePeriodLabel,
@@ -83,6 +83,11 @@ interface HighlightClassification {
   label: string;
   tone?: 'default' | 'pending' | 'success';
   details?: string;
+}
+
+interface CertificateRecipientOption extends SelectableStudentOption {
+  studentId?: string;
+  snapshotName: string;
 }
 
 interface DraftSnapshotInput {
@@ -213,6 +218,8 @@ const normalizeName = (value: string) =>
 const formatAverageLabel = (value: number | null) =>
   typeof value === 'number' ? value.toFixed(1).replace('.', ',') : '-';
 
+const buildLegacySelectionId = (eventStudentRowId: string) => `legacy:${eventStudentRowId}`;
+
 const buildSnapshot = (draft: DraftSnapshotInput): string => {
   const sortedOverrides = Object.fromEntries(
     Object.entries(draft.textOverrides).sort(([a], [b]) => a.localeCompare(b)),
@@ -309,6 +316,47 @@ export function UnifiedCertificateDialog({
     [selectedClassId, students],
   );
 
+  const recipientOptions = useMemo<CertificateRecipientOption[]>(() => {
+    const baseOptions: CertificateRecipientOption[] = classStudents.map((student) => ({
+      id: student.id,
+      name: student.name,
+      studentId: student.id,
+      snapshotName: student.name,
+      isLegacySnapshot: false,
+    }));
+
+    if (mode !== 'edit' || !initialEvent) {
+      return baseOptions;
+    }
+
+    const hasOptionById = new Set(baseOptions.map((option) => option.id));
+    const hasOptionByStudentId = new Set(
+      baseOptions.map((option) => option.studentId).filter((value): value is string => Boolean(value)),
+    );
+    const hasOptionByName = new Set(
+      baseOptions.map((option) => normalizeName(option.name)),
+    );
+
+    initialEvent.students.forEach((eventStudent) => {
+      if (eventStudent.studentId && hasOptionByStudentId.has(eventStudent.studentId)) return;
+      if (hasOptionByName.has(normalizeName(eventStudent.studentNameSnapshot))) return;
+
+      const legacyId = buildLegacySelectionId(eventStudent.id);
+      if (hasOptionById.has(legacyId)) return;
+
+      hasOptionById.add(legacyId);
+      baseOptions.push({
+        id: legacyId,
+        name: eventStudent.studentNameSnapshot,
+        studentId: eventStudent.studentId,
+        snapshotName: eventStudent.studentNameSnapshot,
+        isLegacySnapshot: true,
+      });
+    });
+
+    return baseOptions.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  }, [classStudents, mode, initialEvent]);
+
   const manualSubjects = useMemo(
     () => (selectedClassId ? getProfessionalSubjects(selectedClassId) : []),
     [selectedClassId, getProfessionalSubjects],
@@ -340,6 +388,20 @@ export function UnifiedCertificateDialog({
     () => new Set(selectedStudentIds),
     [selectedStudentIds],
   );
+
+  const selectedRecipientOptions = useMemo(
+    () => recipientOptions.filter((option) => selectedStudentSet.has(option.id)),
+    [recipientOptions, selectedStudentSet],
+  );
+
+  useEffect(() => {
+    const validRecipientIds = new Set(recipientOptions.map((option) => option.id));
+
+    setSelectedStudentIds((current) => {
+      const next = current.filter((id) => validRecipientIds.has(id));
+      return next.length === current.length ? current : next;
+    });
+  }, [recipientOptions]);
 
   const activeQuarters = useMemo(
     () => resolveCertificateQuarters(periodMode, selectedQuarters),
@@ -523,7 +585,10 @@ export function UnifiedCertificateDialog({
           (item) =>
             normalizeName(item.name) === normalizeName(eventStudent.studentNameSnapshot),
         );
-        const resolvedId = eventStudent.studentId || fallbackStudent?.id;
+        const resolvedId =
+          eventStudent.studentId ||
+          fallbackStudent?.id ||
+          buildLegacySelectionId(eventStudent.id);
         if (!resolvedId) return;
         selectedIds.push(resolvedId);
         if (eventStudent.textOverride?.trim()) {
@@ -779,6 +844,9 @@ export function UnifiedCertificateDialog({
       if (useDateRange && (!eventStartDate || !eventEndDate)) {
         return 'Preencha as datas de início e fim do período estendido.';
       }
+      if (useDateRange && eventStartDate > eventEndDate) {
+        return 'A data inicial do período não pode ser posterior à data final.';
+      }
       if (!role.trim()) {
         return 'Informe a função/papel do aluno no evento.';
       }
@@ -881,9 +949,7 @@ export function UnifiedCertificateDialog({
 
     setIsExporting(true);
 
-    const selectedStudentsData = classStudents.filter((student) =>
-      selectedStudentSet.has(student.id),
-    );
+    const selectedStudentsData = selectedRecipientOptions;
     const parsedReferenceYear = Math.trunc(Number(referenceYear));
     const referenceYearToken = String(parsedReferenceYear);
     const periodLabel = formatCertificatePeriodLabel(
@@ -949,7 +1015,9 @@ export function UnifiedCertificateDialog({
         ? selectedStudentsData.reduce<
             Record<string, { status: 'confirmed' | 'pending'; average: number | null }>
           >((acc, student) => {
-            const item = highlightClassificationByStudentId[student.id];
+            const item = student.studentId
+              ? highlightClassificationByStudentId[student.studentId]
+              : undefined;
             if (!item) {
               acc[student.id] = { status: 'pending', average: null };
               return acc;
@@ -989,10 +1057,12 @@ export function UnifiedCertificateDialog({
       signatureMode,
       typeMeta,
       students: selectedStudentsData.map((student) => {
-        const highlight = highlightClassificationByStudentId[student.id];
+        const highlight = student.studentId
+          ? highlightClassificationByStudentId[student.studentId]
+          : undefined;
         return {
-          studentId: student.id,
-          studentNameSnapshot: student.name,
+          studentId: student.studentId,
+          studentNameSnapshot: student.snapshotName,
           textOverride: textOverrides[student.id]?.trim() || undefined,
           highlightStatus:
             certificateType === 'destaque' ? highlight?.status : undefined,
@@ -1045,7 +1115,9 @@ export function UnifiedCertificateDialog({
       selectedStudentsData.forEach((student) => {
         const matched =
           savedEvent.students.find(
-            (savedStudent) => savedStudent.studentId === student.id,
+            (savedStudent) =>
+              Boolean(student.studentId) &&
+              savedStudent.studentId === student.studentId,
           ) ||
           savedEvent.students.find(
             (savedStudent) =>
@@ -1232,7 +1304,7 @@ export function UnifiedCertificateDialog({
                 <div className="space-y-3 rounded-lg border p-4">
                   <p className="text-sm font-semibold">Selecionar alunos alvo</p>
                   <StudentsSelector
-                    students={classStudents}
+                    students={recipientOptions}
                     selectedStudentIds={selectedStudentIds}
                     onChange={(ids) => {
                       setHasManualStudentSelection(true);
@@ -1272,9 +1344,10 @@ export function UnifiedCertificateDialog({
                 <CertificateTextEditor
                   baseText={baseText}
                   onBaseTextChange={setBaseText}
-                  selectedStudents={classStudents.filter((student) =>
-                    selectedStudentSet.has(student.id),
-                  )}
+                  selectedStudents={selectedRecipientOptions.map((student) => ({
+                    id: student.id,
+                    name: student.name,
+                  }))}
                   textOverrides={textOverrides}
                   onTextOverrideChange={(id, value) =>
                     setTextOverrides((prev) => ({ ...prev, [id]: value }))

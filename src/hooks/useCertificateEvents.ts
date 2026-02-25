@@ -29,6 +29,7 @@ interface UseCertificateEventsResult {
   schemaErrorMessage: string | null;
   listCertificateEvents: () => Promise<void>;
   refresh: () => Promise<void>;
+  retrySchemaCheck: () => Promise<void>;
   createCertificateEventWithStudents: (
     input: CreateCertificateEventWithStudentsInput,
   ) => Promise<SavedCertificateEvent>;
@@ -111,6 +112,19 @@ const isCertificateSchemaIncompatibleError = (error: unknown): boolean => {
   return false;
 };
 
+const isMissingCertificateAtomicRpcError = (error: unknown): boolean => {
+  const normalized = extractErrorText(error).toLowerCase();
+  if (!normalized) return false;
+
+  return (
+    normalized.includes("save_certificate_event_atomic") &&
+    (normalized.includes("could not find") ||
+      normalized.includes("does not exist") ||
+      normalized.includes("function") ||
+      normalized.includes("schema cache"))
+  );
+};
+
 const resolveCertificateOperationError = (
   error: unknown,
   fallbackMessage: string,
@@ -152,7 +166,7 @@ export const useCertificateEvents = (): UseCertificateEventsResult => {
     setError(CERTIFICATES_SCHEMA_OUTDATED_MESSAGE);
   }, []);
 
-  const listCertificateEvents = useCallback(async () => {
+  const listCertificateEvents = useCallback(async (forceSchemaRetry = false) => {
     if (!user?.id) {
       setEvents([]);
       setError(null);
@@ -162,7 +176,7 @@ export const useCertificateEvents = (): UseCertificateEventsResult => {
       return;
     }
 
-    if (schemaStatus === "incompatible") {
+    if (schemaStatus === "incompatible" && !forceSchemaRetry) {
       setError(schemaErrorMessage || CERTIFICATES_SCHEMA_OUTDATED_MESSAGE);
       setLoading(false);
       return;
@@ -192,64 +206,7 @@ export const useCertificateEvents = (): UseCertificateEventsResult => {
       }
 
       const rawEvents = (data || []) as CertificateEventWithStudentsRow[];
-      const repairedEvents: CertificateEventWithStudentsRow[] = [];
-
-      for (const eventRow of rawEvents) {
-        const eventStudents = (eventRow.certificate_event_students ||
-          []) as CertificateEventStudentRow[];
-
-        if (eventStudents.length === 0) {
-          repairedEvents.push(eventRow);
-          continue;
-        }
-
-        const repairedStudents: CertificateEventStudentRow[] = [];
-
-        for (const row of eventStudents) {
-          const currentCode = row.verification_code?.trim();
-          if (currentCode) {
-            repairedStudents.push({
-              ...row,
-              verification_code: currentCode.toUpperCase(),
-            });
-            continue;
-          }
-
-          const nextCode = generateVerificationCode();
-          const { data: updatedRow, error: updateError } = await supabase
-            .from("certificate_event_students")
-            .update({
-              verification_code: nextCode,
-              verification_status:
-                row.verification_status === "revoked" ? "revoked" : "valid",
-            })
-            .eq("id", row.id)
-            .select("*")
-            .single();
-
-          if (updateError || !updatedRow) {
-            const resolved = resolveCertificateOperationError(
-              updateError,
-              "Falha ao reparar código de verificação legado.",
-            );
-            if (resolved.schemaIncompatible) {
-              markSchemaIncompatible(updateError);
-            }
-            throw new Error(resolved.message);
-          }
-
-          repairedStudents.push(updatedRow as CertificateEventStudentRow);
-        }
-
-        repairedEvents.push({
-          ...eventRow,
-          certificate_event_students: repairedStudents,
-        });
-      }
-
-      const mapped = repairedEvents.map(
-        mapSavedCertificateEvent,
-      );
+      const mapped = rawEvents.map(mapSavedCertificateEvent);
 
       setEvents(mapped);
       setSchemaStatus("compatible");
@@ -277,6 +234,10 @@ export const useCertificateEvents = (): UseCertificateEventsResult => {
 
   useEffect(() => {
     listCertificateEvents();
+  }, [listCertificateEvents]);
+
+  const retrySchemaCheck = useCallback(async () => {
+    await listCertificateEvents(true);
   }, [listCertificateEvents]);
 
   const createCertificateEventWithStudents = useCallback(
@@ -472,22 +433,6 @@ export const useCertificateEvents = (): UseCertificateEventsResult => {
         students_count: normalizedStudents.length,
       };
 
-      const { error: updateError } = await supabase
-        .from("certificate_events")
-        .update(eventPayload)
-        .eq("id", id);
-
-      if (updateError) {
-        const resolved = resolveCertificateOperationError(
-          updateError,
-          "Falha ao atualizar certificado.",
-        );
-        if (resolved.schemaIncompatible) {
-          markSchemaIncompatible(updateError);
-        }
-        throw new Error(resolved.message);
-      }
-
       const currentRows =
         ((currentData as CertificateEventWithStudentsRow).certificate_event_students ||
           []) as CertificateEventStudentRow[];
@@ -580,6 +525,112 @@ export const useCertificateEvents = (): UseCertificateEventsResult => {
         });
       });
 
+      const fetchUpdatedEvent = async () => {
+        const { data, error: fetchError } = await supabase
+          .from("certificate_events")
+          .select(CERTIFICATE_EVENTS_SELECT)
+          .eq("id", id)
+          .single();
+
+        if (fetchError || !data) {
+          const resolved = resolveCertificateOperationError(
+            fetchError,
+            "Nao foi possivel recarregar o evento atualizado.",
+          );
+          if (resolved.schemaIncompatible) {
+            markSchemaIncompatible(fetchError);
+          }
+          throw new Error(resolved.message);
+        }
+
+        const mapped = mapSavedCertificateEvent(data as CertificateEventWithStudentsRow);
+        setEvents((prev) => prev.map((ev) => (ev.id === id ? mapped : ev)));
+        return mapped;
+      };
+
+      const atomicStudentsPayload = [
+        ...rowsToUpdate.map((row) => ({
+          event_student_id: row.id,
+          student_id: row.payload.student_id,
+          student_name_snapshot: row.payload.student_name_snapshot,
+          text_override: row.payload.text_override,
+          highlight_status: row.payload.highlight_status,
+          highlight_average: row.payload.highlight_average,
+          verification_code: row.payload.verification_code,
+          verification_status: row.payload.verification_status,
+        })),
+        ...rowsToInsert.map((row) => ({
+          event_student_id: null,
+          student_id: row.student_id,
+          student_name_snapshot: row.student_name_snapshot,
+          text_override: row.text_override,
+          highlight_status: row.highlight_status,
+          highlight_average: row.highlight_average,
+          verification_code: row.verification_code,
+          verification_status: row.verification_status,
+        })),
+      ];
+
+      const { error: atomicUpdateError } = await supabase.rpc(
+        "save_certificate_event_atomic",
+        {
+          p_event_id: id,
+          p_title: eventPayload.title,
+          p_certificate_type: eventPayload.certificate_type,
+          p_class_id: eventPayload.class_id,
+          p_class_name_snapshot: eventPayload.class_name_snapshot,
+          p_school_year: eventPayload.school_year,
+          p_period_mode: eventPayload.period_mode,
+          p_selected_quarters: eventPayload.selected_quarters,
+          p_period_label: eventPayload.period_label,
+          p_reference_type: eventPayload.reference_type,
+          p_reference_value: eventPayload.reference_value,
+          p_reference_label: eventPayload.reference_label,
+          p_base_text: eventPayload.base_text,
+          p_teacher_name: eventPayload.teacher_name,
+          p_director_name: eventPayload.director_name,
+          p_signature_mode: eventPayload.signature_mode,
+          p_type_meta: eventPayload.type_meta,
+          p_students_count: eventPayload.students_count,
+          p_students: atomicStudentsPayload,
+        },
+      );
+
+      if (!atomicUpdateError) {
+        return fetchUpdatedEvent();
+      }
+
+      if (!isMissingCertificateAtomicRpcError(atomicUpdateError)) {
+        const resolved = resolveCertificateOperationError(
+          atomicUpdateError,
+          "Falha ao atualizar certificado.",
+        );
+        if (resolved.schemaIncompatible) {
+          markSchemaIncompatible(atomicUpdateError);
+        }
+        throw new Error(resolved.message);
+      }
+
+      console.warn(
+        "RPC save_certificate_event_atomic nao encontrada. Aplicando fallback legado para atualizacao de certificado.",
+      );
+
+      const { error: updateError } = await supabase
+        .from("certificate_events")
+        .update(eventPayload)
+        .eq("id", id);
+
+      if (updateError) {
+        const resolved = resolveCertificateOperationError(
+          updateError,
+          "Falha ao atualizar certificado.",
+        );
+        if (resolved.schemaIncompatible) {
+          markSchemaIncompatible(updateError);
+        }
+        throw new Error(resolved.message);
+      }
+
       for (const row of rowsToUpdate) {
         const { error: updateStudentError } = await supabase
           .from("certificate_event_students")
@@ -634,27 +685,7 @@ export const useCertificateEvents = (): UseCertificateEventsResult => {
         }
       }
 
-      // Refresh do evento atualizado
-      const { data, error: fetchError } = await supabase
-        .from("certificate_events")
-        .select(CERTIFICATE_EVENTS_SELECT)
-        .eq("id", id)
-        .single();
-
-      if (fetchError || !data) {
-        const resolved = resolveCertificateOperationError(
-          fetchError,
-          "Não foi possível recarregar o evento atualizado.",
-        );
-        if (resolved.schemaIncompatible) {
-          markSchemaIncompatible(fetchError);
-        }
-        throw new Error(resolved.message);
-      }
-
-      const mapped = mapSavedCertificateEvent(data as CertificateEventWithStudentsRow);
-      setEvents((prev) => prev.map((ev) => (ev.id === id ? mapped : ev)));
-      return mapped;
+      return fetchUpdatedEvent();
     },
     [
       user?.id,
@@ -670,10 +701,12 @@ export const useCertificateEvents = (): UseCertificateEventsResult => {
     error,
     schemaStatus,
     schemaErrorMessage,
-    listCertificateEvents,
-    refresh: listCertificateEvents,
+    listCertificateEvents: () => listCertificateEvents(),
+    refresh: () => listCertificateEvents(),
+    retrySchemaCheck,
     createCertificateEventWithStudents,
     updateCertificateEvent,
     deleteCertificateEvent,
   };
 };
+

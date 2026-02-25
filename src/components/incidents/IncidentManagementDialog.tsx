@@ -382,6 +382,19 @@ export const IncidentManagementDialog = ({
   const handleSaveFollowUp = async () => {
     if (!user || !canEditFollowUp) return;
 
+    if (!isFamilyFlow && followUpSuspensionApplied) {
+      const incidentDate = getBrasiliaISODate(currentIncident.date);
+      if (incidentDate && followUpDate < incidentDate) {
+        toast({
+          title: 'Data invalida para suspensao',
+          description:
+            'Quando houver suspensao aplicada, a data do acompanhamento nao pode ser anterior a data da ocorrencia.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     const followUp: Omit<FollowUpRecord, "id" | "incidentId" | "createdAt"> = {
       type: followUpType,
       date: followUpDate,

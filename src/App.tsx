@@ -28,6 +28,7 @@ import { ThemeProvider } from 'next-themes';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -41,7 +42,9 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    const next = `${location.pathname}${location.search}${location.hash}`;
+    const params = new URLSearchParams({ next });
+    return <Navigate to={`/login?${params.toString()}`} replace />;
   }
 
   return <>{children}</>;

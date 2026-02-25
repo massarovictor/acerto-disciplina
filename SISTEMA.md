@@ -67,6 +67,7 @@ Fonte: `src/App.tsx`
 Rotas publicas:
 - `/login`: autenticacao OTP com validacao em `authorized_emails`.
 - `/certificados/verificar`: validacao publica de certificado por codigo/QR.
+- `/certificados/verificar/:codigo`: validacao publica direta por codigo em URL.
 
 Rotas protegidas (dentro de `AppLayout`):
 - `/`: dashboard.
@@ -87,6 +88,12 @@ Rotas protegidas (dentro de `AppLayout`):
 Detalhe importante de navegacao:
 - A estrutura de relatorios foi migrada de abas para paginas dedicadas.
 - Compatibilidade legado mantida via redirect de `/relatorios`.
+- Guard de autenticacao (`ProtectedRoute`) preserva destino: usuario sem sessao e redirecionado para `/login?next=<path+query+hash>`.
+- Login aplica sanitizacao de `next` (aceita apenas path interno iniciado por `/`; bloqueia `//`, `http://`, `https://`, `javascript:`; fallback `/`).
+- Deep-link de ocorrencia suportado em `/acompanhamentos`:
+  - `?action=open-incident&incidentId=<uuid>&tab=<info|followup|comments>`
+  - abre o modal da ocorrencia e seleciona aba inicial (ou default por status)
+  - apos consumo, limpa os params com `replace` para evitar reabertura em refresh/back.
 
 ---
 
@@ -133,12 +140,16 @@ Detalhe importante de navegacao:
 - Ciclo de vida: `aberta` -> `acompanhamento` -> `resolvida`.
 - Follow-ups e comentarios estruturados.
 - Regra de reset disciplinar por suspensao:
-  - Checkbox explicito `Suspensao aplicada` no follow-up disciplinar.
+  - Checkbox explicito `Suspensao aplicada` no follow-up disciplinar (nao aparece no fluxo familiar).
+  - Se a ocorrencia ja possui reset, o checkbox fica marcado e bloqueado (nao reversivel pela UI).
   - Ao salvar follow-up com checkbox marcado, `follow_ups.suspension_applied = true`.
+  - Guarda de data na UI: com suspensao marcada, `follow_up.date` nao pode ser anterior a `incident.date`.
   - Trigger SQL (`apply_incident_reset_from_follow_up`) aplica o reset no proprio fluxo transacional:
     - `incidents.disciplinary_reset_applied = true`
-    - `incidents.disciplinary_reset_at = follow_ups.date` (preservando a data mais recente)
+    - `incidents.disciplinary_reset_at = greatest(follow_ups.date, incidents.date)` (preservando a data mais recente)
     - `incidents.disciplinary_reset_inferred = false`
+  - Backfill retroativo de `suspension_applied` foi limitado a ocorrencias disciplinares (removendo marcacoes familiares indevidas).
+  - Migration de guarda corrige legado para impedir `disciplinary_reset_at < incidents.date`.
   - A contagem disciplinar do aluno considera somente ocorrencias com data estritamente posterior ao ultimo reset no mesmo ano.
   - O calculo de historico respeita a data da ocorrencia em analise (nao considera incidentes "futuros" em casos retroativos).
   - Fluxo familiar nao usa reset disciplinar.
@@ -480,6 +491,7 @@ erDiagram
 `public.apply_incident_reset_from_follow_up()`
 - Funcao de trigger para aplicar reset disciplinar em `incidents` quando `follow_ups.suspension_applied = true`.
 - Garante consistencia transacional entre salvamento do follow-up e marco de reset.
+- Guarda semantica de data: `disciplinary_reset_at` nunca pode ficar anterior a `incidents.date` (usa `greatest(new.date, incidents.date)`).
 
 ### 7.4 Indices relevantes (migrations recentes)
 - `grades_class_year_quarter_idx`
@@ -555,6 +567,12 @@ Papeis em uso:
   - Adiciona `follow_ups.suspension_applied`.
   - Cria trigger `trg_follow_ups_apply_incident_reset` com funcao `apply_incident_reset_from_follow_up`.
   - Endurece inferencia retroativa para reset disciplinar usando evidencias de execucao (`incidents.actions` e `follow_ups.providencias`), removendo falsos positivos baseados apenas em sugestao.
+- `2026-02-25_zz_followups_suspension_scope_fix.sql`
+  - Corrige escopo de inferencia retroativa de `follow_ups.suspension_applied` para disciplinar apenas.
+  - Desmarca `suspension_applied` em follow-ups ligados a ocorrencias nao disciplinares quando houve inferencia textual.
+- `2026-02-25_zzzz_disciplinary_reset_date_guard.sql`
+  - Recria `apply_incident_reset_from_follow_up` com guarda de data (`greatest(follow_ups.date, incidents.date)`).
+  - Corrige registros existentes com reset aplicado e data inconsistente (`disciplinary_reset_at < incidents.date`).
 
 ---
 
@@ -596,7 +614,20 @@ Arquivo: `supabase/functions/create-user/index.ts`
 
 ### 11.2 `send-incident-email`
 Arquivo: `supabase/functions/send-incident-email/index.ts`
-- Notifica eventos de ocorrencia por SMTP.
+- Notifica eventos de ocorrencia por SMTP (`new_incident`, `incident_followup`, `incident_resolved`).
+- Exige autenticacao (`Authorization: Bearer <jwt>`); sem token retorna `401`.
+- Valida autorizacao do solicitante no servidor:
+  - `admin`: permitido;
+  - `diretor`: permitido apenas se diretor da turma da ocorrencia (`director_id` ou `director_email`);
+  - `professor`: permitido apenas se for criador/dono da ocorrencia.
+- Resolve destinatario no servidor via `classes.director_email` (nao confia em email vindo do frontend).
+- Reconstroi dados canonicos de ocorrencia/turma/alunos no servidor antes de montar o email.
+- CTA de acesso direto:
+  - URL base via secret `APP_URL` (normalizada sem `/` final);
+  - link: `/acompanhamentos?action=open-incident&incidentId=<id>&tab=<...>`;
+  - `tab` por tipo: `incident_followup -> followup`, `incident_resolved -> info`, `new_incident -> sem tab`.
+- Envia `text` sempre e `html` quando ha CTA.
+- Se `APP_URL` ausente, nao quebra envio: envia sem botao e registra warning em log.
 
 ---
 
@@ -628,6 +659,8 @@ Arquivo: `supabase/functions/send-incident-email/index.ts`
 - `src/App.tsx`
 - `src/main.tsx`
 - `src/components/layout/AppLayout.tsx`
+- `src/pages/Login.tsx`
+- `src/pages/Incidents.tsx`
 
 ### 13.2 Dados e estado
 - `src/hooks/useData.ts`
@@ -636,9 +669,13 @@ Arquivo: `supabase/functions/send-incident-email/index.ts`
 - `src/stores/useDataStore.ts`
 - `src/stores/useFormStore.ts`
 - `src/services/supabase/client.ts`
+- `src/lib/incidentActions.ts`
+- `src/lib/emailService.ts`
 
 ### 13.3 Relatorios/certificados
-- `src/pages/Reports.tsx`
+- `src/pages/IntegratedReportsPage.tsx`
+- `src/pages/SlidesPage.tsx`
+- `src/pages/CertificatesPage.tsx`
 - `src/components/reports/IntegratedReports.tsx`
 - `src/components/reports/ClassSlides.tsx`
 - `src/components/reports/CertificatesReports.tsx`
