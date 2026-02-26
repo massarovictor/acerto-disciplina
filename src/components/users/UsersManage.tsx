@@ -55,7 +55,6 @@ const USER_SESSION_ERROR =
 const ensureFreshAccessToken = async (): Promise<{ token?: string; error?: string }> => {
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError) {
-        console.error('Failed to get auth session for create-user:', sessionError);
         return { error: USER_SESSION_ERROR };
     }
 
@@ -68,7 +67,6 @@ const ensureFreshAccessToken = async (): Promise<{ token?: string; error?: strin
     if (!expiresAtMs || expiresAtMs <= Date.now() + 60_000) {
         const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession();
         if (refreshError || !refreshedData.session?.access_token) {
-            console.error('Failed to refresh auth session for create-user:', refreshError);
             return { error: USER_SESSION_ERROR };
         }
         session = refreshedData.session;
@@ -98,13 +96,12 @@ const callCreateUserFunction = async (
     method: 'POST' | 'PUT' | 'DELETE',
     body: Record<string, unknown>,
 ): Promise<Record<string, unknown>> => {
-    const invokeResult = await supabase.functions.invoke('create-user', {
-        method,
-        body,
-    });
-    if (!invokeResult.error) {
-        return (invokeResult.data || {}) as Record<string, unknown>;
+    const tokenData = await ensureFreshAccessToken();
+    if (!tokenData.token) {
+        throw new Error(tokenData.error || USER_SESSION_ERROR);
     }
+    const accessToken = tokenData.token.trim();
+    const effectiveMethod = method;
 
     const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
     const anonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
@@ -112,24 +109,19 @@ const callCreateUserFunction = async (
         throw new Error('Ambiente Supabase nao configurado no frontend.');
     }
 
-    const tokenData = await ensureFreshAccessToken();
-    if (!tokenData.token) {
-        throw new Error(tokenData.error || USER_SESSION_ERROR);
-    }
-
     const endpoint = `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/create-user`;
     const execute = async (token: string) =>
         fetch(endpoint, {
-            method,
+            method: effectiveMethod,
             headers: {
                 'Content-Type': 'application/json',
                 apikey: anonKey,
-                Authorization: `Bearer ${token}`,
+                Authorization: `Bearer ${token.trim()}`,
             },
             body: JSON.stringify(body),
         });
 
-    let response = await execute(tokenData.token);
+    let response = await execute(accessToken);
 
     if (response.status === 401) {
         const { data: refreshedData } = await supabase.auth.refreshSession();
@@ -141,14 +133,26 @@ const callCreateUserFunction = async (
     }
 
     const raw = await response.text().catch(() => '');
-    const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    let parsed: Record<string, unknown> = {};
+    if (raw) {
+        try {
+            parsed = JSON.parse(raw) as Record<string, unknown>;
+        } catch {
+            parsed = { message: raw };
+        }
+    }
 
     if (!response.ok) {
+        if (response.status === 401) {
+            throw new Error(USER_SESSION_ERROR);
+        }
+        const reason = typeof parsed.reason === 'string' ? parsed.reason : '';
         const message =
             (typeof parsed.error === 'string' && parsed.error) ||
             (typeof parsed.message === 'string' && parsed.message) ||
             `Falha HTTP ${response.status} ao executar create-user.`;
-        throw new Error(message);
+        const detailedMessage = reason ? `${message} (${reason})` : message;
+        throw new Error(detailedMessage);
     }
 
     return parsed;
@@ -184,7 +188,6 @@ export const UsersManage = () => {
             .order('email');
 
         if (error) {
-            console.error('Error fetching users:', error);
             toast({
                 title: 'Erro',
                 description: 'Nao foi possivel carregar os usuarios.',
@@ -613,7 +616,7 @@ export const UsersManage = () => {
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Confirmar Remocao</AlertDialogTitle>
-                        <AlertDialogDescription className="space-y-4">
+                        <AlertDialogDescription asChild>
                             <div className="space-y-2">
                                 <p>
                                     Tem certeza que deseja remover <strong>{deletingUser?.email}</strong> da lista de usuarios autorizados?
@@ -664,4 +667,3 @@ export const UsersManage = () => {
         </div>
     );
 };
-

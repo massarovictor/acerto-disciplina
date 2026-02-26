@@ -116,7 +116,9 @@ export const GlobalCommandPalette = () => {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() !== "k") return;
+      if (event.isComposing) return;
+      const pressedKey = typeof event.key === "string" ? event.key.toLowerCase() : "";
+      if (pressedKey !== "k") return;
       if (!event.metaKey && !event.ctrlKey) return;
       event.preventDefault();
       setOpen((previous) => !previous);

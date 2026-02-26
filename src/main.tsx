@@ -10,6 +10,6 @@ if (typeof document !== "undefined") {
 createRoot(document.getElementById("root")!).render(
   <>
     <App />
-    <Analytics />
+    {import.meta.env.PROD ? <Analytics /> : null}
   </>,
 );

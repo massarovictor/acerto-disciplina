@@ -27,6 +27,9 @@ const formatDisplayNameFromEmail = (email: string) => {
     .join(' ');
 };
 
+const isAlreadyRegisteredError = (message: string) =>
+  /already|exists|registered|duplicate|unique constraint|violates unique/i.test(message);
+
 const jsonResponse = (body: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -35,6 +38,15 @@ const jsonResponse = (body: Record<string, unknown>, status = 200) =>
       'Content-Type': 'application/json',
     },
   });
+
+const unauthorizedResponse = (reason: string) =>
+  jsonResponse({ error: 'Nao autenticado.', reason }, 401);
+
+const badRequestResponse = (error: string, reason: string) =>
+  jsonResponse({ error, reason }, 400);
+
+const emailAlreadyExistsResponse = () =>
+  jsonResponse({ error: 'Este email ja esta cadastrado.', reason: 'email_exists' }, 409);
 
 type AdminListUsersClient = {
   auth: {
@@ -81,29 +93,31 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Ambiente Supabase nao configurado.' }, 500);
   }
 
-  const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization') ?? '';
-  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: authHeader } },
-    auth: { persistSession: false },
-  });
+  const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization') ?? '';
 
   const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: { persistSession: false },
   });
 
-  if (!authHeader.trim()) {
-    return jsonResponse({ error: 'Nao autenticado.' }, 401);
+  if (!authHeader.toLowerCase().startsWith('bearer ')) {
+    return unauthorizedResponse('missing_bearer_header');
   }
 
-  const { data: userData, error: authError } = await userClient.auth.getUser();
-  if (authError || !userData.user) {
-    return jsonResponse({ error: 'Nao autenticado.' }, 401);
+  const accessToken = authHeader.slice('Bearer '.length).trim();
+  if (!accessToken) {
+    return unauthorizedResponse('empty_bearer_token');
+  }
+
+  const { data: authData, error: authError } = await adminClient.auth.getUser(accessToken);
+  if (authError || !authData.user) {
+    const reason = authError?.message ? `invalid_token: ${authError.message}` : 'user_not_found';
+    return unauthorizedResponse(reason);
   }
 
   const { data: profile, error: profileError } = await adminClient
     .from('profiles')
     .select('role')
-    .eq('id', userData.user.id)
+    .eq('id', authData.user.id)
     .maybeSingle();
 
   if (profileError) {
@@ -118,13 +132,13 @@ Deno.serve(async (req) => {
   try {
     payload = await req.json();
   } catch {
-    return jsonResponse({ error: 'JSON invalido.' }, 400);
+    return badRequestResponse('JSON invalido.', 'invalid_json');
   }
 
   const email = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : '';
 
   if (!email || !emailRegex.test(email)) {
-    return jsonResponse({ error: 'Email invalido.' }, 400);
+    return badRequestResponse('Email invalido.', 'invalid_email');
   }
 
   // --- UPDATE (PUT) LOGIC ---
@@ -226,6 +240,20 @@ Deno.serve(async (req) => {
   const normalizedRole = normalizeRole(role);
   const displayName = name || formatDisplayNameFromEmail(email);
 
+  const { data: existingAuthorizedEmail, error: existingAuthorizedEmailError } = await adminClient
+    .from('authorized_emails')
+    .select('email')
+    .eq('email', email)
+    .maybeSingle();
+
+  if (existingAuthorizedEmailError) {
+    return jsonResponse({ error: 'Falha ao validar email existente.' }, 500);
+  }
+
+  if (existingAuthorizedEmail?.email) {
+    return emailAlreadyExistsResponse();
+  }
+
   let userId: string | null = null;
   const { data: created, error: createError } = await adminClient.auth.admin.createUser({
     email,
@@ -237,23 +265,30 @@ Deno.serve(async (req) => {
   });
 
   if (createError) {
-    const message = createError.message?.toLowerCase() ?? '';
-    // Ignore "already exists" errors, we just want to ensure it's in authorized_emails and has profile
-    if (!message.includes('already') && !message.includes('exists')) {
-      return jsonResponse({ error: createError.message }, 400);
+    const message = createError.message || '';
+    // Ignore duplicate/already-registered errors; we still upsert authorized_emails/profile.
+    if (!isAlreadyRegisteredError(message)) {
+      return badRequestResponse(
+        message || 'Falha ao criar usuario no auth.',
+        'auth_create_user_failed',
+      );
     }
   } else {
     userId = created?.user?.id ?? null;
   }
 
-  const { error: upsertError } = await adminClient
+  const { error: insertAuthorizedError } = await adminClient
     .from('authorized_emails')
-    .upsert(
-      { email, role: normalizedRole, display_name: displayName },
-      { onConflict: 'email' },
-    );
+    .insert({ email, role: normalizedRole, display_name: displayName });
 
-  if (upsertError) {
+  if (insertAuthorizedError) {
+    const maybeDuplicateCode = (insertAuthorizedError as { code?: string }).code;
+    if (maybeDuplicateCode === '23505') {
+      return emailAlreadyExistsResponse();
+    }
+    if (isAlreadyRegisteredError(insertAuthorizedError.message || '')) {
+      return emailAlreadyExistsResponse();
+    }
     return jsonResponse({ error: 'Falha ao salvar usuario autorizado.' }, 500);
   }
 
