@@ -375,7 +375,6 @@ Deno.serve(async (req: Request) => {
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
   const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const smtpServer = Deno.env.get('SMTP_SERVER') || 'smtp.gmail.com';
   const smtpPort = parseInt(Deno.env.get('SMTP_PORT') || '587');
@@ -384,7 +383,7 @@ Deno.serve(async (req: Request) => {
   const fromEmail = Deno.env.get('FROM_EMAIL');
   const appUrl = normalizeAppUrl(Deno.env.get('APP_URL'));
 
-  if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
     return jsonResponse({ error: 'Ambiente Supabase nao configurado.' }, 500);
   }
 
@@ -398,17 +397,18 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: 'Nao autenticado.' }, 401);
   }
 
-  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: authHeader } },
-    auth: { persistSession: false },
-  });
-
   const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: { persistSession: false },
   });
 
-  const { data: authData, error: authError } = await userClient.auth.getUser();
+  const accessToken = authHeader.slice('Bearer '.length).trim();
+  if (!accessToken) {
+    return jsonResponse({ error: 'Nao autenticado.' }, 401);
+  }
+
+  const { data: authData, error: authError } = await adminClient.auth.getUser(accessToken);
   if (authError || !authData.user) {
+    console.warn('send-incident-email auth failed:', authError?.message || 'missing user');
     return jsonResponse({ error: 'Nao autenticado.' }, 401);
   }
 
