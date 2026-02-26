@@ -248,7 +248,8 @@ export const IncidentManagementDialog = ({
     canManage;
   const canDownloadFinalReport = currentIncident.status === 'resolvida';
 
-  const canAddStudents = canManage && currentIncident.status === 'acompanhamento';
+  const canAddStudents =
+    canManage && ['aberta', 'acompanhamento'].includes(currentIncident.status);
 
 
   // Permite edição se for admin/diretor E (status aberta OU acompanhamento)
