@@ -37,6 +37,8 @@ interface IncidentRow {
   created_by: string | null;
   class_id: string;
   date: string;
+  updated_at: string | null;
+  status: string | null;
   incident_type: 'disciplinar' | 'acompanhamento_familiar' | null;
   description: string | null;
   final_severity: string;
@@ -82,8 +84,6 @@ const FAMILY_ATTENTION_LABELS: Record<string, string> = {
   gravissima: 'Critica',
 };
 
-const VALID_TABS = new Set(['info', 'followup', 'comments']);
-
 const normalizeEmail = (value?: string | null) => (value || '').trim().toLowerCase();
 
 function parseDateForEmail(dateStr: string): Date | null {
@@ -118,19 +118,9 @@ function normalizeAppUrl(appUrlRaw: string | undefined): string | null {
   return trimmed.replace(/\/+$/, '');
 }
 
-function buildIncidentUrl(appUrl: string | null, incidentId: string, tab?: string): string | null {
+function buildIncidentUrl(appUrl: string | null): string | null {
   if (!appUrl) return null;
-
-  const params = new URLSearchParams({
-    action: 'open-incident',
-    incidentId,
-  });
-
-  if (tab && VALID_TABS.has(tab)) {
-    params.set('tab', tab);
-  }
-
-  return `${appUrl}/acompanhamentos?${params.toString()}`;
+  return `${appUrl}/acompanhamentos`;
 }
 
 function escapeHtml(value: string): string {
@@ -160,7 +150,7 @@ function ctaHtmlSection(incidentUrl: string | null): string {
   return `
   <div style="margin:20px 0;">
     <a href="${safeUrl}" style="display:inline-block;padding:12px 18px;background:#0f766e;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">
-      Abrir Ocorrencia no MAVIC
+      Acessar MAVIC
     </a>
   </div>
   <p style="margin:0 0 6px 0;font-size:14px;color:#334155;">
@@ -392,14 +382,14 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: 'Configuracao SMTP nao encontrada.' }, 500);
   }
 
+  const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: { persistSession: false },
+  });
+
   const authHeader = req.headers.get('Authorization') ?? '';
   if (!authHeader.startsWith('Bearer ')) {
     return jsonResponse({ error: 'Nao autenticado.' }, 401);
   }
-
-  const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
-    auth: { persistSession: false },
-  });
 
   const accessToken = authHeader.slice('Bearer '.length).trim();
   if (!accessToken) {
@@ -411,6 +401,10 @@ Deno.serve(async (req: Request) => {
     console.warn('send-incident-email auth failed:', authError?.message || 'missing user');
     return jsonResponse({ error: 'Nao autenticado.' }, 401);
   }
+  const authUser: { id: string; email?: string } = {
+    id: authData.user.id,
+    email: authData.user.email,
+  };
 
   let payload: EmailPayload;
   try {
@@ -426,7 +420,7 @@ Deno.serve(async (req: Request) => {
   const { data: incidentData, error: incidentError } = await adminClient
     .from('incidents')
     .select(
-      'id, owner_id, created_by, class_id, date, incident_type, description, final_severity, suggested_action, student_ids',
+      'id, owner_id, created_by, class_id, date, updated_at, status, incident_type, description, final_severity, suggested_action, student_ids',
     )
     .eq('id', payload.incident.id)
     .maybeSingle();
@@ -453,11 +447,14 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: 'Falha ao validar turma.' }, 500);
   }
 
-  const userRole = await resolveUserRole(adminClient as unknown as RoleLookupClient, authData.user.id);
+  const userRole = await resolveUserRole(
+    adminClient as unknown as RoleLookupClient,
+    authUser.id,
+  );
   const canNotify = isAuthorizedToNotify(
     userRole,
-    authData.user.id,
-    authData.user.email,
+    authUser.id,
+    authUser.email,
     incidentRow,
     classRow ?? null,
   );
@@ -509,13 +506,7 @@ Deno.serve(async (req: Request) => {
     console.warn('APP_URL missing - sending incident email without CTA button');
   }
 
-  const tabByType: Record<EmailPayload['type'], string | undefined> = {
-    new_incident: undefined,
-    incident_followup: 'followup',
-    incident_resolved: 'info',
-  };
-
-  const incidentUrl = buildIncidentUrl(appUrl, effectivePayload.incident.id, tabByType[effectivePayload.type]);
+  const incidentUrl = buildIncidentUrl(appUrl);
   const { subject, text, html } = buildEmailContent(effectivePayload, incidentUrl);
 
   const transporter = nodemailer.createTransport({

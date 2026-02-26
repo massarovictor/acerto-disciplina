@@ -59,6 +59,7 @@ export const IncidentWizard = ({
   incidentType = "disciplinar",
 }: IncidentWizardProps) => {
   const [currentStep, setCurrentStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<Partial<IncidentFormData>>({
     date: getBrasiliaISODate(),
     studentIds: [],
@@ -104,6 +105,10 @@ export const IncidentWizard = ({
   }, [currentStep]);
 
   const handleSubmit = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
     if (
       !user ||
       !formData.classId ||
@@ -133,6 +138,7 @@ export const IncidentWizard = ({
     }
 
     try {
+      setIsSubmitting(true);
       const newIncident = await addIncident({
         incidentType,
         classId: formData.classId,
@@ -191,6 +197,8 @@ export const IncidentWizard = ({
             : "Não foi possível registrar a ocorrência.",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -299,13 +307,16 @@ export const IncidentWizard = ({
             Avançar
           </Button>
         ) : (
-          <Button onClick={handleSubmit}>
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
             {incidentType === "acompanhamento_familiar"
               ? "Registrar Acompanhamento Familiar"
-              : "Registrar Ocorrência"}
+              : isSubmitting
+                ? "Registrando..."
+                : "Registrar Ocorrência"}
           </Button>
         )}
       </div>
     </div>
   );
 };
+

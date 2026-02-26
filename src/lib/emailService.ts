@@ -16,6 +16,141 @@ interface EmailPayload {
     teacherName?: string;
 }
 
+const inFlightEmails = new Set<string>();
+
+const getFunctionsErrorStatus = (error: unknown): number | null => {
+    if (
+        typeof error === 'object' &&
+        error !== null &&
+        'status' in error &&
+        typeof (error as { status?: unknown }).status === 'number'
+    ) {
+        return (error as { status: number }).status;
+    }
+
+    const maybeContext =
+        typeof error === 'object' && error !== null && 'context' in error
+            ? (error as { context?: Response }).context
+            : undefined;
+
+    if (!maybeContext) return null;
+    return typeof maybeContext.status === 'number' ? maybeContext.status : null;
+};
+
+const isUnauthorizedError = (error: unknown): boolean => {
+    const status = getFunctionsErrorStatus(error);
+    if (status === 401) return true;
+
+    const message = error instanceof Error ? error.message : String(error || '');
+    return /401|unauthorized|nao autenticado|not authenticated|invalid jwt/i.test(message || '');
+};
+
+const enrichFunctionsErrorLog = async (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+
+    if (
+        typeof error === 'object' &&
+        error !== null &&
+        'status' in error &&
+        'body' in error
+    ) {
+        console.error('Email function error:', error);
+        return;
+    }
+
+    const maybeContext =
+        typeof error === 'object' && error !== null && 'context' in error
+            ? (error as { context?: Response }).context
+            : undefined;
+
+    if (!maybeContext) {
+        console.error('Email function error:', error);
+        return;
+    }
+
+    let responseText = '';
+    try {
+        responseText = await maybeContext.clone().text();
+    } catch {
+        responseText = '';
+    }
+
+    console.error('Email function error:', {
+        message,
+        status: maybeContext.status,
+        statusText: maybeContext.statusText,
+        body: responseText,
+    });
+};
+
+const ensureFreshAuthenticatedSession = async (): Promise<{
+    ok: boolean;
+    error?: string;
+    accessToken?: string;
+}> => {
+    const userSessionError =
+        'Sessao expirada ou invalida. Faca logout e login novamente para enviar o e-mail.';
+
+    const getSessionData = async () => supabase.auth.getSession();
+    const refreshSessionData = async () => supabase.auth.refreshSession();
+
+    const { data: sessionData, error: sessionError } = await getSessionData();
+    if (sessionError) {
+        console.error('Failed to get auth session before sending incident email:', sessionError);
+        return {
+            ok: false,
+            error: userSessionError,
+        };
+    }
+
+    let session = sessionData.session;
+    if (!session?.access_token) {
+        return {
+            ok: false,
+            error: 'Usuario nao autenticado. Faca login para enviar o e-mail.',
+        };
+    }
+
+    const expiresAtMs = (session.expires_at || 0) * 1000;
+    const needsRefresh = !expiresAtMs || expiresAtMs <= Date.now() + 60_000;
+    if (needsRefresh) {
+        const { data: refreshedData, error: refreshError } = await refreshSessionData();
+        if (refreshError || !refreshedData.session?.access_token) {
+            console.error('Failed to refresh session before sending incident email:', refreshError);
+            return {
+                ok: false,
+                error: userSessionError,
+            };
+        }
+        session = refreshedData.session;
+    }
+
+    const validateToken = async (token: string): Promise<boolean> => {
+        const { data: userData, error: userError } = await supabase.auth.getUser(token);
+        return !userError && Boolean(userData.user);
+    };
+
+    let accessToken = session.access_token;
+    if (!(await validateToken(accessToken))) {
+        const { data: refreshedData, error: refreshError } = await refreshSessionData();
+        if (refreshError || !refreshedData.session?.access_token) {
+            return {
+                ok: false,
+                error: userSessionError,
+            };
+        }
+        accessToken = refreshedData.session.access_token;
+        if (!(await validateToken(accessToken))) {
+            return {
+                ok: false,
+                error: userSessionError,
+            };
+        }
+    }
+
+    return { ok: true, accessToken };
+};
+
 /**
  * Send incident notification email to class director.
  * Recipient is resolved server-side using incident/class data.
@@ -44,53 +179,65 @@ export async function sendIncidentEmail(
         teacherName: undefined,
     };
 
+    const requestKey = `${type}:${incident.id}`;
+    if (inFlightEmails.has(requestKey)) {
+        return { success: true };
+    }
+
+    inFlightEmails.add(requestKey);
+
     try {
-        let accessToken: string | null = null;
+        const sessionCheck = await ensureFreshAuthenticatedSession();
+        if (!sessionCheck.ok || !sessionCheck.accessToken) {
+            return { success: false, error: sessionCheck.error };
+        }
 
-        const { data: sessionData } = await supabase.auth.getSession();
-        accessToken = sessionData.session?.access_token ?? null;
+        const anonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
+        const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
+        if (!anonKey) {
+            return { success: false, error: 'VITE_SUPABASE_ANON_KEY nao configurada.' };
+        }
+        if (!supabaseUrl) {
+            return { success: false, error: 'VITE_SUPABASE_URL nao configurada.' };
+        }
 
-        if (!accessToken) {
-            const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession();
-            if (refreshError) {
-                console.error('Failed to refresh session before sending incident email:', refreshError);
+        const endpoint = `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/send-incident-email`;
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                apikey: anonKey,
+                Authorization: `Bearer ${sessionCheck.accessToken.trim()}`,
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const responseBody = await response.text().catch(() => '');
+            const errorLike = {
+                message: 'Edge Function returned a non-2xx status code',
+                status: response.status,
+                statusText: response.statusText,
+                body: responseBody,
+            };
+            await enrichFunctionsErrorLog(errorLike);
+            if (isUnauthorizedError(errorLike)) {
+                return {
+                    success: false,
+                    error: 'Sessao expirada ou invalida. Faca logout e login novamente para enviar o e-mail.',
+                };
             }
-            accessToken = refreshedData.session?.access_token ?? null;
+            return { success: false, error: `Falha HTTP ${response.status} ao enviar e-mail.` };
         }
 
-        if (!accessToken) {
-            return { success: false, error: 'Sessao expirada. Faca login novamente para enviar o e-mail.' };
-        }
-
-        const invokeEmail = async (token: string) =>
-            supabase.functions.invoke('send-incident-email', {
-                body: payload,
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            });
-
-        let { data, error } = await invokeEmail(accessToken);
-
-        if (error && /401|unauthorized|nao autenticado|not authenticated/i.test(error.message || '')) {
-            const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession();
-            if (refreshError) {
-                console.error('Failed to refresh session after 401 from send-incident-email:', refreshError);
-            } else if (refreshedData.session?.access_token) {
-                ({ data, error } = await invokeEmail(refreshedData.session.access_token));
-            }
-        }
-
-        if (error) {
-            console.error('Email function error:', error);
-            return { success: false, error: error.message };
-        }
-
+        const data = await response.json().catch(() => ({}));
         console.log('Email sent successfully:', data);
         return { success: true };
     } catch (err) {
         console.error('Failed to send email:', err);
         return { success: false, error: String(err) };
+    } finally {
+        inFlightEmails.delete(requestKey);
     }
 }
 

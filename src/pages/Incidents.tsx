@@ -563,16 +563,20 @@ const Incidents = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-4">
-              <p>Tem certeza que deseja excluir este acompanhamento? Esta ação não pode ser desfeita.</p>
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Digite <span className="font-bold text-destructive">excluir</span> para confirmar:</p>
-                <Input
-                  value={deleteConfirmationText}
-                  onChange={(e) => setDeleteConfirmationText(e.target.value)}
-                  placeholder="excluir"
-                  className="border-destructive/30 focus-visible:ring-destructive"
-                />
+            <AlertDialogDescription asChild>
+              <div className="space-y-4 text-sm text-muted-foreground">
+                <p>Tem certeza que deseja excluir este acompanhamento? Esta ação não pode ser desfeita.</p>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-foreground">
+                    Digite <span className="font-bold text-destructive">excluir</span> para confirmar:
+                  </p>
+                  <Input
+                    value={deleteConfirmationText}
+                    onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                    placeholder="excluir"
+                    className="border-destructive/30 focus-visible:ring-destructive"
+                  />
+                </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
