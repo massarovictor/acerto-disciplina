@@ -45,9 +45,41 @@ export async function sendIncidentEmail(
     };
 
     try {
-        const { data, error } = await supabase.functions.invoke('send-incident-email', {
-            body: payload,
-        });
+        let accessToken: string | null = null;
+
+        const { data: sessionData } = await supabase.auth.getSession();
+        accessToken = sessionData.session?.access_token ?? null;
+
+        if (!accessToken) {
+            const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession();
+            if (refreshError) {
+                console.error('Failed to refresh session before sending incident email:', refreshError);
+            }
+            accessToken = refreshedData.session?.access_token ?? null;
+        }
+
+        if (!accessToken) {
+            return { success: false, error: 'Sessao expirada. Faca login novamente para enviar o e-mail.' };
+        }
+
+        const invokeEmail = async (token: string) =>
+            supabase.functions.invoke('send-incident-email', {
+                body: payload,
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+        let { data, error } = await invokeEmail(accessToken);
+
+        if (error && /401|unauthorized|nao autenticado|not authenticated/i.test(error.message || '')) {
+            const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession();
+            if (refreshError) {
+                console.error('Failed to refresh session after 401 from send-incident-email:', refreshError);
+            } else if (refreshedData.session?.access_token) {
+                ({ data, error } = await invokeEmail(refreshedData.session.access_token));
+            }
+        }
 
         if (error) {
             console.error('Email function error:', error);
