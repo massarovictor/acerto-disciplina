@@ -1,726 +1,840 @@
-# Sistema MAVIC - Documentacao Tecnica Mestre
+# Sistema MAVIC - Snapshot Tecnico Completo
 
-## Metadados do documento
-- Nome do sistema: `MAVIC` (Monitoramento, Avaliacao e Visao Integrada de Classes)
-- Repositorio: `acerto-disciplina`
-- Branch analisada: `main`
-- Commit de referencia: `latest`
-- Ultima atualizacao desta documentacao: `2026-02-25`
-- Idioma padrao da aplicacao: `pt-BR`
-- Objetivo: descrever, de ponta a ponta, o comportamento atual do sistema e seu banco de dados
+## Metadados do snapshot
+- Sistema: `MAVIC` (acerto-disciplina)
+- Repositorio: `massarovictor/acerto-disciplina`
+- Branch: `main`
+- Data deste documento: `2026-02-26`
+- Fonte de verdade usada: codigo em `src/`, `supabase/functions/`, `supabase/schema.sql`, `supabase/migrations/`, scripts SQL auxiliares em `supabase/`
+- Versao para publicacao no GitHub: dados sensiveis de ambiente removidos (refs de projeto, chaves, endpoints privados, identificadores operacionais)
+
+## 1) Arquitetura atual
+
+### 1.1 Stack
+- Frontend SPA: React 18 + TypeScript + Vite
+- Roteamento: `react-router-dom`
+- Estado servidor/cache: `@tanstack/react-query`
+- Estado local: `zustand`
+- UI: Tailwind + Radix + shadcn
+- Backend: Supabase (Auth, Postgres, RLS, Storage, Edge Functions)
+
+### 1.2 Componentes de execucao
+- Browser client chama:
+  - Supabase Auth (OTP por email)
+  - Supabase REST/RPC (tabelas e funcoes SQL)
+  - Supabase Edge Functions (`create-user`, `send-incident-email`)
+  - Supabase Storage (`school-assets`)
+- Edge Functions usam `SUPABASE_SERVICE_ROLE_KEY` para operacoes administrativas
+
+### 1.3 Variaveis de ambiente usadas pelo frontend
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `VITE_CERTIFICATE_VERIFICATION_BASE_URL` (opcional)
+
+### 1.4 Variaveis de ambiente usadas nas Edge Functions
+- `create-user`
+  - `SUPABASE_URL`
+  - `SUPABASE_ANON_KEY`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+- `send-incident-email`
+  - `SUPABASE_URL`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+  - `SMTP_SERVER`
+  - `SMTP_PORT`
+  - `SMTP_USERNAME`
+  - `SMTP_PASSWORD`
+  - `FROM_EMAIL`
+  - `APP_URL` (opcional, para CTA no email)
+
+## 2) Rotas da aplicacao e controle de acesso
+
+Fonte: `src/App.tsx`, `src/pages/Users.tsx`, `src/components/auth/AdminOnlyRoute.tsx`.
+
+### 2.1 Rotas publicas
+- `/login`
+- `/certificados/verificar`
+- `/certificados/verificar/:codigo`
+
+### 2.2 Rotas protegidas (exigem sessao)
+Dentro de `/` com `ProtectedRoute` + `AppLayout`:
+- `/` (Dashboard)
+- `/acompanhamentos`
+- `/ocorrencias` (redirect para `/acompanhamentos`)
+- `/turmas` (admin)
+- `/turmas-arquivadas` (admin)
+- `/alunos` (admin)
+- `/notas-frequencia` (admin)
+- `/relatorios-integrados`
+- `/slides`
+- `/certificados`
+- `/relatorios` (redirect legado por query `tab`)
+- `/analytics`
+- `/trajetoria`
+- `/usuarios` (pagina aplica guard admin internamente)
+
+### 2.3 Regras de autenticacao e sessao
+- `ProtectedRoute` redireciona sem sessao para `/login?next=<rota>`.
+- Sanitizacao de `next` no login:
+  - aceita apenas path iniciando com `/`
+  - bloqueia `//`, `http://`, `https://`, `javascript:`
+- `AuthContext` carrega perfil em `public.profiles` por `id = auth.user.id`.
+- Fallback de perfil quando `profiles` nao existe:
+  - `name` via `user_metadata.name` ou prefixo do email
+  - `role` via `user_metadata.role` ou `diretor`
+
+### 2.4 Fluxo de login
+- Tela `/login` usa OTP por email (`signInWithOtp` + `verifyOtp`).
+- Antes de enviar OTP, consulta `authorized_emails` para whitelist de acesso.
+- `shouldCreateUser: true` no envio OTP.
+
+### 2.5 Mapa pagina por pagina (funcional)
+
+#### Rotas publicas
+- `/login` (`src/pages/Login.tsx`)
+  - Objetivo: autenticar por OTP de email.
+  - Regras: email precisa existir em `authorized_emails` antes de enviar OTP.
+  - Fluxo:
+    - Passo 1: email.
+    - Passo 2: token OTP de 6 digitos.
+    - Redireciona para `next` sanitizado.
+- `/certificados/verificar` e `/certificados/verificar/:codigo` (`src/pages/CertificateVerification.tsx`)
+  - Objetivo: validacao publica de certificado.
+  - Entrada de codigo:
+    - Parametro de rota `:codigo`.
+    - Query string `?codigo=...`.
+    - Campo manual na tela.
+  - Processamento:
+    - Normaliza para alfanumerico maiusculo.
+    - Chama RPC `verify_certificate_code`.
+    - Exibe status (`valid` ou `revoked`) e metadados do certificado.
+  - Tratamento de erro:
+    - Mapeia erros de schema cache/RPC ausente com mensagem amigavel.
+
+#### Rotas protegidas (app principal com layout)
+- `/` Dashboard (`src/pages/Dashboard.tsx`)
+  - Componentes principais:
+    - `OperatingStatus`
+    - `RecentActivity`
+    - `BirthdayWidget`
+    - menu de aplicativos
+  - Dados: `classes`, `students`, `incidents`.
+  - Regras de escopo por papel:
+    - Admin: visao global.
+    - Diretor: recorte por turmas dirigidas.
+    - Professor: cards administrativos ocultados.
+  - Acoes:
+    - Atalho para busca global (`open-global-search`).
+    - Abrir dialog de configuracao escolar (`SchoolConfigDialog`).
+- `/acompanhamentos` (`src/pages/Incidents.tsx`)
+  - Objetivo: gestao de ocorrencias disciplinares e acompanhamentos familiares.
+  - Dados: `incidents`, `classes`, `students`.
+  - Filtros:
+    - Busca textual.
+    - Filtro por tipo (`disciplinar` / `acompanhamento_familiar` / todos).
+    - Filtro por turma.
+    - Abas de status (`aberta`, `acompanhamento`, `resolvida`).
+  - Acoes:
+    - Nova ocorrencia disciplinar.
+    - Novo acompanhamento familiar.
+    - Abrir `IncidentManagementDialog`.
+    - Excluir ocorrencia com confirmacao.
+  - Deep-link suportado por query:
+    - `?action=nova-ocorrencia&tipo=...`
+    - `?action=open-incident&incidentId=<uuid>&tab=info|followup|comments`
+- `/turmas` (`src/pages/Classes.tsx`)
+  - Objetivo: administrar estrutura de turmas.
+  - Abas:
+    - `Gerenciar Turmas` (`ClassesManage`)
+    - `Criar Nova Turma` (`ClassesCreate`)
+    - `Templates` (`SubjectTemplatesManager`)
+  - Acoes:
+    - Navegar para turmas arquivadas.
+    - Highlight de turma via query `?highlight=...` com auto-limpeza.
+- `/turmas-arquivadas` (`src/pages/ArchivedClasses.tsx`)
+  - Objetivo: consultar e restaurar turmas arquivadas.
+  - Dados: `archivedClasses`, `students`.
+  - Acoes:
+    - Busca por nome/curso/motivo.
+    - Visualizar detalhes da turma (dialog).
+    - Desarquivar turma e reativar alunos (`status = active`).
+- `/alunos` (`src/pages/Students.tsx`)
+  - Objetivo: cadastro e manutencao de alunos.
+  - Abas:
+    - `Gerenciar Alunos` (`StudentsManage`)
+    - `Cadastrar` (`StudentsRegister`)
+    - `Aprovações` (`StudentApprovalManager`)
+  - Acoes:
+    - Highlight de aluno via query `?highlight=...` com auto-limpeza.
+- `/notas-frequencia` (`src/pages/GradesAttendance.tsx`)
+  - Objetivo atual: lancamento de notas.
+  - Componente ativo: `GradesManager`.
+  - Observacao: modulo de frequencia esta desativado na UI desta rota.
+- `/relatorios-integrados` (`src/pages/IntegratedReportsPage.tsx`)
+  - Objetivo: relatorios consolidados academicos/comportamentais.
+  - Componente principal: `IntegratedReports`.
+  - Dados injetados: `classes`, `students`, `incidents`.
+- `/slides` (`src/pages/SlidesPage.tsx`)
+  - Objetivo: gerar apresentacoes.
+  - Componente principal: `ClassSlides`.
+  - Dados injetados: `classes`, `students`, `incidents`.
+- `/certificados` (`src/pages/CertificatesPage.tsx`)
+  - Objetivo: emitir, editar, baixar e validar certificados.
+  - Componente principal: `CertificatesReports`.
+  - Acoes:
+    - Botao `Emitir Certificados` incrementa `createRequestNonce`.
+    - Suporta gatilho por query `?action=emitir`.
+- `/analytics` (`src/pages/Analytics.tsx`)
+  - Objetivo: exploracao analitica.
+  - Filtros globais via `AnalyticsFilters`.
+  - Abas funcionais:
+    - `dashboard` (Visao 360)
+    - `subjects` (Disciplinas)
+    - `classes` (Ranking de Turma)
+    - `ranking-alunos` (Ranking de Alunos)
+    - `behavior` (Convivencia Disciplinar)
+    - `family` (Convivencia Familiar)
+  - Motor: `useSchoolAnalyticsWorker`.
+  - Acoes por insight:
+    - aplica filtros locais.
+    - navega para `/acompanhamentos` em cenarios de risco.
+- `/trajetoria` (`src/pages/StudentTrajectory.tsx`)
+  - Objetivo: historico longitudinal por aluno/turma.
+  - Fontes de dados:
+    - `grades` (regular)
+    - `historical_grades`
+    - `external_assessments`
+    - `incidents`
+    - disciplinas profissionais/templates
+  - Modos:
+    - `ClassTrajectoryView` (visao de turma)
+    - visao individual com abas `summary`, `trajectory`, `entry`
+    - sub-abas em entrada: historico escolar e avaliacoes externas
+  - Acoes:
+    - importacao em lote (`TrajectoryImportDialog`)
+    - cadastro em lote de avaliacoes externas (`ExternalAssessmentBatchDialog`)
+    - deep-link por query (`classId`, `studentId`, `subject`)
+- `/usuarios` (`src/pages/Users.tsx`)
+  - Objetivo: administracao de acessos.
+  - Restricao: somente admin (guard na pagina + regras backend).
+  - Componente principal: `UsersManage`.
+  - Acoes:
+    - criar/editar/remover usuario via Edge Function `create-user`.
+    - controle de papeis (`admin`, `diretor`, `professor`).
+
+#### Rotas de compatibilidade/redirect
+- `/ocorrencias`
+  - Redirect para `/acompanhamentos` preservando query/hash.
+- `/relatorios`
+  - Redirect legado para:
+    - `/slides` se `tab=slides`
+    - `/certificados` se `tab=certificates`
+    - `/relatorios-integrados` caso contrario
+
+#### Fallback de rota
+- `*` (`src/pages/NotFound.tsx`)
+  - Tela 404.
+
+#### Paginas existentes nao ativas por rota no `App.tsx`
+- `src/pages/NewIncident.tsx` (wizard isolado, nao roteado atualmente)
+- `src/pages/Reports.tsx` (componente legado de redirect; rota real tratada em `App.tsx`)
+- `src/pages/Index.tsx` (alias historico para `Dashboard`)
+
+## 3) Inventario de dados acessados pelo frontend
+
+### 3.1 Tabelas consultadas/escritas pelo frontend
+Detectadas em `src/`:
+- `attendance`
+- `authorized_emails`
+- `certificate_events`
+- `certificate_event_students`
+- `classes`
+- `comments`
+- `external_assessments`
+- `follow_ups`
+- `grades`
+- `historical_grades`
+- `incidents`
+- `professional_subject_templates`
+- `professional_subjects`
+- `profiles`
+- `school_config`
+- `students`
+
+### 3.2 RPC usadas pelo frontend
+- `fetch_grades_analytics`
+- `verify_certificate_code`
+- `save_certificate_event_atomic`
+
+### 3.3 Storage usado pelo frontend
+- Bucket: `school-assets`
+
+## 4) Banco de dados - schema atual (public)
+
+Base: `supabase/schema.sql` + migrations de `supabase/migrations`.
+
+## 4.1 Tabelas e colunas
+
+### `public.attendance`
+- `id uuid NOT NULL DEFAULT gen_random_uuid()`
+- `owner_id uuid NOT NULL`
+- `student_id uuid NOT NULL`
+- `class_id uuid NOT NULL`
+- `date date NOT NULL`
+- `status text NOT NULL CHECK (presente|falta|falta_justificada|atestado)`
+- `recorded_by uuid`
+- `recorded_at timestamptz NOT NULL DEFAULT now()`
+- `created_at timestamptz NOT NULL DEFAULT now()`
+- `updated_at timestamptz NOT NULL DEFAULT now()`
+- PK: `attendance_pkey(id)`
+- FK: `owner_id -> auth.users(id)`
+- FK: `student_id -> public.students(id)`
+- FK: `class_id -> public.classes(id)`
+- FK: `recorded_by -> auth.users(id)`
+
+### `public.authorized_emails`
+- `email text NOT NULL`
+- `role text DEFAULT 'professor'`
+- `display_name text` (adicionado em `2026-02-26_authorized_emails_display_name.sql`)
+- `created_at timestamptz DEFAULT now()`
+- PK: `authorized_emails_pkey(email)`
+
+### `public.classes`
+- `id uuid NOT NULL DEFAULT gen_random_uuid()`
+- `owner_id uuid NOT NULL`
+- `name text NOT NULL`
+- `series text NOT NULL`
+- `letter text`
+- `course text`
+- `director_id uuid`
+- `director_email text`
+- `active boolean NOT NULL DEFAULT true`
+- `start_year smallint`
+- `current_year smallint`
+- `start_year_date date`
+- `start_calendar_year integer`
+- `end_calendar_year integer`
+- `archived boolean NOT NULL DEFAULT false`
+- `archived_at timestamptz`
+- `archived_reason text`
+- `template_id uuid`
+- `created_at timestamptz NOT NULL DEFAULT now()`
+- `updated_at timestamptz NOT NULL DEFAULT now()`
+- PK: `classes_pkey(id)`
+- FK: `owner_id -> auth.users(id)`
+- FK: `director_id -> public.profiles(id)`
+
+### `public.certificate_events`
+- `id uuid NOT NULL DEFAULT gen_random_uuid()`
+- `owner_id uuid NOT NULL`
+- `created_by_name text NOT NULL`
+- `title text NOT NULL`
+- `certificate_type text NOT NULL CHECK (monitoria|destaque|evento_participacao|evento_organizacao)`
+- `class_id uuid`
+- `class_name_snapshot text NOT NULL`
+- `school_year smallint NOT NULL CHECK (1..3)`
+- `period_mode text NOT NULL CHECK (quarters|annual)`
+- `selected_quarters text[] NOT NULL DEFAULT '{}'`
+- `period_label text NOT NULL`
+- `reference_type text CHECK (subject|area)`
+- `reference_value text`
+- `reference_label text`
+- `base_text text NOT NULL`
+- `teacher_name text`
+- `director_name text`
+- `signature_mode text NOT NULL DEFAULT 'digital_cursive' CHECK (digital_cursive|physical_print)`
+- `type_meta jsonb NOT NULL DEFAULT '{}'`
+- `students_count integer NOT NULL DEFAULT 0 CHECK (students_count >= 0)`
+- `created_at timestamptz NOT NULL DEFAULT now()`
+- `updated_at timestamptz NOT NULL DEFAULT now()`
+- PK: `certificate_events_pkey(id)`
+- FK: `owner_id -> auth.users(id)`
+- FK: `class_id -> public.classes(id) ON DELETE SET NULL`
+
+### `public.certificate_event_students`
+- `id uuid NOT NULL DEFAULT gen_random_uuid()`
+- `owner_id uuid NOT NULL`
+- `certificate_event_id uuid NOT NULL`
+- `student_id uuid`
+- `student_name_snapshot text NOT NULL`
+- `text_override text`
+- `highlight_status text CHECK (confirmed|pending)`
+- `highlight_average numeric`
+- `verification_code text NOT NULL DEFAULT upper(replace(gen_random_uuid()::text,'-',''))`
+- `verification_status text NOT NULL DEFAULT 'valid' CHECK (valid|revoked)`
+- `created_at timestamptz NOT NULL DEFAULT now()`
+- PK: `certificate_event_students_pkey(id)`
+- FK: `owner_id -> auth.users(id)`
+- FK: `certificate_event_id -> public.certificate_events(id) ON DELETE CASCADE`
+- FK: `student_id -> public.students(id) ON DELETE SET NULL`
+
+### `public.comments`
+- `id uuid NOT NULL DEFAULT gen_random_uuid()`
+- `owner_id uuid NOT NULL`
+- `incident_id uuid NOT NULL`
+- `user_id uuid`
+- `user_name text`
+- `text text NOT NULL`
+- `created_at timestamptz NOT NULL DEFAULT now()`
+- PK: `comments_pkey(id)`
+- FK: `owner_id -> auth.users(id)`
+- FK: `incident_id -> public.incidents(id)`
+- FK: `user_id -> auth.users(id)`
+
+### `public.external_assessments`
+- `id uuid NOT NULL DEFAULT gen_random_uuid()`
+- `student_id uuid NOT NULL`
+- `assessment_type text NOT NULL`
+- `assessment_name text NOT NULL`
+- `subject text`
+- `score numeric NOT NULL`
+- `max_score numeric NOT NULL DEFAULT 100`
+- `proficiency_level text`
+- `applied_date date`
+- `temporal_position jsonb DEFAULT '{}'`
+- `notes text`
+- `created_at timestamptz DEFAULT now()`
+- `updated_at timestamptz DEFAULT now()`
+- `grade_year integer`
+- `quarter text`
+- `school_level text`
+- PK: `external_assessments_pkey(id)`
+- FK: `student_id -> public.students(id)`
+
+### `public.follow_ups`
+- `id uuid NOT NULL DEFAULT gen_random_uuid()`
+- `owner_id uuid NOT NULL`
+- `incident_id uuid NOT NULL`
+- `type text NOT NULL CHECK (conversa_individual|conversa_pais|situacoes_diversas)`
+- `date date NOT NULL`
+- `suspension_applied boolean NOT NULL DEFAULT false`
+- `responsavel text`
+- `motivo text`
+- `providencias text`
+- `assuntos_tratados text`
+- `encaminhamentos text`
+- `disciplina text`
+- `tipo_situacao text`
+- `descricao_situacao text`
+- `nome_responsavel_pai text`
+- `grau_parentesco text`
+- `created_by uuid`
+- `created_at timestamptz NOT NULL DEFAULT now()`
+- `updated_at timestamptz NOT NULL DEFAULT now()`
+- PK: `follow_ups_pkey(id)`
+- FK: `owner_id -> auth.users(id)`
+- FK: `incident_id -> public.incidents(id)`
+- FK: `created_by -> auth.users(id)`
+
+### `public.grades`
+- `id uuid NOT NULL DEFAULT gen_random_uuid()`
+- `owner_id uuid NOT NULL`
+- `student_id uuid NOT NULL`
+- `class_id uuid NOT NULL`
+- `subject text NOT NULL`
+- `quarter text NOT NULL`
+- `school_year smallint NOT NULL DEFAULT 1 CHECK (1..3)`
+- `grade numeric NOT NULL CHECK (0 <= grade <= 10)`
+- `observation text`
+- `recorded_at timestamptz NOT NULL DEFAULT now()`
+- `created_at timestamptz NOT NULL DEFAULT now()`
+- `updated_at timestamptz NOT NULL DEFAULT now()`
+- PK: `grades_pkey(id)`
+- FK: `owner_id -> auth.users(id)`
+- FK: `student_id -> public.students(id)`
+- FK: `class_id -> public.classes(id)`
+- Unique (migration): `(student_id, class_id, subject, quarter, school_year)`
+
+### `public.historical_grades`
+- `id uuid NOT NULL DEFAULT gen_random_uuid()`
+- `student_id uuid NOT NULL`
+- `school_level text NOT NULL DEFAULT 'fundamental'`
+- `grade_year integer NOT NULL`
+- `subject text NOT NULL`
+- `quarter text NOT NULL`
+- `grade numeric NOT NULL CHECK (0 <= grade <= 10)`
+- `school_name text`
+- `calendar_year integer NOT NULL`
+- `created_at timestamptz DEFAULT now()`
+- `updated_at timestamptz DEFAULT now()`
+- PK: `historical_grades_pkey(id)`
+- FK: `student_id -> public.students(id)`
+
+### `public.incidents`
+- `id uuid NOT NULL DEFAULT gen_random_uuid()`
+- `owner_id uuid NOT NULL`
+- `class_id uuid NOT NULL`
+- `date date NOT NULL`
+- `student_ids uuid[] NOT NULL DEFAULT '{}'`
+- `episodes text[] NOT NULL DEFAULT '{}'`
+- `incident_type text NOT NULL DEFAULT 'disciplinar' CHECK (disciplinar|acompanhamento_familiar)`
+- `calculated_severity text NOT NULL CHECK (leve|intermediaria|grave|gravissima)`
+- `final_severity text NOT NULL CHECK (leve|intermediaria|grave|gravissima)`
+- `severity_override_reason text`
+- `description text`
+- `actions text`
+- `suggested_action text`
+- `status text NOT NULL CHECK (aberta|acompanhamento|resolvida)`
+- `validated_by uuid`
+- `validated_at timestamptz`
+- `validated_by_name text` (migration `2026-02-26_zz_incidents_validated_by_name_snapshot.sql`)
+- `disciplinary_reset_applied boolean NOT NULL DEFAULT false`
+- `disciplinary_reset_at date`
+- `disciplinary_reset_inferred boolean NOT NULL DEFAULT false`
+- `created_by uuid`
+- `created_by_name text` (migration `2026-02-26_incidents_created_by_name_snapshot.sql`)
+- `created_at timestamptz NOT NULL DEFAULT now()`
+- `updated_at timestamptz NOT NULL DEFAULT now()`
+- PK: `incidents_pkey(id)`
+- FK: `owner_id -> auth.users(id)`
+- FK: `class_id -> public.classes(id)`
+- FK: `validated_by -> auth.users(id)`
+- FK: `created_by -> auth.users(id)`
+
+### `public.professional_subject_templates`
+- `id uuid NOT NULL DEFAULT gen_random_uuid()`
+- `owner_id uuid NOT NULL`
+- `name text NOT NULL`
+- `course text NOT NULL`
+- `subjects_by_year jsonb NOT NULL DEFAULT '[]'`
+- `created_at timestamptz NOT NULL DEFAULT now()`
+- `updated_at timestamptz NOT NULL DEFAULT now()`
+- PK: `professional_subject_templates_pkey(id)`
+- FK: `owner_id -> auth.users(id)`
+
+### `public.professional_subjects`
+- `id uuid NOT NULL DEFAULT gen_random_uuid()`
+- `owner_id uuid NOT NULL`
+- `class_id uuid NOT NULL`
+- `subject text NOT NULL`
+- `created_at timestamptz NOT NULL DEFAULT now()`
+- `updated_at timestamptz NOT NULL DEFAULT now()`
+- PK: `professional_subjects_pkey(id)`
+- FK: `owner_id -> auth.users(id)`
+- FK: `class_id -> public.classes(id)`
+
+### `public.profiles`
+- `id uuid NOT NULL`
+- `name text NOT NULL`
+- `role text NOT NULL DEFAULT 'diretor'`
+- `created_at timestamptz NOT NULL DEFAULT now()`
+- `updated_at timestamptz NOT NULL DEFAULT now()`
+- PK: `profiles_pkey(id)`
+- FK: `id -> auth.users(id)`
+
+### `public.school_config`
+- `id uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000'`
+- `school_name text NOT NULL DEFAULT 'INSTITUIÇÃO DE ENSINO'`
+- `address text`
+- `city text`
+- `state text`
+- `cep text`
+- `phone text`
+- `email text`
+- `director_name text`
+- `inep text`
+- `logo_base64 text`
+- `signature_base64 text`
+- `logo_storage_path text` (migration `2026-02-23_school_config_storage_paths.sql`)
+- `certificate_frame_storage_path text` (migration `2026-02-23_school_config_storage_paths.sql`)
+- `theme_color text DEFAULT '#0F172A'`
+- `additional_info text`
+- `created_at timestamptz NOT NULL DEFAULT now()`
+- `updated_at timestamptz NOT NULL DEFAULT now()`
+- PK: `school_config_pkey(id)`
+- Check: linha unica (id fixo)
+
+### `public.students`
+- `id uuid NOT NULL DEFAULT gen_random_uuid()`
+- `owner_id uuid NOT NULL`
+- `class_id uuid NOT NULL`
+- `name text NOT NULL`
+- `birth_date date NOT NULL`
+- `gender text NOT NULL`
+- `enrollment text`
+- `census_id text`
+- `cpf text`
+- `rg text`
+- `photo_url text`
+- `status text NOT NULL DEFAULT 'active'`
+- `created_at timestamptz NOT NULL DEFAULT now()`
+- `updated_at timestamptz NOT NULL DEFAULT now()`
+- PK: `students_pkey(id)`
+- FK: `owner_id -> auth.users(id)`
+- FK: `class_id -> public.classes(id)`
+
+## 4.2 Indexes ativos definidos no repositorio
+- `classes_owner_id_name_key` (unique) em `classes(owner_id, name)`
+- `grades_class_year_quarter_idx` em `grades(class_id, school_year, quarter)`
+- `grades_student_year_quarter_idx` em `grades(student_id, school_year, quarter)`
+- `incidents_type_class_date_idx` em `incidents(incident_type, class_id, date desc)`
+- `incidents_disciplinary_reset_idx` em `incidents(disciplinary_reset_applied, disciplinary_reset_at)`
+- `certificate_events_owner_created_at_idx` em `certificate_events(owner_id, created_at desc)`
+- `certificate_events_type_created_at_idx` em `certificate_events(certificate_type, created_at desc)`
+- `certificate_events_class_created_at_idx` em `certificate_events(class_id, created_at desc)`
+- `certificate_event_students_event_idx` em `certificate_event_students(certificate_event_id)`
+- `certificate_event_students_owner_idx` em `certificate_event_students(owner_id)`
+- `certificate_event_students_verification_code_uidx` (unique) em `certificate_event_students(verification_code)`
+- `certificate_event_students_verification_status_idx` em `certificate_event_students(verification_status)`
+
+## 4.3 Funcoes SQL/RPC (estado atual)
+
+### Funcoes de permissao e RLS
+- `public.current_app_role()`
+  - Resolve role por `profiles.role` (prioritario) ou `authorized_emails.role` por email JWT
+  - `security definer`
+  - `grant execute to authenticated`
+- `public.is_director_of_class(target_class_id uuid)`
+  - Verifica direcao por `classes.director_id` ou `classes.director_email == jwt email`
+  - `security definer`
+  - `grant execute to authenticated`
+- `public.can_manage_incident_class(target_class_id uuid)`
+  - `admin` sempre
+  - `diretor` somente para turma dirigida
+  - `security definer`
+  - `grant execute to authenticated`
+
+### Funcoes de dominio
+- `public.fetch_grades_analytics(class_ids uuid[], student_id uuid, quarter text, school_year smallint) -> jsonb`
+  - Agrega notas para analytics em uma chamada
+- `public.verify_certificate_code(p_code text) -> table(...)`
+  - Publica validacao de certificado por codigo
+  - `security definer`
+  - `grant execute to anon, authenticated`
+- `public.save_certificate_event_atomic(...) -> void`
+  - Atualizacao atomica de evento de certificado e alunos
+  - Apaga/insere alunos dentro da mesma transacao logica da funcao
+  - `security definer`
+  - `grant execute to authenticated`
+- `public.normalize_display_name(input_value text) -> text`
+  - Normaliza nomes para snapshots legiveis
+  - definida em migrations de backfill de criador/validador
+- `public.apply_incident_reset_from_follow_up() -> trigger`
+  - Aplica reset disciplinar em `incidents` quando follow-up com `suspension_applied = true`
+  - garante `disciplinary_reset_at >= incidents.date`
+
+### Funcoes de nomeacao de turma (legado mantido)
+- `public.build_class_name(start_calendar_year, end_calendar_year, series, letter, course)`
+- `public.set_class_name()` (trigger function)
+
+## 4.4 Triggers ativos definidos no repositorio
+- `set_class_name` em `public.classes`
+  - `BEFORE INSERT OR UPDATE`
+  - executa `public.set_class_name()`
+- `trg_follow_ups_apply_incident_reset` em `public.follow_ups`
+  - `AFTER INSERT OR UPDATE OF suspension_applied, date`
+  - executa `public.apply_incident_reset_from_follow_up()`
+
+### Trigger em script auxiliar (nao migration)
+- `set_school_config_updated_at` em `public.school_config`
+  - criado por `supabase/add_school_config.sql`
+  - usa `public.set_updated_at()` (funcao nao versionada neste repositorio)
+
+## 4.5 RLS e policies
+
+### Policies finais explicitamente definidas nas migrations
+
+#### `public.classes`
+- `classes_select_authenticated` (SELECT): authenticated pode ler
+- `classes_insert_admin_only` (INSERT): somente admin e `owner_id = auth.uid()`
+- `classes_update_admin_only` (UPDATE): somente admin
+- `classes_delete_admin_only` (DELETE): somente admin
+
+#### `public.incidents`
+- `incidents_select_authenticated` (SELECT): authenticated pode ler
+- `incidents_insert_open_by_role` (INSERT): role em {admin,diretor,professor} e `owner_id = created_by = auth.uid()`
+- `incidents_update_manage_by_role` (UPDATE): `can_manage_incident_class(class_id)`
+- `incidents_delete_manage_by_role` (DELETE): `can_manage_incident_class(class_id)`
+
+#### `public.follow_ups`
+- `follow_ups_select_authenticated` (SELECT)
+- `follow_ups_insert_manage_by_role` (INSERT): owner/created_by = auth.uid e permissao pela classe da ocorrencia
+- `follow_ups_update_manage_by_role` (UPDATE): permissao pela classe da ocorrencia
+- `follow_ups_delete_manage_by_role` (DELETE): permissao pela classe da ocorrencia
+
+#### `public.comments`
+- `comments_select_authenticated` (SELECT)
+- `comments_insert_manage_by_role` (INSERT): owner + user_id coerente com auth.uid + permissao pela classe da ocorrencia
+- `comments_delete_manage_by_role` (DELETE): permissao pela classe da ocorrencia
+
+#### `public.students`
+- `students_authenticated_access` (ALL): authenticated
+
+#### `public.grades`
+- `grades_authenticated_access` (ALL): authenticated
+
+#### `public.attendance`
+- `attendance_authenticated_access` (ALL): authenticated
+
+#### `public.professional_subject_templates`
+- `professional_subject_templates_authenticated_access` (ALL): authenticated
+
+#### `public.professional_subjects`
+- `professional_subjects_authenticated_access` (ALL): authenticated
+
+#### `public.certificate_events`
+- `certificate_events_select_by_role` (SELECT): admin ou owner
+- `certificate_events_insert_own` (INSERT): owner = auth.uid
+- `certificate_events_update_by_role` (UPDATE): admin ou owner
+- `certificate_events_delete_by_role` (DELETE): admin ou owner
+
+#### `public.certificate_event_students`
+- `certificate_event_students_select_by_role` (SELECT): admin ou owner
+- `certificate_event_students_insert_own` (INSERT): owner = auth.uid
+- `certificate_event_students_update_by_role` (UPDATE): admin ou owner
+- `certificate_event_students_delete_by_role` (DELETE): admin ou owner
+
+#### `storage.objects` para bucket `school-assets`
+- `school_assets_authenticated_select`
+- `school_assets_authenticated_insert`
+- `school_assets_authenticated_update`
+- `school_assets_authenticated_delete`
+- Todas limitadas por `bucket_id = 'school-assets'`
+
+### Policies fora de migrations (script auxiliar)
+- `school_config_authenticated_access` em `public.school_config` (ALL authenticated)
+  - definida em `supabase/add_school_config.sql`
+
+### Observacao importante de rastreabilidade
+As migrations versionadas nao trazem definicoes explicitas de policy para:
+- `public.authorized_emails`
+- `public.profiles`
+- `public.historical_grades`
+- `public.external_assessments`
+
+`supabase_trajectory_tables.sql` (script auxiliar) define policy `Allow all for authenticated` para `historical_grades` e `external_assessments`.
+
+## 4.6 Storage
+
+### Bucket
+- `school-assets`
+- `public = false`
+- `file_size_limit = 5242880` (5MB)
+- `allowed_mime_types = image/png, image/jpeg, image/webp, image/svg+xml`
+
+### Uso no dominio
+- `school_config.logo_storage_path`
+- `school_config.certificate_frame_storage_path`
+
+## 5) Edge Functions (contratos do codigo)
+
+Fonte: `supabase/functions/*`.
+
+### Observacao de seguranca para publicacao
+- Este documento descreve contratos e comportamento.
+- Nao inclui IDs de projeto, URL de ambiente, chaves, versoes operacionais ou timestamps de deploy.
+
+## 5.1 `create-user`
+- Endpoint: `POST/PUT/DELETE /functions/v1/create-user`
+- CORS methods: `POST, OPTIONS, DELETE, PUT`
+- Auth:
+  - exige Bearer token
+  - valida token via `adminClient.auth.getUser(accessToken)`
+  - exige perfil `admin` em `public.profiles`
+- Entrada minima:
+  - `email` obrigatorio e valido para todos os metodos
+  - `name` e `role` usados em `POST`/`PUT`
+
+### Regras por metodo
+- `POST` (criar usuario)
+  - valida duplicidade em `authorized_emails`
+  - tenta criar `auth.users` com `email_confirm: true` e metadata `{name, role}`
+  - NAO usa senha
+  - insere em `authorized_emails (email, role, display_name)`
+  - upsert em `profiles` quando userId disponivel
+  - se email duplicado: retorna `409` com `reason: email_exists`
+- `PUT` (atualizar usuario)
+  - atualiza `authorized_emails.role` e `authorized_emails.display_name`
+  - procura usuario no Auth por email (pagina por pagina)
+  - atualiza `profiles.role` e `profiles.name` quando encontrado
+  - atualiza `auth.users.user_metadata`
+- `DELETE` (remover usuario)
+  - remove usuario de `auth.users` por email (se existir)
+  - remove email de `authorized_emails`
+
+### Status HTTP relevantes
+- `200`: sucesso
+- `400`: payload invalido (`invalid_json`, `invalid_email`, `auth_create_user_failed`)
+- `401`: token ausente/invalido (`missing_bearer_header`, `empty_bearer_token`, `invalid_token`, `user_not_found`)
+- `403`: nao autorizado (nao-admin)
+- `409`: email ja cadastrado (`email_exists`)
+- `500`: falhas internas de DB/ambiente
+
+## 5.2 `send-incident-email`
+- Endpoint: `POST /functions/v1/send-incident-email`
+- CORS methods: `POST, OPTIONS`
+- Dependencias: `nodemailer`
+- Auth:
+  - exige Bearer token
+  - valida token via `adminClient.auth.getUser`
+  - resolve papel por `profiles.role`
+
+### Payload esperado
+- `type`: `new_incident | incident_followup | incident_resolved`
+- `incident.id` obrigatorio
+- Demais campos sao reconciliados com banco antes de enviar
+
+### Validacoes e autorizacao
+- Carrega incidente real por `incident.id`
+- Carrega turma (`classes`) e email do diretor (`director_email`)
+- Permissao para envio:
+  - `admin`: sempre
+  - `diretor`: apenas se for diretor da turma (id ou email)
+  - `professor`: apenas se criador da ocorrencia ou owner da ocorrencia
+
+### Comportamento de envio
+- Monta assunto/corpo com variacao por tipo e por `incident_type`
+- Busca nomes dos alunos por `incident.student_ids`
+- Usa SMTP (`SMTP_*`) e remetente `FROM_EMAIL`
+- Se `APP_URL` existir, inclui CTA para `/acompanhamentos`
+
+### Status HTTP relevantes
+- `200`: enviado com sucesso (`{ ok: true, sent: true, ctaEnabled }`)
+- `400`: payload incompleto ou email diretor nao configurado
+- `401`: nao autenticado
+- `403`: sem permissao
+- `404`: ocorrencia nao encontrada
+- `500`: erro interno/SMTP
+
+## 6) Fluxos criticos do sistema
+
+### 6.1 Gestao de usuarios (`/usuarios`)
+- Frontend chama `create-user` via `fetch` direto no endpoint da function.
+- Token de acesso e renovado automaticamente antes da chamada.
+- Retry automatico em `401` com `refreshSession`.
+- Erro de duplicidade de email retorna para a UI com mensagem e `reason`.
+
+### 6.2 Certificados
+- Criacao/edicao de evento com alunos usa RPC `save_certificate_event_atomic`.
+- Se RPC nao existir no ambiente, frontend cai em fallback legado (update + inserts/deletes separados).
+- Verificacao publica de certificado usa RPC `verify_certificate_code` (anon permitido).
+
+### 6.3 Incidentes e reset disciplinar
+- `follow_ups.suspension_applied = true` aciona trigger para marcar reset em `incidents`.
+- Data de reset sempre protegida para nao ficar anterior a data da ocorrencia.
+- Scope de inferencia retroativa corrigido para incidentes disciplinares apenas.
+
+## 7) Scripts SQL auxiliares e observacoes de operacao
+
+### 7.1 Scripts auxiliares fora de migrations
+- `supabase/add_school_config.sql`
+  - cria `school_config`
+  - habilita RLS e policy authenticated
+  - cria trigger `set_school_config_updated_at`
+- `supabase_trajectory_tables.sql`
+  - cria/ajusta `historical_grades` e `external_assessments`
+  - habilita RLS e policy authenticated nessas tabelas
+
+### 7.2 Scripts de validacao
+- `supabase/tests/rls_smoke_test.sql` (smoke test de RLS para classes/incidents/follow_ups/comments)
+- `supabase/manual/certificates_schema_healthcheck.sql` (healthcheck de schema de certificados)
+
+## 8) Pontos de atencao de rastreabilidade
+- `supabase/schema.sql` e declarado como "for context only" e nao contem todo o historico de RLS/funcoes/triggers.
+- O estado final do banco depende de:
+  - aplicacao completa das migrations em ordem
+  - execucao dos scripts auxiliares quando o ambiente foi criado com esse fluxo
+- Nao existe `supabase/config.toml` versionado neste repositorio.
 
 ---
 
-## 1) Visao geral do produto
-O MAVIC e uma SPA React para gestao escolar com foco operacional e analitico.
-
-Cobertura funcional principal:
-- Gestao de turmas e estudantes.
-- Lancamento/importacao de notas.
-- Registro e acompanhamento de ocorrencias.
-- Relatorios (integrados, slides, certificados).
-- Trajetoria academica longitudinal.
-- Analytics escolar com processamento pesado em worker.
-
-Back-end:
-- Supabase Auth + Postgres + RLS + Realtime + Edge Functions.
-
----
-
-## 2) Arquitetura atual
-
-### 2.1 Stack
-- Frontend: `React 18`, `TypeScript`, `Vite`.
-- UI: `Tailwind`, `shadcn/ui`, `Radix`, `lucide-react`.
-- Estado remoto: hooks custom em `src/hooks/useData.ts`.
-- Estado global de UI/form: `Zustand` (`useUIStore`, `useDataStore`, `useFormStore`).
-- Banco e auth: `@supabase/supabase-js`.
-- PDF e exportacoes: `pdfmake`, `jsPDF`, `html2canvas`, `jszip`, `qrcode`.
-- Graficos: `Recharts`.
-- Script headless de relatorio: `Puppeteer`.
-
-### 2.2 Fluxo de alto nivel
-```mermaid
-flowchart LR
-  U[Usuario] --> SPA[React SPA]
-  SPA --> ROUTER[React Router]
-  SPA --> HOOKS[Hooks de dominio e dados]
-  HOOKS --> SB[(Supabase Postgres)]
-  SPA --> AUTH[Supabase Auth]
-  SB --> RLS[RLS + Policies]
-  SPA --> EDGE[Edge Functions]
-  SPA --> WORKER[Web Worker Analytics]
-  WORKER --> CACHE[IndexedDB]
-```
-
-### 2.3 Caracteristicas arquiteturais
-- Aplicacao client-heavy: parte relevante da regra de negocio esta no frontend.
-- Supabase usado como backend transacional e de seguranca (RLS).
-- Realtime em entidades centrais para sincronizacao de tela.
-- Estrategias de cache e dedupe para reduzir custo de fetch.
-
----
-
-## 3) Rotas e telas
-Fonte: `src/App.tsx`
-
-Rotas publicas:
-- `/login`: autenticacao OTP com validacao em `authorized_emails`.
-- `/certificados/verificar`: validacao publica de certificado por codigo/QR.
-- `/certificados/verificar/:codigo`: validacao publica direta por codigo em URL.
-
-Rotas protegidas (dentro de `AppLayout`):
-- `/`: dashboard.
-- `/acompanhamentos`: ocorrencias (rota oficial atual).
-- `/ocorrencias`: redirect legado para `/acompanhamentos`.
-- `/turmas`: gestao de turmas (**admin-only**).
-- `/turmas-arquivadas`: turmas arquivadas (**admin-only**).
-- `/alunos`: gestao de estudantes (**admin-only**).
-- `/notas-frequencia`: pagina de notas (**admin-only**).
-- `/relatorios-integrados`: relatorios integrados.
-- `/slides`: slides de apresentacao.
-- `/certificados`: certificados.
-- `/relatorios`: redirect legado para as rotas novas (query `tab` -> rota dedicada).
-- `/analytics`: painel analitico.
-- `/trajetoria`: visao longitudinal.
-- `/usuarios`: gestao de usuarios (**admin-only**).
-
-Detalhe importante de navegacao:
-- A estrutura de relatorios foi migrada de abas para paginas dedicadas.
-- Compatibilidade legado mantida via redirect de `/relatorios`.
-- Guard de autenticacao (`ProtectedRoute`) preserva destino: usuario sem sessao e redirecionado para `/login?next=<path+query+hash>`.
-- Login aplica sanitizacao de `next` (aceita apenas path interno iniciado por `/`; bloqueia `//`, `http://`, `https://`, `javascript:`; fallback `/`).
-- Deep-link de ocorrencia suportado em `/acompanhamentos`:
-  - `?action=open-incident&incidentId=<uuid>&tab=<info|followup|comments>`
-  - abre o modal da ocorrencia e seleciona aba inicial (ou default por status)
-  - apos consumo, limpa os params com `replace` para evitar reabertura em refresh/back.
-
----
-
-## 4) Modulos funcionais
-
-### 4.1 Dashboard
-- KPIs operacionais gerais.
-- Atalhos de navegacao.
-- Acesso a configuracao escolar (`school_config`).
-- Card de aniversariantes com dialog explorador:
-  - abas `Proximos` e `Passados`
-  - busca por aluno/turma
-  - filtros de janela temporal (30, 90, 365 dias)
-  - calculo de datas em horario de Brasilia
-- Card `Atividade Recente`:
-  - CTA `Ver todas` abre dialog no proprio dashboard.
-  - Escopo por perfil:
-    - `admin`: todas as turmas
-    - `diretor`: apenas turmas dirigidas (`director_id`/`director_email`)
-    - `professor`: card omitido
-- Busca global na TopBar (`Ctrl+K`/`Cmd+K`) com resultados sensiveis a permissao.
-
-### 4.2 Turmas
-- CRUD de turmas.
-- Campos academicos e ciclo (`start_calendar_year`, `end_calendar_year`, `archived`).
-- Vinculo de direcao por `director_id` e/ou `director_email`.
-- Integracao com templates de disciplinas profissionais.
-- Acesso restrito a perfil `admin` (UI + guard de rota).
-
-### 4.3 Alunos
-- CRUD e movimentacao entre turmas.
-- Campos cadastrais completos (matricula, CPF, RG, status etc.).
-- Acesso restrito a perfil `admin` (UI + guard de rota).
-
-### 4.4 Notas
-- Lancamento manual por turma/aluno/disciplina/bimestre.
-- Uso de `upsert` e agregacoes para analytics.
-- Importacao via parser SIGE.
-- Acesso restrito a perfil `admin` (UI + guard de rota).
-
-### 4.5 Ocorrencias
-- Wizard de registro.
-- Severidade calculada e severidade final com justificativa de override.
-- Ciclo de vida: `aberta` -> `acompanhamento` -> `resolvida`.
-- Follow-ups e comentarios estruturados.
-- Regra de reset disciplinar por suspensao:
-  - Checkbox explicito `Suspensao aplicada` no follow-up disciplinar (nao aparece no fluxo familiar).
-  - Se a ocorrencia ja possui reset, o checkbox fica marcado e bloqueado (nao reversivel pela UI).
-  - Ao salvar follow-up com checkbox marcado, `follow_ups.suspension_applied = true`.
-  - Guarda de data na UI: com suspensao marcada, `follow_up.date` nao pode ser anterior a `incident.date`.
-  - Trigger SQL (`apply_incident_reset_from_follow_up`) aplica o reset no proprio fluxo transacional:
-    - `incidents.disciplinary_reset_applied = true`
-    - `incidents.disciplinary_reset_at = greatest(follow_ups.date, incidents.date)` (preservando a data mais recente)
-    - `incidents.disciplinary_reset_inferred = false`
-  - Backfill retroativo de `suspension_applied` foi limitado a ocorrencias disciplinares (removendo marcacoes familiares indevidas).
-  - Migration de guarda corrige legado para impedir `disciplinary_reset_at < incidents.date`.
-  - A contagem disciplinar do aluno considera somente ocorrencias com data estritamente posterior ao ultimo reset no mesmo ano.
-  - O calculo de historico respeita a data da ocorrencia em analise (nao considera incidentes "futuros" em casos retroativos).
-  - Fluxo familiar nao usa reset disciplinar.
-
-### 4.6 Relatorios
-- Relatorios integrados.
-- Slides de apresentacao.
-- Certificados com snapshot persistido + reprocessamento posterior.
-
-### 4.7 Analytics
-- Filtros por serie/turma/disciplina/periodo.
-- Processamento em worker para nao bloquear UI.
-- Cache em IndexedDB.
-- Segmentacao oficial de convivência:
-  - **Convivência Disciplinar**: considera somente `incident_type = disciplinar`.
-  - **Convivência Familiar**: considera somente `incident_type = acompanhamento_familiar`.
-  - A aba de Analytics foi dividida para evitar mistura de contextos.
-  - Sem migracao legada: a separacao ocorre por regra de calculo.
-- Contrato de insights (v2026-02):
-  - Insights de convivência são exibidos em bloco unico por aba (sem duplicacao entre componentes).
-  - Geração baseada em regras acionáveis (pendências críticas, concentração grave, turma fora da curva, piora de tendência).
-  - Coleções de insights são deduplicadas por chave semântica e ordenadas por prioridade.
-  - “Destaques Importantes” do dashboard usa política de evidência mínima para crescimento/queda.
-
-### 4.8 Trajetoria academica
-- Cruzamento de notas regulares, historicas e externas.
-- Leitura longitudinal por aluno/turma.
-
-### 4.9 Usuarios
-- Gestao de acessos e papeis com suporte por Edge Function.
-
----
-
-## 5) Estado e sincronizacao
-
-### 5.1 `useData` (core)
-Arquivo: `src/hooks/useData.ts`
-
-Responsabilidades:
-- Fetch e mutacoes das entidades principais (`classes`, `students`, `grades`, `incidents`, etc.).
-- Realtime subscriptions.
-- Cache em memoria e dedupe de requests concorrentes.
-- RPC de analytics (`fetch_grades_analytics`) quando aplicavel.
-
-### 5.2 Stores Zustand
-- `src/stores/useUIStore.ts`: persistencia de filtros e abas por pagina.
-- `src/stores/useDataStore.ts`: estado de dados compartilhados.
-- `src/stores/useFormStore.ts`: persistencia de formularios.
-
-### 5.3 Convencoes
-- Filtros e tabs persistidos em `localStorage`.
-- UI default em portugues (`document.documentElement.lang = 'pt-BR'` em `src/main.tsx`).
-
----
-
-## 6) Certificados (estado atual detalhado)
-
-### 6.1 Tipos suportados
-- `monitoria`
-- `destaque`
-- `evento_participacao`
-- `evento_organizacao`
-
-### 6.2 Fluxo de geracao (Dialog Unificado)
-Arquivos principais:
-- `src/components/reports/CertificatesReports.tsx` (pagina host)
-- `src/components/reports/certificates/UnifiedCertificateDialog.tsx` (dialog unico multi-step)
-- `src/components/reports/certificates/CertificateDialogStepper.tsx` (stepper visual)
-- `src/components/reports/certificates/steps/CertificateContextStep.tsx` (etapa: turma e parametros)
-- `src/components/reports/certificates/steps/CertificateFinishStep.tsx` (etapa: assinatura e padrao visual)
-- `src/components/reports/certificates/CertificateTextEditor.tsx` (editor de texto base + overrides)
-- `src/components/reports/certificates/StudentsSelector.tsx` (selecao de alunos)
-
-Fluxo multi-step:
-1. **Tipo**: usuario escolhe entre Monitoria, Destaque, Evento Participacao ou Evento Organizacao.
-2. **Contexto**: seleciona turma, periodo (bimestres ou anual), referencia (disciplina/area), dados do evento/monitoria.
-3. **Alunos**: selecao dos destinatarios.
-4. **Texto**: previa e edicao do template com override por aluno.
-5. **Exportar**: configuracao de assinatura, padrao visual da faixa lateral e download.
-
-Ao confirmar:
-- Salva snapshot (`certificate_events` + `certificate_event_students`) via `onSaveEvent`.
-- Codigos de verificacao sao gerados e associados a cada aluno.
-- Dispara download do PDF (unico ou ZIP individual).
-
-### 6.3 Layout do PDF
-Arquivo central: `src/lib/certificatePdfExport.ts`
-
-Layout paisagem com camadas:
-1. **Fundo branco** (`#F8FAFC`)
-2. **Faixa lateral esquerda** (140px, cor da escola via `school_config.theme_color`)
-3. **Padrao SVG geometrico** sobre a faixa (3 opcoes selecionaveis pelo usuario):
-   - `chevrons`: linhas em V repetidas (corporativo)
-   - `hexagons`: grid de hexagonos wireframe (tech/moderno)
-   - `diagonal_lines`: riscos finos a 45 graus (minimalista)
-4. **Gradiente de profundidade** vertical sobre a faixa
-5. **Moldura lateral opcional** (asset da escola em `school-assets`, aplicado apenas na faixa esquerda)
-6. **Header**: logo da escola ao lado do titulo "CERTIFICADO DE [TIPO]"
-7. **Corpo**: nome do aluno, texto do certificado, data de emissao
-8. **Assinaturas**: cursiva digital acima da linha, nome impresso e subtitulo abaixo
-9. **QR Code**: selo de verificacao no canto superior direito, codigo discreto em fonte 6px
-
-Capacidades de export:
-- Geracao por aluno (`generateCertificateFiles`).
-- Geracao de PDF unico com varias paginas (`generateCombinedCertificatePdf`).
-- Download individual/ZIP (`downloadCertificateFiles`, `downloadCombinedCertificatePdf`).
-- Uso de: logo, moldura lateral (opcional), assinatura da direcao, assinatura do professor, QR + codigo por aluno.
-
-### 6.4 Templates de texto
-Arquivo: `src/lib/certificateTemplates.ts`
-
-Cada tipo tem template com placeholders (`{{aluno}}`, `{{turma}}`, `{{periodo}}`, `{{referencia}}`, etc.).
-Escolha de referencia usa `src/lib/certificateRules.ts` para resolver disciplinas e areas por turma.
-Periodos formatados por `src/lib/certificatePeriods.ts` (inclui ano corrente automatico).
-
-### 6.5 Lista de certificados salvos
-Arquivos:
-- `src/components/reports/certificates/SavedCertificateEventsTable.tsx`
-- `src/components/reports/certificates/SavedCertificateEventDialog.tsx`
-- `src/hooks/useCertificateEvents.ts`
-
-Capacidades:
-- Busca, filtro por tipo, selecao multipla.
-- Download por evento, por aluno, por subconjunto e em lote (ZIP unico com pastas por evento).
-- Exclusao definitiva com confirmacao.
-
-### 6.6 Verificacao publica
-- Rota: `/certificados/verificar`
-- Fonte: `src/pages/CertificateVerification.tsx`
-- Backend: RPC `public.verify_certificate_code(p_code text)`
-- Resultado esperado: status (`valid`/`revoked`) + dados essenciais do certificado.
-
-### 6.7 Pre-requisito de schema para QR (obrigatorio)
-Para o fluxo atual (sem legado), certificados dependem de:
-- Coluna `verification_code` em `public.certificate_event_students`.
-- Coluna `verification_status` em `public.certificate_event_students`.
-- Funcao `public.verify_certificate_code(text)`.
-
-Migration obrigatoria:
-- `supabase/migrations/2026-02-22_certificate_verification_and_signature.sql`
-
-Sintoma de ambiente desatualizado:
-- Erro `Could not find the 'verification_code' column of 'certificate_event_students' in the schema cache`.
-
-Checklist rapido de troubleshooting:
-1. Aplicar migrations incrementais em ordem no SQL Editor (nao apenas `schema.sql`).
-2. Executar `NOTIFY pgrst, 'reload schema';`.
-3. Confirmar colunas e indices em `information_schema.columns` e `pg_indexes`.
-4. Validar RPC `public.verify_certificate_code`.
-
----
-
-## 7) Banco de dados Supabase (visao profunda)
-
-Fonte principal consolidada:
-- `supabase/schema.sql`
-- `supabase/migrations/*.sql`
-
-### 7.1 Catalogo de tabelas por dominio
-
-#### Acesso e identidade
-
-`public.authorized_emails`
-- PK: `email`
-- Campos: `role`, `created_at`
-- Uso: whitelist para login OTP e fallback de role.
-
-`public.profiles`
-- PK/FK: `id` -> `auth.users(id)`
-- Campos: `name`, `role`, timestamps
-- Uso: perfil principal da aplicacao.
-
-#### Estrutura escolar e cadastro
-
-`public.classes`
-- PK: `id`
-- FK: `owner_id` -> `auth.users`, `director_id` -> `profiles`
-- Campos centrais:
-  - identidade da turma: `name`, `series`, `letter`, `course`
-  - direcao: `director_id`, `director_email`
-  - ciclo: `start_year`, `current_year`, `start_calendar_year`, `end_calendar_year`
-  - estado: `active`, `archived`, `archived_at`, `archived_reason`
-
-`public.students`
-- PK: `id`
-- FK: `owner_id` -> `auth.users`, `class_id` -> `classes`
-- Campos centrais: `name`, `birth_date`, `gender`, `enrollment`, `cpf`, `rg`, `status`.
-
-`public.school_config`
-- PK fixa singleton: `id = 00000000-0000-0000-0000-000000000000`
-- Campos centrais: identidade escolar, contato, diretor, logo, assinatura, cor tema.
-- Assets de identidade visual:
-  - `logo_storage_path` (Supabase Storage privado, bucket `school-assets`)
-  - `certificate_frame_storage_path` (moldura lateral de certificados)
-  - Fallback legado de logo em `logo_base64` para compatibilidade.
-
-#### Academico
-
-`public.grades`
-- PK: `id`
-- FKs: `owner_id`, `student_id`, `class_id`
-- Checks:
-  - `school_year` entre 1 e 3
-  - `grade` entre 0 e 10
-- Campos: `subject`, `quarter`, `observation`, timestamps.
-
-`public.attendance`
-- PK: `id`
-- FKs: `owner_id`, `student_id`, `class_id`, `recorded_by`
-- Check `status`: `presente|falta|falta_justificada|atestado`.
-
-`public.professional_subject_templates`
-- PK: `id`
-- FK: `owner_id`
-- Campos: `name`, `course`, `subjects_by_year (jsonb)`.
-
-`public.professional_subjects`
-- PK: `id`
-- FK: `owner_id`, `class_id`
-- Campos: `subject`.
-
-#### Ocorrencias
-
-`public.incidents`
-- PK: `id`
-- FKs: `owner_id`, `class_id`, `validated_by`, `created_by`
-- Campos centrais:
-  - `incident_type`: `disciplinar|acompanhamento_familiar`
-  - `student_ids (uuid[])`, `episodes (text[])`
-  - severidades calculada/final
-  - `status`: `aberta|acompanhamento|resolvida`
-  - reset disciplinar:
-    - `disciplinary_reset_applied` (bool)
-    - `disciplinary_reset_at` (date)
-    - `disciplinary_reset_inferred` (bool, marca backfill por inferencia)
-
-`public.follow_ups`
-- PK: `id`
-- FKs: `owner_id`, `incident_id`, `created_by`
-- Check `type`: `conversa_individual|conversa_pais|situacoes_diversas`.
-- Campo adicional:
-  - `suspension_applied` (bool) para marcar suspensao efetivamente aplicada no follow-up disciplinar.
-
-`public.comments`
-- PK: `id`
-- FKs: `owner_id`, `incident_id`, `user_id`
-- Campos: `user_name`, `text`, `created_at`.
-
-#### Trajetoria longitudinal
-
-`public.historical_grades`
-- PK: `id`
-- FK: `student_id`
-- Check `grade` entre 0 e 10
-- Campos: `school_level`, `grade_year`, `calendar_year`, `quarter`, `subject`, `school_name`.
-
-`public.external_assessments`
-- PK: `id`
-- FK: `student_id`
-- Campos centrais: `assessment_type`, `assessment_name`, `score`, `max_score`, `temporal_position (jsonb)`.
-
-#### Certificados persistidos
-
-`public.certificate_events`
-- PK: `id`
-- FKs: `owner_id` -> `auth.users`, `class_id` -> `classes` (on delete set null)
-- Checks:
-  - `certificate_type` em `monitoria|destaque|evento_participacao|evento_organizacao`
-  - `school_year` entre 1 e 3
-  - `period_mode` em `quarters|annual`
-  - `signature_mode` em `digital_cursive|physical_print`
-  - `students_count >= 0`
-- Campos centrais:
-  - contexto congelado: turma, periodo, referencia
-  - conteudo: `base_text`, `type_meta (jsonb)`
-  - autoria: `created_by_name`, `teacher_name`, `director_name`
-
-`public.certificate_event_students`
-- PK: `id`
-- FKs: `owner_id`, `certificate_event_id` (on delete cascade), `student_id` (on delete set null)
-- Checks:
-  - `highlight_status` em `confirmed|pending`
-  - `verification_status` em `valid|revoked`
-- Campos centrais:
-  - snapshot do aluno: `student_name_snapshot`
-  - customizacao: `text_override`
-  - validacao: `verification_code` unico, `verification_status`
-
-### 7.2 Relacionamentos principais
-```mermaid
-erDiagram
-  AUTH_USERS ||--o{ PROFILES : "id"
-  AUTH_USERS ||--o{ CLASSES : "owner_id"
-  AUTH_USERS ||--o{ STUDENTS : "owner_id"
-  AUTH_USERS ||--o{ GRADES : "owner_id"
-  AUTH_USERS ||--o{ ATTENDANCE : "owner_id"
-  AUTH_USERS ||--o{ INCIDENTS : "owner_id"
-  AUTH_USERS ||--o{ FOLLOW_UPS : "owner_id"
-  AUTH_USERS ||--o{ COMMENTS : "owner_id"
-  AUTH_USERS ||--o{ CERTIFICATE_EVENTS : "owner_id"
-  AUTH_USERS ||--o{ CERTIFICATE_EVENT_STUDENTS : "owner_id"
-
-  CLASSES ||--o{ STUDENTS : "class_id"
-  CLASSES ||--o{ GRADES : "class_id"
-  CLASSES ||--o{ ATTENDANCE : "class_id"
-  CLASSES ||--o{ INCIDENTS : "class_id"
-  CLASSES ||--o{ PROFESSIONAL_SUBJECTS : "class_id"
-  CLASSES ||--o{ CERTIFICATE_EVENTS : "class_id"
-
-  STUDENTS ||--o{ GRADES : "student_id"
-  STUDENTS ||--o{ ATTENDANCE : "student_id"
-  STUDENTS ||--o{ HISTORICAL_GRADES : "student_id"
-  STUDENTS ||--o{ EXTERNAL_ASSESSMENTS : "student_id"
-  STUDENTS ||--o{ CERTIFICATE_EVENT_STUDENTS : "student_id"
-
-  INCIDENTS ||--o{ FOLLOW_UPS : "incident_id"
-  INCIDENTS ||--o{ COMMENTS : "incident_id"
-
-  CERTIFICATE_EVENTS ||--o{ CERTIFICATE_EVENT_STUDENTS : "certificate_event_id"
-```
-
-### 7.3 Funcoes SQL relevantes
-`public.current_app_role()`
-- Resolve role a partir de `profiles` com fallback em `authorized_emails`.
-
-`public.is_director_of_class(target_class_id uuid)`
-- Verifica se usuario atual e diretor da turma.
-
-`public.can_manage_incident_class(target_class_id uuid)`
-- Regra central de permissao para gerenciamento de ocorrencias.
-
-`public.fetch_grades_analytics(class_ids, student_id, quarter, school_year)`
-- Retorna JSON agregado de notas para analytics.
-
-`public.verify_certificate_code(p_code text)`
-- RPC publica (security definer) para validacao de certificado por codigo.
-- Grants: `anon`, `authenticated`.
-
-`public.apply_incident_reset_from_follow_up()`
-- Funcao de trigger para aplicar reset disciplinar em `incidents` quando `follow_ups.suspension_applied = true`.
-- Garante consistencia transacional entre salvamento do follow-up e marco de reset.
-- Guarda semantica de data: `disciplinary_reset_at` nunca pode ficar anterior a `incidents.date` (usa `greatest(new.date, incidents.date)`).
-
-### 7.4 Indices relevantes (migrations recentes)
-- `grades_class_year_quarter_idx`
-- `grades_student_year_quarter_idx`
-- `incidents_type_class_date_idx`
-- `incidents_disciplinary_reset_idx`
-- `certificate_events_owner_created_at_idx`
-- `certificate_events_type_created_at_idx`
-- `certificate_events_class_created_at_idx`
-- `certificate_event_students_event_idx`
-- `certificate_event_students_owner_idx`
-- `certificate_event_students_verification_code_uidx`
-- `certificate_event_students_verification_status_idx`
-
----
-
-## 8) RLS e autorizacao (estado atual)
-
-### 8.1 Regras de papel
-Papeis em uso:
-- `admin`
-- `diretor`
-- `professor`
-
-### 8.2 Matriz resumida de acesso (migracoes recentes)
-
-`classes` (`2026-02-09_z_classes_admin_rls.sql`):
-- `select`: autenticado
-- `insert/update/delete`: apenas `admin` (com `owner_id = auth.uid()` no insert)
-
-`incidents`, `follow_ups`, `comments` (`2026-02-09_incidents_role_rls.sql`):
-- `select`: autenticado
-- `insert`:
-  - incidents: `admin|diretor|professor`, com owner e created_by do proprio usuario
-  - follow_ups/comments: exigem capacidade de gerenciamento da turma via `can_manage_incident_class`
-- `update/delete`: gerenciamento condicionado a `can_manage_incident_class`
-
-`certificate_events` e `certificate_event_students` (`2026-02-21_certificate_events.sql`):
-- `select`: `admin` ve tudo; demais apenas `owner_id = auth.uid()`
-- `insert`: somente proprio owner
-- `update/delete`: `admin` ou dono do registro
-
-### 8.3 Observacao
-- Este documento prioriza politicas explicitamente registradas em migrations recentes do repositorio.
-- Para tabelas com politicas antigas nao documentadas aqui, conferir historico completo de migrations em ambiente Supabase.
-
----
-
-## 9) Migrations relevantes (linha do tempo)
-
-- `2025-01-22_analytics_grades_rpc.sql`
-  - Cria `fetch_grades_analytics`.
-- `2025-01-22_grades_analytics_indexes.sql`
-  - Indices para filtros de analytics de notas.
-- `2026-02-09_incidents_role_rls.sql`
-  - Funcoes de papel e hardening RLS de ocorrencias.
-- `2026-02-09_z_classes_admin_rls.sql`
-  - RLS de turmas restrito a admin para escrita.
-- `2026-02-20_incidents_type.sql`
-  - Introduz `incident_type` + indice.
-- `2026-02-21_certificate_events.sql`
-  - Cria snapshot persistido de certificados + RLS.
-- `2026-02-22_certificate_verification_and_signature.sql`
-  - Adiciona assinatura por modo, codigo de verificacao e RPC publica de validacao.
-- `2026-02-23_school_config_storage_paths.sql`
-  - Adiciona paths de Storage para logo e moldura lateral em `school_config`.
-- `2026-02-23_storage_school_assets_bucket.sql`
-  - Cria/configura bucket privado `school-assets` e policies em `storage.objects`.
-- `2026-02-25_incidents_disciplinary_reset.sql`
-  - Adiciona campos de reset disciplinar em `incidents`.
-  - Cria indice `incidents_disciplinary_reset_idx`.
-- `2026-02-25_z_incidents_disciplinary_reset_hardening.sql`
-  - Adiciona `follow_ups.suspension_applied`.
-  - Cria trigger `trg_follow_ups_apply_incident_reset` com funcao `apply_incident_reset_from_follow_up`.
-  - Endurece inferencia retroativa para reset disciplinar usando evidencias de execucao (`incidents.actions` e `follow_ups.providencias`), removendo falsos positivos baseados apenas em sugestao.
-- `2026-02-25_zz_followups_suspension_scope_fix.sql`
-  - Corrige escopo de inferencia retroativa de `follow_ups.suspension_applied` para disciplinar apenas.
-  - Desmarca `suspension_applied` em follow-ups ligados a ocorrencias nao disciplinares quando houve inferencia textual.
-- `2026-02-25_zzzz_disciplinary_reset_date_guard.sql`
-  - Recria `apply_incident_reset_from_follow_up` com guarda de data (`greatest(follow_ups.date, incidents.date)`).
-  - Corrige registros existentes com reset aplicado e data inconsistente (`disciplinary_reset_at < incidents.date`).
-
----
-
-## 10) Relatorios (detalhes operacionais)
-
-### 10.1 Integrados
-Arquivo: `src/components/reports/IntegratedReports.tsx`
-- Relatorios por aluno/turma/trajetoria.
-- Montagem condicional por aba ativa.
-
-### 10.2 Slides
-Arquivo: `src/components/reports/ClassSlides.tsx`
-- Modos de geracao por recorte (turma, individual, situacao, escola).
-
-### 10.2.1 Tendencia mensal em convivência
-- As series mensais de convivência (disciplinar e familiar) usam `monthLabel` (`MMM/AA`) no eixo X.
-- Motivo: evitar colisoes de rótulo em intervalos que cruzam anos (ex.: Jan/25 vs Jan/26).
-
-### 10.3 Certificados
-Arquivos principais:
-- `src/components/reports/CertificatesReports.tsx`
-- `src/components/reports/certificates/*`
-- `src/hooks/useCertificateEvents.ts`
-- `src/lib/certificateEventTypes.ts`
-- `src/lib/certificatePdfExport.ts`
-- `src/lib/certificateTemplates.ts`
-
-Hardening aplicado:
-- `CertificatesErrorBoundary` evita tela branca no modulo.
-- Dialog de detalhe (`SavedCertificateEventDialog`) blindado para `event = null`.
-
----
-
-## 11) Edge Functions e integracoes
-
-### 11.1 `create-user`
-Arquivo: `supabase/functions/create-user/index.ts`
-- Cria/atualiza/remove usuarios com validacao de role.
-
-### 11.2 `send-incident-email`
-Arquivo: `supabase/functions/send-incident-email/index.ts`
-- Notifica eventos de ocorrencia por SMTP (`new_incident`, `incident_followup`, `incident_resolved`).
-- Exige autenticacao (`Authorization: Bearer <jwt>`); sem token retorna `401`.
-- Valida autorizacao do solicitante no servidor:
-  - `admin`: permitido;
-  - `diretor`: permitido apenas se diretor da turma da ocorrencia (`director_id` ou `director_email`);
-  - `professor`: permitido apenas se for criador/dono da ocorrencia.
-- Resolve destinatario no servidor via `classes.director_email` (nao confia em email vindo do frontend).
-- Reconstroi dados canonicos de ocorrencia/turma/alunos no servidor antes de montar o email.
-- CTA de acesso direto:
-  - URL base via secret `APP_URL` (normalizada sem `/` final);
-  - link: `/acompanhamentos?action=open-incident&incidentId=<id>&tab=<...>`;
-  - `tab` por tipo: `incident_followup -> followup`, `incident_resolved -> info`, `new_incident -> sem tab`.
-- Envia `text` sempre e `html` quando ha CTA.
-- Se `APP_URL` ausente, nao quebra envio: envia sem botao e registra warning em log.
-
----
-
-## 12) Operacao local
-
-### 12.1 Requisitos
-- Node.js compativel com projeto.
-- Env vars:
-  - `VITE_SUPABASE_URL`
-  - `VITE_SUPABASE_ANON_KEY`
-
-### 12.2 Comandos
-- `npm install`
-- `npm run dev`
-- `npm run build`
-- `npm run lint`
-- `npm run preview`
-- `npm run report`
-
-### 12.3 Localizacao e idioma
-- `index.html`: `lang="pt-BR"`
-- `src/main.tsx`: reforco de `document.documentElement.lang = 'pt-BR'`
-
----
-
-## 13) Mapa de arquivos criticos
-
-### 13.1 App shell e rotas
-- `src/App.tsx`
-- `src/main.tsx`
-- `src/components/layout/AppLayout.tsx`
-- `src/pages/Login.tsx`
-- `src/pages/Incidents.tsx`
-
-### 13.2 Dados e estado
-- `src/hooks/useData.ts`
-- `src/hooks/useCertificateEvents.ts`
-- `src/stores/useUIStore.ts`
-- `src/stores/useDataStore.ts`
-- `src/stores/useFormStore.ts`
-- `src/services/supabase/client.ts`
-- `src/lib/incidentActions.ts`
-- `src/lib/emailService.ts`
-
-### 13.3 Relatorios/certificados
-- `src/pages/IntegratedReportsPage.tsx`
-- `src/pages/SlidesPage.tsx`
-- `src/pages/CertificatesPage.tsx`
-- `src/components/reports/IntegratedReports.tsx`
-- `src/components/reports/ClassSlides.tsx`
-- `src/components/reports/CertificatesReports.tsx`
-- `src/components/reports/certificates/UnifiedCertificateDialog.tsx`
-- `src/components/reports/certificates/CertificateDialogStepper.tsx`
-- `src/components/reports/certificates/steps/CertificateContextStep.tsx`
-- `src/components/reports/certificates/steps/CertificateFinishStep.tsx`
-- `src/components/reports/certificates/CertificateTextEditor.tsx`
-- `src/components/reports/certificates/StudentsSelector.tsx`
-- `src/components/reports/certificates/SavedCertificateEventsTable.tsx`
-- `src/components/reports/certificates/SavedCertificateEventDialog.tsx`
-- `src/lib/certificatePdfExport.ts`
-- `src/lib/certificateTemplates.ts`
-- `src/lib/certificatePeriods.ts`
-- `src/lib/certificateRules.ts`
-- `src/lib/certificateEventTypes.ts`
-
-### 13.4 Banco e backend
-- `supabase/schema.sql`
-- `supabase/migrations/*.sql`
-- `supabase/functions/create-user/index.ts`
-- `supabase/functions/send-incident-email/index.ts`
-
----
-
-## 14) Limitacoes e divida tecnica
-- `src/hooks/useData.ts` concentra muita responsabilidade.
-- Alguns modulos ainda grandes (ex.: `ClassSlides`, `StudentTrajectory`).
-- Frequencia existe em banco, mas cobertura funcional na UI segue parcial.
-- Persistencia de snapshot de certificados nao inclui arquivo PDF (somente dados para regeneracao).
-- Dialogs antigos de certificado (`MonitoriaCertificateDialog`, `HighlightCertificateDialog`, `EventCertificateDialog`) foram substituidos pelo `UnifiedCertificateDialog` e podem ser removidos se ainda presentes.
-
----
-
-## 15) Regra de manutencao deste documento
-Sempre que houver alteracao de:
-- schema/migration/policies/RPC,
-- fluxo critico de negocio,
-- contratos publicos de hooks/tipos,
-- rotas e comportamento de telas,
-
-atualizar `SISTEMA.md` no mesmo PR.
-
-Checklist minimo por PR:
-1. Atualizou metadados (`commit`, `data`)?
-2. Atualizou secoes de banco e RLS quando aplicavel?
-3. Atualizou mapa de arquivos impactados?
-4. Registrou riscos/regressoes conhecidos?
+Este documento representa o estado tecnico atual do sistema com base no codigo e SQL versionados no repositorio no momento desta atualizacao.
