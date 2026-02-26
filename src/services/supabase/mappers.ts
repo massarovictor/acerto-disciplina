@@ -105,10 +105,12 @@ export interface IncidentRow {
   status: string;
   validated_by: string | null;
   validated_at: string | null;
+  validated_by_name?: string | null;
   disciplinary_reset_applied?: boolean | null;
   disciplinary_reset_at?: string | null;
   disciplinary_reset_inferred?: boolean | null;
   created_by: string | null;
+  created_by_name?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -341,11 +343,13 @@ export const mapIncidentFromDb = (row: IncidentRow): Incident => ({
   status: row.status as Incident['status'],
   validatedBy: row.validated_by ?? undefined,
   validatedAt: row.validated_at ?? undefined,
+  validatedByName: row.validated_by_name ?? undefined,
   disciplinaryResetApplied: row.disciplinary_reset_applied ?? false,
   disciplinaryResetAt: row.disciplinary_reset_at ?? undefined,
   disciplinaryResetInferred: row.disciplinary_reset_inferred ?? false,
   followUps: [],
-  createdBy: row.created_by ?? '',
+  createdBy: row.created_by ?? row.owner_id ?? '',
+  createdByName: row.created_by_name ?? undefined,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
   comments: [],
@@ -372,10 +376,12 @@ export const mapIncidentToDb = (
   status: data.status,
   validated_by: data.validatedBy ?? null,
   validated_at: data.validatedAt ?? null,
+  validated_by_name: data.validatedByName ?? null,
   disciplinary_reset_applied: data.disciplinaryResetApplied ?? false,
   disciplinary_reset_at: data.disciplinaryResetAt ?? null,
   disciplinary_reset_inferred: data.disciplinaryResetInferred ?? false,
   created_by: createdBy,
+  created_by_name: data.createdByName ?? null,
 });
 
 export const mapIncidentPatchToDb = (
@@ -399,9 +405,11 @@ export const mapIncidentPatchToDb = (
   if (has('status')) payload.status = updates.status;
   if (has('validatedBy')) payload.validated_by = updates.validatedBy ?? null;
   if (has('validatedAt')) payload.validated_at = updates.validatedAt ?? null;
+  if (has('validatedByName')) payload.validated_by_name = updates.validatedByName ?? null;
   if (has('disciplinaryResetApplied')) payload.disciplinary_reset_applied = updates.disciplinaryResetApplied ?? false;
   if (has('disciplinaryResetAt')) payload.disciplinary_reset_at = updates.disciplinaryResetAt ?? null;
   if (has('disciplinaryResetInferred')) payload.disciplinary_reset_inferred = updates.disciplinaryResetInferred ?? false;
+  if (has('createdByName')) payload.created_by_name = updates.createdByName ?? null;
 
   return payload;
 };
@@ -422,7 +430,7 @@ export const mapFollowUpFromDb = (row: FollowUpRow): FollowUpRecord => ({
   descricaoSituacao: row.descricao_situacao ?? undefined,
   nomeResponsavelPai: row.nome_responsavel_pai ?? undefined,
   grauParentesco: row.grau_parentesco ?? undefined,
-  createdBy: row.created_by ?? '',
+  createdBy: row.created_by ?? row.owner_id ?? '',
   createdAt: row.created_at,
 });
 

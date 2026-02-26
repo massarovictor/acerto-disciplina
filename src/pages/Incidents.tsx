@@ -37,6 +37,7 @@ import {
   getIncidentTypeLabel,
   isDisciplinaryIncident,
 } from '@/lib/incidentType';
+import { resolveCreatorDisplayName } from '@/lib/userDisplayName';
 
 const INCIDENT_TABS = new Set(['info', 'followup', 'comments']);
 const UUID_REGEX =
@@ -275,6 +276,39 @@ const Incidents = () => {
             .map((studentId) => studentMap.get(studentId))
             .filter((student): student is NonNullable<typeof student> => Boolean(student));
           const canManage = canManageIncident(incident);
+          const creatorDisplay = resolveCreatorDisplayName({
+            snapshotName: incident.createdByName,
+            profileName:
+              incident.createdBy === user?.id
+                ? profile?.name ||
+                  (typeof user?.user_metadata?.name === 'string'
+                    ? user.user_metadata.name
+                    : '')
+                : '',
+            email:
+              incident.createdBy === user?.id
+                ? user?.email || profile?.email || ''
+                : '',
+            fallback: 'Usuario da equipe',
+          });
+          const resolverDisplay =
+            incident.status === 'resolvida'
+              ? resolveCreatorDisplayName({
+                  snapshotName: incident.validatedByName,
+                  profileName:
+                    incident.validatedBy === user?.id
+                      ? profile?.name ||
+                        (typeof user?.user_metadata?.name === 'string'
+                          ? user.user_metadata.name
+                          : '')
+                      : '',
+                  email:
+                    incident.validatedBy === user?.id
+                      ? user?.email || profile?.email || ''
+                      : '',
+                  fallback: '',
+                })
+              : '';
 
           return (
             <div
@@ -318,6 +352,16 @@ const Incidents = () => {
                     {incident.description}
                   </p>
                 )}
+
+                <p className="text-xs text-muted-foreground mt-1">
+                  <span className="font-medium">Criado por:</span> {creatorDisplay}
+                </p>
+                {incident.status === 'resolvida' && resolverDisplay.trim() ? (
+                  <p className="text-xs text-muted-foreground">
+                    <span className="font-medium">Resolvida por:</span>{' '}
+                    {resolverDisplay}
+                  </p>
+                ) : null}
               </div>
 
               <div className="flex gap-2 self-center ml-2">

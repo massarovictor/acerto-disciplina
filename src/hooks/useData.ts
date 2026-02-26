@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/services/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/stores/useDataStore";
@@ -38,6 +38,7 @@ import {
   mapTemplateToDb,
 } from "@/services/supabase/mappers";
 import { perfTimer } from "@/lib/perf";
+import { resolveCreatorDisplayName } from "@/lib/userDisplayName";
 
 const logError = (scope: string, error: unknown) => {
   console.error(`[Supabase:${scope}]`, error);
@@ -1496,7 +1497,7 @@ export function useAttendance() {
 export function useIncidents() {
   const { user, profile } = useAuth();
 
-  // ✅ Usando store global para estado compartilhado entre componentes
+  // âœ… Usando store global para estado compartilhado entre componentes
   const classes = useDataStore((state) => state.classes);
   const incidents = useDataStore((state) => state.incidents);
   const setIncidents = useDataStore((state) => state.setIncidents);
@@ -1532,7 +1533,7 @@ export function useIncidents() {
       return metadataRole;
     }
 
-    // Compatibilidade: perfis legados com papel inválido se comportam como professor.
+    // Compatibilidade: perfis legados com papel invÃ¡lido se comportam como professor.
     return user?.id ? "professor" : undefined;
   };
 
@@ -1563,7 +1564,7 @@ export function useIncidents() {
   const getIncidentOrThrow = (incidentId: string) => {
     const incident = incidents.find((item) => item.id === incidentId);
     if (!incident) {
-      const notFoundError = new Error("Ocorrência não encontrada.");
+      const notFoundError = new Error("OcorrÃªncia nÃ£o encontrada.");
       logError("incidents.lookup", notFoundError);
       throw notFoundError;
     }
@@ -1573,7 +1574,7 @@ export function useIncidents() {
   const assertCanManageIncident = (incident: Incident) => {
     if (!canManageIncident(incident)) {
       const permissionError = new Error(
-        "Sem permissão para gerenciar esta ocorrência.",
+        "Sem permissÃ£o para gerenciar esta ocorrÃªncia.",
       );
       logError("incidents.permission", permissionError);
       throw permissionError;
@@ -1583,7 +1584,7 @@ export function useIncidents() {
   const assertCanCreateIncident = () => {
     const role = getCurrentRole();
     if (!role) {
-      const permissionError = new Error("Perfil sem permissão para criar ocorrência.");
+      const permissionError = new Error("Perfil sem permissÃ£o para criar ocorrÃªncia.");
       logError("incidents.permission", permissionError);
       throw permissionError;
     }
@@ -1730,7 +1731,24 @@ export function useIncidents() {
     assertCanCreateIncident();
 
     const { followUps, comments, ...incidentData } = incident;
-    const payload = mapIncidentToDb(incidentData, user.id, user.id);
+    const createdByNameSnapshot = resolveCreatorDisplayName({
+      snapshotName: incidentData.createdByName,
+      profileName:
+        profile?.name ||
+        (typeof user.user_metadata?.name === "string"
+          ? user.user_metadata.name
+          : ""),
+      email: user.email,
+      fallback: "Usuario",
+    });
+    const payload = mapIncidentToDb(
+      {
+        ...incidentData,
+        createdByName: createdByNameSnapshot,
+      },
+      user.id,
+      user.id,
+    );
 
     const { data, error } = await supabase
       .from("incidents")
@@ -1744,7 +1762,7 @@ export function useIncidents() {
     }
 
     const newIncident = mapIncidentFromDb(data);
-    storeAddIncident(newIncident); // ✅ Atualiza store global - todos os componentes veem
+    storeAddIncident(newIncident); // âœ… Atualiza store global - todos os componentes veem
     return newIncident;
   };
 
@@ -1769,13 +1787,13 @@ export function useIncidents() {
     }
     if (!data) {
       const updateError = new Error(
-        "Ocorrência não encontrada ou sem permissão para atualização.",
+        "OcorrÃªncia nÃ£o encontrada ou sem permissÃ£o para atualizaÃ§Ã£o.",
       );
       logError("incidents.update", updateError);
       throw updateError;
     }
 
-    storeUpdateIncident(id, updates); // ✅ Atualiza store global
+    storeUpdateIncident(id, updates); // âœ… Atualiza store global
   };
 
   const deleteIncident = async (id: string) => {
@@ -1795,12 +1813,12 @@ export function useIncidents() {
     }
     if (!data) {
       const deleteError = new Error(
-        "Ocorrência não encontrada ou sem permissão para exclusão.",
+        "OcorrÃªncia nÃ£o encontrada ou sem permissÃ£o para exclusÃ£o.",
       );
       logError("incidents.delete", deleteError);
       throw deleteError;
     }
-    storeDeleteIncident(id); // ✅ Atualiza store global
+    storeDeleteIncident(id); // âœ… Atualiza store global
   };
 
   const addFollowUp = async (
@@ -1859,7 +1877,7 @@ export function useIncidents() {
       savedFollowUp = mapFollowUpFromDb(data);
     }
 
-    // Otimização: Atualizar store local imediatamente sem refetch total
+    // OtimizaÃ§Ã£o: Atualizar store local imediatamente sem refetch total
     const currentIncidents = useDataStore.getState().incidents;
     const incidentToUpdate = currentIncidents.find(i => i.id === incidentId);
 
@@ -1899,7 +1917,7 @@ export function useIncidents() {
 
       storeUpdateIncident(incidentId, incidentUpdates);
     } else {
-      // Fallback se não encontrar no store (improvável)
+      // Fallback se nÃ£o encontrar no store (improvÃ¡vel)
       await fetchIncidents(true);
     }
   };
@@ -1912,7 +1930,7 @@ export function useIncidents() {
     const payload = mapCommentToDb(
       {
         userId: user.id,
-        userName: user.email ?? "Usuário",
+        userName: user.email ?? "UsuÃ¡rio",
         text,
       },
       incidentId,
@@ -1932,7 +1950,7 @@ export function useIncidents() {
 
     const savedComment = mapCommentFromDb(data);
 
-    // Otimização: Atualizar store
+    // OtimizaÃ§Ã£o: Atualizar store
     const currentIncidents = useDataStore.getState().incidents;
     const incidentToUpdate = currentIncidents.find(i => i.id === incidentId);
 
@@ -2305,7 +2323,7 @@ export function useArchivedClasses() {
 }
 
 // ========================
-// Historical Grades Hook (6º-9º ano Fundamental)
+// Historical Grades Hook (6Âº-9Âº ano Fundamental)
 // ========================
 
 const mapHistoricalGradeFromDb = (row: any): HistoricalGrade => ({
@@ -2727,7 +2745,7 @@ export function useHistoricalGrades() {
 }
 
 // ========================
-// External Assessments Hook (SAEB, SIGE, Diagnósticas)
+// External Assessments Hook (SAEB, SIGE, DiagnÃ³sticas)
 // ========================
 
 const mapExternalAssessmentFromDb = (row: any): ExternalAssessment => ({
@@ -3042,3 +3060,5 @@ export function useExternalAssessments() {
     getStudentExternalAssessments,
   };
 }
+
+

@@ -8,7 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useCertificateEvents } from '@/hooks/useCertificateEvents';
 import {
@@ -43,7 +42,6 @@ const CertificatesReportsContent = ({
   students,
   createRequestNonce,
 }: CertificatesReportsProps) => {
-  const { profile } = useAuth();
   const { toast } = useToast();
 
   const {
@@ -75,7 +73,6 @@ const CertificatesReportsContent = ({
     });
   }, [events, editingEvent?.id]);
 
-  const isAdmin = profile?.role === 'admin';
   const schemaIncompatible = schemaStatus === 'incompatible';
   const schemaBlockMessage = schemaErrorMessage || CERTIFICATES_SCHEMA_BLOCK_REASON;
 
@@ -286,7 +283,6 @@ const CertificatesReportsContent = ({
           events={events}
           loading={loading}
           error={schemaIncompatible ? null : error}
-          isAdmin={isAdmin}
           actionsDisabled={schemaIncompatible}
           actionsDisabledReason={schemaBlockMessage}
           onEditEvent={(event) => {

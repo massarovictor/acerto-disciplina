@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   CertificateEventRow,
@@ -12,6 +12,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/services/supabase";
 import { SavedCertificateEvent } from "@/types";
+import { resolveCreatorDisplayName } from "@/lib/userDisplayName";
 
 const CERTIFICATE_EVENTS_SELECT = "*, certificate_event_students(*)";
 const CERTIFICATES_SCHEMA_MIGRATION_FILE =
@@ -153,13 +154,18 @@ export const useCertificateEvents = (): UseCertificateEventsResult => {
   const [schemaErrorMessage, setSchemaErrorMessage] = useState<string | null>(null);
 
   const createdByName = useMemo(
-    () => profile?.name || user?.email?.split("@")[0] || "Usuário",
+    () =>
+      resolveCreatorDisplayName({
+        profileName: profile?.name,
+        email: user?.email,
+        fallback: "Usuario",
+      }),
     [profile?.name, user?.email],
   );
 
   const markSchemaIncompatible = useCallback((cause?: unknown) => {
     if (cause) {
-      console.error("Schema incompatível para certificados detectado:", cause);
+      console.error("Schema incompatÃ­vel para certificados detectado:", cause);
     }
     setSchemaStatus("incompatible");
     setSchemaErrorMessage(CERTIFICATES_SCHEMA_OUTDATED_MESSAGE);
@@ -247,7 +253,7 @@ export const useCertificateEvents = (): UseCertificateEventsResult => {
       }
 
       if (!user?.id) {
-        throw new Error("Usuário não autenticado.");
+        throw new Error("UsuÃ¡rio nÃ£o autenticado.");
       }
 
       const normalizedStudents = normalizeSavedCertificateStudents(input.students);
@@ -320,7 +326,7 @@ export const useCertificateEvents = (): UseCertificateEventsResult => {
 
         if (rollbackError) {
           console.error(
-            "Falha no rollback de certificate_events após erro em certificate_event_students:",
+            "Falha no rollback de certificate_events apÃ³s erro em certificate_event_students:",
             rollbackError,
           );
         }
@@ -387,7 +393,7 @@ export const useCertificateEvents = (): UseCertificateEventsResult => {
       }
 
       if (!user?.id) {
-        throw new Error("Usuário não autenticado.");
+        throw new Error("UsuÃ¡rio nÃ£o autenticado.");
       }
 
       const normalizedStudents = normalizeSavedCertificateStudents(updates.students);
@@ -404,7 +410,7 @@ export const useCertificateEvents = (): UseCertificateEventsResult => {
       if (currentError || !currentData) {
         const resolved = resolveCertificateOperationError(
           currentError,
-          "Não foi possível carregar o evento antes da atualização.",
+          "NÃ£o foi possÃ­vel carregar o evento antes da atualizaÃ§Ã£o.",
         );
         if (resolved.schemaIncompatible) {
           markSchemaIncompatible(currentError);
@@ -676,7 +682,7 @@ export const useCertificateEvents = (): UseCertificateEventsResult => {
         if (deleteStudentsError) {
           const resolved = resolveCertificateOperationError(
             deleteStudentsError,
-            "Falha ao remover alunos não selecionados.",
+            "Falha ao remover alunos nÃ£o selecionados.",
           );
           if (resolved.schemaIncompatible) {
             markSchemaIncompatible(deleteStudentsError);
@@ -709,4 +715,5 @@ export const useCertificateEvents = (): UseCertificateEventsResult => {
     deleteCertificateEvent,
   };
 };
+
 

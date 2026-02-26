@@ -10,6 +10,7 @@ import {
   ExportCertificatesPdfInput,
   HighlightStudentMeta,
 } from "@/lib/certificatePdfExport";
+import { resolveCreatorDisplayName } from "@/lib/userDisplayName";
 
 export interface SavedCertificateHighlightMeta {
   status: "confirmed" | "pending";
@@ -155,7 +156,10 @@ export const mapSavedCertificateEvent = (
   return {
     id: row.id,
     ownerId: row.owner_id,
-    createdByName: row.created_by_name,
+    createdByName: resolveCreatorDisplayName({
+      snapshotName: row.created_by_name,
+      fallback: "Usuario da equipe",
+    }),
     title: row.title,
     certificateType: row.certificate_type,
     classId: row.class_id || undefined,

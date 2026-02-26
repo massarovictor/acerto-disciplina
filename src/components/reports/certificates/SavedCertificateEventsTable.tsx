@@ -23,14 +23,14 @@ import {
 } from '@/components/ui/select';
 import { CERTIFICATE_TYPE_LABEL, CERTIFICATE_TYPE_ORDER } from '@/lib/certificateEventTypes';
 import { formatBrasiliaDateTime } from '@/lib/brasiliaDate';
+import { resolveCreatorDisplayName } from '@/lib/userDisplayName';
 import { SavedCertificateEvent, SavedCertificateType } from '@/types';
-import { Download, Pencil, Search, Trash2 } from 'lucide-react';
+import { Download, ExternalLink, Search, Trash2 } from 'lucide-react';
 
 interface SavedCertificateEventsTableProps {
   events: SavedCertificateEvent[];
   loading: boolean;
   error?: string | null;
-  isAdmin: boolean;
   actionsDisabled?: boolean;
   actionsDisabledReason?: string;
   onEditEvent: (event: SavedCertificateEvent) => void;
@@ -45,7 +45,6 @@ export const SavedCertificateEventsTable = ({
   events,
   loading,
   error,
-  isAdmin,
   actionsDisabled = false,
   actionsDisabledReason,
   onEditEvent,
@@ -209,16 +208,10 @@ export const SavedCertificateEventsTable = ({
                       <span className="font-medium text-foreground/80">
                         {event.classNameSnapshot || 'Turma N/A'}
                       </span>
-                      <span>•</span>
+                      <span>&bull;</span>
                       <span>{event.studentsCount} aluno(s)</span>
-                      <span>•</span>
+                      <span>&bull;</span>
                       <span>{formatBrasiliaDateTime(event.createdAt)}</span>
-                      {isAdmin && event.createdByName ? (
-                        <>
-                          <span>•</span>
-                          <span>por {event.createdByName}</span>
-                        </>
-                      ) : null}
                     </div>
 
                     {event.referenceLabel ? (
@@ -226,6 +219,13 @@ export const SavedCertificateEventsTable = ({
                         Referência: {event.referenceLabel}
                       </p>
                     ) : null}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      <span className="font-medium">Criado por:</span>{' '}
+                      {resolveCreatorDisplayName({
+                        snapshotName: event.createdByName,
+                        fallback: 'Usuario da equipe',
+                      })}
+                    </p>
                   </div>
 
                   <div className="flex gap-2 self-center ml-2">
@@ -242,7 +242,7 @@ export const SavedCertificateEventsTable = ({
                       disabled={actionsDisabled}
                       title="Abrir detalhes"
                     >
-                      <Pencil className="h-4 w-4" />
+                      <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                       <span className="sr-only">Abrir detalhes</span>
                     </Button>
                     <Button
@@ -258,7 +258,7 @@ export const SavedCertificateEventsTable = ({
                       disabled={actionsDisabled || downloadingId === event.id}
                       title="Baixar certificados"
                     >
-                      <Download className="h-4 w-4" />
+                      <Download className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                       <span className="sr-only">Baixar certificados</span>
                     </Button>
                     <Button
@@ -350,3 +350,4 @@ export const SavedCertificateEventsTable = ({
     </>
   );
 };
+

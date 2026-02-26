@@ -17,6 +17,7 @@ import {
   CertificateEventTypeMeta,
 } from '@/lib/certificateEventTypes';
 import { formatBrasiliaDateTime } from '@/lib/brasiliaDate';
+import { resolveCreatorDisplayName } from '@/lib/userDisplayName';
 import { SavedCertificateEvent, SavedCertificateEventStudent } from '@/types';
 import { Download, Pencil, Save, Search, X } from 'lucide-react';
 import { Label } from '@/components/ui/label';
@@ -162,7 +163,12 @@ export const SavedCertificateEventDialog = ({
             </div>
             <div className="rounded-md border p-3">
               <p className="text-xs text-muted-foreground">Autor</p>
-              <p className="text-sm font-medium">{event.createdByName}</p>
+              <p className="text-sm font-medium">
+                {resolveCreatorDisplayName({
+                  snapshotName: event.createdByName,
+                  fallback: 'Usuario da equipe',
+                })}
+              </p>
             </div>
             <div className="rounded-md border p-3">
               <p className="text-xs text-muted-foreground">Assinatura</p>

@@ -58,11 +58,13 @@ export interface Incident {
   status: IncidentStatus;
   validatedBy?: string;
   validatedAt?: string;
+  validatedByName?: string;
   disciplinaryResetApplied?: boolean;
   disciplinaryResetAt?: string;
   disciplinaryResetInferred?: boolean;
   followUps?: FollowUpRecord[];
   createdBy: string;
+  createdByName?: string;
   createdAt: string;
   updatedAt: string;
   comments?: Comment[];

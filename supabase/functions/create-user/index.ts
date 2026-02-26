@@ -10,6 +10,22 @@ const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const allowedRoles = new Set(['admin', 'diretor', 'professor']);
 const normalizeRole = (role: string | undefined) =>
   role && allowedRoles.has(role) ? role : 'professor';
+const formatDisplayNameFromEmail = (email: string) => {
+  const localPart = email.split('@')[0] || '';
+  const normalized = localPart.replace(/[._-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!normalized) return 'Usuario';
+
+  const particles = new Set(['da', 'de', 'do', 'das', 'dos', 'e']);
+  return normalized
+    .split(' ')
+    .filter(Boolean)
+    .map((token, index) => {
+      const lower = token.toLowerCase();
+      if (index > 0 && particles.has(lower)) return lower;
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(' ');
+};
 
 const jsonResponse = (body: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -65,8 +81,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Ambiente Supabase nao configurado.' }, 500);
   }
 
-  const authHeader = req.headers.get('Authorization') ?? '';
-
+  const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization') ?? '';
   const userClient = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: authHeader } },
     auth: { persistSession: false },
@@ -75,6 +90,10 @@ Deno.serve(async (req) => {
   const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: { persistSession: false },
   });
+
+  if (!authHeader.trim()) {
+    return jsonResponse({ error: 'Nao autenticado.' }, 401);
+  }
 
   const { data: userData, error: authError } = await userClient.auth.getUser();
   if (authError || !userData.user) {
@@ -113,11 +132,16 @@ Deno.serve(async (req) => {
     const roleToUpdate = normalizeRole(
       typeof payload.role === 'string' ? payload.role : undefined,
     );
+    const nameToUpdate = typeof payload.name === 'string' ? payload.name.trim() : '';
+    const resolvedDisplayName = nameToUpdate || formatDisplayNameFromEmail(email);
 
     // 1. Update authorized_emails
     const { error: updateEmailError } = await adminClient
       .from('authorized_emails')
-      .update({ role: roleToUpdate })
+      .update({
+        role: roleToUpdate,
+        display_name: resolvedDisplayName,
+      })
       .eq('email', email);
 
     if (updateEmailError) {
@@ -129,9 +153,14 @@ Deno.serve(async (req) => {
 
     if (existingUser) {
       // 3. Update public.profiles
+      const profileUpdates: { role: string; name: string } = {
+        role: roleToUpdate,
+        name: resolvedDisplayName,
+      };
+
       const { error: updateProfileError } = await adminClient
         .from('profiles')
-        .update({ role: roleToUpdate })
+        .update(profileUpdates)
         .eq('id', existingUser.id);
 
       if (updateProfileError) {
@@ -139,8 +168,13 @@ Deno.serve(async (req) => {
       }
 
       // 4. Update auth.users metadata (optional but good for consistency)
+      const metadataUpdates: Record<string, string> = {
+        role: roleToUpdate,
+        name: resolvedDisplayName,
+      };
+
       await adminClient.auth.admin.updateUserById(existingUser.id, {
-        user_metadata: { role: roleToUpdate }
+        user_metadata: metadataUpdates,
       });
     }
 
@@ -190,7 +224,7 @@ Deno.serve(async (req) => {
   const name = typeof payload.name === 'string' ? payload.name.trim() : '';
 
   const normalizedRole = normalizeRole(role);
-  const displayName = name || email.split('@')[0];
+  const displayName = name || formatDisplayNameFromEmail(email);
 
   let userId: string | null = null;
   const { data: created, error: createError } = await adminClient.auth.admin.createUser({
@@ -214,7 +248,10 @@ Deno.serve(async (req) => {
 
   const { error: upsertError } = await adminClient
     .from('authorized_emails')
-    .upsert({ email, role: normalizedRole }, { onConflict: 'email' });
+    .upsert(
+      { email, role: normalizedRole, display_name: displayName },
+      { onConflict: 'email' },
+    );
 
   if (upsertError) {
     return jsonResponse({ error: 'Falha ao salvar usuario autorizado.' }, 500);

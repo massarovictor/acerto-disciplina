@@ -37,6 +37,7 @@ import {
   getIncidentTypeLabel,
   isFamilyIncident,
 } from '@/lib/incidentType';
+import { resolveCreatorDisplayName } from '@/lib/userDisplayName';
 import { AddStudentsDialog } from './AddStudentsDialog';
 import { X } from 'lucide-react';
 import {
@@ -452,8 +453,21 @@ export const IncidentManagementDialog = ({
     if (!user || !canResolve) return;
 
     try {
+      const validatedByNameSnapshot = resolveCreatorDisplayName({
+        profileName:
+          profile?.name ||
+          (typeof user.user_metadata?.name === 'string'
+            ? user.user_metadata.name
+            : ''),
+        email: user.email,
+        fallback: '',
+      });
+
       await updateIncident(incident.id, {
         status: 'resolvida',
+        validatedBy: user.id,
+        validatedAt: new Date().toISOString(),
+        validatedByName: validatedByNameSnapshot,
       });
 
       // Enviar email de resolução ao diretor
